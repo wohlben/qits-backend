@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+target/
+dist/
+build/
+.allure/
+allure-results/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Local DB files
+*.db
+*.db-shm
+*.db-wal
+
+# Misc
+.claude/
