@@ -12,7 +12,7 @@ import org.mapstruct.Mapping;
 import java.util.Comparator;
 import java.util.List;
 
-@Mapper(componentModel = "cdi", uses = ActionConfigurationMapper.class)
+@Mapper(componentModel = "jakarta", uses = ActionConfigurationMapper.class)
 public interface FeatureFlowPhaseMapper {
 
     @Mapping(target = "featureFlowConfigurationId", source = "featureFlowConfiguration.id")

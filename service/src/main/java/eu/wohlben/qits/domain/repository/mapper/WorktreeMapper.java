@@ -5,7 +5,7 @@ import eu.wohlben.qits.domain.repository.entity.Worktree;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "cdi")
+@Mapper(componentModel = "jakarta")
 public interface WorktreeMapper {
 
     @Mapping(source = "parent", target = "parent")
