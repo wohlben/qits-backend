@@ -6,6 +6,7 @@ import eu.wohlben.qits.domain.featureflow.mapper.FeatureFlowConfigurationMapper;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
+import eu.wohlben.qits.validation.NotBlankIfPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -76,7 +77,7 @@ public class FeatureFlowConfigurationController {
     }
 
     public static record UpdateFeatureFlowConfigurationRequest(
-        String name
+        @NotBlankIfPresent String name
     ) {
         public record Response(FeatureFlowConfigurationDto featureFlowConfiguration) {}
     }

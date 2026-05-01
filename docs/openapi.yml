@@ -167,6 +167,19 @@ components:
           type: string
     DiscardWorktreeRequest:
       type: object
+    EchoRequest:
+      type: object
+      properties:
+        message:
+          type: string
+    EchoResponse:
+      type: object
+      properties:
+        echo:
+          type: string
+        length:
+          type: integer
+          format: int32
     Entry:
       type: object
       properties:
@@ -522,6 +535,13 @@ components:
       properties:
         featureFlowConfiguration:
           $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+    TraceResponse:
+      type: object
+      properties:
+        traceId:
+          type: string
+        source:
+          type: string
     UpdateActionConfigurationRequest:
       type: object
       properties:
@@ -674,6 +694,78 @@ paths:
       summary: Delete
       tags:
       - Action Configuration Controller
+  /api/context/chain:
+    post:
+      parameters:
+      - name: X-Trace-Id
+        in: header
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceResponse"
+      summary: Chain Trace
+      tags:
+      - Context Propagation Controller
+  /api/context/trace:
+    get:
+      parameters:
+      - name: X-Trace-Id
+        in: header
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceResponse"
+      summary: Get Trace
+      tags:
+      - Context Propagation Controller
+  /api/echo/reactive:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EchoRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EchoResponse"
+        "400":
+          description: Bad Request
+      summary: Echo Reactive Post
+      tags:
+      - Reactive Echo Controller
+  /api/echo/reactive/{message}:
+    get:
+      parameters:
+      - name: message
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EchoResponse"
+      summary: Echo Reactive
+      tags:
+      - Reactive Echo Controller
   /api/feature-flow-configurations:
     get:
       responses:

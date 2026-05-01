@@ -1,0 +1,220 @@
+package eu.wohlben.qits.validation;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+
+@QuarkusTest
+@TestProfile(ValidationTest.TestProfile.class)
+public class ValidationTest {
+
+    public static class TestProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            try {
+                Path tempDir = Files.createTempDirectory("qits-test-repos");
+                return Map.of("qits.repositories.data-dir", tempDir.toString());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private final String fixtureUrl;
+
+    public ValidationTest() throws Exception {
+        fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
+    }
+
+    // --- Create validation ---
+
+    @Test
+    public void createProjectWithBlankNameReturns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "proj-id", "", null
+            ))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(422)))
+            .body("violations.message", hasItem("must not be blank"));
+    }
+
+    @Test
+    public void createProjectWithBlankIdReturns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "", "Name", null
+            ))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(422)))
+            .body("violations.message", hasItem("must not be blank"));
+    }
+
+    @Test
+    public void createFeatureFlowConfigurationWithBlankNameReturns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest(
+                ""
+            ))
+        .when()
+            .post("/api/feature-flow-configurations")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(422)))
+            .body("violations.message", hasItem("must not be blank"));
+    }
+
+    @Test
+    public void createActionConfigurationWithBlankScriptsReturns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest(
+                "act-id", "name", null, "", "check"
+            ))
+        .when()
+            .post("/api/action-configurations")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(422)))
+            .body("violations.message", hasItem("must not be blank"));
+    }
+
+    // --- Update validation (@NotBlankIfPresent) ---
+
+    @Test
+    public void updateProjectWithBlankNameReturns400() {
+        // seed
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "upd-proj", "Original", null
+            ))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(200);
+
+        // update with blank name
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.UpdateProjectRequest(
+                "", null
+            ))
+        .when()
+            .put("/api/projects/upd-proj")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(422)))
+            .body("violations.message", hasItem("must not be blank"));
+    }
+
+    @Test
+    public void updateFeatureFlowPhaseWithBlankNameReturns400() {
+        // seed config
+        String configId = given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest(
+                "config-name"
+            ))
+        .when()
+            .post("/api/feature-flow-configurations")
+        .then()
+            .statusCode(200)
+            .extract().path("featureFlowConfiguration.id");
+
+        // seed phase
+        var phaseId = given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.FeatureFlowPhaseController.CreateFeatureFlowPhaseRequest(
+                configId, "phase-name", null, 0, null
+            ))
+        .when()
+            .post("/api/feature-flow-phases")
+        .then()
+            .statusCode(200)
+            .extract().path("featureFlowPhase.id");
+
+        // update with blank name
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.FeatureFlowPhaseController.UpdateFeatureFlowPhaseRequest(
+                "", null, null, null
+            ))
+        .when()
+            .put("/api/feature-flow-phases/" + phaseId)
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(422)))
+            .body("violations.message", hasItem("must not be blank"));
+    }
+
+    // --- Partial update acceptance (null fields are fine) ---
+
+    @Test
+    public void updateProjectWithNullNameIsAllowed() {
+        // seed
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "partial-proj", "Original", "desc"
+            ))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(200);
+
+        // partial update — only description
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.UpdateProjectRequest(
+                null, "Updated Desc"
+            ))
+        .when()
+            .put("/api/projects/partial-proj")
+        .then()
+            .statusCode(200)
+            .body("project.description", equalTo("Updated Desc"))
+            .body("project.name", equalTo("Original"));
+    }
+
+    @Test
+    public void updateActionConfigurationWithNullFieldsIsAllowed() {
+        // seed
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest(
+                "partial-act", "Original Name", "desc", "exec", "check"
+            ))
+        .when()
+            .post("/api/action-configurations")
+        .then()
+            .statusCode(200);
+
+        // partial update — only description
+        given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.UpdateActionConfigurationRequest(
+                null, "Updated Desc", null, null
+            ))
+        .when()
+            .put("/api/action-configurations/partial-act")
+        .then()
+            .statusCode(200)
+            .body("actionConfiguration.description", equalTo("Updated Desc"))
+            .body("actionConfiguration.name", equalTo("Original Name"));
+    }
+}
