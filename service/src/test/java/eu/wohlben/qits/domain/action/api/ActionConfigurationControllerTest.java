@@ -23,11 +23,11 @@ public class ActionConfigurationControllerTest {
             .post("/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("id", equalTo("ctrl-test"))
-            .body("name", equalTo("Ctrl Action"))
-            .body("description", equalTo("Desc"))
-            .body("executeScript", equalTo("echo run"))
-            .body("checkScript", equalTo("echo required"));
+            .body("actionConfiguration.id", equalTo("ctrl-test"))
+            .body("actionConfiguration.name", equalTo("Ctrl Action"))
+            .body("actionConfiguration.description", equalTo("Desc"))
+            .body("actionConfiguration.executeScript", equalTo("echo run"))
+            .body("actionConfiguration.checkScript", equalTo("echo required"));
 
         // Get
         given()
@@ -36,8 +36,8 @@ public class ActionConfigurationControllerTest {
             .get("/action-configurations/ctrl-test")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("id", equalTo("ctrl-test"))
-            .body("name", equalTo("Ctrl Action"));
+            .body("actionConfiguration.id", equalTo("ctrl-test"))
+            .body("actionConfiguration.name", equalTo("Ctrl Action"));
 
         // List
         given()
@@ -46,7 +46,7 @@ public class ActionConfigurationControllerTest {
             .get("/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("entries.id", hasItem("ctrl-test"));
+            .body("entries.actionConfiguration.id", hasItem("ctrl-test"));
 
         // Update
         given()
@@ -58,10 +58,10 @@ public class ActionConfigurationControllerTest {
             .put("/action-configurations/ctrl-test")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("name", equalTo("Updated Name"))
-            .body("description", equalTo("Updated Desc"))
-            .body("executeScript", equalTo("echo updated"))
-            .body("checkScript", equalTo("echo suggested"));
+            .body("actionConfiguration.name", equalTo("Updated Name"))
+            .body("actionConfiguration.description", equalTo("Updated Desc"))
+            .body("actionConfiguration.executeScript", equalTo("echo updated"))
+            .body("actionConfiguration.checkScript", equalTo("echo suggested"));
 
         // Delete
         given()

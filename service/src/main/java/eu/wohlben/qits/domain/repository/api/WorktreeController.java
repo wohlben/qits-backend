@@ -1,6 +1,8 @@
 package eu.wohlben.qits.domain.repository.api;
 
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
+import eu.wohlben.qits.domain.repository.mapper.WorktreeMapper;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -19,16 +21,19 @@ public class WorktreeController {
     @Inject
     WorktreeService worktreeService;
 
+    @Inject
+    WorktreeMapper worktreeMapper;
+
     public static record CreateWorktreeRequest(@NotBlank String id,
                                                 String parent,
                                                 String branch) {
-        public record Response(String id, String parent) {}
+        public record Response(WorktreeDto worktree) {}
     }
 
     @POST
     public CreateWorktreeRequest.Response create(@PathParam("repoId") String repoId, @Valid CreateWorktreeRequest request) {
         var wt = worktreeService.createWorktree(repoId, request.id(), request.parent(), request.branch());
-        return new CreateWorktreeRequest.Response(wt.worktreeId, wt.parent);
+        return new CreateWorktreeRequest.Response(worktreeMapper.toDto(wt));
     }
 
     public static record MergeWorktreeRequest(String target) {
