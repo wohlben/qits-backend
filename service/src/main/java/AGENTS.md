@@ -13,7 +13,8 @@ eu.wohlben.qits/
   <domain>/             e.g. issue, user, project
     api/                REST boundary — controllers + nested DTO records
     control/            Services — business logic, orchestration
-    entity/             JPA / Panache entities and repositories
+    entity/             JPA / Panache entities and enums
+    persistence/        Panache repositories
     mapper/             MapStruct mappers (omit if no mapping layer needed)
 ```
 
@@ -27,6 +28,8 @@ eu.wohlben.qits.issue/
     IssueService.java
   entity/
     Issue.java
+  persistence/
+    IssueRepository.java
   mapper/
     IssueMapper.java
 ```
@@ -46,29 +49,27 @@ public class IssueController {
     @Inject
     IssueService issueService;
 
-    @GET
-    public ListIssues.Response list() { ... }
-
-    @POST
-    public CreateIssue.Response create(CreateIssue request) { ... }
-
-    @PUT
-    @Path("/{id}")
-    public UpdateIssue.Response update(@PathParam("id") Long id, UpdateIssue request) { ... }
-
-    // ── DTOs ──────────────────────────────────────────────────────────────
-
     public static record ListIssuesRequest() {
         public record Response(List<IssueDto> items) {}
     }
+
+    @GET
+    public ListIssuesRequest.Response list() { ... }
 
     public static record CreateIssueRequest(String title, String description) {
         public record Response(Long id, String title, String description) {}
     }
 
+    @POST
+    public CreateIssueRequest.Response create(CreateIssueRequest request) { ... }
+
     public static record UpdateIssueRequest(String title, String description) {
         public record Response(Long id, String title, String description) {}
     }
+
+    @PUT
+    @Path("/{id}")
+    public UpdateIssueRequest.Response update(@PathParam("id") Long id, UpdateIssueRequest request) { ... }
 
     // Shared projection used across multiple responses would instead go into a dto/* sub-package as a top level record (not nested)
     public record IssueDto(Long id, String title) {}
@@ -99,15 +100,58 @@ public class IssueService {
 }
 ```
 
+## Exception Handling
+
+Services throw **JAX-RS `jakarta.ws.rs` exceptions** for domain-level failures. Quarkus maps these to the correct HTTP responses automatically.
+
+| Exception | Use when |
+|-----------|----------|
+| `NotFoundException` | An expected entity or resource does not exist |
+| `BadRequestException` | Input is invalid or a business rule is violated |
+| `InternalServerErrorException` | An unexpected infrastructure error occurs (e.g., external command failure) |
+
+```java
+public Issue findById(String id) {
+    return issueRepository.findByIdOptional(id)
+        .orElseThrow(() -> new NotFoundException("Issue not found: " + id));
+}
+
+public Issue create(String title) {
+    if (title == null || title.isBlank()) {
+        throw new BadRequestException("title is required");
+    }
+    // ...
+}
+```
+
 ## Entity Pattern
 
-Entities in `<domain>/entity/` use Panache active-record or repository style consistently per domain.
+Entities in `<domain>/entity/` extend `PanacheEntityBase` (custom IDs) or `PanacheEntity` (generated `Long` IDs). Keep entities in `entity/` and repositories in `persistence/`.
 
 ```java
 @Entity
-public class Issue extends PanacheEntity {
+public class Issue extends PanacheEntityBase {
+    @Id
+    public String id;
     public String title;
-    public String description;
+}
+
+@Entity
+public class Comment extends PanacheEntity {
+    public String text;
+}
+```
+
+## Persistence Pattern
+
+Repositories in `<domain>/persistence/` implement `PanacheRepository<T>` (for `PanacheEntity`) or `PanacheRepositoryBase<T, ID>` (for `PanacheEntityBase`).
+
+```java
+@ApplicationScoped
+public class IssueRepository implements PanacheRepositoryBase<Issue, String> {
+    public Optional<Issue> findByTitle(String title) {
+        return find("title", title).firstResultOptional();
+    }
 }
 ```
 
