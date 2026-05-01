@@ -1,7 +1,14 @@
 package eu.wohlben.qits.domain.featureflow.api;
 
+import eu.wohlben.qits.domain.action.control.ActionConfigurationService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;
+import eu.wohlben.qits.domain.featureflow.entity.ActionType;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +17,21 @@ import static org.hamcrest.Matchers.*;
 
 @QuarkusTest
 public class FeatureFlowConfigurationControllerTest {
+
+    @Inject
+    FeatureFlowConfigurationService featureFlowConfigurationService;
+
+    @Inject
+    FeatureFlowPhaseService featureFlowPhaseService;
+
+    @Inject
+    FeatureFlowPhaseStepService featureFlowPhaseStepService;
+
+    @Inject
+    FeatureFlowPhaseActionService featureFlowPhaseActionService;
+
+    @Inject
+    ActionConfigurationService actionConfigurationService;
 
     @Test
     public void testCreateAndGetAndListAndUpdateAndDelete() {
@@ -104,6 +126,137 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
         .when()
             .delete("/feature-flow-configurations/non-existent")
+        .then()
+            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+    }
+
+    @Test
+    public void testGetFullTreeSerialization() {
+        var config = featureFlowConfigurationService.create("End-to-End Flow");
+        var phase = featureFlowPhaseService.create(config.id, "Development", "Dev phase", 0, null);
+        var step = featureFlowPhaseStepService.create(phase.id, "Lint", 0);
+        var action = actionConfigurationService.create(
+            "lint-fe", "Lint Frontend", "Runs eslint", "eslint .", "echo required"
+        );
+        featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, "lint-group");
+
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-configurations/" + config.id)
+        .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .body("featureFlowConfiguration.id", equalTo(config.id))
+            .body("featureFlowConfiguration.name", equalTo("End-to-End Flow"))
+            .body("featureFlowConfiguration.phases.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].id", equalTo(phase.id))
+            .body("featureFlowConfiguration.phases[0].name", equalTo("Development"))
+            .body("featureFlowConfiguration.phases[0].steps.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].steps[0].id", equalTo(step.id))
+            .body("featureFlowConfiguration.phases[0].steps[0].name", equalTo("Lint"))
+            .body("featureFlowConfiguration.phases[0].steps[0].actions.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].steps[0].actions[0].actionConfiguration.id", equalTo(action.id))
+            .body("featureFlowConfiguration.phases[0].steps[0].actions[0].actionType", equalTo("PREREQUISITE"))
+            .body("featureFlowConfiguration.phases[0].steps[0].actions[0].parallelGroup", equalTo("lint-group"));
+    }
+
+    @Test
+    public void testSubPhaseWithStepsAndActions() {
+        var config = featureFlowConfigurationService.create("Sub-Phase Flow");
+        var parent = featureFlowPhaseService.create(config.id, "Development", null, 0, null);
+        var child = featureFlowPhaseService.create(config.id, "Work Package A", null, 0, parent.id);
+        var step = featureFlowPhaseStepService.create(child.id, "Test", 0);
+        var action = actionConfigurationService.create(
+            "test-wp", "Test WP", "Desc", "pytest", "echo required"
+        );
+        featureFlowPhaseActionService.create(step.id, action.id, ActionType.QUALITY_GATE, 0, null);
+
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-configurations/" + config.id)
+        .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .body("featureFlowConfiguration.phases.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].subPhases.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].subPhases[0].id", equalTo(child.id))
+            .body("featureFlowConfiguration.phases[0].subPhases[0].steps.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].name", equalTo("Test"))
+            .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].actions.size()", equalTo(1))
+            .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].actions[0].actionType", equalTo("QUALITY_GATE"));
+    }
+
+    @Test
+    public void testCascadeDeletePhaseRemovesSubPhasesStepsAndActions() {
+        var config = featureFlowConfigurationService.create("Cascade Flow");
+        var phase = featureFlowPhaseService.create(config.id, "Dev", null, 0, null);
+        var step = featureFlowPhaseStepService.create(phase.id, "Build", 0);
+        var action = actionConfigurationService.create(
+            "build-cascade", "Build", "Desc", "mvn build", "echo required"
+        );
+        var link = featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, null);
+
+        // Add a sub-phase with its own step and action
+        var child = featureFlowPhaseService.create(config.id, "Sub-Dev", null, 0, phase.id);
+        var childStep = featureFlowPhaseStepService.create(child.id, "Lint", 0);
+        var childAction = actionConfigurationService.create(
+            "lint-cascade", "Lint", "Desc", "eslint", "echo required"
+        );
+        var childLink = featureFlowPhaseActionService.create(childStep.id, childAction.id, ActionType.PREREQUISITE, 0, null);
+
+        // Delete the parent phase
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .delete("/feature-flow-phases/" + phase.id)
+        .then()
+            .statusCode(Response.Status.OK.getStatusCode());
+
+        // Parent phase should be gone
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-phases/" + phase.id)
+        .then()
+            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+
+        // Parent step should be gone
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-phase-steps/" + step.id)
+        .then()
+            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+
+        // Parent action link should be gone
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-phase-actions/" + link.id)
+        .then()
+            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+
+        // Sub-phase should be gone
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-phases/" + child.id)
+        .then()
+            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+
+        // Sub-phase step should be gone
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-phase-steps/" + childStep.id)
+        .then()
+            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+
+        // Sub-phase action link should be gone
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/feature-flow-phase-actions/" + childLink.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
