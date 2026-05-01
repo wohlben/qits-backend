@@ -4,6 +4,7 @@ import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationServic
 import eu.wohlben.qits.domain.featureflow.dto.FeatureFlowConfigurationDto;
 import eu.wohlben.qits.domain.featureflow.mapper.FeatureFlowConfigurationMapper;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.ws.rs.Consumes;
@@ -21,6 +22,7 @@ import java.util.List;
 @Path("/feature-flow-configurations")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Transactional
 public class FeatureFlowConfigurationController {
 
     @Inject

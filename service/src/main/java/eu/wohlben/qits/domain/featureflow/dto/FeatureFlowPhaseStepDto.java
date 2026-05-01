@@ -2,8 +2,9 @@ package eu.wohlben.qits.domain.featureflow.dto;
 
 import java.util.List;
 
-public record FeatureFlowConfigurationDto(
+public record FeatureFlowPhaseStepDto(
     String id,
     String name,
-    List<FeatureFlowPhaseDto> phases
+    int sortOrder,
+    List<FeatureFlowPhaseActionDto> actions
 ) {}
