@@ -1,8 +1,8 @@
 package eu.wohlben.qits.domain.featureflow.control;
 
-import eu.wohlben.qits.domain.action.entity.ActionConfiguration;
-import eu.wohlben.qits.domain.action.persistence.ActionConfigurationRepository;
+import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
+import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseAction;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.featureflow.persistence.FeatureFlowPhaseActionRepository;

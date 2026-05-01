@@ -3,7 +3,7 @@
 ## Introduction
 
 **Related / Dependent Plans:**
-- [`docs/features/2026-05-01_actions.md`](2026-05-01_actions.md) — Actions are associated with feature-flow *steps* via an `N:N` join that carries ordering and gating metadata.
+- [`docs/features/2026-05-01_actions.md`](2026-05-01_actions.md) — The standalone action domain was merged into feature flow. Action configurations now live under the `featureflow` package and are linked to steps via `FeatureFlowPhaseAction`.
 - [`docs/feature-ideas/feature-flows.md`](../feature-ideas/feature-flows.md) — Future extensions (feature development instances, transition automation) remain in the idea draft.
 
 ## Goals
@@ -60,6 +60,20 @@ An ordered, named step inside a phase. Groups related actions together.
 | `phase` | ref | Owning phase |
 | `actions` | list | Action links belonging to this step |
 
+### ActionConfiguration
+
+Executable task definition merged from the former standalone `action` domain. Reusable across multiple steps and phases.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string (manual) | Primary key (e.g. `lint-frontend`) |
+| `name` | string | Human-readable name |
+| `description` | string (optional) | What the action does |
+| `executeScript` | string | Shell script to run |
+| `checkScript` | string | Shell script that self-reports necessity |
+| `createdAt` | timestamp | |
+| `updatedAt` | timestamp | |
+
 ### FeatureFlowPhaseAction
 
 Join entity between a step and an `ActionConfiguration`. Adds ordering and gating semantics.
@@ -78,9 +92,10 @@ Join entity between a step and an `ActionConfiguration`. Adds ordering and gatin
 | Resource | Path | Operations |
 |----------|------|------------|
 | FeatureFlowConfiguration | `/feature-flow-configurations` | CRUD (now returns phase tree with steps) |
-| FeatureFlowPhase | `/feature-flow-phases` | CRUD + list by `featureFlowConfigurationId` |
-| FeatureFlowPhaseStep | `/feature-flow-phase-steps` | CRUD + list by `phaseId` |
-| FeatureFlowPhaseAction | `/feature-flow-phase-actions` | CRUD + list by `stepId` |
+| FeatureFlowPhase | `/feature-flow-phases` | CRUD + list by `featureFlowConfigurationId` or list all |
+| FeatureFlowPhaseStep | `/feature-flow-phase-steps` | CRUD + list by `phaseId` or list all |
+| FeatureFlowPhaseAction | `/feature-flow-phase-actions` | CRUD + list by `stepId` or list all |
+| ActionConfiguration | `/action-configurations` | CRUD (merged from standalone action domain) |
 
 ## Quality Gate Semantics
 

@@ -1,4 +1,4 @@
-package eu.wohlben.qits.domain.action.api;
+package eu.wohlben.qits.domain.featureflow.api;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;

@@ -1,4 +1,4 @@
-package eu.wohlben.qits.domain.action.dto;
+package eu.wohlben.qits.domain.featureflow.dto;
 
 public record ActionConfigurationDto(
     String id,

@@ -1,6 +1,5 @@
 package eu.wohlben.qits.domain.featureflow.mapper;
 
-import eu.wohlben.qits.domain.action.mapper.ActionConfigurationMapper;
 import eu.wohlben.qits.domain.featureflow.dto.FeatureFlowPhaseActionDto;
 import eu.wohlben.qits.domain.featureflow.dto.FeatureFlowPhaseDto;
 import eu.wohlben.qits.domain.featureflow.dto.FeatureFlowPhaseStepDto;

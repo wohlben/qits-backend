@@ -1,6 +1,6 @@
 package eu.wohlben.qits.domain.featureflow.api;
 
-import eu.wohlben.qits.domain.action.control.ActionConfigurationService;
+import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;

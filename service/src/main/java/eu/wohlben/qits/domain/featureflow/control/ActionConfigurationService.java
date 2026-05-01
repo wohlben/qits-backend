@@ -1,7 +1,7 @@
-package eu.wohlben.qits.domain.action.control;
+package eu.wohlben.qits.domain.featureflow.control;
 
-import eu.wohlben.qits.domain.action.entity.ActionConfiguration;
-import eu.wohlben.qits.domain.action.persistence.ActionConfigurationRepository;
+import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
+import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
