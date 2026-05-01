@@ -1,0 +1,1407 @@
+---
+openapi: 3.1.0
+components:
+  schemas:
+    ActionConfigurationDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        executeScript:
+          type: string
+        checkScript:
+          type: string
+    ActionType:
+      type: string
+      enum:
+      - PREREQUISITE
+      - QUALITY_GATE
+    AssociateRepositoryRequest:
+      type: object
+      required:
+      - repositoryId
+      properties:
+        repositoryId:
+          type: string
+          pattern: \S
+    CloneRepositoryRequest:
+      type: object
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          pattern: \S
+        archetype:
+          $ref: "#/components/schemas/RepositoryArchetype"
+    CreateActionConfigurationRequest:
+      type: object
+      required:
+      - id
+      - name
+      - executeScript
+      - checkScript
+      properties:
+        id:
+          type: string
+          pattern: \S
+        name:
+          type: string
+          pattern: \S
+        description:
+          type: string
+        executeScript:
+          type: string
+          pattern: \S
+        checkScript:
+          type: string
+          pattern: \S
+    CreateFeatureFlowConfigurationRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          pattern: \S
+    CreateFeatureFlowPhaseActionRequest:
+      type: object
+      required:
+      - stepId
+      - actionConfigurationId
+      - actionType
+      - sortOrder
+      properties:
+        stepId:
+          type: string
+          pattern: \S
+        actionConfigurationId:
+          type: string
+          pattern: \S
+        actionType:
+          $ref: "#/components/schemas/ActionType"
+        sortOrder:
+          type: integer
+          format: int32
+        parallelGroup:
+          type: string
+    CreateFeatureFlowPhaseRequest:
+      type: object
+      required:
+      - featureFlowConfigurationId
+      - name
+      - orderIndex
+      properties:
+        featureFlowConfigurationId:
+          type: string
+          pattern: \S
+        name:
+          type: string
+          pattern: \S
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        parentPhaseId:
+          type: string
+    CreateFeatureFlowPhaseStepRequest:
+      type: object
+      required:
+      - phaseId
+      - name
+      - sortOrder
+      properties:
+        phaseId:
+          type: string
+          pattern: \S
+        name:
+          type: string
+          pattern: \S
+        sortOrder:
+          type: integer
+          format: int32
+    CreateProjectRepositoryRequest:
+      type: object
+      required:
+      - id
+      - url
+      properties:
+        id:
+          type: string
+          pattern: \S
+        url:
+          type: string
+          pattern: \S
+        archetype:
+          $ref: "#/components/schemas/RepositoryArchetype"
+    CreateProjectRequest:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          pattern: \S
+        name:
+          type: string
+          pattern: \S
+        description:
+          type: string
+    CreateWorktreeRequest:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          pattern: \S
+        parent:
+          type: string
+        branch:
+          type: string
+    DiscardWorktreeRequest:
+      type: object
+    Entry:
+      type: object
+      properties:
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+    Entry1:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+    Entry2:
+      type: object
+      properties:
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    Entry3:
+      type: object
+      properties:
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    Entry4:
+      type: object
+      properties:
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
+    Entry5:
+      type: object
+      properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+    Entry6:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/ProjectDto"
+    FeatureFlowConfigurationDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phases:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    FeatureFlowPhaseActionDto:
+      type: object
+      properties:
+        id:
+          type: string
+        stepId:
+          type: string
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+        actionType:
+          $ref: "#/components/schemas/ActionType"
+        sortOrder:
+          type: integer
+          format: int32
+        parallelGroup:
+          type: string
+    FeatureFlowPhaseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        featureFlowConfigurationId:
+          type: string
+        parentPhaseId:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
+        subPhases:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    FeatureFlowPhaseStepDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sortOrder:
+          type: integer
+          format: int32
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    MergeWorktreeRequest:
+      type: object
+      properties:
+        target:
+          type: string
+    ProjectDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    PullRepositoryRequest:
+      type: object
+    PushRepositoryRequest:
+      type: object
+    RepositoryArchetype:
+      type: string
+      enum:
+      - SERVICE
+      - SERVICE_TEMPLATE
+      - FORK
+    RepositoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        archetype:
+          $ref: "#/components/schemas/RepositoryArchetype"
+    Response:
+      type: object
+      properties:
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+    Response1:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+    Response10:
+      type: object
+      properties:
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    Response11:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry2"
+    Response12:
+      type: object
+      properties:
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    Response13:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response14:
+      type: object
+      properties:
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    Response15:
+      type: object
+      properties:
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    Response16:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry3"
+    Response17:
+      type: object
+      properties:
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    Response18:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response19:
+      type: object
+      properties:
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    Response2:
+      type: object
+      properties:
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+    Response20:
+      type: object
+      properties:
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
+    Response21:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry4"
+    Response22:
+      type: object
+      properties:
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
+    Response23:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response24:
+      type: object
+      properties:
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
+    Response25:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/ProjectDto"
+    Response26:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry5"
+    Response27:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry6"
+    Response28:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/ProjectDto"
+    Response29:
+      type: object
+      properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+    Response3:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response30:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response31:
+      type: object
+      properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+        projectId:
+          type: string
+    Response32:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/ProjectDto"
+    Response33:
+      type: object
+      properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+        projectId:
+          type: string
+    Response34:
+      type: object
+      properties:
+        output:
+          type: string
+    Response35:
+      type: object
+      properties:
+        output:
+          type: string
+    Response36:
+      type: object
+      properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+    Response37:
+      type: object
+      properties:
+        commitHash:
+          type: string
+        hasConflicts:
+          type: boolean
+        output:
+          type: string
+    Response38:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response39:
+      type: object
+      properties:
+        worktree:
+          $ref: "#/components/schemas/WorktreeDto"
+    Response4:
+      type: object
+      properties:
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+    Response5:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+    Response6:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry1"
+    Response7:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+    Response8:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response9:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+    UpdateActionConfigurationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        executeScript:
+          type: string
+        checkScript:
+          type: string
+    UpdateFeatureFlowConfigurationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+    UpdateFeatureFlowPhaseActionRequest:
+      type: object
+      properties:
+        actionType:
+          $ref: "#/components/schemas/ActionType"
+        sortOrder:
+          type: integer
+          format: int32
+        parallelGroup:
+          type: string
+    UpdateFeatureFlowPhaseRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        orderIndex:
+          type: integer
+          format: int32
+        parentPhaseId:
+          type: string
+    UpdateFeatureFlowPhaseStepRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        sortOrder:
+          type: integer
+          format: int32
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    WorktreeDto:
+      type: object
+      properties:
+        worktreeId:
+          type: string
+        parent:
+          type: string
+paths:
+  /action-configurations:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response1"
+      summary: List
+      tags:
+      - Action Configuration Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateActionConfigurationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response4"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Action Configuration Controller
+  /action-configurations/{id}:
+    put:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateActionConfigurationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response"
+        "400":
+          description: Bad Request
+      summary: Update
+      tags:
+      - Action Configuration Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response2"
+      summary: Get
+      tags:
+      - Action Configuration Controller
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response3"
+      summary: Delete
+      tags:
+      - Action Configuration Controller
+  /feature-flow-configurations:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response6"
+      summary: List
+      tags:
+      - Feature Flow Configuration Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeatureFlowConfigurationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response9"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Feature Flow Configuration Controller
+  /feature-flow-configurations/{id}:
+    put:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeatureFlowConfigurationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response5"
+        "400":
+          description: Bad Request
+      summary: Update
+      tags:
+      - Feature Flow Configuration Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response7"
+      summary: Get
+      tags:
+      - Feature Flow Configuration Controller
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response8"
+      summary: Delete
+      tags:
+      - Feature Flow Configuration Controller
+  /feature-flow-phase-actions:
+    get:
+      parameters:
+      - name: stepId
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response11"
+      summary: List
+      tags:
+      - Feature Flow Phase Action Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeatureFlowPhaseActionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response14"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Feature Flow Phase Action Controller
+  /feature-flow-phase-actions/{id}:
+    put:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeatureFlowPhaseActionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response10"
+        "400":
+          description: Bad Request
+      summary: Update
+      tags:
+      - Feature Flow Phase Action Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response12"
+      summary: Get
+      tags:
+      - Feature Flow Phase Action Controller
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response13"
+      summary: Delete
+      tags:
+      - Feature Flow Phase Action Controller
+  /feature-flow-phase-steps:
+    get:
+      parameters:
+      - name: phaseId
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response21"
+      summary: List
+      tags:
+      - Feature Flow Phase Step Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeatureFlowPhaseStepRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response24"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Feature Flow Phase Step Controller
+  /feature-flow-phase-steps/{id}:
+    put:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeatureFlowPhaseStepRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response20"
+        "400":
+          description: Bad Request
+      summary: Update
+      tags:
+      - Feature Flow Phase Step Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response22"
+      summary: Get
+      tags:
+      - Feature Flow Phase Step Controller
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response23"
+      summary: Delete
+      tags:
+      - Feature Flow Phase Step Controller
+  /feature-flow-phases:
+    get:
+      parameters:
+      - name: featureFlowConfigurationId
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response16"
+      summary: List
+      tags:
+      - Feature Flow Phase Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFeatureFlowPhaseRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response19"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Feature Flow Phase Controller
+  /feature-flow-phases/{id}:
+    put:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeatureFlowPhaseRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response15"
+        "400":
+          description: Bad Request
+      summary: Update
+      tags:
+      - Feature Flow Phase Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response17"
+      summary: Get
+      tags:
+      - Feature Flow Phase Controller
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response18"
+      summary: Delete
+      tags:
+      - Feature Flow Phase Controller
+  /projects:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response27"
+      summary: List
+      tags:
+      - Project Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response32"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Project Controller
+  /projects/{id}:
+    put:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response25"
+        "400":
+          description: Bad Request
+      summary: Update
+      tags:
+      - Project Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response28"
+      summary: Get
+      tags:
+      - Project Controller
+    delete:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response30"
+      summary: Delete
+      tags:
+      - Project Controller
+  /projects/{projectId}/associate:
+    put:
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssociateRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response33"
+        "400":
+          description: Bad Request
+      summary: Associate Repository
+      tags:
+      - Project Controller
+  /projects/{projectId}/associate/{repositoryId}:
+    delete:
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repositoryId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response29"
+      summary: Disassociate Repository
+      tags:
+      - Project Controller
+  /projects/{projectId}/repositories:
+    get:
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response26"
+      summary: List Repositories
+      tags:
+      - Project Controller
+    post:
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response31"
+        "400":
+          description: Bad Request
+      summary: Create Repository
+      tags:
+      - Project Controller
+  /repositories/{repoId}/clone:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloneRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response36"
+        "400":
+          description: Bad Request
+      summary: Clone
+      tags:
+      - Repository Controller
+  /repositories/{repoId}/pull:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PullRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response35"
+        "400":
+          description: Bad Request
+      summary: Pull
+      tags:
+      - Repository Controller
+  /repositories/{repoId}/push:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response34"
+        "400":
+          description: Bad Request
+      summary: Push
+      tags:
+      - Repository Controller
+  /repositories/{repoId}/worktrees:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorktreeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response39"
+        "400":
+          description: Bad Request
+      summary: Create
+      tags:
+      - Worktree Controller
+  /repositories/{repoId}/worktrees/{worktreeId}/discard:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscardWorktreeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response38"
+        "400":
+          description: Bad Request
+      summary: Discard
+      tags:
+      - Worktree Controller
+  /repositories/{repoId}/worktrees/{worktreeId}/merge:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeWorktreeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response37"
+        "400":
+          description: Bad Request
+      summary: Merge
+      tags:
+      - Worktree Controller
+info:
+  title: service API
+  version: 1.0.0-SNAPSHOT
