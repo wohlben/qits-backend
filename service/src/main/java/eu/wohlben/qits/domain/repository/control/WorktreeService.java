@@ -24,6 +24,9 @@ public class WorktreeService {
     WorktreeRepository worktreeRepository;
 
     @Inject
+    MetadataService metadataService;
+
+    @Inject
     GitExecutor git;
 
     @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
@@ -64,6 +67,11 @@ public class WorktreeService {
         worktree.repository = repo;
         worktree.parent = parent;
         worktreeRepository.persist(worktree);
+
+        WorktreeMetadata metadata = new WorktreeMetadata();
+        metadata.worktreeId = worktreeId;
+        metadata.parent = parent;
+        metadataService.writeWorktreeMetadata(repoId, metadata);
 
         return worktree;
     }
@@ -152,6 +160,7 @@ public class WorktreeService {
             }
 
             worktreeRepository.delete(worktree);
+            metadataService.deleteWorktreeMetadata(repoId, worktreeId);
         } catch (InternalServerErrorException e) {
             throw e;
         } catch (Exception e) {

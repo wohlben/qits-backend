@@ -51,11 +51,8 @@ Example shape:
 ```json
 {
   "id": "...",
-  "name": "my-project",
-  "remote_url": "git@github.com:...",
-  "default_branch": "main",
-  "created_at": "...",
-  "updated_at": "..."
+  "url": "git@github.com:...",
+  "archetype": "SERVICE"
 }
 ```
 
@@ -66,28 +63,46 @@ Stores per-worktree metadata. One file per worktree. The worktree ID is embedded
 Example shape:
 ```json
 {
-  "id": "...",
-  "worktree_id": "...",
-  "branch": "feature/x",
-  "path": "...",
-  "created_at": "...",
-  "updated_at": "..."
+  "worktreeId": "...",
+  "parent": "..."
 }
 ```
+
+## Implementation
+
+### Components
+
+- **`MetadataService`** (`control/MetadataService.java`): Reads and writes JSON metadata files to the filesystem. Provides methods for repository and worktree metadata CRUD.
+- **`RepositoryDiscoveryService`** (`control/RepositoryDiscoveryService.java`): Scans the data directory at application startup (`@Observes StartupEvent`), detects repositories by the presence of `origin/`, reads metadata, and upserts records into the database.
+- **`RepositoryMetadata`** / **`WorktreeMetadata`** (`control/RepositoryMetadata.java`, `control/WorktreeMetadata.java`): Simple Jackson-serializable DTOs that mirror the entity fields.
+
+### Integration Points
+
+- **`RepositoryService.cloneRepository`**: After cloning and persisting the repository, writes `metadata/repository.json`.
+- **`WorktreeService.createWorktree`**: After creating and persisting the worktree, writes `metadata/worktree_{id}.json`.
+- **`WorktreeService.discardWorktree`**: After deleting the worktree from the database, deletes `metadata/worktree_{id}.json`.
 
 ## Startup Flow
 
 1. **Scan** — Iterate over subdirectories of the configured data directory.
 2. **Detect** — For each subdirectory, check if `origin/` exists.
 3. **Read** — If yes, read `metadata/repository.json` and any `metadata/worktree_*.json` files.
-4. **Upsert** — Ensure the database contains corresponding records (create if missing, update if changed).
+4. **Upsert** — Ensure the database contains corresponding records:
+   - Create repository if missing; update fields if metadata file exists.
+   - Create worktrees if missing; update fields if metadata file exists.
+   - Delete database worktrees that have no corresponding metadata file (filesystem wins).
 
 ## Runtime Behavior
 
-When the application writes repository or worktree changes to the database, it should also write the corresponding JSON file(s) to the metadata directory.
+When the application writes repository or worktree changes to the database, it also writes the corresponding JSON file(s) to the metadata directory.
 
-## Open Questions
+## Open Questions (Resolved)
 
-1. Should `origin/` be a hardcoded directory name or configurable per repository?
-2. What is the authoritative source when database and JSON metadata disagree at startup?
-3. Should old or orphaned `worktree_*.json` files be cleaned up automatically?
+1. **Should `origin/` be a hardcoded directory name or configurable per repository?**  
+   *Resolved:* Hardcoded for simplicity. The feature is focused on convention-over-configuration discovery.
+
+2. **What is the authoritative source when database and JSON metadata disagree at startup?**  
+   *Resolved:* Filesystem wins at startup. If a metadata file exists, its contents overwrite the database. If no metadata file exists, the repository is still discovered from directory structure, but existing database fields are preserved.
+
+3. **Should old or orphaned `worktree_*.json` files be cleaned up automatically?**  
+   *Resolved:* Orphaned database worktrees (not present in filesystem metadata) are deleted at startup. Orphaned metadata files are left alone; they will be re-imported if the worktree is recreated.
