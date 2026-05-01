@@ -40,7 +40,7 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(new FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest("Ctrl Flow"))
         .when()
-            .post("/feature-flow-configurations")
+            .post("/api/feature-flow-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.id", notNullValue())
@@ -52,7 +52,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-configurations/" + id)
+            .get("/api/feature-flow-configurations/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.id", equalTo(id))
@@ -62,7 +62,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-configurations")
+            .get("/api/feature-flow-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("entries.featureFlowConfiguration.id", hasItem(id));
@@ -72,7 +72,7 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(new FeatureFlowConfigurationController.UpdateFeatureFlowConfigurationRequest("Updated Flow"))
         .when()
-            .put("/feature-flow-configurations/" + id)
+            .put("/api/feature-flow-configurations/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.name", equalTo("Updated Flow"));
@@ -81,7 +81,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-configurations/" + id)
+            .delete("/api/feature-flow-configurations/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("success", equalTo(true));
@@ -90,7 +90,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-configurations/" + id)
+            .get("/api/feature-flow-configurations/" + id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -101,7 +101,7 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(new FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest(""))
         .when()
-            .post("/feature-flow-configurations")
+            .post("/api/feature-flow-configurations")
         .then()
             .statusCode(anyOf(
                 equalTo(Response.Status.BAD_REQUEST.getStatusCode()),
@@ -115,7 +115,7 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(new FeatureFlowConfigurationController.UpdateFeatureFlowConfigurationRequest("Name"))
         .when()
-            .put("/feature-flow-configurations/non-existent")
+            .put("/api/feature-flow-configurations/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -125,7 +125,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-configurations/non-existent")
+            .delete("/api/feature-flow-configurations/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -143,7 +143,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-configurations/" + config.id)
+            .get("/api/feature-flow-configurations/" + config.id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.id", equalTo(config.id))
@@ -174,7 +174,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-configurations/" + config.id)
+            .get("/api/feature-flow-configurations/" + config.id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.phases.size()", equalTo(1))
@@ -208,7 +208,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-phases/" + phase.id)
+            .delete("/api/feature-flow-phases/" + phase.id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode());
 
@@ -216,7 +216,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phases/" + phase.id)
+            .get("/api/feature-flow-phases/" + phase.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
@@ -224,7 +224,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phase-steps/" + step.id)
+            .get("/api/feature-flow-phase-steps/" + step.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
@@ -232,7 +232,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phase-actions/" + link.id)
+            .get("/api/feature-flow-phase-actions/" + link.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
@@ -240,7 +240,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phases/" + child.id)
+            .get("/api/feature-flow-phases/" + child.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
@@ -248,7 +248,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phase-steps/" + childStep.id)
+            .get("/api/feature-flow-phase-steps/" + childStep.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
@@ -256,7 +256,7 @@ public class FeatureFlowConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phase-actions/" + childLink.id)
+            .get("/api/feature-flow-phase-actions/" + childLink.id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
