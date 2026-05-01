@@ -1,7 +1,8 @@
 package eu.wohlben.qits.domain.action.api;
 
 import eu.wohlben.qits.domain.action.control.ActionConfigurationService;
-import eu.wohlben.qits.domain.action.entity.ActionConfiguration;
+import eu.wohlben.qits.domain.action.dto.ActionConfigurationDto;
+import eu.wohlben.qits.domain.action.mapper.ActionConfigurationMapper;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -25,6 +26,9 @@ public class ActionConfigurationController {
     @Inject
     ActionConfigurationService actionConfigurationService;
 
+    @Inject
+    ActionConfigurationMapper actionConfigurationMapper;
+
     public static record CreateActionConfigurationRequest(
         @NotBlank String id,
         @NotBlank String name,
@@ -32,7 +36,7 @@ public class ActionConfigurationController {
         @NotBlank String executeScript,
         @NotBlank String checkScript
     ) {
-        public record Response(String id, String name, String description, String executeScript, String checkScript) {}
+        public record Response(ActionConfigurationDto actionConfiguration) {}
     }
 
     @POST
@@ -40,23 +44,27 @@ public class ActionConfigurationController {
         var config = actionConfigurationService.create(
             request.id(), request.name(), request.description(), request.executeScript(), request.checkScript()
         );
-        return toResponse(config);
+        return new CreateActionConfigurationRequest.Response(
+            actionConfigurationMapper.toDto(config)
+        );
     }
 
     public static record GetActionConfigurationRequest() {
-        public record Response(String id, String name, String description, String executeScript, String checkScript) {}
+        public record Response(ActionConfigurationDto actionConfiguration) {}
     }
 
     @GET
     @Path("/{id}")
     public GetActionConfigurationRequest.Response get(@PathParam("id") String id) {
         var config = actionConfigurationService.get(id);
-        return toGetResponse(config);
+        return new GetActionConfigurationRequest.Response(
+            actionConfigurationMapper.toDto(config)
+        );
     }
 
     public static record ListActionConfigurationsRequest() {
         public record Response(List<Entry> entries) {
-            public record Entry(String id, String name, String description) {}
+            public record Entry(ActionConfigurationDto actionConfiguration) {}
         }
     }
 
@@ -64,7 +72,9 @@ public class ActionConfigurationController {
     public ListActionConfigurationsRequest.Response list() {
         var configs = actionConfigurationService.list();
         var entries = configs.stream()
-            .map(c -> new ListActionConfigurationsRequest.Response.Entry(c.id, c.name, c.description))
+            .map(c -> new ListActionConfigurationsRequest.Response.Entry(
+                actionConfigurationMapper.toDto(c)
+            ))
             .toList();
         return new ListActionConfigurationsRequest.Response(entries);
     }
@@ -75,7 +85,7 @@ public class ActionConfigurationController {
         String executeScript,
         String checkScript
     ) {
-        public record Response(String id, String name, String description, String executeScript, String checkScript) {}
+        public record Response(ActionConfigurationDto actionConfiguration) {}
     }
 
     @PUT
@@ -84,7 +94,9 @@ public class ActionConfigurationController {
         var config = actionConfigurationService.update(
             id, request.name(), request.description(), request.executeScript(), request.checkScript()
         );
-        return toUpdateResponse(config);
+        return new UpdateActionConfigurationRequest.Response(
+            actionConfigurationMapper.toDto(config)
+        );
     }
 
     public static record DeleteActionConfigurationRequest() {
@@ -96,23 +108,5 @@ public class ActionConfigurationController {
     public DeleteActionConfigurationRequest.Response delete(@PathParam("id") String id) {
         actionConfigurationService.delete(id);
         return new DeleteActionConfigurationRequest.Response(true);
-    }
-
-    private static CreateActionConfigurationRequest.Response toResponse(ActionConfiguration config) {
-        return new CreateActionConfigurationRequest.Response(
-            config.id, config.name, config.description, config.executeScript, config.checkScript
-        );
-    }
-
-    private static GetActionConfigurationRequest.Response toGetResponse(ActionConfiguration config) {
-        return new GetActionConfigurationRequest.Response(
-            config.id, config.name, config.description, config.executeScript, config.checkScript
-        );
-    }
-
-    private static UpdateActionConfigurationRequest.Response toUpdateResponse(ActionConfiguration config) {
-        return new UpdateActionConfigurationRequest.Response(
-            config.id, config.name, config.description, config.executeScript, config.checkScript
-        );
     }
 }
