@@ -1,6 +1,6 @@
-package eu.wohlben.qits.domain.action.persistence;
+package eu.wohlben.qits.domain.featureflow.persistence;
 
-import eu.wohlben.qits.domain.action.entity.ActionConfiguration;
+import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 

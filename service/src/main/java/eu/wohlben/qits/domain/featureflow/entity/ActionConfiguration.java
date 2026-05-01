@@ -1,4 +1,4 @@
-package eu.wohlben.qits.domain.action.entity;
+package eu.wohlben.qits.domain.featureflow.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;

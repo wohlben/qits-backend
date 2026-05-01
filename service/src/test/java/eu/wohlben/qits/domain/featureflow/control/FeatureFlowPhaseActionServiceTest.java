@@ -1,6 +1,6 @@
 package eu.wohlben.qits.domain.featureflow.control;
 
-import eu.wohlben.qits.domain.action.control.ActionConfigurationService;
+import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
@@ -41,7 +41,7 @@ public class FeatureFlowPhaseActionServiceTest {
         return featureFlowPhaseStepService.create(phase.id, "Build", 0);
     }
 
-    private eu.wohlben.qits.domain.action.entity.ActionConfiguration createAction(String id) {
+    private ActionConfiguration createAction(String id) {
         return actionConfigurationService.create(
             id, "Action " + id, "Desc", "echo exec", "echo check"
         );

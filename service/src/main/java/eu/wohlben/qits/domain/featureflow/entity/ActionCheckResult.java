@@ -1,4 +1,4 @@
-package eu.wohlben.qits.domain.action.entity;
+package eu.wohlben.qits.domain.featureflow.entity;
 
 public enum ActionCheckResult {
     REQUIRED,

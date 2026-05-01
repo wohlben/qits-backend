@@ -1,6 +1,5 @@
 package eu.wohlben.qits.domain.featureflow.dto;
 
-import eu.wohlben.qits.domain.action.dto.ActionConfigurationDto;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
 
 public record FeatureFlowPhaseActionDto(

@@ -1,8 +1,8 @@
-package eu.wohlben.qits.domain.action.api;
+package eu.wohlben.qits.domain.featureflow.api;
 
-import eu.wohlben.qits.domain.action.control.ActionConfigurationService;
-import eu.wohlben.qits.domain.action.dto.ActionConfigurationDto;
-import eu.wohlben.qits.domain.action.mapper.ActionConfigurationMapper;
+import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
+import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
+import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
