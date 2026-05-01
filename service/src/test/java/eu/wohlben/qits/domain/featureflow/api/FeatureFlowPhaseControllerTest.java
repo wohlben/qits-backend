@@ -27,7 +27,7 @@ public class FeatureFlowPhaseControllerTest {
                 config.id, "Refining", "Desc", 0, null
             ))
         .when()
-            .post("/feature-flow-phases")
+            .post("/api/feature-flow-phases")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowPhase.id", notNullValue())
@@ -42,7 +42,7 @@ public class FeatureFlowPhaseControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phases/" + id)
+            .get("/api/feature-flow-phases/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowPhase.id", equalTo(id))
@@ -53,7 +53,7 @@ public class FeatureFlowPhaseControllerTest {
             .contentType(ContentType.JSON)
             .queryParam("featureFlowConfigurationId", config.id)
         .when()
-            .get("/feature-flow-phases")
+            .get("/api/feature-flow-phases")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("entries.featureFlowPhase.id", hasItem(id));
@@ -65,7 +65,7 @@ public class FeatureFlowPhaseControllerTest {
                 "Updated", "New desc", 1, null
             ))
         .when()
-            .put("/feature-flow-phases/" + id)
+            .put("/api/feature-flow-phases/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowPhase.name", equalTo("Updated"))
@@ -76,7 +76,7 @@ public class FeatureFlowPhaseControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-phases/" + id)
+            .delete("/api/feature-flow-phases/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("success", equalTo(true));
@@ -85,7 +85,7 @@ public class FeatureFlowPhaseControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phases/" + id)
+            .get("/api/feature-flow-phases/" + id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -98,7 +98,7 @@ public class FeatureFlowPhaseControllerTest {
                 "", "", null, 0, null
             ))
         .when()
-            .post("/feature-flow-phases")
+            .post("/api/feature-flow-phases")
         .then()
             .statusCode(anyOf(
                 equalTo(Response.Status.BAD_REQUEST.getStatusCode()),
@@ -114,7 +114,7 @@ public class FeatureFlowPhaseControllerTest {
                 "Name", null, 0, null
             ))
         .when()
-            .put("/feature-flow-phases/non-existent")
+            .put("/api/feature-flow-phases/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -124,7 +124,7 @@ public class FeatureFlowPhaseControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-phases/non-existent")
+            .delete("/api/feature-flow-phases/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }

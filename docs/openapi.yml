@@ -583,7 +583,7 @@ components:
         parent:
           type: string
 paths:
-  /action-configurations:
+  /api/action-configurations:
     get:
       responses:
         "200":
@@ -614,7 +614,7 @@ paths:
       summary: Create
       tags:
       - Action Configuration Controller
-  /action-configurations/{id}:
+  /api/action-configurations/{id}:
     put:
       parameters:
       - name: id
@@ -674,7 +674,7 @@ paths:
       summary: Delete
       tags:
       - Action Configuration Controller
-  /feature-flow-configurations:
+  /api/feature-flow-configurations:
     get:
       responses:
         "200":
@@ -705,7 +705,7 @@ paths:
       summary: Create
       tags:
       - Feature Flow Configuration Controller
-  /feature-flow-configurations/{id}:
+  /api/feature-flow-configurations/{id}:
     put:
       parameters:
       - name: id
@@ -765,7 +765,7 @@ paths:
       summary: Delete
       tags:
       - Feature Flow Configuration Controller
-  /feature-flow-phase-actions:
+  /api/feature-flow-phase-actions:
     get:
       parameters:
       - name: stepId
@@ -801,7 +801,7 @@ paths:
       summary: Create
       tags:
       - Feature Flow Phase Action Controller
-  /feature-flow-phase-actions/{id}:
+  /api/feature-flow-phase-actions/{id}:
     put:
       parameters:
       - name: id
@@ -861,7 +861,7 @@ paths:
       summary: Delete
       tags:
       - Feature Flow Phase Action Controller
-  /feature-flow-phase-steps:
+  /api/feature-flow-phase-steps:
     get:
       parameters:
       - name: phaseId
@@ -897,7 +897,7 @@ paths:
       summary: Create
       tags:
       - Feature Flow Phase Step Controller
-  /feature-flow-phase-steps/{id}:
+  /api/feature-flow-phase-steps/{id}:
     put:
       parameters:
       - name: id
@@ -957,7 +957,7 @@ paths:
       summary: Delete
       tags:
       - Feature Flow Phase Step Controller
-  /feature-flow-phases:
+  /api/feature-flow-phases:
     get:
       parameters:
       - name: featureFlowConfigurationId
@@ -993,7 +993,7 @@ paths:
       summary: Create
       tags:
       - Feature Flow Phase Controller
-  /feature-flow-phases/{id}:
+  /api/feature-flow-phases/{id}:
     put:
       parameters:
       - name: id
@@ -1053,7 +1053,7 @@ paths:
       summary: Delete
       tags:
       - Feature Flow Phase Controller
-  /projects:
+  /api/projects:
     get:
       responses:
         "200":
@@ -1084,7 +1084,7 @@ paths:
       summary: Create
       tags:
       - Project Controller
-  /projects/{id}:
+  /api/projects/{id}:
     put:
       parameters:
       - name: id
@@ -1144,7 +1144,7 @@ paths:
       summary: Delete
       tags:
       - Project Controller
-  /projects/{projectId}/associate:
+  /api/projects/{projectId}/associate:
     put:
       parameters:
       - name: projectId
@@ -1170,7 +1170,7 @@ paths:
       summary: Associate Repository
       tags:
       - Project Controller
-  /projects/{projectId}/associate/{repositoryId}:
+  /api/projects/{projectId}/associate/{repositoryId}:
     delete:
       parameters:
       - name: projectId
@@ -1193,7 +1193,7 @@ paths:
       summary: Disassociate Repository
       tags:
       - Project Controller
-  /projects/{projectId}/repositories:
+  /api/projects/{projectId}/repositories:
     get:
       parameters:
       - name: projectId
@@ -1236,7 +1236,7 @@ paths:
       summary: Create Repository
       tags:
       - Project Controller
-  /repositories/{repoId}/clone:
+  /api/repositories/{repoId}/clone:
     post:
       parameters:
       - name: repoId
@@ -1262,7 +1262,7 @@ paths:
       summary: Clone
       tags:
       - Repository Controller
-  /repositories/{repoId}/pull:
+  /api/repositories/{repoId}/pull:
     post:
       parameters:
       - name: repoId
@@ -1288,7 +1288,7 @@ paths:
       summary: Pull
       tags:
       - Repository Controller
-  /repositories/{repoId}/push:
+  /api/repositories/{repoId}/push:
     post:
       parameters:
       - name: repoId
@@ -1314,7 +1314,7 @@ paths:
       summary: Push
       tags:
       - Repository Controller
-  /repositories/{repoId}/worktrees:
+  /api/repositories/{repoId}/worktrees:
     post:
       parameters:
       - name: repoId
@@ -1340,7 +1340,7 @@ paths:
       summary: Create
       tags:
       - Worktree Controller
-  /repositories/{repoId}/worktrees/{worktreeId}/discard:
+  /api/repositories/{repoId}/worktrees/{worktreeId}/discard:
     post:
       parameters:
       - name: repoId
@@ -1371,7 +1371,7 @@ paths:
       summary: Discard
       tags:
       - Worktree Controller
-  /repositories/{repoId}/worktrees/{worktreeId}/merge:
+  /api/repositories/{repoId}/worktrees/{worktreeId}/merge:
     post:
       parameters:
       - name: repoId

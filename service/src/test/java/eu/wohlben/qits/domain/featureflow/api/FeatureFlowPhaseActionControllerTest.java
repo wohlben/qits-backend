@@ -52,7 +52,7 @@ public class FeatureFlowPhaseActionControllerTest {
                 stepId, actionId, ActionType.PREREQUISITE, 0, "group-a"
             ))
         .when()
-            .post("/feature-flow-phase-actions")
+            .post("/api/feature-flow-phase-actions")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowPhaseAction.id", notNullValue())
@@ -68,7 +68,7 @@ public class FeatureFlowPhaseActionControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phase-actions/" + linkId)
+            .get("/api/feature-flow-phase-actions/" + linkId)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowPhaseAction.id", equalTo(linkId))
@@ -79,7 +79,7 @@ public class FeatureFlowPhaseActionControllerTest {
             .contentType(ContentType.JSON)
             .queryParam("stepId", stepId)
         .when()
-            .get("/feature-flow-phase-actions")
+            .get("/api/feature-flow-phase-actions")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("entries.featureFlowPhaseAction.id", hasItem(linkId));
@@ -91,7 +91,7 @@ public class FeatureFlowPhaseActionControllerTest {
                 ActionType.QUALITY_GATE, 5, "group-b"
             ))
         .when()
-            .put("/feature-flow-phase-actions/" + linkId)
+            .put("/api/feature-flow-phase-actions/" + linkId)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowPhaseAction.actionType", equalTo("QUALITY_GATE"))
@@ -102,7 +102,7 @@ public class FeatureFlowPhaseActionControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-phase-actions/" + linkId)
+            .delete("/api/feature-flow-phase-actions/" + linkId)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("success", equalTo(true));
@@ -111,7 +111,7 @@ public class FeatureFlowPhaseActionControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/feature-flow-phase-actions/" + linkId)
+            .get("/api/feature-flow-phase-actions/" + linkId)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -124,7 +124,7 @@ public class FeatureFlowPhaseActionControllerTest {
                 "", "", null, 0, null
             ))
         .when()
-            .post("/feature-flow-phase-actions")
+            .post("/api/feature-flow-phase-actions")
         .then()
             .statusCode(anyOf(
                 equalTo(Response.Status.BAD_REQUEST.getStatusCode()),
@@ -140,7 +140,7 @@ public class FeatureFlowPhaseActionControllerTest {
                 ActionType.QUALITY_GATE, 0, null
             ))
         .when()
-            .put("/feature-flow-phase-actions/non-existent")
+            .put("/api/feature-flow-phase-actions/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -150,7 +150,7 @@ public class FeatureFlowPhaseActionControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/feature-flow-phase-actions/non-existent")
+            .delete("/api/feature-flow-phase-actions/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }

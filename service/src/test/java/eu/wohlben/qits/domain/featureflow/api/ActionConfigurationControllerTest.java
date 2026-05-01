@@ -20,7 +20,7 @@ public class ActionConfigurationControllerTest {
                 "ctrl-test", "Ctrl Action", "Desc", "echo run", "echo required"
             ))
         .when()
-            .post("/action-configurations")
+            .post("/api/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("actionConfiguration.id", equalTo("ctrl-test"))
@@ -33,7 +33,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/action-configurations/ctrl-test")
+            .get("/api/action-configurations/ctrl-test")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("actionConfiguration.id", equalTo("ctrl-test"))
@@ -43,7 +43,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/action-configurations")
+            .get("/api/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("entries.actionConfiguration.id", hasItem("ctrl-test"));
@@ -55,7 +55,7 @@ public class ActionConfigurationControllerTest {
                 "Updated Name", "Updated Desc", "echo updated", "echo suggested"
             ))
         .when()
-            .put("/action-configurations/ctrl-test")
+            .put("/api/action-configurations/ctrl-test")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("actionConfiguration.name", equalTo("Updated Name"))
@@ -67,7 +67,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/action-configurations/ctrl-test")
+            .delete("/api/action-configurations/ctrl-test")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("success", equalTo(true));
@@ -76,7 +76,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/action-configurations/ctrl-test")
+            .get("/api/action-configurations/ctrl-test")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -89,7 +89,7 @@ public class ActionConfigurationControllerTest {
                 "dup-id", "First", null, "echo 1", "echo optional"
             ))
         .when()
-            .post("/action-configurations")
+            .post("/api/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode());
 
@@ -99,7 +99,7 @@ public class ActionConfigurationControllerTest {
                 "dup-id", "Second", null, "echo 2", "echo optional"
             ))
         .when()
-            .post("/action-configurations")
+            .post("/api/action-configurations")
         .then()
             .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
     }
@@ -112,7 +112,7 @@ public class ActionConfigurationControllerTest {
                 "", "", null, "", ""
             ))
         .when()
-            .post("/action-configurations")
+            .post("/api/action-configurations")
         .then()
             .statusCode(anyOf(
                 equalTo(Response.Status.BAD_REQUEST.getStatusCode()),
@@ -128,7 +128,7 @@ public class ActionConfigurationControllerTest {
                 "Name", null, "echo", "echo"
             ))
         .when()
-            .put("/action-configurations/non-existent")
+            .put("/api/action-configurations/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
@@ -138,7 +138,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/action-configurations/non-existent")
+            .delete("/api/action-configurations/non-existent")
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
     }
