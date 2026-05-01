@@ -4,6 +4,7 @@ import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
 import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
 import jakarta.inject.Inject;
+import eu.wohlben.qits.validation.NotBlankIfPresent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.ws.rs.Consumes;
@@ -80,10 +81,10 @@ public class ActionConfigurationController {
     }
 
     public static record UpdateActionConfigurationRequest(
-        String name,
+        @NotBlankIfPresent String name,
         String description,
-        String executeScript,
-        String checkScript
+        @NotBlankIfPresent String executeScript,
+        @NotBlankIfPresent String checkScript
     ) {
         public record Response(ActionConfigurationDto actionConfiguration) {}
     }

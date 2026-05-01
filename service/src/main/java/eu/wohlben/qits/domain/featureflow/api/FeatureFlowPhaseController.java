@@ -7,6 +7,7 @@ import eu.wohlben.qits.domain.featureflow.mapper.FeatureFlowPhaseMapper;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
+import eu.wohlben.qits.validation.NotBlankIfPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
@@ -91,7 +92,7 @@ public class FeatureFlowPhaseController {
     }
 
     public static record UpdateFeatureFlowPhaseRequest(
-        String name,
+        @NotBlankIfPresent String name,
         String description,
         Integer orderIndex,
         String parentPhaseId
