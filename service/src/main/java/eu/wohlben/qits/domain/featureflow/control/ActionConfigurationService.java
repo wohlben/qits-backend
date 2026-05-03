@@ -17,7 +17,7 @@ public class ActionConfigurationService {
     ActionConfigurationRepository actionConfigurationRepository;
 
     @Transactional
-    public ActionConfiguration create(String id, String name, String description, String executeScript, String checkScript) {
+    public ActionConfiguration create(String name, String description, String executeScript, String checkScript) {
         if (name == null || name.isBlank()) {
             throw new BadRequestException("name is required");
         }
@@ -27,15 +27,8 @@ public class ActionConfigurationService {
         if (checkScript == null || checkScript.isBlank()) {
             throw new BadRequestException("checkScript is required");
         }
-        if (id == null || id.isBlank()) {
-            throw new BadRequestException("id is required");
-        }
-        if (actionConfigurationRepository.findByIdOptional(id).isPresent()) {
-            throw new BadRequestException("ActionConfiguration already exists: " + id);
-        }
 
         ActionConfiguration config = new ActionConfiguration();
-        config.id = id;
         config.name = name;
         config.description = description;
         config.executeScript = executeScript;

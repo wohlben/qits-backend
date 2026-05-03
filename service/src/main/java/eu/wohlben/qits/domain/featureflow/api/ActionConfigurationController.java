@@ -31,7 +31,6 @@ public class ActionConfigurationController {
     ActionConfigurationMapper actionConfigurationMapper;
 
     public static record CreateActionConfigurationRequest(
-        @NotBlank String id,
         @NotBlank String name,
         String description,
         @NotBlank String executeScript,
@@ -43,7 +42,7 @@ public class ActionConfigurationController {
     @POST
     public CreateActionConfigurationRequest.Response create(@Valid CreateActionConfigurationRequest request) {
         var config = actionConfigurationService.create(
-            request.id(), request.name(), request.description(), request.executeScript(), request.checkScript()
+            request.name(), request.description(), request.executeScript(), request.checkScript()
         );
         return new CreateActionConfigurationRequest.Response(
             actionConfigurationMapper.toDto(config)

@@ -22,46 +22,37 @@ public class ActionConfigurationServiceTest {
     @Test
     public void testCreateAndGet() {
         var config = actionConfigurationService.create(
-            "test-create", "Test Action", "A test action", "echo hello", "echo required"
+            "Test Action", "A test action", "echo hello", "echo required"
         );
 
-        assertEquals("test-create", config.id);
+        assertNotNull(config.id);
         assertEquals("Test Action", config.name);
         assertEquals("A test action", config.description);
         assertEquals("echo hello", config.executeScript);
         assertEquals("echo required", config.checkScript);
 
-        var found = actionConfigurationService.get("test-create");
+        var found = actionConfigurationService.get(config.id);
         assertEquals(config.id, found.id);
-    }
-
-    @Test
-    public void testCreateDuplicateIdThrows() {
-        actionConfigurationService.create("test-dup", "First", null, "echo 1", "echo optional");
-
-        assertThrows(BadRequestException.class, () ->
-            actionConfigurationService.create("test-dup", "Second", null, "echo 2", "echo optional")
-        );
     }
 
     @Test
     public void testCreateMissingNameThrows() {
         assertThrows(BadRequestException.class, () ->
-            actionConfigurationService.create("test-no-name", null, null, "echo hello", "echo required")
+            actionConfigurationService.create(null, null, "echo hello", "echo required")
         );
     }
 
     @Test
     public void testCreateMissingExecuteScriptThrows() {
         assertThrows(BadRequestException.class, () ->
-            actionConfigurationService.create("test-no-exec", "Name", null, null, "echo required")
+            actionConfigurationService.create("Name", null, null, "echo required")
         );
     }
 
     @Test
     public void testCreateMissingCheckScriptThrows() {
         assertThrows(BadRequestException.class, () ->
-            actionConfigurationService.create("test-no-check", "Name", null, "echo hello", null)
+            actionConfigurationService.create("Name", null, "echo hello", null)
         );
     }
 
@@ -75,8 +66,8 @@ public class ActionConfigurationServiceTest {
     @Test
     public void testList() {
         long before = actionConfigurationRepository.count();
-        actionConfigurationService.create("test-list-1", "One", null, "echo 1", "echo required");
-        actionConfigurationService.create("test-list-2", "Two", null, "echo 2", "echo suggested");
+        actionConfigurationService.create("One", null, "echo 1", "echo required");
+        actionConfigurationService.create("Two", null, "echo 2", "echo suggested");
 
         var list = actionConfigurationService.list();
         assertEquals(before + 2, list.size());
@@ -84,12 +75,12 @@ public class ActionConfigurationServiceTest {
 
     @Test
     public void testUpdate() {
-        actionConfigurationService.create(
-            "test-update", "Original", "Desc", "echo old", "echo optional"
+        var config = actionConfigurationService.create(
+            "Original", "Desc", "echo old", "echo optional"
         );
 
         var updated = actionConfigurationService.update(
-            "test-update", "Updated", "New desc", "echo new", "echo required"
+            config.id, "Updated", "New desc", "echo new", "echo required"
         );
 
         assertEquals("Updated", updated.name);
@@ -100,12 +91,12 @@ public class ActionConfigurationServiceTest {
 
     @Test
     public void testUpdatePartial() {
-        actionConfigurationService.create(
-            "test-update-partial", "Original", "Desc", "echo old", "echo optional"
+        var config = actionConfigurationService.create(
+            "Original", "Desc", "echo old", "echo optional"
         );
 
         var updated = actionConfigurationService.update(
-            "test-update-partial", null, "New desc", null, null
+            config.id, null, "New desc", null, null
         );
 
         assertEquals("Original", updated.name);
@@ -123,13 +114,13 @@ public class ActionConfigurationServiceTest {
 
     @Test
     public void testDelete() {
-        actionConfigurationService.create(
-            "test-delete", "ToDelete", null, "echo hello", "echo unnecessary"
+        var config = actionConfigurationService.create(
+            "ToDelete", null, "echo hello", "echo unnecessary"
         );
 
-        assertNotNull(actionConfigurationService.get("test-delete"));
+        assertNotNull(actionConfigurationService.get(config.id));
 
-        actionConfigurationService.delete("test-delete");
+        actionConfigurationService.delete(config.id);
 
         // Post-delete visibility is verified in the controller test where each
         // request runs in its own transaction. Within a single test transaction
