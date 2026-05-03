@@ -6,6 +6,7 @@ import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
+import eu.wohlben.qits.domain.project.control.ProjectService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
@@ -33,18 +34,32 @@ public class FeatureFlowConfigurationControllerTest {
     @Inject
     ActionConfigurationService actionConfigurationService;
 
+    @Inject
+    ProjectService projectService;
+
     @Test
     public void testCreateAndGetAndListAndUpdateAndDelete() {
-        // Create
+        // Create project
+        String projectId = given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest("Ctrl Project", null))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .extract().path("project.id");
+
+        // Create feature flow configuration under project
         String id = given()
             .contentType(ContentType.JSON)
-            .body(new FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest("Ctrl Flow"))
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectFeatureFlowConfigurationRequest("Ctrl Flow"))
         .when()
-            .post("/api/feature-flow-configurations")
+            .post("/api/projects/" + projectId + "/feature-flow-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.id", notNullValue())
             .body("featureFlowConfiguration.name", equalTo("Ctrl Flow"))
+            .body("featureFlowConfiguration.projectId", equalTo(projectId))
             .extract()
             .path("featureFlowConfiguration.id");
 
@@ -97,11 +112,21 @@ public class FeatureFlowConfigurationControllerTest {
 
     @Test
     public void testCreateValidationErrors() {
+        // Create project
+        String projectId = given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest("Val Project", null))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .extract().path("project.id");
+
         given()
             .contentType(ContentType.JSON)
-            .body(new FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest(""))
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectFeatureFlowConfigurationRequest(""))
         .when()
-            .post("/api/feature-flow-configurations")
+            .post("/api/projects/" + projectId + "/feature-flow-configurations")
         .then()
             .statusCode(anyOf(
                 equalTo(Response.Status.BAD_REQUEST.getStatusCode()),
@@ -132,11 +157,12 @@ public class FeatureFlowConfigurationControllerTest {
 
     @Test
     public void testGetFullTreeSerialization() {
-        var config = featureFlowConfigurationService.create("End-to-End Flow");
+        var project = projectService.create("Tree Project", null);
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "End-to-End Flow");
         var phase = featureFlowPhaseService.create(config.id, "Development", "Dev phase", 0, null);
         var step = featureFlowPhaseStepService.create(phase.id, "Lint", 0);
         var action = actionConfigurationService.create(
-            "lint-fe", "Lint Frontend", "Runs eslint", "eslint .", "echo required"
+            "Lint Frontend", "Runs eslint", "eslint .", "echo required"
         );
         featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, "lint-group");
 
@@ -162,12 +188,13 @@ public class FeatureFlowConfigurationControllerTest {
 
     @Test
     public void testSubPhaseWithStepsAndActions() {
-        var config = featureFlowConfigurationService.create("Sub-Phase Flow");
+        var project = projectService.create("Sub Project", null);
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Sub-Phase Flow");
         var parent = featureFlowPhaseService.create(config.id, "Development", null, 0, null);
         var child = featureFlowPhaseService.create(config.id, "Work Package A", null, 0, parent.id);
         var step = featureFlowPhaseStepService.create(child.id, "Test", 0);
         var action = actionConfigurationService.create(
-            "test-wp", "Test WP", "Desc", "pytest", "echo required"
+            "Test WP", "Desc", "pytest", "echo required"
         );
         featureFlowPhaseActionService.create(step.id, action.id, ActionType.QUALITY_GATE, 0, null);
 
@@ -188,11 +215,12 @@ public class FeatureFlowConfigurationControllerTest {
 
     @Test
     public void testCascadeDeletePhaseRemovesSubPhasesStepsAndActions() {
-        var config = featureFlowConfigurationService.create("Cascade Flow");
+        var project = projectService.create("Cascade Project", null);
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Cascade Flow");
         var phase = featureFlowPhaseService.create(config.id, "Dev", null, 0, null);
         var step = featureFlowPhaseStepService.create(phase.id, "Build", 0);
         var action = actionConfigurationService.create(
-            "build-cascade", "Build", "Desc", "mvn build", "echo required"
+            "Build", "Desc", "mvn build", "echo required"
         );
         var link = featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, null);
 
@@ -200,7 +228,7 @@ public class FeatureFlowConfigurationControllerTest {
         var child = featureFlowPhaseService.create(config.id, "Sub-Dev", null, 0, phase.id);
         var childStep = featureFlowPhaseStepService.create(child.id, "Lint", 0);
         var childAction = actionConfigurationService.create(
-            "lint-cascade", "Lint", "Desc", "eslint", "echo required"
+            "Lint", "Desc", "eslint", "echo required"
         );
         var childLink = featureFlowPhaseActionService.create(childStep.id, childAction.id, ActionType.PREREQUISITE, 0, null);
 

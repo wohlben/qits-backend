@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.featureflow.api;
 
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
+import eu.wohlben.qits.domain.project.control.ProjectService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
@@ -20,8 +21,12 @@ public class FeatureFlowPhaseStepControllerTest {
     @Inject
     FeatureFlowPhaseService featureFlowPhaseService;
 
+    @Inject
+    ProjectService projectService;
+
     private String createPhaseId() {
-        var config = featureFlowConfigurationService.create("Step Test Flow");
+        var project = projectService.create("Step Project", null);
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Step Test Flow");
         var phase = featureFlowPhaseService.create(config.id, "Phase", null, 0, null);
         return phase.id;
     }

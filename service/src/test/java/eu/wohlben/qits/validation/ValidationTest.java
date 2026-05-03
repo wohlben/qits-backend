@@ -44,21 +44,7 @@ public class ValidationTest {
         given()
             .contentType(ContentType.JSON)
             .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                "proj-id", "", null
-            ))
-        .when()
-            .post("/api/projects")
-        .then()
-            .statusCode(anyOf(equalTo(400), equalTo(422)))
-            .body("violations.message", hasItem("must not be blank"));
-    }
-
-    @Test
-    public void createProjectWithBlankIdReturns400() {
-        given()
-            .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                "", "Name", null
+                "", null
             ))
         .when()
             .post("/api/projects")
@@ -69,13 +55,24 @@ public class ValidationTest {
 
     @Test
     public void createFeatureFlowConfigurationWithBlankNameReturns400() {
+        String projectId = given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "Val Project", null
+            ))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(200)
+            .extract().path("project.id");
+
         given()
             .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.featureflow.api.FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest(
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectFeatureFlowConfigurationRequest(
                 ""
             ))
         .when()
-            .post("/api/feature-flow-configurations")
+            .post("/api/projects/" + projectId + "/feature-flow-configurations")
         .then()
             .statusCode(anyOf(equalTo(400), equalTo(422)))
             .body("violations.message", hasItem("must not be blank"));
@@ -86,7 +83,7 @@ public class ValidationTest {
         given()
             .contentType(ContentType.JSON)
             .body(new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest(
-                "act-id", "name", null, "", "check"
+                "name", null, "", "check"
             ))
         .when()
             .post("/api/action-configurations")
@@ -100,15 +97,16 @@ public class ValidationTest {
     @Test
     public void updateProjectWithBlankNameReturns400() {
         // seed
-        given()
+        String id = given()
             .contentType(ContentType.JSON)
             .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                "upd-proj", "Original", null
+                "Original", null
             ))
         .when()
             .post("/api/projects")
         .then()
-            .statusCode(200);
+            .statusCode(200)
+            .extract().path("project.id");
 
         // update with blank name
         given()
@@ -117,7 +115,7 @@ public class ValidationTest {
                 "", null
             ))
         .when()
-            .put("/api/projects/upd-proj")
+            .put("/api/projects/" + id)
         .then()
             .statusCode(anyOf(equalTo(400), equalTo(422)))
             .body("violations.message", hasItem("must not be blank"));
@@ -125,14 +123,26 @@ public class ValidationTest {
 
     @Test
     public void updateFeatureFlowPhaseWithBlankNameReturns400() {
+        // seed project
+        String projectId = given()
+            .contentType(ContentType.JSON)
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "Original", null
+            ))
+        .when()
+            .post("/api/projects")
+        .then()
+            .statusCode(200)
+            .extract().path("project.id");
+
         // seed config
         String configId = given()
             .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.featureflow.api.FeatureFlowConfigurationController.CreateFeatureFlowConfigurationRequest(
+            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectFeatureFlowConfigurationRequest(
                 "config-name"
             ))
         .when()
-            .post("/api/feature-flow-configurations")
+            .post("/api/projects/" + projectId + "/feature-flow-configurations")
         .then()
             .statusCode(200)
             .extract().path("featureFlowConfiguration.id");
@@ -167,15 +177,16 @@ public class ValidationTest {
     @Test
     public void updateProjectWithNullNameIsAllowed() {
         // seed
-        given()
+        String id = given()
             .contentType(ContentType.JSON)
             .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                "partial-proj", "Original", "desc"
+                "Original", "desc"
             ))
         .when()
             .post("/api/projects")
         .then()
-            .statusCode(200);
+            .statusCode(200)
+            .extract().path("project.id");
 
         // partial update — only description
         given()
@@ -184,7 +195,7 @@ public class ValidationTest {
                 null, "Updated Desc"
             ))
         .when()
-            .put("/api/projects/partial-proj")
+            .put("/api/projects/" + id)
         .then()
             .statusCode(200)
             .body("project.description", equalTo("Updated Desc"))
@@ -194,15 +205,16 @@ public class ValidationTest {
     @Test
     public void updateActionConfigurationWithNullFieldsIsAllowed() {
         // seed
-        given()
+        String id = given()
             .contentType(ContentType.JSON)
             .body(new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest(
-                "partial-act", "Original Name", "desc", "exec", "check"
+                "Original Name", "desc", "exec", "check"
             ))
         .when()
             .post("/api/action-configurations")
         .then()
-            .statusCode(200);
+            .statusCode(200)
+            .extract().path("actionConfiguration.id");
 
         // partial update — only description
         given()
@@ -211,7 +223,7 @@ public class ValidationTest {
                 null, "Updated Desc", null, null
             ))
         .when()
-            .put("/api/action-configurations/partial-act")
+            .put("/api/action-configurations/" + id)
         .then()
             .statusCode(200)
             .body("actionConfiguration.description", equalTo("Updated Desc"))

@@ -6,6 +6,7 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.featureflow.persistence.FeatureFlowPhaseActionRepository;
+import eu.wohlben.qits.domain.project.control.ProjectService;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
@@ -35,15 +36,19 @@ public class FeatureFlowPhaseActionServiceTest {
     @Inject
     FeatureFlowPhaseActionRepository featureFlowPhaseActionRepository;
 
+    @Inject
+    ProjectService projectService;
+
     private FeatureFlowPhaseStep createStep() {
-        FeatureFlowConfiguration config = featureFlowConfigurationService.create("Test Flow");
+        var project = projectService.create("Action Project", null);
+        FeatureFlowConfiguration config = featureFlowConfigurationService.createUnderProject(project.id, "Test Flow");
         FeatureFlowPhase phase = featureFlowPhaseService.create(config.id, "Phase", null, 0, null);
         return featureFlowPhaseStepService.create(phase.id, "Build", 0);
     }
 
-    private ActionConfiguration createAction(String id) {
+    private ActionConfiguration createAction(String suffix) {
         return actionConfigurationService.create(
-            id, "Action " + id, "Desc", "echo exec", "echo check"
+            "Action " + suffix, "Desc", "echo exec", "echo check"
         );
     }
 

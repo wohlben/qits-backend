@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface FeatureFlowConfigurationMapper {
 
     @Mapping(target = "phases", source = "phases")
+    @Mapping(target = "projectId", source = "project.id")
     FeatureFlowConfigurationDto toDto(FeatureFlowConfiguration entity);
 }
