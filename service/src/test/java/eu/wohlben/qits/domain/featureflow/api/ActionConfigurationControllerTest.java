@@ -14,29 +14,30 @@ public class ActionConfigurationControllerTest {
     @Test
     public void testCreateAndGetAndListAndUpdateAndDelete() {
         // Create
-        given()
+        String id = given()
             .contentType(ContentType.JSON)
             .body(new ActionConfigurationController.CreateActionConfigurationRequest(
-                "ctrl-test", "Ctrl Action", "Desc", "echo run", "echo required"
+                "Ctrl Action", "Desc", "echo run", "echo required"
             ))
         .when()
             .post("/api/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("actionConfiguration.id", equalTo("ctrl-test"))
+            .body("actionConfiguration.id", notNullValue())
             .body("actionConfiguration.name", equalTo("Ctrl Action"))
             .body("actionConfiguration.description", equalTo("Desc"))
             .body("actionConfiguration.executeScript", equalTo("echo run"))
-            .body("actionConfiguration.checkScript", equalTo("echo required"));
+            .body("actionConfiguration.checkScript", equalTo("echo required"))
+            .extract().path("actionConfiguration.id");
 
         // Get
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/api/action-configurations/ctrl-test")
+            .get("/api/action-configurations/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("actionConfiguration.id", equalTo("ctrl-test"))
+            .body("actionConfiguration.id", equalTo(id))
             .body("actionConfiguration.name", equalTo("Ctrl Action"));
 
         // List
@@ -46,7 +47,7 @@ public class ActionConfigurationControllerTest {
             .get("/api/action-configurations")
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .body("entries.actionConfiguration.id", hasItem("ctrl-test"));
+            .body("entries.actionConfiguration.id", hasItem(id));
 
         // Update
         given()
@@ -55,7 +56,7 @@ public class ActionConfigurationControllerTest {
                 "Updated Name", "Updated Desc", "echo updated", "echo suggested"
             ))
         .when()
-            .put("/api/action-configurations/ctrl-test")
+            .put("/api/action-configurations/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("actionConfiguration.name", equalTo("Updated Name"))
@@ -67,7 +68,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .delete("/api/action-configurations/ctrl-test")
+            .delete("/api/action-configurations/" + id)
         .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("success", equalTo(true));
@@ -76,32 +77,9 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
         .when()
-            .get("/api/action-configurations/ctrl-test")
+            .get("/api/action-configurations/" + id)
         .then()
             .statusCode(Response.Status.NOT_FOUND.getStatusCode());
-    }
-
-    @Test
-    public void testCreateDuplicateId() {
-        given()
-            .contentType(ContentType.JSON)
-            .body(new ActionConfigurationController.CreateActionConfigurationRequest(
-                "dup-id", "First", null, "echo 1", "echo optional"
-            ))
-        .when()
-            .post("/api/action-configurations")
-        .then()
-            .statusCode(Response.Status.OK.getStatusCode());
-
-        given()
-            .contentType(ContentType.JSON)
-            .body(new ActionConfigurationController.CreateActionConfigurationRequest(
-                "dup-id", "Second", null, "echo 2", "echo optional"
-            ))
-        .when()
-            .post("/api/action-configurations")
-        .then()
-            .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
     }
 
     @Test
@@ -109,7 +87,7 @@ public class ActionConfigurationControllerTest {
         given()
             .contentType(ContentType.JSON)
             .body(new ActionConfigurationController.CreateActionConfigurationRequest(
-                "", "", null, "", ""
+                "", null, "", ""
             ))
         .when()
             .post("/api/action-configurations")
