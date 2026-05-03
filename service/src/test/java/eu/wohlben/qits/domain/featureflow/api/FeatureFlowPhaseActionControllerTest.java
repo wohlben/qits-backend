@@ -2,9 +2,11 @@ package eu.wohlben.qits.domain.featureflow.api;
 
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
+import eu.wohlben.qits.domain.project.control.ProjectService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
@@ -29,15 +31,19 @@ public class FeatureFlowPhaseActionControllerTest {
     @Inject
     ActionConfigurationService actionConfigurationService;
 
+    @Inject
+    ProjectService projectService;
+
     private String createStepId() {
-        var config = featureFlowConfigurationService.create("Action Test Flow");
+        var project = projectService.create("Action Project", null);
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Action Test Flow");
         var phase = featureFlowPhaseService.create(config.id, "Phase", null, 0, null);
         var step = featureFlowPhaseStepService.create(phase.id, "Build", 0);
         return step.id;
     }
 
-    private String createActionId(String id) {
-        return actionConfigurationService.create(id, "Action " + id, "Desc", "echo exec", "echo check").id;
+    private String createActionId(String suffix) {
+        return actionConfigurationService.create("Action " + suffix, "Desc", "echo exec", "echo check").id;
     }
 
     @Test

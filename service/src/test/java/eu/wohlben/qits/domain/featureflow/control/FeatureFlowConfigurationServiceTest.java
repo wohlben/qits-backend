@@ -2,6 +2,8 @@ package eu.wohlben.qits.domain.featureflow.control;
 
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowConfiguration;
 import eu.wohlben.qits.domain.featureflow.persistence.FeatureFlowConfigurationRepository;
+import eu.wohlben.qits.domain.project.control.ProjectService;
+import eu.wohlben.qits.domain.project.entity.Project;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
@@ -19,12 +21,21 @@ public class FeatureFlowConfigurationServiceTest {
     @Inject
     FeatureFlowConfigurationRepository featureFlowConfigurationRepository;
 
+    @Inject
+    ProjectService projectService;
+
+    private Project createProject() {
+        return projectService.create("Test Project", null);
+    }
+
     @Test
     public void testCreateAndGet() {
-        var config = featureFlowConfigurationService.create("Test Flow");
+        var project = createProject();
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Test Flow");
 
         assertNotNull(config.id);
         assertEquals("Test Flow", config.name);
+        assertEquals(project.id, config.project.id);
 
         var found = featureFlowConfigurationService.get(config.id);
         assertEquals(config.id, found.id);
@@ -33,11 +44,19 @@ public class FeatureFlowConfigurationServiceTest {
 
     @Test
     public void testCreateMissingNameThrows() {
+        var project = createProject();
         assertThrows(BadRequestException.class, () ->
-            featureFlowConfigurationService.create(null)
+            featureFlowConfigurationService.createUnderProject(project.id, null)
         );
         assertThrows(BadRequestException.class, () ->
-            featureFlowConfigurationService.create("   ")
+            featureFlowConfigurationService.createUnderProject(project.id, "   ")
+        );
+    }
+
+    @Test
+    public void testCreateMissingProjectThrows() {
+        assertThrows(NotFoundException.class, () ->
+            featureFlowConfigurationService.createUnderProject("non-existent", "Name")
         );
     }
 
@@ -50,17 +69,34 @@ public class FeatureFlowConfigurationServiceTest {
 
     @Test
     public void testList() {
+        var project = createProject();
         long before = featureFlowConfigurationRepository.count();
-        featureFlowConfigurationService.create("Flow One");
-        featureFlowConfigurationService.create("Flow Two");
+        featureFlowConfigurationService.createUnderProject(project.id, "Flow One");
+        featureFlowConfigurationService.createUnderProject(project.id, "Flow Two");
 
         var list = featureFlowConfigurationService.list();
         assertEquals(before + 2, list.size());
     }
 
     @Test
+    public void testListByProject() {
+        var projectA = createProject();
+        var projectB = createProject();
+        featureFlowConfigurationService.createUnderProject(projectA.id, "Flow A");
+        featureFlowConfigurationService.createUnderProject(projectA.id, "Flow A2");
+        featureFlowConfigurationService.createUnderProject(projectB.id, "Flow B");
+
+        var listA = featureFlowConfigurationService.listByProject(projectA.id);
+        assertEquals(2, listA.size());
+
+        var listB = featureFlowConfigurationService.listByProject(projectB.id);
+        assertEquals(1, listB.size());
+    }
+
+    @Test
     public void testUpdate() {
-        var config = featureFlowConfigurationService.create("Original");
+        var project = createProject();
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Original");
 
         var updated = featureFlowConfigurationService.update(config.id, "Updated");
 
@@ -69,7 +105,8 @@ public class FeatureFlowConfigurationServiceTest {
 
     @Test
     public void testUpdatePartial() {
-        var config = featureFlowConfigurationService.create("Original");
+        var project = createProject();
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Original");
 
         var updated = featureFlowConfigurationService.update(config.id, null);
 
@@ -85,7 +122,8 @@ public class FeatureFlowConfigurationServiceTest {
 
     @Test
     public void testDelete() {
-        var config = featureFlowConfigurationService.create("ToDelete");
+        var project = createProject();
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "ToDelete");
 
         assertNotNull(featureFlowConfigurationService.get(config.id));
 

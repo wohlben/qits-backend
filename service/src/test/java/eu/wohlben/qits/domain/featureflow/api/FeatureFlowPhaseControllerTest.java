@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.featureflow.api;
 
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
+import eu.wohlben.qits.domain.project.control.ProjectService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
@@ -16,9 +17,13 @@ public class FeatureFlowPhaseControllerTest {
     @Inject
     FeatureFlowConfigurationService featureFlowConfigurationService;
 
+    @Inject
+    ProjectService projectService;
+
     @Test
     public void testCreateAndGetAndListAndUpdateAndDelete() {
-        var config = featureFlowConfigurationService.create("Ctrl Flow");
+        var project = projectService.create("Phase Project", null);
+        var config = featureFlowConfigurationService.createUnderProject(project.id, "Ctrl Flow");
 
         // Create
         String id = given()

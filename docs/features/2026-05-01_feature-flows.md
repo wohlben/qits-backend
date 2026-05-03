@@ -4,6 +4,7 @@
 
 **Related / Dependent Plans:**
 - [`docs/features/2026-05-01_actions.md`](2026-05-01_actions.md) — The standalone action domain was merged into feature flow. Action configurations now live under the `featureflow` package and are linked to steps via `FeatureFlowPhaseAction`.
+- [`docs/features/2026-05-01_project-domain.md`](2026-05-01_project-domain.md) — `FeatureFlowConfiguration` is now associated with a `Project` rather than a single `Repository`, allowing a flow to span all repositories in the project.
 - [`docs/feature-ideas/feature-flows.md`](../feature-ideas/feature-flows.md) — Future extensions (feature development instances, transition automation) remain in the idea draft.
 
 ## Goals
@@ -14,6 +15,7 @@
 4. Introduce `FeatureFlowPhaseStep` as an ordered, named container of actions within a phase — enabling logical groupings such as "lint" that contain multiple concrete actions (e.g. `lint-frontend`, `lint-backend`).
 5. Provide a quality-gate mechanism per phase: an ordered set of mandatory actions that must pass before the phase can transition.
 6. Support parallel execution hints via an optional `parallelGroup` on action links.
+7. Associate feature-flow configurations with a **project** so that a single flow can orchestrate changes across all repositories in that project.
 
 ## Non-Goals
 
@@ -25,12 +27,13 @@
 
 ### FeatureFlowConfiguration
 
-The root blueprint entity. Owns an ordered list of phases.
+The root blueprint entity. Owns an ordered list of phases and belongs to a project.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | UUID | Auto-generated primary key |
 | `name` | string | Human-readable name |
+| `project` | ref (required) | Owning project |
 | `phases` | list | Ordered top-level phases |
 
 ### FeatureFlowPhase
@@ -91,7 +94,8 @@ Join entity between a step and an `ActionConfiguration`. Adds ordering and gatin
 
 | Resource | Path | Operations |
 |----------|------|------------|
-| FeatureFlowConfiguration | `/feature-flow-configurations` | CRUD (now returns phase tree with steps) |
+| FeatureFlowConfiguration | `/feature-flow-configurations` | Get, update, delete, list all |
+| FeatureFlowConfiguration (project-scoped) | `/projects/{projectId}/feature-flow-configurations` | Create under project, list by project |
 | FeatureFlowPhase | `/feature-flow-phases` | CRUD + list by `featureFlowConfigurationId` or list all |
 | FeatureFlowPhaseStep | `/feature-flow-phase-steps` | CRUD + list by `phaseId` or list all |
 | FeatureFlowPhaseAction | `/feature-flow-phase-actions` | CRUD + list by `stepId` or list all |

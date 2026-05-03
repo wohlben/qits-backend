@@ -32,20 +32,6 @@ public class FeatureFlowConfigurationController {
     @Inject
     FeatureFlowConfigurationMapper featureFlowConfigurationMapper;
 
-    public static record CreateFeatureFlowConfigurationRequest(
-        @NotBlank String name
-    ) {
-        public record Response(FeatureFlowConfigurationDto featureFlowConfiguration) {}
-    }
-
-    @POST
-    public CreateFeatureFlowConfigurationRequest.Response create(@Valid CreateFeatureFlowConfigurationRequest request) {
-        var config = featureFlowConfigurationService.create(request.name());
-        return new CreateFeatureFlowConfigurationRequest.Response(
-            featureFlowConfigurationMapper.toDto(config)
-        );
-    }
-
     public static record GetFeatureFlowConfigurationRequest() {
         public record Response(FeatureFlowConfigurationDto featureFlowConfiguration) {}
     }
