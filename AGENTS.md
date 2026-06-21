@@ -15,5 +15,5 @@
 ## Testing
 
 - **Aim for full test coverage** on all new features and bug fixes.
-- Every package with business logic should have corresponding `_test.go` files.
+- Every package with business logic should have corresponding JUnit `*Test.java` classes (e.g. `ProjectServiceTest`, `ProjectControllerTest`).
 - Regression tests are required when fixing bugs or when a feature is first implemented.
