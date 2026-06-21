@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.repository.control;
 
+import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
@@ -13,6 +14,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 @ApplicationScoped
 public class WorktreeService {
@@ -32,6 +34,27 @@ public class WorktreeService {
     @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
     String dataDir;
 
+    public List<WorktreeDto> listWorktrees(String repoId) {
+        repositoryRepository.findByIdOptional(repoId)
+            .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
+
+        return worktreeRepository.findByRepositoryId(repoId).stream()
+            .map(wt -> new WorktreeDto(wt.worktreeId, wt.parent, currentBranchOrNull(repoId, wt.worktreeId)))
+            .toList();
+    }
+
+    private String currentBranchOrNull(String repoId, String worktreeId) {
+        Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
+        if (!Files.exists(worktreePath)) {
+            return null;
+        }
+        try {
+            return git.getCurrentBranch(worktreePath);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     @Transactional
     public Worktree createWorktree(String repoId, String worktreeId, String parent, String branch) {
         var repo = repositoryRepository.findByIdOptional(repoId)
@@ -46,18 +69,17 @@ public class WorktreeService {
             throw new BadRequestException("Worktree already exists: " + worktreeId);
         }
 
-        if (parent != null && !parent.isBlank()) {
-            if (worktreeRepository.findByRepositoryAndWorktreeId(repoId, parent).isEmpty()) {
-                throw new NotFoundException("Parent worktree not found: " + parent);
-            }
-        }
-
-        String resolvedBranch = (branch == null || branch.isBlank()) ? "master" : branch;
-        Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
+        // `parent` is the branch to fork from; `branch` is the new branch the worktree owns.
+        // Each worktree gets its own branch so two worktrees never commit to the same branch.
+        String parentBranch = (parent == null || parent.isBlank()) ? "master" : parent;
+        String newBranch = (branch == null || branch.isBlank()) ? worktreeId : branch;
+        // Absolute path: `git worktree add` runs with cwd=origin, so a relative path
+        // would be created nested under origin instead of the repo's worktrees dir.
+        Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
 
         try {
             Files.createDirectories(worktreePath.getParent());
-            git.exec(originPath.toFile(), "git", "worktree", "add", worktreePath.toString(), resolvedBranch);
+            git.exec(originPath.toFile(), "git", "worktree", "add", "-b", newBranch, worktreePath.toString(), parentBranch);
         } catch (Exception e) {
             throw new InternalServerErrorException("Git worktree add failed: " + e.getMessage());
         }
@@ -65,12 +87,12 @@ public class WorktreeService {
         Worktree worktree = new Worktree();
         worktree.worktreeId = worktreeId;
         worktree.repository = repo;
-        worktree.parent = parent;
+        worktree.parent = parentBranch;
         worktreeRepository.persist(worktree);
 
         WorktreeMetadata metadata = new WorktreeMetadata();
         metadata.worktreeId = worktreeId;
-        metadata.parent = parent;
+        metadata.parent = parentBranch;
         metadataService.writeWorktreeMetadata(repoId, metadata);
 
         return worktree;
@@ -107,7 +129,7 @@ public class WorktreeService {
         Path mergeCwd = findWorktreePathForBranch(repoId, resolvedTarget);
         boolean isTemp = false;
         if (mergeCwd == null) {
-            mergeCwd = Path.of(dataDir, repoId, "worktrees", ".tmp-merge-" + System.currentTimeMillis());
+            mergeCwd = Path.of(dataDir, repoId, "worktrees", ".tmp-merge-" + System.currentTimeMillis()).toAbsolutePath();
             try {
                 git.exec(originPath.toFile(), "git", "worktree", "add", mergeCwd.toString(), resolvedTarget);
             } catch (Exception e) {
