@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface WorktreeMapper {
 
     @Mapping(source = "parent", target = "parent")
+    @Mapping(target = "branch", ignore = true)
     WorktreeDto toDto(Worktree entity);
 }

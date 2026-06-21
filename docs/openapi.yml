@@ -192,6 +192,11 @@ components:
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
+    Entry8:
+      type: object
+      properties:
+        worktree:
+          $ref: "#/components/schemas/WorktreeDto"
     FeatureFlowConfigurationDto:
       type: object
       properties:
@@ -464,27 +469,41 @@ components:
     Response37:
       type: object
       properties:
+        branches:
+          type: array
+          items:
+            type: string
+    Response38:
+      type: object
+      properties:
         commitHash:
           type: string
         hasConflicts:
           type: boolean
         output:
           type: string
-    Response38:
-      type: object
-      properties:
-        success:
-          type: boolean
     Response39:
       type: object
       properties:
-        worktree:
-          $ref: "#/components/schemas/WorktreeDto"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry8"
     Response4:
       type: object
       properties:
         actionConfiguration:
           $ref: "#/components/schemas/ActionConfigurationDto"
+    Response40:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response41:
+      type: object
+      properties:
+        worktree:
+          $ref: "#/components/schemas/WorktreeDto"
     Response5:
       type: object
       properties:
@@ -578,6 +597,8 @@ components:
         worktreeId:
           type: string
         parent:
+          type: string
+        branch:
           type: string
 paths:
   /api/action-configurations:
@@ -1315,6 +1336,24 @@ paths:
       summary: Delete
       tags:
       - Repository Controller
+  /api/repositories/{repoId}/branches:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response37"
+      summary: Branches
+      tags:
+      - Repository Controller
   /api/repositories/{repoId}/pull:
     post:
       parameters:
@@ -1352,6 +1391,23 @@ paths:
       tags:
       - Repository Controller
   /api/repositories/{repoId}/worktrees:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response39"
+      summary: List
+      tags:
+      - Worktree Controller
     post:
       parameters:
       - name: repoId
@@ -1371,7 +1427,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response39"
+                $ref: "#/components/schemas/Response41"
         "400":
           description: Bad Request
       summary: Create
@@ -1402,7 +1458,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response38"
+                $ref: "#/components/schemas/Response40"
         "400":
           description: Bad Request
       summary: Discard
@@ -1433,7 +1489,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response37"
+                $ref: "#/components/schemas/Response38"
         "400":
           description: Bad Request
       summary: Merge
