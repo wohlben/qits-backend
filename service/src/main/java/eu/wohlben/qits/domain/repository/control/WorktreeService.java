@@ -34,11 +34,14 @@ public class WorktreeService {
         .findByIdOptional(repoId)
         .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
 
+    Path originPath = Path.of(dataDir, repoId, "origin");
     return worktreeRepository.findByRepositoryId(repoId).stream()
         .map(
-            wt ->
-                new WorktreeDto(
-                    wt.worktreeId, wt.parent, currentBranchOrNull(repoId, wt.worktreeId)))
+            wt -> {
+              String branch = currentBranchOrNull(repoId, wt.worktreeId);
+              AheadBehind ab = aheadBehind(originPath, wt.parent, branch);
+              return new WorktreeDto(wt.worktreeId, wt.parent, branch, ab.ahead(), ab.behind());
+            })
         .toList();
   }
 
@@ -53,6 +56,43 @@ public class WorktreeService {
       return null;
     }
   }
+
+  /**
+   * Counts how far {@code branch} is ahead of and behind its {@code parent} branch. Runs in the
+   * bare origin, which holds every worktree branch as a ref. Returns {@code (0, 0)} when the two
+   * names are the same or either is missing, and {@code (null, null)} if git can't resolve a ref.
+   */
+  private AheadBehind aheadBehind(Path originPath, String parent, String branch) {
+    if (parent == null
+        || branch == null
+        || parent.isBlank()
+        || branch.isBlank()
+        || parent.equals(branch)
+        || !Files.exists(originPath)) {
+      return new AheadBehind(0, 0);
+    }
+    try {
+      // `--left-right --count A...B` prints "<behind>\t<ahead>": commits in A not B, then B not A.
+      String out =
+          git.exec(
+                  originPath.toFile(),
+                  "git",
+                  "rev-list",
+                  "--left-right",
+                  "--count",
+                  parent + "..." + branch)
+              .trim();
+      String[] parts = out.split("\\s+");
+      if (parts.length != 2) {
+        return new AheadBehind(null, null);
+      }
+      return new AheadBehind(Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
+    } catch (Exception e) {
+      return new AheadBehind(null, null);
+    }
+  }
+
+  private record AheadBehind(Integer ahead, Integer behind) {}
 
   @Transactional
   public Worktree createWorktree(String repoId, String worktreeId, String parent, String branch) {
