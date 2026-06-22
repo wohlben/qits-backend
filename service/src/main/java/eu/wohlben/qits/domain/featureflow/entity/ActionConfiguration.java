@@ -6,34 +6,33 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.Instant;
 
 @Entity
 public class ActionConfiguration extends PanacheEntityBase {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    public String id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  public String id;
 
-    @Column(nullable = false)
-    public String name;
+  @Column(nullable = false)
+  public String name;
 
-    public String description;
+  public String description;
 
-    @Column(name = "execute_script", nullable = false, length = 4000)
-    public String executeScript;
+  @Column(name = "execute_script", nullable = false, length = 4000)
+  public String executeScript;
 
-    @Column(name = "check_script", nullable = false, length = 4000)
-    public String checkScript;
+  @Column(name = "check_script", nullable = false, length = 4000)
+  public String checkScript;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    public Instant createdAt;
+  @CreationTimestamp
+  @Column(name = "created_at", nullable = false, updatable = false)
+  public Instant createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    public Instant updatedAt;
+  @UpdateTimestamp
+  @Column(name = "updated_at", nullable = false)
+  public Instant updatedAt;
 }

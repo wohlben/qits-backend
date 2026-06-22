@@ -10,5 +10,4 @@ public record FeatureFlowPhaseDto(
     String featureFlowConfigurationId,
     String parentPhaseId,
     List<FeatureFlowPhaseStepDto> steps,
-    List<FeatureFlowPhaseDto> subPhases
-) {}
+    List<FeatureFlowPhaseDto> subPhases) {}

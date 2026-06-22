@@ -7,5 +7,5 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "jakarta")
 public interface ActionConfigurationMapper {
 
-    ActionConfigurationDto toDto(ActionConfiguration entity);
+  ActionConfigurationDto toDto(ActionConfiguration entity);
 }

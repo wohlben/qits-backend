@@ -17,29 +17,28 @@ import jakarta.persistence.UniqueConstraint;
 @Entity
 @Table(
     name = "feature_flow_phase_action",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"step_id", "action_configuration_id"})
-)
+    uniqueConstraints = @UniqueConstraint(columnNames = {"step_id", "action_configuration_id"}))
 public class FeatureFlowPhaseAction extends PanacheEntityBase {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    public String id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  public String id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "step_id")
-    public FeatureFlowPhaseStep step;
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(name = "step_id")
+  public FeatureFlowPhaseStep step;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "action_configuration_id")
-    public ActionConfiguration actionConfiguration;
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(name = "action_configuration_id")
+  public ActionConfiguration actionConfiguration;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "action_type", nullable = false)
-    public ActionType actionType;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "action_type", nullable = false)
+  public ActionType actionType;
 
-    @Column(name = "sort_order", nullable = false)
-    public int sortOrder;
+  @Column(name = "sort_order", nullable = false)
+  public int sortOrder;
 
-    @Column(name = "parallel_group")
-    public String parallelGroup;
+  @Column(name = "parallel_group")
+  public String parallelGroup;
 }

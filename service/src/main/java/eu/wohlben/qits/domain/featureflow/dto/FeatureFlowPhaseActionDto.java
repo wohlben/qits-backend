@@ -8,5 +8,4 @@ public record FeatureFlowPhaseActionDto(
     ActionConfigurationDto actionConfiguration,
     ActionType actionType,
     int sortOrder,
-    String parallelGroup
-) {}
+    String parallelGroup) {}
