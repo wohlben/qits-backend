@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Quarkus 3 (Java 17) backend for managing Git repositories, worktrees, and "feature flow" configurations, with an Angular UI served via Quarkus Quinoa. Maven multi-module: root `pom.xml` aggregates the single `service/` module. Group `eu.wohlben`, base package `eu.wohlben.qits`.
+A Quarkus 3 (Java 25) backend for managing Git repositories, worktrees, and "feature flow" configurations, with an Angular UI served via Quarkus Quinoa. Maven multi-module: root `pom.xml` aggregates the single `service/` module. Group `eu.wohlben`, base package `eu.wohlben.qits`.
+
+Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docker images use `ubi9/openjdk-25-runtime`; project JDK pinned via `.sdkmanrc`). Spotless (google-java-format) runs automatically on every build via the `process-sources` phase — google-java-format requires JDK 21+, so don't build on JDK 17.
 
 ## Commands
 
