@@ -600,6 +600,12 @@ components:
           type: string
         branch:
           type: string
+        ahead:
+          type: integer
+          format: int32
+        behind:
+          type: integer
+          format: int32
 paths:
   /api/action-configurations:
     get:
