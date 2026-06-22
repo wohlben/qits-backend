@@ -20,7 +20,6 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
-
 import java.util.List;
 
 @Path("/feature-flow-phase-actions")
@@ -29,95 +28,90 @@ import java.util.List;
 @Transactional
 public class FeatureFlowPhaseActionController {
 
-    @Inject
-    FeatureFlowPhaseActionService featureFlowPhaseActionService;
+  @Inject FeatureFlowPhaseActionService featureFlowPhaseActionService;
 
-    @Inject
-    FeatureFlowPhaseMapper featureFlowPhaseMapper;
+  @Inject FeatureFlowPhaseMapper featureFlowPhaseMapper;
 
-    public static record CreateFeatureFlowPhaseActionRequest(
-        @NotBlank String stepId,
-        @NotBlank String actionConfigurationId,
-        @NotNull ActionType actionType,
-        @NotNull int sortOrder,
-        String parallelGroup
-    ) {
-        public record Response(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
-    }
+  public static record CreateFeatureFlowPhaseActionRequest(
+      @NotBlank String stepId,
+      @NotBlank String actionConfigurationId,
+      @NotNull ActionType actionType,
+      @NotNull int sortOrder,
+      String parallelGroup) {
+    public record Response(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
+  }
 
-    @POST
-    public CreateFeatureFlowPhaseActionRequest.Response create(@Valid CreateFeatureFlowPhaseActionRequest request) {
-        var link = featureFlowPhaseActionService.create(
+  @POST
+  public CreateFeatureFlowPhaseActionRequest.Response create(
+      @Valid CreateFeatureFlowPhaseActionRequest request) {
+    var link =
+        featureFlowPhaseActionService.create(
             request.stepId(),
             request.actionConfigurationId(),
             request.actionType(),
             request.sortOrder(),
-            request.parallelGroup()
-        );
-        return new CreateFeatureFlowPhaseActionRequest.Response(
-            featureFlowPhaseMapper.toActionDto(link)
-        );
-    }
+            request.parallelGroup());
+    return new CreateFeatureFlowPhaseActionRequest.Response(
+        featureFlowPhaseMapper.toActionDto(link));
+  }
 
-    public static record GetFeatureFlowPhaseActionRequest() {
-        public record Response(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
-    }
+  public static record GetFeatureFlowPhaseActionRequest() {
+    public record Response(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
+  }
 
-    @GET
-    @Path("/{id}")
-    public GetFeatureFlowPhaseActionRequest.Response get(@PathParam("id") String id) {
-        var link = featureFlowPhaseActionService.get(id);
-        return new GetFeatureFlowPhaseActionRequest.Response(
-            featureFlowPhaseMapper.toActionDto(link)
-        );
-    }
+  @GET
+  @Path("/{id}")
+  public GetFeatureFlowPhaseActionRequest.Response get(@PathParam("id") String id) {
+    var link = featureFlowPhaseActionService.get(id);
+    return new GetFeatureFlowPhaseActionRequest.Response(featureFlowPhaseMapper.toActionDto(link));
+  }
 
-    public static record ListFeatureFlowPhaseActionsRequest() {
-        public record Response(List<Entry> entries) {
-            public record Entry(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
-        }
+  public static record ListFeatureFlowPhaseActionsRequest() {
+    public record Response(List<Entry> entries) {
+      public record Entry(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
     }
+  }
 
-    @GET
-    public ListFeatureFlowPhaseActionsRequest.Response list(@QueryParam("stepId") String stepId) {
-        List<FeatureFlowPhaseAction> links = stepId != null
+  @GET
+  public ListFeatureFlowPhaseActionsRequest.Response list(@QueryParam("stepId") String stepId) {
+    List<FeatureFlowPhaseAction> links =
+        stepId != null
             ? featureFlowPhaseActionService.listByStep(stepId)
             : featureFlowPhaseActionService.listAll();
-        var entries = links.stream()
-            .map(l -> new ListFeatureFlowPhaseActionsRequest.Response.Entry(
-                featureFlowPhaseMapper.toActionDto(l)
-            ))
+    var entries =
+        links.stream()
+            .map(
+                l ->
+                    new ListFeatureFlowPhaseActionsRequest.Response.Entry(
+                        featureFlowPhaseMapper.toActionDto(l)))
             .toList();
-        return new ListFeatureFlowPhaseActionsRequest.Response(entries);
-    }
+    return new ListFeatureFlowPhaseActionsRequest.Response(entries);
+  }
 
-    public static record UpdateFeatureFlowPhaseActionRequest(
-        ActionType actionType,
-        Integer sortOrder,
-        String parallelGroup
-    ) {
-        public record Response(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
-    }
+  public static record UpdateFeatureFlowPhaseActionRequest(
+      ActionType actionType, Integer sortOrder, String parallelGroup) {
+    public record Response(FeatureFlowPhaseActionDto featureFlowPhaseAction) {}
+  }
 
-    @PUT
-    @Path("/{id}")
-    public UpdateFeatureFlowPhaseActionRequest.Response update(@PathParam("id") String id, @Valid UpdateFeatureFlowPhaseActionRequest request) {
-        var link = featureFlowPhaseActionService.update(
-            id, request.actionType(), request.sortOrder(), request.parallelGroup()
-        );
-        return new UpdateFeatureFlowPhaseActionRequest.Response(
-            featureFlowPhaseMapper.toActionDto(link)
-        );
-    }
+  @PUT
+  @Path("/{id}")
+  public UpdateFeatureFlowPhaseActionRequest.Response update(
+      @PathParam("id") String id, @Valid UpdateFeatureFlowPhaseActionRequest request) {
+    var link =
+        featureFlowPhaseActionService.update(
+            id, request.actionType(), request.sortOrder(), request.parallelGroup());
+    return new UpdateFeatureFlowPhaseActionRequest.Response(
+        featureFlowPhaseMapper.toActionDto(link));
+  }
 
-    public static record DeleteFeatureFlowPhaseActionRequest() {
-        public record Response(boolean success) {}
-    }
+  public static record DeleteFeatureFlowPhaseActionRequest() {
+    public record Response(boolean success) {}
+  }
 
-    @DELETE
-    @Path("/{id}")
-    public DeleteFeatureFlowPhaseActionRequest.Response delete(@PathParam("id") String id) {
-        featureFlowPhaseActionService.delete(id);
-        return new DeleteFeatureFlowPhaseActionRequest.Response(true);
-    }
+  @DELETE
+  @Path("/{id}")
+  public DeleteFeatureFlowPhaseActionRequest.Response delete(@PathParam("id") String id) {
+    featureFlowPhaseActionService.delete(id);
+    return new DeleteFeatureFlowPhaseActionRequest.Response(true);
+  }
 }

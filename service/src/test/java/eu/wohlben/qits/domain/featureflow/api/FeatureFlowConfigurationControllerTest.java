@@ -1,5 +1,8 @@
 package eu.wohlben.qits.domain.featureflow.api;
 
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
@@ -13,49 +16,47 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.*;
-
 @QuarkusTest
 public class FeatureFlowConfigurationControllerTest {
 
-    @Inject
-    FeatureFlowConfigurationService featureFlowConfigurationService;
+  @Inject FeatureFlowConfigurationService featureFlowConfigurationService;
 
-    @Inject
-    FeatureFlowPhaseService featureFlowPhaseService;
+  @Inject FeatureFlowPhaseService featureFlowPhaseService;
 
-    @Inject
-    FeatureFlowPhaseStepService featureFlowPhaseStepService;
+  @Inject FeatureFlowPhaseStepService featureFlowPhaseStepService;
 
-    @Inject
-    FeatureFlowPhaseActionService featureFlowPhaseActionService;
+  @Inject FeatureFlowPhaseActionService featureFlowPhaseActionService;
 
-    @Inject
-    ActionConfigurationService actionConfigurationService;
+  @Inject ActionConfigurationService actionConfigurationService;
 
-    @Inject
-    ProjectService projectService;
+  @Inject ProjectService projectService;
 
-    @Test
-    public void testCreateAndGetAndListAndUpdateAndDelete() {
-        // Create project
-        String projectId = given()
+  @Test
+  public void testCreateAndGetAndListAndUpdateAndDelete() {
+    // Create project
+    String projectId =
+        given()
             .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest("Ctrl Project", null))
-        .when()
+            .body(
+                new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                    "Ctrl Project", null))
+            .when()
             .post("/api/projects")
-        .then()
+            .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .extract().path("project.id");
+            .extract()
+            .path("project.id");
 
-        // Create feature flow configuration under project
-        String id = given()
+    // Create feature flow configuration under project
+    String id =
+        given()
             .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectFeatureFlowConfigurationRequest("Ctrl Flow"))
-        .when()
+            .body(
+                new eu.wohlben.qits.domain.project.api.ProjectController
+                    .CreateProjectFeatureFlowConfigurationRequest("Ctrl Flow"))
+            .when()
             .post("/api/projects/" + projectId + "/feature-flow-configurations")
-        .then()
+            .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("featureFlowConfiguration.id", notNullValue())
             .body("featureFlowConfiguration.name", equalTo("Ctrl Flow"))
@@ -63,229 +64,240 @@ public class FeatureFlowConfigurationControllerTest {
             .extract()
             .path("featureFlowConfiguration.id");
 
-        // Get
+    // Get
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .get("/api/feature-flow-configurations/" + id)
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("featureFlowConfiguration.id", equalTo(id))
+        .body("featureFlowConfiguration.name", equalTo("Ctrl Flow"));
+
+    // List
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .get("/api/feature-flow-configurations")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("entries.featureFlowConfiguration.id", hasItem(id));
+
+    // Update
+    given()
+        .contentType(ContentType.JSON)
+        .body(
+            new FeatureFlowConfigurationController.UpdateFeatureFlowConfigurationRequest(
+                "Updated Flow"))
+        .when()
+        .put("/api/feature-flow-configurations/" + id)
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("featureFlowConfiguration.name", equalTo("Updated Flow"));
+
+    // Delete
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .delete("/api/feature-flow-configurations/" + id)
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("success", equalTo(true));
+
+    // Get after delete should 404
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .get("/api/feature-flow-configurations/" + id)
+        .then()
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testCreateValidationErrors() {
+    // Create project
+    String projectId =
         given()
             .contentType(ContentType.JSON)
-        .when()
-            .get("/api/feature-flow-configurations/" + id)
-        .then()
-            .statusCode(Response.Status.OK.getStatusCode())
-            .body("featureFlowConfiguration.id", equalTo(id))
-            .body("featureFlowConfiguration.name", equalTo("Ctrl Flow"));
-
-        // List
-        given()
-            .contentType(ContentType.JSON)
-        .when()
-            .get("/api/feature-flow-configurations")
-        .then()
-            .statusCode(Response.Status.OK.getStatusCode())
-            .body("entries.featureFlowConfiguration.id", hasItem(id));
-
-        // Update
-        given()
-            .contentType(ContentType.JSON)
-            .body(new FeatureFlowConfigurationController.UpdateFeatureFlowConfigurationRequest("Updated Flow"))
-        .when()
-            .put("/api/feature-flow-configurations/" + id)
-        .then()
-            .statusCode(Response.Status.OK.getStatusCode())
-            .body("featureFlowConfiguration.name", equalTo("Updated Flow"));
-
-        // Delete
-        given()
-            .contentType(ContentType.JSON)
-        .when()
-            .delete("/api/feature-flow-configurations/" + id)
-        .then()
-            .statusCode(Response.Status.OK.getStatusCode())
-            .body("success", equalTo(true));
-
-        // Get after delete should 404
-        given()
-            .contentType(ContentType.JSON)
-        .when()
-            .get("/api/feature-flow-configurations/" + id)
-        .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
-    }
-
-    @Test
-    public void testCreateValidationErrors() {
-        // Create project
-        String projectId = given()
-            .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest("Val Project", null))
-        .when()
+            .body(
+                new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                    "Val Project", null))
+            .when()
             .post("/api/projects")
-        .then()
+            .then()
             .statusCode(Response.Status.OK.getStatusCode())
-            .extract().path("project.id");
+            .extract()
+            .path("project.id");
 
-        given()
-            .contentType(ContentType.JSON)
-            .body(new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectFeatureFlowConfigurationRequest(""))
+    given()
+        .contentType(ContentType.JSON)
+        .body(
+            new eu.wohlben.qits.domain.project.api.ProjectController
+                .CreateProjectFeatureFlowConfigurationRequest(""))
         .when()
-            .post("/api/projects/" + projectId + "/feature-flow-configurations")
+        .post("/api/projects/" + projectId + "/feature-flow-configurations")
         .then()
-            .statusCode(anyOf(
-                equalTo(Response.Status.BAD_REQUEST.getStatusCode()),
-                equalTo(422)
-            ));
-    }
+        .statusCode(anyOf(equalTo(Response.Status.BAD_REQUEST.getStatusCode()), equalTo(422)));
+  }
 
-    @Test
-    public void testUpdateNotFound() {
-        given()
-            .contentType(ContentType.JSON)
-            .body(new FeatureFlowConfigurationController.UpdateFeatureFlowConfigurationRequest("Name"))
+  @Test
+  public void testUpdateNotFound() {
+    given()
+        .contentType(ContentType.JSON)
+        .body(new FeatureFlowConfigurationController.UpdateFeatureFlowConfigurationRequest("Name"))
         .when()
-            .put("/api/feature-flow-configurations/non-existent")
+        .put("/api/feature-flow-configurations/non-existent")
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
-    }
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+  }
 
-    @Test
-    public void testDeleteNotFound() {
-        given()
-            .contentType(ContentType.JSON)
+  @Test
+  public void testDeleteNotFound() {
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .delete("/api/feature-flow-configurations/non-existent")
+        .delete("/api/feature-flow-configurations/non-existent")
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
-    }
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+  }
 
-    @Test
-    public void testGetFullTreeSerialization() {
-        var project = projectService.create("Tree Project", null);
-        var config = featureFlowConfigurationService.createUnderProject(project.id, "End-to-End Flow");
-        var phase = featureFlowPhaseService.create(config.id, "Development", "Dev phase", 0, null);
-        var step = featureFlowPhaseStepService.create(phase.id, "Lint", 0);
-        var action = actionConfigurationService.create(
-            "Lint Frontend", "Runs eslint", "eslint .", "echo required"
-        );
-        featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, "lint-group");
+  @Test
+  public void testGetFullTreeSerialization() {
+    var project = projectService.create("Tree Project", null);
+    var config = featureFlowConfigurationService.createUnderProject(project.id, "End-to-End Flow");
+    var phase = featureFlowPhaseService.create(config.id, "Development", "Dev phase", 0, null);
+    var step = featureFlowPhaseStepService.create(phase.id, "Lint", 0);
+    var action =
+        actionConfigurationService.create(
+            "Lint Frontend", "Runs eslint", "eslint .", "echo required");
+    featureFlowPhaseActionService.create(
+        step.id, action.id, ActionType.PREREQUISITE, 0, "lint-group");
 
-        given()
-            .contentType(ContentType.JSON)
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-configurations/" + config.id)
+        .get("/api/feature-flow-configurations/" + config.id)
         .then()
-            .statusCode(Response.Status.OK.getStatusCode())
-            .body("featureFlowConfiguration.id", equalTo(config.id))
-            .body("featureFlowConfiguration.name", equalTo("End-to-End Flow"))
-            .body("featureFlowConfiguration.phases.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].id", equalTo(phase.id))
-            .body("featureFlowConfiguration.phases[0].name", equalTo("Development"))
-            .body("featureFlowConfiguration.phases[0].steps.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].steps[0].id", equalTo(step.id))
-            .body("featureFlowConfiguration.phases[0].steps[0].name", equalTo("Lint"))
-            .body("featureFlowConfiguration.phases[0].steps[0].actions.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].steps[0].actions[0].actionConfiguration.id", equalTo(action.id))
-            .body("featureFlowConfiguration.phases[0].steps[0].actions[0].actionType", equalTo("PREREQUISITE"))
-            .body("featureFlowConfiguration.phases[0].steps[0].actions[0].parallelGroup", equalTo("lint-group"));
-    }
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("featureFlowConfiguration.id", equalTo(config.id))
+        .body("featureFlowConfiguration.name", equalTo("End-to-End Flow"))
+        .body("featureFlowConfiguration.phases.size()", equalTo(1))
+        .body("featureFlowConfiguration.phases[0].id", equalTo(phase.id))
+        .body("featureFlowConfiguration.phases[0].name", equalTo("Development"))
+        .body("featureFlowConfiguration.phases[0].steps.size()", equalTo(1))
+        .body("featureFlowConfiguration.phases[0].steps[0].id", equalTo(step.id))
+        .body("featureFlowConfiguration.phases[0].steps[0].name", equalTo("Lint"))
+        .body("featureFlowConfiguration.phases[0].steps[0].actions.size()", equalTo(1))
+        .body(
+            "featureFlowConfiguration.phases[0].steps[0].actions[0].actionConfiguration.id",
+            equalTo(action.id))
+        .body(
+            "featureFlowConfiguration.phases[0].steps[0].actions[0].actionType",
+            equalTo("PREREQUISITE"))
+        .body(
+            "featureFlowConfiguration.phases[0].steps[0].actions[0].parallelGroup",
+            equalTo("lint-group"));
+  }
 
-    @Test
-    public void testSubPhaseWithStepsAndActions() {
-        var project = projectService.create("Sub Project", null);
-        var config = featureFlowConfigurationService.createUnderProject(project.id, "Sub-Phase Flow");
-        var parent = featureFlowPhaseService.create(config.id, "Development", null, 0, null);
-        var child = featureFlowPhaseService.create(config.id, "Work Package A", null, 0, parent.id);
-        var step = featureFlowPhaseStepService.create(child.id, "Test", 0);
-        var action = actionConfigurationService.create(
-            "Test WP", "Desc", "pytest", "echo required"
-        );
-        featureFlowPhaseActionService.create(step.id, action.id, ActionType.QUALITY_GATE, 0, null);
+  @Test
+  public void testSubPhaseWithStepsAndActions() {
+    var project = projectService.create("Sub Project", null);
+    var config = featureFlowConfigurationService.createUnderProject(project.id, "Sub-Phase Flow");
+    var parent = featureFlowPhaseService.create(config.id, "Development", null, 0, null);
+    var child = featureFlowPhaseService.create(config.id, "Work Package A", null, 0, parent.id);
+    var step = featureFlowPhaseStepService.create(child.id, "Test", 0);
+    var action = actionConfigurationService.create("Test WP", "Desc", "pytest", "echo required");
+    featureFlowPhaseActionService.create(step.id, action.id, ActionType.QUALITY_GATE, 0, null);
 
-        given()
-            .contentType(ContentType.JSON)
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-configurations/" + config.id)
+        .get("/api/feature-flow-configurations/" + config.id)
         .then()
-            .statusCode(Response.Status.OK.getStatusCode())
-            .body("featureFlowConfiguration.phases.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].subPhases.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].subPhases[0].id", equalTo(child.id))
-            .body("featureFlowConfiguration.phases[0].subPhases[0].steps.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].name", equalTo("Test"))
-            .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].actions.size()", equalTo(1))
-            .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].actions[0].actionType", equalTo("QUALITY_GATE"));
-    }
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("featureFlowConfiguration.phases.size()", equalTo(1))
+        .body("featureFlowConfiguration.phases[0].subPhases.size()", equalTo(1))
+        .body("featureFlowConfiguration.phases[0].subPhases[0].id", equalTo(child.id))
+        .body("featureFlowConfiguration.phases[0].subPhases[0].steps.size()", equalTo(1))
+        .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].name", equalTo("Test"))
+        .body("featureFlowConfiguration.phases[0].subPhases[0].steps[0].actions.size()", equalTo(1))
+        .body(
+            "featureFlowConfiguration.phases[0].subPhases[0].steps[0].actions[0].actionType",
+            equalTo("QUALITY_GATE"));
+  }
 
-    @Test
-    public void testCascadeDeletePhaseRemovesSubPhasesStepsAndActions() {
-        var project = projectService.create("Cascade Project", null);
-        var config = featureFlowConfigurationService.createUnderProject(project.id, "Cascade Flow");
-        var phase = featureFlowPhaseService.create(config.id, "Dev", null, 0, null);
-        var step = featureFlowPhaseStepService.create(phase.id, "Build", 0);
-        var action = actionConfigurationService.create(
-            "Build", "Desc", "mvn build", "echo required"
-        );
-        var link = featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, null);
+  @Test
+  public void testCascadeDeletePhaseRemovesSubPhasesStepsAndActions() {
+    var project = projectService.create("Cascade Project", null);
+    var config = featureFlowConfigurationService.createUnderProject(project.id, "Cascade Flow");
+    var phase = featureFlowPhaseService.create(config.id, "Dev", null, 0, null);
+    var step = featureFlowPhaseStepService.create(phase.id, "Build", 0);
+    var action = actionConfigurationService.create("Build", "Desc", "mvn build", "echo required");
+    var link =
+        featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, null);
 
-        // Add a sub-phase with its own step and action
-        var child = featureFlowPhaseService.create(config.id, "Sub-Dev", null, 0, phase.id);
-        var childStep = featureFlowPhaseStepService.create(child.id, "Lint", 0);
-        var childAction = actionConfigurationService.create(
-            "Lint", "Desc", "eslint", "echo required"
-        );
-        var childLink = featureFlowPhaseActionService.create(childStep.id, childAction.id, ActionType.PREREQUISITE, 0, null);
+    // Add a sub-phase with its own step and action
+    var child = featureFlowPhaseService.create(config.id, "Sub-Dev", null, 0, phase.id);
+    var childStep = featureFlowPhaseStepService.create(child.id, "Lint", 0);
+    var childAction = actionConfigurationService.create("Lint", "Desc", "eslint", "echo required");
+    var childLink =
+        featureFlowPhaseActionService.create(
+            childStep.id, childAction.id, ActionType.PREREQUISITE, 0, null);
 
-        // Delete the parent phase
-        given()
-            .contentType(ContentType.JSON)
+    // Delete the parent phase
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .delete("/api/feature-flow-phases/" + phase.id)
+        .delete("/api/feature-flow-phases/" + phase.id)
         .then()
-            .statusCode(Response.Status.OK.getStatusCode());
+        .statusCode(Response.Status.OK.getStatusCode());
 
-        // Parent phase should be gone
-        given()
-            .contentType(ContentType.JSON)
+    // Parent phase should be gone
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-phases/" + phase.id)
+        .get("/api/feature-flow-phases/" + phase.id)
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
-        // Parent step should be gone
-        given()
-            .contentType(ContentType.JSON)
+    // Parent step should be gone
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-phase-steps/" + step.id)
+        .get("/api/feature-flow-phase-steps/" + step.id)
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
-        // Parent action link should be gone
-        given()
-            .contentType(ContentType.JSON)
+    // Parent action link should be gone
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-phase-actions/" + link.id)
+        .get("/api/feature-flow-phase-actions/" + link.id)
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
-        // Sub-phase should be gone
-        given()
-            .contentType(ContentType.JSON)
+    // Sub-phase should be gone
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-phases/" + child.id)
+        .get("/api/feature-flow-phases/" + child.id)
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
-        // Sub-phase step should be gone
-        given()
-            .contentType(ContentType.JSON)
+    // Sub-phase step should be gone
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-phase-steps/" + childStep.id)
+        .get("/api/feature-flow-phase-steps/" + childStep.id)
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
 
-        // Sub-phase action link should be gone
-        given()
-            .contentType(ContentType.JSON)
+    // Sub-phase action link should be gone
+    given()
+        .contentType(ContentType.JSON)
         .when()
-            .get("/api/feature-flow-phase-actions/" + childLink.id)
+        .get("/api/feature-flow-phase-actions/" + childLink.id)
         .then()
-            .statusCode(Response.Status.NOT_FOUND.getStatusCode());
-    }
+        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+  }
 }

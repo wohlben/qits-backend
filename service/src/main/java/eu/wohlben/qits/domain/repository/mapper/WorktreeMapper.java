@@ -8,7 +8,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "jakarta")
 public interface WorktreeMapper {
 
-    @Mapping(source = "parent", target = "parent")
-    @Mapping(target = "branch", ignore = true)
-    WorktreeDto toDto(Worktree entity);
+  @Mapping(source = "parent", target = "parent")
+  @Mapping(target = "branch", ignore = true)
+  WorktreeDto toDto(Worktree entity);
 }

@@ -8,7 +8,6 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
-
 import java.time.Duration;
 
 @Path("/echo")
@@ -16,22 +15,28 @@ import java.time.Duration;
 @Consumes(MediaType.APPLICATION_JSON)
 public class ReactiveEchoController {
 
-    public static record EchoRequest(String message) {}
-    public static record EchoResponse(String echo, int length) {}
+  public static record EchoRequest(String message) {}
 
-    @GET
-    @Path("/reactive/{message}")
-    public Uni<EchoResponse> echoReactive(@PathParam("message") String message) {
-        return Uni.createFrom().item(message)
-            .map(String::toUpperCase)
-            .onItem().transform(upper -> new EchoResponse(upper, upper.length()));
-    }
+  public static record EchoResponse(String echo, int length) {}
 
-    @POST
-    @Path("/reactive")
-    public Uni<EchoResponse> echoReactivePost(EchoRequest request) {
-        return Uni.createFrom().item(request.message())
-            .onItem().delayIt().by(Duration.ofMillis(10))
-            .map(msg -> new EchoResponse(msg, msg.length()));
-    }
+  @GET
+  @Path("/reactive/{message}")
+  public Uni<EchoResponse> echoReactive(@PathParam("message") String message) {
+    return Uni.createFrom()
+        .item(message)
+        .map(String::toUpperCase)
+        .onItem()
+        .transform(upper -> new EchoResponse(upper, upper.length()));
+  }
+
+  @POST
+  @Path("/reactive")
+  public Uni<EchoResponse> echoReactivePost(EchoRequest request) {
+    return Uni.createFrom()
+        .item(request.message())
+        .onItem()
+        .delayIt()
+        .by(Duration.ofMillis(10))
+        .map(msg -> new EchoResponse(msg, msg.length()));
+  }
 }

@@ -9,64 +9,68 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
-
 import java.util.List;
 
 @ApplicationScoped
 public class FeatureFlowConfigurationService {
 
-    @Inject
-    FeatureFlowConfigurationRepository featureFlowConfigurationRepository;
+  @Inject FeatureFlowConfigurationRepository featureFlowConfigurationRepository;
 
-    @Inject
-    ProjectRepository projectRepository;
+  @Inject ProjectRepository projectRepository;
 
-    @Transactional
-    public FeatureFlowConfiguration createUnderProject(String projectId, String name) {
-        if (name == null || name.isBlank()) {
-            throw new BadRequestException("name is required");
-        }
+  @Transactional
+  public FeatureFlowConfiguration createUnderProject(String projectId, String name) {
+    if (name == null || name.isBlank()) {
+      throw new BadRequestException("name is required");
+    }
 
-        Project project = projectRepository.findByIdOptional(projectId)
+    Project project =
+        projectRepository
+            .findByIdOptional(projectId)
             .orElseThrow(() -> new NotFoundException("Project not found: " + projectId));
 
-        FeatureFlowConfiguration config = new FeatureFlowConfiguration();
-        config.name = name;
-        config.project = project;
-        featureFlowConfigurationRepository.persist(config);
+    FeatureFlowConfiguration config = new FeatureFlowConfiguration();
+    config.name = name;
+    config.project = project;
+    featureFlowConfigurationRepository.persist(config);
 
-        return config;
-    }
+    return config;
+  }
 
-    public List<FeatureFlowConfiguration> listByProject(String projectId) {
-        return featureFlowConfigurationRepository.list("project.id", projectId);
-    }
+  public List<FeatureFlowConfiguration> listByProject(String projectId) {
+    return featureFlowConfigurationRepository.list("project.id", projectId);
+  }
 
-    public FeatureFlowConfiguration get(String id) {
-        return featureFlowConfigurationRepository.findByIdOptional(id)
+  public FeatureFlowConfiguration get(String id) {
+    return featureFlowConfigurationRepository
+        .findByIdOptional(id)
+        .orElseThrow(() -> new NotFoundException("FeatureFlowConfiguration not found: " + id));
+  }
+
+  public List<FeatureFlowConfiguration> list() {
+    return featureFlowConfigurationRepository.listAll();
+  }
+
+  @Transactional
+  public FeatureFlowConfiguration update(String id, String name) {
+    FeatureFlowConfiguration config =
+        featureFlowConfigurationRepository
+            .findByIdOptional(id)
             .orElseThrow(() -> new NotFoundException("FeatureFlowConfiguration not found: " + id));
+
+    if (name != null && !name.isBlank()) {
+      config.name = name;
     }
 
-    public List<FeatureFlowConfiguration> list() {
-        return featureFlowConfigurationRepository.listAll();
-    }
+    return config;
+  }
 
-    @Transactional
-    public FeatureFlowConfiguration update(String id, String name) {
-        FeatureFlowConfiguration config = featureFlowConfigurationRepository.findByIdOptional(id)
+  @Transactional
+  public void delete(String id) {
+    FeatureFlowConfiguration config =
+        featureFlowConfigurationRepository
+            .findByIdOptional(id)
             .orElseThrow(() -> new NotFoundException("FeatureFlowConfiguration not found: " + id));
-
-        if (name != null && !name.isBlank()) {
-            config.name = name;
-        }
-
-        return config;
-    }
-
-    @Transactional
-    public void delete(String id) {
-        FeatureFlowConfiguration config = featureFlowConfigurationRepository.findByIdOptional(id)
-            .orElseThrow(() -> new NotFoundException("FeatureFlowConfiguration not found: " + id));
-        featureFlowConfigurationRepository.delete(config);
-    }
+    featureFlowConfigurationRepository.delete(config);
+  }
 }

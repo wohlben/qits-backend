@@ -4,13 +4,13 @@ import jakarta.enterprise.context.RequestScoped;
 
 @RequestScoped
 public class RequestContext {
-    private String traceId;
+  private String traceId;
 
-    public String getTraceId() {
-        return traceId;
-    }
+  public String getTraceId() {
+    return traceId;
+  }
 
-    public void setTraceId(String traceId) {
-        this.traceId = traceId;
-    }
+  public void setTraceId(String traceId) {
+    this.traceId = traceId;
+  }
 }
