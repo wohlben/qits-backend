@@ -291,6 +291,8 @@ components:
           type: string
         url:
           type: string
+        mainBranch:
+          type: string
         archetype:
           $ref: "#/components/schemas/RepositoryArchetype"
         projectId:
@@ -454,41 +456,33 @@ components:
     Response34:
       type: object
       properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+    Response35:
+      type: object
+      properties:
         output:
           type: string
-    Response35:
+    Response36:
+      type: object
+      properties:
+        output:
+          type: string
+    Response37:
       type: object
       properties:
         repository:
           $ref: "#/components/schemas/RepositoryDto"
-    Response36:
+    Response38:
       type: object
       properties:
         success:
           type: boolean
-    Response37:
-      type: object
-      properties:
-        branches:
-          type: array
-          items:
-            type: string
-    Response38:
-      type: object
-      properties:
-        commitHash:
-          type: string
-        hasConflicts:
-          type: boolean
-        output:
-          type: string
     Response39:
       type: object
       properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry8"
+        success:
+          type: boolean
     Response4:
       type: object
       properties:
@@ -497,9 +491,32 @@ components:
     Response40:
       type: object
       properties:
+        branches:
+          type: array
+          items:
+            type: string
+    Response41:
+      type: object
+      properties:
+        commitHash:
+          type: string
+        hasConflicts:
+          type: boolean
+        output:
+          type: string
+    Response42:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry8"
+    Response43:
+      type: object
+      properties:
         success:
           type: boolean
-    Response41:
+    Response44:
       type: object
       properties:
         worktree:
@@ -531,6 +548,29 @@ components:
       properties:
         featureFlowPhaseAction:
           $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    SetMainBranchRequest:
+      type: object
+      required:
+      - branch
+      properties:
+        branch:
+          type: string
+          pattern: \S
+    SyncStatusDto:
+      type: object
+      properties:
+        branch:
+          type: string
+        remoteReachable:
+          type: boolean
+        remoteExists:
+          type: boolean
+        ahead:
+          type: integer
+          format: int32
+        behind:
+          type: integer
+          format: int32
     TraceResponse:
       type: object
       properties:
@@ -1321,7 +1361,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response35"
+                $ref: "#/components/schemas/Response37"
       summary: Get
       tags:
       - Repository Controller
@@ -1338,11 +1378,34 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response36"
+                $ref: "#/components/schemas/Response39"
       summary: Delete
       tags:
       - Repository Controller
   /api/repositories/{repoId}/branches:
+    delete:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: branch
+        in: query
+        schema:
+          type: string
+          pattern: \S
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response38"
+      summary: Delete Branch
+      tags:
+      - Repository Controller
     get:
       parameters:
       - name: repoId
@@ -1356,8 +1419,34 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response37"
+                $ref: "#/components/schemas/Response40"
       summary: Branches
+      tags:
+      - Repository Controller
+  /api/repositories/{repoId}/main-branch:
+    put:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetMainBranchRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response34"
+        "400":
+          description: Bad Request
+      summary: Set Main Branch
       tags:
       - Repository Controller
   /api/repositories/{repoId}/pull:
@@ -1374,7 +1463,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response34"
+                $ref: "#/components/schemas/Response36"
       summary: Pull
       tags:
       - Repository Controller
@@ -1392,8 +1481,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response33"
+                $ref: "#/components/schemas/Response35"
       summary: Push
+      tags:
+      - Repository Controller
+  /api/repositories/{repoId}/sync:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response33"
+      summary: Sync
+      tags:
+      - Repository Controller
+  /api/repositories/{repoId}/sync-status:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncStatusDto"
+      summary: Sync Status
       tags:
       - Repository Controller
   /api/repositories/{repoId}/worktrees:
@@ -1410,7 +1535,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response39"
+                $ref: "#/components/schemas/Response42"
       summary: List
       tags:
       - Worktree Controller
@@ -1433,7 +1558,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response41"
+                $ref: "#/components/schemas/Response44"
         "400":
           description: Bad Request
       summary: Create
@@ -1464,7 +1589,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response40"
+                $ref: "#/components/schemas/Response43"
         "400":
           description: Bad Request
       summary: Discard
@@ -1495,7 +1620,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response38"
+                $ref: "#/components/schemas/Response41"
         "400":
           description: Bad Request
       summary: Merge
