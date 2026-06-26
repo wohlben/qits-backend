@@ -71,7 +71,7 @@ Migrations live in `service/src/main/resources/db/migration/` and run at startup
 
 ### Frontend
 
-`service/src/main/webui/` is a relative symlink to the sibling `../qits-ui` Angular repo. Quinoa builds it (`dist/qits-ui/browser`) and serves it with SPA routing; `/api` is excluded from SPA fallback. The symlink target must exist for `quarkus:dev` and `package` to fully succeed.
+The Angular app lives in `service/src/main/webui/` — Quinoa's default UI directory (previously a separate `qits-ui` repo, now merged in here). Quinoa **auto-detects** the framework (Angular) and package manager (pnpm, from `pnpm-lock.yaml`), and reads `angular.json` to derive the build output dir (`dist/qits-ui/browser`) — so no `quarkus.quinoa.build-dir` override is needed. Quinoa builds it and serves it with SPA routing; `/api` is excluded from SPA fallback (`quarkus.quinoa.ignored-path-prefixes=/api`). Dev mode proxies to the Angular dev server on `:4200`.
 
 ## Project documentation workflow (from AGENTS.md)
 
