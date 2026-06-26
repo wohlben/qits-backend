@@ -13,7 +13,7 @@ qits/
         ├── main/
         │   ├── java/                # Backend (Quarkus, REST API, services)
         │   ├── resources/           # Application config, DB migrations
-        │   └── webui/               # Angular frontend (symlink → ../qits-ui)
+        │   └── webui/               # Angular frontend (Quinoa default UI dir)
         │       ├── package.json
         │       ├── angular.json
         │       └── src/             # Angular source
@@ -78,7 +78,7 @@ git submodule update --init --recursive
 
 ## Frontend
 
-The Angular UI is located at `service/src/main/webui/`, which is a relative symlink to `../qits-ui` (the sibling `qits-ui` repository). It is built and served via [Quarkus Quinoa](https://quarkiverse.github.io/quarkiverse-docs/quarkus-quinoa/dev/index.html) during development and packaged into the application at build time.
+The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI directory. It is built and served via [Quarkus Quinoa](https://quarkiverse.github.io/quarkiverse-docs/quarkus-quinoa/dev/index.html) during development and packaged into the application at build time. Quinoa auto-detects the Angular framework and the pnpm package manager, so no extra `quarkus.quinoa.*` path configuration is required.
 
 ## Building
 

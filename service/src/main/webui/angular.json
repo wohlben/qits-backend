@@ -1,0 +1,110 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "pnpm"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "qits-ui": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "inlineTemplate": true,
+          "inlineStyle": true
+        }
+      },
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "qits",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": [
+              "src/styles.css",
+              "node_modules/@xterm/xterm/css/xterm.css"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "qits-ui:build:production"
+            },
+            "development": {
+              "buildTarget": "qits-ui:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "exclude": [
+              "src/**/*.browser.spec.ts"
+            ]
+          }
+        },
+        "test-visual": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "qits-ui:build",
+            "browsers": [
+              "chromium"
+            ],
+            "headless": true,
+            "browserViewport": "820x1200",
+            "include": [
+              "src/**/*.browser.spec.ts"
+            ]
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
