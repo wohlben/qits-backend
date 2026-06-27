@@ -66,6 +66,18 @@ public class WorktreeController {
         result.commitHash(), result.hasConflicts(), result.output());
   }
 
+  public static record FastForwardWorktreeRequest() {
+    public record Response(String output) {}
+  }
+
+  @POST
+  @Path("/{worktreeId}/fast-forward")
+  public FastForwardWorktreeRequest.Response fastForward(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    var output = worktreeService.fastForwardWorktree(repoId, worktreeId);
+    return new FastForwardWorktreeRequest.Response(output);
+  }
+
   public static record DiscardWorktreeRequest() {
     public record Response(boolean success) {}
   }

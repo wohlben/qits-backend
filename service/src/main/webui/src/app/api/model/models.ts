@@ -69,6 +69,7 @@ export * from './response41';
 export * from './response42';
 export * from './response43';
 export * from './response44';
+export * from './response45';
 export * from './response5';
 export * from './response6';
 export * from './response7';

@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideCircleAlert } from '@ng-icons/lucide';
 
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
@@ -16,7 +18,7 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
  */
 @Component({
   selector: 'app-branch-tree',
-  imports: [ZardTreeImports, BranchRowComponent],
+  imports: [ZardTreeImports, BranchRowComponent, NgIcon],
   template: `
     <z-tree [zData]="nodes()" zExpandAll class="gap-2">
       <ng-template #nodeTemplate let-node let-level="level">
@@ -26,9 +28,24 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
               class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none"
               [attr.title]="title(node.data)"
             >
-              <span class="text-muted-foreground" [class.invisible]="(node.data.behind ?? 0) === 0">
-                -{{ node.data.behind ?? 0 }}
-              </span>
+              @if (canFastForward(node.data)) {
+                <button
+                  type="button"
+                  class="cursor-pointer text-muted-foreground hover:text-foreground"
+                  [attr.title]="'Fast-forward to ' + (node.data.parent ?? 'parent')"
+                  (click)="fastForward.emit(node.data)"
+                >
+                  -{{ node.data.behind ?? 0 }}
+                </button>
+              } @else if (isDiverged(node.data)) {
+                <ng-icon
+                  name="lucideCircleAlert"
+                  class="size-3 text-destructive"
+                  [attr.title]="'Diverged from ' + (node.data.parent ?? 'parent') + ' — cannot fast-forward'"
+                />
+              } @else {
+                <span class="invisible">-{{ node.data.behind ?? 0 }}</span>
+              }
               <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
             </div>
           }
@@ -48,6 +65,7 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
       </ng-template>
     </z-tree>
   `,
+  viewProviders: [provideIcons({ lucideCircleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BranchTreeComponent {
@@ -58,8 +76,19 @@ export class BranchTreeComponent {
   readonly integrate = output<WorktreeDto>();
   readonly abandon = output<WorktreeDto>();
   readonly delete = output<string>();
+  readonly fastForward = output<WorktreeDto>();
 
   title(wt: WorktreeDto): string {
     return `${wt.ahead ?? 0} commit(s) ahead of ${wt.parent ?? 'parent'}, ${wt.behind ?? 0} behind`;
+  }
+
+  /** Behind the parent with no commits of its own — a clean fast-forward is possible. */
+  canFastForward(wt: WorktreeDto): boolean {
+    return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) === 0;
+  }
+
+  /** Behind *and* ahead — histories diverged, so a fast-forward can't apply. */
+  isDiverged(wt: WorktreeDto): boolean {
+    return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) > 0;
   }
 }

@@ -540,9 +540,14 @@ components:
     Response43:
       type: object
       properties:
+        output:
+          type: string
+    Response44:
+      type: object
+      properties:
         success:
           type: boolean
-    Response44:
+    Response45:
       type: object
       properties:
         worktree:
@@ -1608,7 +1613,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response44"
+                $ref: "#/components/schemas/Response45"
         "400":
           description: Bad Request
       summary: Create
@@ -1639,10 +1644,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response43"
+                $ref: "#/components/schemas/Response44"
         "400":
           description: Bad Request
       summary: Discard
+      tags:
+      - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/fast-forward:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response43"
+      summary: Fast Forward
       tags:
       - Worktree Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/merge:

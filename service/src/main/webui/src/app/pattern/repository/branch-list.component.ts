@@ -59,7 +59,11 @@ interface CreateWorktreeForm {
             (integrate)="openIntegrate($event)"
             (abandon)="openAbandon($event)"
             (delete)="openDelete($event)"
+            (fastForward)="onFastForward($event)"
           />
+          @if (fastForwardMutation.isError()) {
+            <div class="text-sm text-destructive">Failed to fast-forward branch</div>
+          }
         }
       }
     </div>
@@ -268,6 +272,14 @@ export class BranchListComponent {
     onSuccess: () => this.onMutationSuccess(),
   }));
 
+  readonly fastForwardMutation = injectMutation(() => ({
+    mutationFn: (worktreeId: string) =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFastForwardPost(this.repoId(), worktreeId),
+      ),
+    onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+  }));
+
   viewCommits(branch: string) {
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'commits']);
   }
@@ -327,6 +339,12 @@ export class BranchListComponent {
     const branch = this.ui.branch();
     if (branch) {
       this.deleteBranchMutation.mutate(branch);
+    }
+  }
+
+  onFastForward(worktree: WorktreeDto) {
+    if (worktree.worktreeId) {
+      this.fastForwardMutation.mutate(worktree.worktreeId);
     }
   }
 

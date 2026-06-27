@@ -222,6 +222,46 @@ public class WorktreeService {
     }
   }
 
+  /**
+   * Fast-forwards a worktree's branch to the latest commit of its parent branch. Runs {@code git
+   * merge --ff-only} inside the worktree so the ref, index and working tree all advance together;
+   * the {@code --ff-only} flag refuses (and reports an error) when the branch has diverged or the
+   * working tree is dirty, which surfaces as a 400.
+   */
+  public String fastForwardWorktree(String repoId, String worktreeId) {
+    repositoryRepository
+        .findByIdOptional(repoId)
+        .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
+
+    Worktree worktree =
+        worktreeRepository
+            .findByRepositoryAndWorktreeId(repoId, worktreeId)
+            .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
+
+    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
+    if (!Files.exists(worktreePath)) {
+      throw new NotFoundException("Worktree not found on disk");
+    }
+
+    String parent = worktree.parent;
+    if (parent == null || parent.isBlank()) {
+      throw new BadRequestException(
+          "Worktree '" + worktreeId + "' has no parent to fast-forward to");
+    }
+
+    try {
+      return git.exec(worktreePath.toFile(), "git", "merge", "--ff-only", parent);
+    } catch (Exception e) {
+      throw new BadRequestException(
+          "Cannot fast-forward worktree '"
+              + worktreeId
+              + "' to '"
+              + parent
+              + "': "
+              + e.getMessage());
+    }
+  }
+
   @Transactional
   public void discardWorktree(String repoId, String worktreeId) {
     repositoryRepository

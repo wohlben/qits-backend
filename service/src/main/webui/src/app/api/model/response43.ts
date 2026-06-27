@@ -10,6 +10,6 @@
 
 
 export interface Response43 { 
-    success?: boolean;
+    output?: string;
 }
 
