@@ -17,7 +17,11 @@ Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docke
 All Maven commands use the wrapper.
 
 ```bash
-# Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200)
+# First on a fresh checkout, build so the `domain` module is resolvable from the local repo:
+./mvnw install -DskipTests
+
+# Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200). Quarkus dev mode is
+# workspace-aware, so edits to the `domain` module live-reload too.
 ./mvnw -pl service quarkus:dev
 
 # Full build (all modules, frontend + backend)
