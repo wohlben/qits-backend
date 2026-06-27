@@ -12,6 +12,11 @@ export const repositoriesRoutes: Routes = [
       import('./branch-commits/branch-commits.page').then((m) => m.BranchCommitsPage),
   },
   {
+    path: ':repoId/branch/:branchName/commits/:commitHash',
+    loadComponent: () =>
+      import('./commit-detail/commit-detail.page').then((m) => m.CommitDetailPage),
+  },
+  {
     path: ':repoId/branch/:branchName/terminal',
     loadComponent: () =>
       import('./branch-terminal/branch-terminal.page').then((m) => m.BranchTerminalPage),

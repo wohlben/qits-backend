@@ -23,6 +23,10 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
+            "allowedCommonJsDependencies": [
+              "diff2html/lib/ui/js/diff2html-ui",
+              "diff2html/lib/types"
+            ],
             "assets": [
               {
                 "glob": "**/*",

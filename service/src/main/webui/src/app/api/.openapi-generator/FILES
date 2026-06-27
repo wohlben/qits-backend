@@ -19,7 +19,10 @@ git_push.sh
 index.ts
 model/actionConfigurationDto.ts
 model/actionType.ts
+model/commitChangesDto.ts
 model/commitDto.ts
+model/commitFileChangeDto.ts
+model/commitFileDiffDto.ts
 model/commitLogDto.ts
 model/createActionConfigurationRequest.ts
 model/createFeatureFlowPhaseActionRequest.ts
