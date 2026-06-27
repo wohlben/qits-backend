@@ -17,6 +17,10 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
+import { CommitChangesDto } from '../model/commitChangesDto';
+// @ts-ignore
+import { CommitFileDiffDto } from '../model/commitFileDiffDto';
+// @ts-ignore
 import { CommitLogDto } from '../model/commitLogDto';
 // @ts-ignore
 import { Response33 } from '../model/response33';
@@ -173,6 +177,165 @@ export class RepositoryControllerService extends BaseService {
         return this.httpClient.request<Response40>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Commit Changes
+     * @endpoint get /api/repositories/{repoId}/commits/{commitHash}/changes
+     * @param commitHash 
+     * @param repoId 
+     * @param parent 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiRepositoriesRepoIdCommitsCommitHashChangesGet(commitHash: string, repoId: string, parent?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<CommitChangesDto>;
+    public apiRepositoriesRepoIdCommitsCommitHashChangesGet(commitHash: string, repoId: string, parent?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<CommitChangesDto>>;
+    public apiRepositoriesRepoIdCommitsCommitHashChangesGet(commitHash: string, repoId: string, parent?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<CommitChangesDto>>;
+    public apiRepositoriesRepoIdCommitsCommitHashChangesGet(commitHash: string, repoId: string, parent?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (commitHash === null || commitHash === undefined) {
+            throw new Error('Required parameter commitHash was null or undefined when calling apiRepositoriesRepoIdCommitsCommitHashChangesGet.');
+        }
+        if (repoId === null || repoId === undefined) {
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdCommitsCommitHashChangesGet.');
+        }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'parent',
+            <any>parent,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/commits/${this.configuration.encodeParam({name: "commitHash", value: commitHash, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/changes`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<CommitChangesDto>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Commit File Diff
+     * @endpoint get /api/repositories/{repoId}/commits/{commitHash}/diff
+     * @param commitHash 
+     * @param repoId 
+     * @param path 
+     * @param parent 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiRepositoriesRepoIdCommitsCommitHashDiffGet(commitHash: string, repoId: string, path: string, parent?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<CommitFileDiffDto>;
+    public apiRepositoriesRepoIdCommitsCommitHashDiffGet(commitHash: string, repoId: string, path: string, parent?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<CommitFileDiffDto>>;
+    public apiRepositoriesRepoIdCommitsCommitHashDiffGet(commitHash: string, repoId: string, path: string, parent?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<CommitFileDiffDto>>;
+    public apiRepositoriesRepoIdCommitsCommitHashDiffGet(commitHash: string, repoId: string, path: string, parent?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (commitHash === null || commitHash === undefined) {
+            throw new Error('Required parameter commitHash was null or undefined when calling apiRepositoriesRepoIdCommitsCommitHashDiffGet.');
+        }
+        if (repoId === null || repoId === undefined) {
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdCommitsCommitHashDiffGet.');
+        }
+        if (path === null || path === undefined) {
+            throw new Error('Required parameter path was null or undefined when calling apiRepositoriesRepoIdCommitsCommitHashDiffGet.');
+        }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'parent',
+            <any>parent,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'path',
+            <any>path,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/commits/${this.configuration.encodeParam({name: "commitHash", value: commitHash, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/diff`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<CommitFileDiffDto>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

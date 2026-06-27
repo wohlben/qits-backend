@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { Router } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
+import { CommitDto } from '@/api/model/commitDto';
 import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.component';
 import { CommitRowComponent } from '@/ui/components/repository/commit-row.component';
 
@@ -30,7 +32,7 @@ import { CommitRowComponent } from '@/ui/components/repository/commit-row.compon
         } @else {
           <div class="flex flex-col gap-2">
             @for (commit of commits; track commit.hash) {
-              <app-commit-row [commit]="commit" />
+              <app-commit-row [commit]="commit" (view)="openCommit(commit)" />
             }
           </div>
         }
@@ -44,6 +46,7 @@ export class CommitListComponent {
   readonly branchName = input.required<string>();
 
   private readonly repositoryService = inject(RepositoryControllerService);
+  private readonly router = inject(Router);
 
   readonly commitsQuery = injectQuery(() => ({
     queryKey: ['commits', this.repoId(), this.branchName()],
@@ -52,4 +55,18 @@ export class CommitListComponent {
         this.repositoryService.apiRepositoriesRepoIdCommitsGet(this.repoId(), this.branchName()),
       ).then((r) => r.commits ?? []),
   }));
+
+  /** Open a commit's diff view. No `parent` is passed, so it diffs against its own first parent. */
+  openCommit(commit: CommitDto) {
+    if (commit.hash) {
+      this.router.navigate([
+        '/repositories',
+        this.repoId(),
+        'branch',
+        this.branchName(),
+        'commits',
+        commit.hash,
+      ]);
+    }
+  }
 }

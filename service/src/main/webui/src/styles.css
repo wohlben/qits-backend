@@ -1,5 +1,6 @@
 @layer ng-icon, theme, base, components, utilities;
 @import 'tailwindcss';
+@import 'diff2html/bundles/css/diff2html.min.css';
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
@@ -149,4 +150,123 @@
 ::-webkit-scrollbar-track {
   border-radius: 5px;
   background: var(--muted);
+}
+/*
+ * highlight.js token theme for diff2html's syntax highlighting (it bundles hljs but ships no
+ * token CSS). Colors track the app's light/dark mode so code reads on either diff color scheme.
+ * GitHub-ish light palette by default; GitHub-dark-ish under `.dark`.
+ */
+.commit-diff .hljs-comment,
+.commit-diff .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+.commit-diff .hljs-keyword,
+.commit-diff .hljs-selector-tag,
+.commit-diff .hljs-literal,
+.commit-diff .hljs-section,
+.commit-diff .hljs-doctag,
+.commit-diff .hljs-name {
+  color: #d73a49;
+}
+.commit-diff .hljs-string,
+.commit-diff .hljs-regexp,
+.commit-diff .hljs-meta .hljs-string {
+  color: #032f62;
+}
+.commit-diff .hljs-number,
+.commit-diff .hljs-symbol,
+.commit-diff .hljs-bullet,
+.commit-diff .hljs-link {
+  color: #005cc5;
+}
+.commit-diff .hljs-title,
+.commit-diff .hljs-title.function_,
+.commit-diff .hljs-built_in {
+  color: #6f42c1;
+}
+.commit-diff .hljs-type,
+.commit-diff .hljs-class .hljs-title {
+  color: #d73a49;
+}
+.commit-diff .hljs-attr,
+.commit-diff .hljs-attribute,
+.commit-diff .hljs-variable,
+.commit-diff .hljs-template-variable,
+.commit-diff .hljs-tag {
+  color: #e36209;
+}
+
+.dark .commit-diff .hljs-comment,
+.dark .commit-diff .hljs-quote {
+  color: #8b949e;
+}
+.dark .commit-diff .hljs-keyword,
+.dark .commit-diff .hljs-selector-tag,
+.dark .commit-diff .hljs-literal,
+.dark .commit-diff .hljs-section,
+.dark .commit-diff .hljs-doctag {
+  color: #ff7b72;
+}
+.dark .commit-diff .hljs-string,
+.dark .commit-diff .hljs-regexp,
+.dark .commit-diff .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+.dark .commit-diff .hljs-number,
+.dark .commit-diff .hljs-symbol,
+.dark .commit-diff .hljs-bullet,
+.dark .commit-diff .hljs-link {
+  color: #79c0ff;
+}
+.dark .commit-diff .hljs-title,
+.dark .commit-diff .hljs-title.function_,
+.dark .commit-diff .hljs-built_in {
+  color: #d2a8ff;
+}
+.dark .commit-diff .hljs-type,
+.dark .commit-diff .hljs-class .hljs-title,
+.dark .commit-diff .hljs-name {
+  color: #ffa657;
+}
+.dark .commit-diff .hljs-attr,
+.dark .commit-diff .hljs-attribute,
+.dark .commit-diff .hljs-variable,
+.dark .commit-diff .hljs-template-variable,
+.dark .commit-diff .hljs-tag {
+  color: #7ee787;
+}
+
+/*
+ * diff2html pins line numbers with `position: absolute`, which detaches them from the
+ * scrolling diff (they stay put and overflow while the code scrolls). Revert the number
+ * column to a normal table cell so it scrolls together with the code, and drop the large
+ * left padding the code line used to reserve space for the absolute number.
+ */
+.commit-diff .d2h-code-linenumber,
+.commit-diff .d2h-code-side-linenumber {
+  position: static;
+  display: table-cell;
+  vertical-align: top;
+}
+.commit-diff .d2h-code-line,
+.commit-diff .d2h-code-side-line {
+  padding: 0 0.5em;
+  width: auto;
+}
+
+/*
+ * The diff lives in a bordered pane already, so drop diff2html's own file-wrapper border,
+ * radius and bottom margin (they create a doubled border and a top/left gap). Pin the file
+ * header to the top of the scrolling pane so the filename stays visible while scrolling.
+ */
+.commit-diff .d2h-file-wrapper {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+.commit-diff .d2h-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
