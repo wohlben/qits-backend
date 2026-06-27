@@ -45,10 +45,8 @@
             </testResource>
             <!-- Share the git test fixture that lives in the domain module. -->
             <testResource>
-                <directory>${project.parent.basedir}/domain/src/test/resources</directory>
-                <includes>
-                    <include>fixtures/**</include>
-                </includes>
+                <directory>${project.basedir}/../domain/src/test/resources/fixtures</directory>
+                <targetPath>fixtures</targetPath>
             </testResource>
         </testResources>
         <plugins>

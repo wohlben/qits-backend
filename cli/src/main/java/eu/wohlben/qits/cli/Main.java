@@ -32,15 +32,21 @@ public class Main {
 
     @Inject SeedService seedService;
 
+    @Inject GenerateMigrationService generateMigrationService;
+
     @Override
-    public int run(String... args) {
+    public int run(String... args) throws Exception {
       String command = args.length > 0 ? args[0] : "";
       switch (command) {
         case "seed":
           seedService.seed();
           return 0;
+        case "generate-migration":
+          generateMigrationService.generate();
+          return 0;
         default:
-          LOG.errorf("Usage: <command>. Known commands: seed. (got: '%s')", command);
+          LOG.errorf(
+              "Usage: <command>. Known commands: seed, generate-migration. (got: '%s')", command);
           return 1;
       }
     }
