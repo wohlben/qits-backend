@@ -36,8 +36,9 @@ import { ZardButtonComponent } from '@/shared/components/button';
         <button z-button [zType]="worktree() ? 'secondary' : 'default'" (click)="branchOff.emit()">
           Branch off worktree
         </button>
+        <!-- Any branch can be integrated into a target (defaults to the repo's main branch). -->
+        <button z-button zType="secondary" (click)="integrate.emit()">Integrate</button>
         @if (worktree()) {
-          <button z-button zType="secondary" (click)="integrate.emit()">Integrate</button>
           <button z-button zType="destructive" (click)="abandon.emit()">Abandon</button>
         } @else if (!hasChildren()) {
           <button z-button zType="destructive" (click)="delete.emit()">Delete</button>

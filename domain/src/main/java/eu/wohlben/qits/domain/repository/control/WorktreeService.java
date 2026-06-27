@@ -4,6 +4,7 @@ import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
+import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
@@ -188,6 +189,44 @@ public class WorktreeService {
     }
 
     String currentBranch = git.getCurrentBranch(worktreePath);
+    return mergeIntoTarget(repoId, currentBranch, resolvedTarget);
+  }
+
+  /**
+   * Integrates an arbitrary branch into a target branch, defaulting to the repository's configured
+   * main branch when {@code target} is blank. Unlike {@link #mergeWorktree}, the source needs no
+   * worktree of its own — its branch ref is merged into the target's worktree (a temporary one is
+   * created and removed when the target isn't checked out anywhere).
+   */
+  public MergeResult mergeBranch(String repoId, String source, String target) {
+    // `source`/`target` are user-supplied: reject blank or dash-leading names so a value like
+    // "-D" can't be smuggled to git as a flag (argv flag injection).
+    if (source == null || source.isBlank() || source.startsWith("-")) {
+      throw new BadRequestException("Invalid source branch: " + source);
+    }
+
+    Repository repo =
+        repositoryRepository
+            .findByIdOptional(repoId)
+            .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
+
+    String resolvedTarget = (target == null || target.isBlank()) ? repo.mainBranch : target;
+    if (resolvedTarget == null || resolvedTarget.isBlank() || resolvedTarget.startsWith("-")) {
+      throw new BadRequestException("Invalid target branch: " + target);
+    }
+    if (source.equals(resolvedTarget)) {
+      throw new BadRequestException("Cannot integrate '" + source + "' into itself");
+    }
+
+    return mergeIntoTarget(repoId, source, resolvedTarget);
+  }
+
+  /**
+   * Merges {@code sourceBranch} into {@code resolvedTarget}: runs {@code git merge} inside the
+   * target branch's worktree, creating (and afterwards removing) a temporary worktree when the
+   * target isn't already checked out. Shared by worktree and branch integration.
+   */
+  private MergeResult mergeIntoTarget(String repoId, String sourceBranch, String resolvedTarget) {
     Path originPath = Path.of(dataDir, repoId, "origin");
 
     // Find existing worktree for target branch or create a temp one
@@ -213,9 +252,9 @@ public class WorktreeService {
               mergeCwd.toFile(),
               "git",
               "merge",
-              currentBranch,
+              sourceBranch,
               "-m",
-              "Merge " + currentBranch + " into " + resolvedTarget);
+              "Merge " + sourceBranch + " into " + resolvedTarget);
       String commitHash = git.exec(mergeCwd.toFile(), "git", "rev-parse", "HEAD").trim();
       boolean hasConflicts = output.toLowerCase().contains("conflict");
       if (isTemp) {

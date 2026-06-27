@@ -101,12 +101,13 @@ interface CreateWorktreeForm {
     <!-- Integrate (merge) -->
     <z-dialog [open]="ui().open === 'integrate'" (openChange)="closeDialog()" zTitle="Integrate Change">
       <p class="text-sm text-muted-foreground">
-        Merge <span class="font-medium">{{ ui().selected?.worktreeId }}</span> into a target branch.
+        Merge <span class="font-medium">{{ ui().branch }}</span> into a target branch (defaults to
+        the main branch).
       </p>
       <form (submit)="onIntegrate($event)" class="flex flex-col gap-3">
-        <app-form-field-layout [field]="integrateForm.target" id="worktree-target-branch" label="Target branch">
+        <app-form-field-layout [field]="integrateForm.target" id="branch-target-branch" label="Target branch">
           <z-select appFormFieldSlot="input" [formField]="integrateForm.target" zPlaceholder="Select branch…">
-            @for (b of branches(); track b) {
+            @for (b of integrateTargets(); track b) {
               <z-select-item [zValue]="b">{{ b }}</z-select-item>
             }
           </z-select>
@@ -202,7 +203,32 @@ export class BranchListComponent {
       ),
   }));
 
+  readonly repositoryQuery = injectQuery(() => ({
+    queryKey: ['repository', this.repoId()],
+    queryFn: () =>
+      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdGet(this.repoId())).then(
+        (r) => r.repository,
+      ),
+  }));
+
   readonly branches = computed(() => this.branchesQuery.data() ?? []);
+
+  /** The repository's configured main branch — the default integration target. */
+  readonly mainBranch = computed(() => this.repositoryQuery.data()?.mainBranch ?? '');
+
+  /** Branch name → its worktree (when one exists), used to resolve a branch's parent. */
+  readonly worktreeByBranch = computed(() => {
+    const map = new Map<string, WorktreeDto>();
+    for (const wt of this.worktreesQuery.data() ?? []) {
+      if (wt.branch) map.set(wt.branch, wt);
+    }
+    return map;
+  });
+
+  /** A branch can't be integrated into itself, so the source is removed from the target list. */
+  readonly integrateTargets = computed(() =>
+    this.branches().filter((b) => b !== this.ui.branch()),
+  );
 
   /**
    * Builds the nested worktree tree for `z-tree`. A worktree's `parent` is the
@@ -249,9 +275,10 @@ export class BranchListComponent {
   }));
 
   readonly mergeMutation = injectMutation(() => ({
-    mutationFn: ({ worktreeId, target }: { worktreeId: string; target: string }) =>
+    mutationFn: ({ source, target }: { source: string; target: string }) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdMergePost(this.repoId(), worktreeId, {
+        this.repositoryService.apiRepositoriesRepoIdBranchesMergePost(this.repoId(), {
+          source,
           target: target || undefined,
         }),
       ),
@@ -293,9 +320,12 @@ export class BranchListComponent {
     patchState(this.ui, { open: 'create', selected: null, parent });
   }
 
-  openIntegrate(worktree: WorktreeDto) {
-    this.integrateModel.set({ target: worktree.parent ?? '' });
-    patchState(this.ui, { open: 'integrate', selected: worktree });
+  openIntegrate(branch: string) {
+    // Default the target to the worktree's parent when this branch is worktree-backed, otherwise
+    // to the repository's configured main branch.
+    const worktree = this.worktreeByBranch().get(branch) ?? null;
+    this.integrateModel.set({ target: worktree?.parent ?? this.mainBranch() });
+    patchState(this.ui, { open: 'integrate', selected: worktree, branch });
   }
 
   openAbandon(worktree: WorktreeDto) {
@@ -321,10 +351,10 @@ export class BranchListComponent {
 
   async onIntegrate(event: Event) {
     event.preventDefault();
-    const worktreeId = this.ui.selected()?.worktreeId;
-    if (!worktreeId) return;
+    const source = this.ui.branch();
+    if (!source) return;
     await submit(this.integrateForm, {
-      action: async () => this.mergeMutation.mutate({ worktreeId, target: this.integrateModel().target }),
+      action: async () => this.mergeMutation.mutate({ source, target: this.integrateModel().target }),
     });
   }
 

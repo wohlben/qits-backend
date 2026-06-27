@@ -57,7 +57,7 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
             (viewCommits)="viewCommits.emit(node.label)"
             (viewTerminal)="viewTerminal.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
-            (integrate)="integrate.emit(node.data)"
+            (integrate)="integrate.emit(node.label)"
             (abandon)="abandon.emit(node.data)"
             (delete)="delete.emit(node.label)"
           />
@@ -73,7 +73,7 @@ export class BranchTreeComponent {
   readonly viewCommits = output<string>();
   readonly viewTerminal = output<string>();
   readonly branchOff = output<string>();
-  readonly integrate = output<WorktreeDto>();
+  readonly integrate = output<string>();
   readonly abandon = output<WorktreeDto>();
   readonly delete = output<string>();
   readonly fastForward = output<WorktreeDto>();

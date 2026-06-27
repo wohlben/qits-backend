@@ -9,7 +9,8 @@
  */
 
 
-export interface Response40 { 
-    success?: boolean;
+export interface MergeBranchRequest { 
+    source: string;
+    target?: string;
 }
 
