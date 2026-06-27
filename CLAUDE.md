@@ -43,9 +43,9 @@ All Maven commands use the wrapper.
 ./mvnw -pl service package -Dnative
 
 # Seed demo data (project + branch tree incl. fast-forwardable/diverged worktrees) into the shared
-# H2 file. Command-mode app, no web server; run from the repo root so the fixture resolves.
-./mvnw -pl cli -am package -DskipTests
-java -jar cli/target/quarkus-app/quarkus-run.jar seed
+# H2 file. One-step command-mode run, no web server (the cli pom binds quarkus:run's program args
+# to the cli.args property). Idempotent.
+./mvnw -pl cli quarkus:run -Dcli.args=seed
 ```
 
 The app runs on **H2 everywhere** — no Docker/Postgres needed. `service` and `cli` share one file-based H2 at a fixed, CWD-independent location (`${user.home}/.qits/data/h2/qits`, AUTO_SERVER) so the `cli` seed shows up in the running app; repos clone under `${user.home}/.qits/data/repositories`. **Tests** use in-memory H2 (each module's `src/test/resources/application.properties`; `domain` has no main config). The Postgres driver and the `docker-compose.yml` Postgres service are commented out — to switch back, uncomment `quarkus-jdbc-postgresql` in `domain/pom.xml`, restore the Postgres service in `docker-compose.yml`, and set `quarkus.datasource.*` back to postgresql. Flyway migrations live in `domain/src/main/resources/db/migration/` (on the classpath of both apps); they're written to be portable, but `generate-flyway-migration.sh` may emit Postgres-dialect DDL, so hand-edit a generated migration for H2 portability when that happens.

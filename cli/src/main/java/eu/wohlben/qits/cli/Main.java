@@ -11,13 +11,12 @@ import org.jboss.logging.Logger;
  * exits. It depends on {@code domain} but not on the web stack, so it boots with no HTTP server. It
  * reuses the same beans as the service, so commands stay in sync with the domain.
  *
- * <p>Build the runner (and the domain it needs), then run a command from the repo root (so the
- * testing-repo fixture resolves). It shares the service's H2 file via a fixed {@code
+ * <p>Run a command in one step (the cli pom binds {@code quarkus:run}'s program arguments to the
+ * {@code cli.args} property). It shares the service's H2 file via a fixed {@code
  * ${user.home}/.qits} location, so data it writes shows up in the running app:
  *
  * <pre>
- *   ./mvnw -pl cli -am package -DskipTests
- *   java -jar cli/target/quarkus-app/quarkus-run.jar seed
+ *   ./mvnw -pl cli quarkus:run -Dcli.args=seed
  * </pre>
  */
 @QuarkusMain

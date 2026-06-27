@@ -12,6 +12,11 @@
     <artifactId>cli</artifactId>
     <packaging>quarkus</packaging>
 
+    <properties>
+        <!-- Command passed to `quarkus:run`; override with -Dcli.args=seed. -->
+        <cli.args></cli.args>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>eu.wohlben</groupId>
@@ -51,6 +56,10 @@
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <extensions>true</extensions>
+                <configuration>
+                    <!-- `quarkus:run` ignores -Dquarkus.args; pass the command via -Dcli.args=seed -->
+                    <programArguments>${cli.args}</programArguments>
+                </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
