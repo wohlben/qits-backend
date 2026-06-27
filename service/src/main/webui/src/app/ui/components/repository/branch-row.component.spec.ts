@@ -9,20 +9,24 @@ describe('BranchRowComponent', () => {
     }).compileComponents();
   });
 
-  it('offers to branch off a worktree when the branch has none', () => {
+  it('offers to branch off and integrate a branch that has no worktree', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'develop');
     fixture.componentRef.setInput('worktree', null);
     fixture.detectChanges();
 
     let branchedOff = false;
+    let integrated = false;
     fixture.componentInstance.branchOff.subscribe(() => (branchedOff = true));
+    fixture.componentInstance.integrate.subscribe(() => (integrated = true));
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('develop');
     const buttons = Array.from(el.querySelectorAll('button'));
-    expect(buttons.some((b) => b.textContent?.includes('Integrate'))).toBe(false);
+    // Integrate is offered on every branch, worktree-backed or not.
+    buttons.find((b) => b.textContent?.includes('Integrate'))!.click();
     buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
+    expect(integrated).toBe(true);
     expect(branchedOff).toBe(true);
   });
 

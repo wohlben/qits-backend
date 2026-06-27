@@ -10,8 +10,6 @@
 
 
 export interface Response41 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    branches?: Array<string>;
 }
 

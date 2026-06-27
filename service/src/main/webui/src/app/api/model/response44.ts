@@ -10,6 +10,6 @@
 
 
 export interface Response44 { 
-    success?: boolean;
+    output?: string;
 }
 

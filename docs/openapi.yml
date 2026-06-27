@@ -319,6 +319,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    MergeBranchRequest:
+      type: object
+      required:
+      - source
+      properties:
+        source:
+          type: string
+          pattern: \S
+        target:
+          type: string
     MergeWorktreeRequest:
       type: object
       properties:
@@ -526,13 +536,17 @@ components:
     Response37:
       type: object
       properties:
-        repository:
-          $ref: "#/components/schemas/RepositoryDto"
+        commitHash:
+          type: string
+        hasConflicts:
+          type: boolean
+        output:
+          type: string
     Response38:
       type: object
       properties:
-        success:
-          type: boolean
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
     Response39:
       type: object
       properties:
@@ -546,11 +560,16 @@ components:
     Response40:
       type: object
       properties:
+        success:
+          type: boolean
+    Response41:
+      type: object
+      properties:
         branches:
           type: array
           items:
             type: string
-    Response41:
+    Response42:
       type: object
       properties:
         commitHash:
@@ -559,24 +578,24 @@ components:
           type: boolean
         output:
           type: string
-    Response42:
+    Response43:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry8"
-    Response43:
+    Response44:
       type: object
       properties:
         output:
           type: string
-    Response44:
+    Response45:
       type: object
       properties:
         success:
           type: boolean
-    Response45:
+    Response46:
       type: object
       properties:
         worktree:
@@ -1421,7 +1440,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response37"
+                $ref: "#/components/schemas/Response38"
       summary: Get
       tags:
       - Repository Controller
@@ -1438,7 +1457,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response39"
+                $ref: "#/components/schemas/Response40"
       summary: Delete
       tags:
       - Repository Controller
@@ -1462,7 +1481,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response38"
+                $ref: "#/components/schemas/Response39"
       summary: Delete Branch
       tags:
       - Repository Controller
@@ -1479,8 +1498,34 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response40"
+                $ref: "#/components/schemas/Response41"
       summary: Branches
+      tags:
+      - Repository Controller
+  /api/repositories/{repoId}/branches/merge:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeBranchRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response37"
+        "400":
+          description: Bad Request
+      summary: Merge Branch
       tags:
       - Repository Controller
   /api/repositories/{repoId}/commits:
@@ -1679,7 +1724,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response42"
+                $ref: "#/components/schemas/Response43"
       summary: List
       tags:
       - Worktree Controller
@@ -1702,7 +1747,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response45"
+                $ref: "#/components/schemas/Response46"
         "400":
           description: Bad Request
       summary: Create
@@ -1733,7 +1778,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response44"
+                $ref: "#/components/schemas/Response45"
         "400":
           description: Bad Request
       summary: Discard
@@ -1758,7 +1803,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response43"
+                $ref: "#/components/schemas/Response44"
       summary: Fast Forward
       tags:
       - Worktree Controller
@@ -1787,7 +1832,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response41"
+                $ref: "#/components/schemas/Response42"
         "400":
           description: Bad Request
       summary: Merge
