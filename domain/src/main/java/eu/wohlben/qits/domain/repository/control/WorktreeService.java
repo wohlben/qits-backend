@@ -101,6 +101,13 @@ public class WorktreeService {
             .findByIdOptional(repoId)
             .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
 
+    // `worktreeId` becomes a path segment under the repo's worktrees dir, so it must be a strict
+    // slug: no slashes/dots/dashes-leading that could traverse out of the dir or smuggle a git
+    // flag.
+    if (!worktreeId.matches("[A-Za-z0-9_-]{1,64}") || worktreeId.startsWith("-")) {
+      throw new BadRequestException("Invalid worktree id: " + worktreeId);
+    }
+
     Path originPath = Path.of(dataDir, repoId, "origin");
     if (!Files.exists(originPath)) {
       throw new NotFoundException("Repository origin not found on disk");
@@ -114,6 +121,11 @@ public class WorktreeService {
     // Each worktree gets its own branch so two worktrees never commit to the same branch.
     String parentBranch = (parent == null || parent.isBlank()) ? "master" : parent;
     String newBranch = (branch == null || branch.isBlank()) ? worktreeId : branch;
+    // Both are user-supplied and passed to git: reject dash-leading names so they can't be smuggled
+    // in as flags (argv flag injection).
+    if (parentBranch.startsWith("-") || newBranch.startsWith("-")) {
+      throw new BadRequestException("Invalid branch name");
+    }
     // Absolute path: `git worktree add` runs with cwd=origin, so a relative path
     // would be created nested under origin instead of the repo's worktrees dir.
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
@@ -127,6 +139,7 @@ public class WorktreeService {
           "add",
           "-b",
           newBranch,
+          "--end-of-options",
           worktreePath.toString(),
           parentBranch);
     } catch (Exception e) {
