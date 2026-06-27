@@ -10,7 +10,9 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>domain</module>
         <module>service</module>
+        <module>cli</module>
     </modules>
 
     <properties>
@@ -25,6 +27,9 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.34.6</quarkus.platform.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
+        <!-- Default so surefire's `@{argLine}` resolves in modules without the quarkus-maven-plugin
+             (which sets it). App modules override it at build time. -->
+        <argLine></argLine>
         <spotless-plugin.version>2.44.5</spotless-plugin.version>
         <google-java-format.version>1.28.0</google-java-format.version>
         <skipITs>true</skipITs>
@@ -38,6 +43,11 @@
                 <version>${quarkus.platform.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>domain</artifactId>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.mapstruct</groupId>
@@ -106,11 +116,6 @@
             </plugins>
         </pluginManagement>
         <plugins>
-            <plugin>
-                <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>quarkus-maven-plugin</artifactId>
-                <extensions>true</extensions>
-            </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
