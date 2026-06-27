@@ -25,8 +25,29 @@ describe('BranchTreeComponent', () => {
     await TestBed.configureTestingModule({ imports: [BranchTreeComponent] }).compileComponents();
   });
 
-  it('shows ahead/behind on a nested node and keeps the behind number visible when behind', async () => {
+  it('shows the behind number as a fast-forward action when behind but not ahead', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
+    // behind 2, ahead 0 → a clean fast-forward is possible, so the behind count renders as a
+    // clickable action rather than the diverged alert icon.
+    fixture.componentRef.setInput('nodes', tree(2, 0));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
+    expect(connector.textContent).toContain('+0');
+    // behind renders as a negative number on the fast-forward button
+    expect(connector.textContent).toContain('-2');
+    const behindButton = Array.from(connector.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('-2'),
+    )!;
+    expect(behindButton).toBeTruthy();
+    expect(behindButton.classList.contains('invisible')).toBe(false);
+  });
+
+  it('shows a divergence alert instead of the behind number when both ahead and behind', async () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    // behind 2, ahead 5 → diverged: a fast-forward cannot apply, so an alert replaces the count.
     fixture.componentRef.setInput('nodes', tree(2, 5));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -34,10 +55,8 @@ describe('BranchTreeComponent', () => {
 
     const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
     expect(connector.textContent).toContain('+5');
-    // behind renders as a negative number
-    expect(connector.textContent).toContain('-2');
-    const behindSpan = Array.from(connector.querySelectorAll('span')).find((s) => s.textContent?.includes('-2'))!;
-    expect(behindSpan.classList.contains('invisible')).toBe(false);
+    expect(connector.textContent).not.toContain('-2');
+    expect(connector.querySelector('ng-icon')).toBeTruthy();
   });
 
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {
