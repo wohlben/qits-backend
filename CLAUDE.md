@@ -33,7 +33,7 @@ All Maven commands use the wrapper. The root POM drives the `service` module.
 ./mvnw -pl service package -Dnative
 ```
 
-Postgres is required at runtime (dev/prod). Start it with `docker compose up -d` (db `qits`, user/pass `qits`, port 5432). **Tests run against in-memory H2** (`quarkus-jdbc-h2`, test scope; configured in `service/src/test/resources/application.properties`), so the suite needs no Docker/Postgres. The Flyway migrations are portable and apply cleanly to both — but `generate-flyway-migration.sh` emits Postgres-dialect DDL, so a future generated migration could use Postgres-only syntax that breaks the H2 test run; hand-edit for portability when that happens.
+The app runs on **H2 everywhere** — no Docker/Postgres needed. Dev and the packaged app use a file-based H2 (`service/src/main/resources/application.properties`) whose DB file lives under the gitignored `service/data/` dir; **tests** use in-memory H2 (`service/src/test/resources/application.properties`). The Postgres driver and the `docker-compose.yml` Postgres service are commented out — to switch back, uncomment `quarkus-jdbc-postgresql` in `service/pom.xml`, restore the Postgres service in `docker-compose.yml`, and set `quarkus.datasource.*` back to postgresql. Flyway migrations are written to be portable, but `generate-flyway-migration.sh` may emit Postgres-dialect DDL, so hand-edit a generated migration for H2 portability when that happens.
 
 ## Architecture
 
