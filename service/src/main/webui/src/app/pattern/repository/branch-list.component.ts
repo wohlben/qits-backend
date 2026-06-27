@@ -12,7 +12,10 @@ import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogComponent } from '@/shared/components/dialog';
 import { ZardSelectImports } from '@/shared/components/select/select.imports';
 import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.component';
-import { BranchTreeComponent, BranchTreeNode } from '@/ui/components/repository/branch-tree.component';
+import {
+  BranchTreeComponent,
+  BranchTreeNode,
+} from '@/ui/components/repository/branch-tree.component';
 import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-field-layout.component';
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
 import { invalidateRepository } from './invalidate-repository';
@@ -75,11 +78,16 @@ interface CreateWorktreeForm {
       [zTitle]="'New worktree from ' + (ui().parent ?? '')"
     >
       <p class="text-sm text-muted-foreground">
-        Fork a new worktree from <span class="font-medium">{{ ui().parent }}</span>. The worktree
-        gets its own branch so it never shares commits with another worktree.
+        Fork a new worktree from <span class="font-medium">{{ ui().parent }}</span
+        >. The worktree gets its own branch so it never shares commits with another worktree.
       </p>
       <form (submit)="onCreate($event)" class="flex flex-col gap-3">
-        <app-form-field-layout [field]="createForm.id" id="worktree-id" label="Worktree ID" autocomplete="off" />
+        <app-form-field-layout
+          [field]="createForm.id"
+          id="worktree-id"
+          label="Worktree ID"
+          autocomplete="off"
+        />
 
         <app-form-field-layout
           [field]="createForm.branch"
@@ -99,14 +107,26 @@ interface CreateWorktreeForm {
     </z-dialog>
 
     <!-- Integrate (merge) -->
-    <z-dialog [open]="ui().open === 'integrate'" (openChange)="closeDialog()" zTitle="Integrate Change">
+    <z-dialog
+      [open]="ui().open === 'integrate'"
+      (openChange)="closeDialog()"
+      zTitle="Integrate Change"
+    >
       <p class="text-sm text-muted-foreground">
         Merge <span class="font-medium">{{ ui().branch }}</span> into a target branch (defaults to
         the main branch).
       </p>
       <form (submit)="onIntegrate($event)" class="flex flex-col gap-3">
-        <app-form-field-layout [field]="integrateForm.target" id="branch-target-branch" label="Target branch">
-          <z-select appFormFieldSlot="input" [formField]="integrateForm.target" zPlaceholder="Select branch…">
+        <app-form-field-layout
+          [field]="integrateForm.target"
+          id="branch-target-branch"
+          label="Target branch"
+        >
+          <z-select
+            appFormFieldSlot="input"
+            [formField]="integrateForm.target"
+            zPlaceholder="Select branch…"
+          >
             @for (b of integrateTargets(); track b) {
               <z-select-item [zValue]="b">{{ b }}</z-select-item>
             }
@@ -124,12 +144,22 @@ interface CreateWorktreeForm {
     </z-dialog>
 
     <!-- Abandon (discard) -->
-    <z-dialog [open]="ui().open === 'abandon'" (openChange)="closeDialog()" zTitle="Abandon worktree?">
+    <z-dialog
+      [open]="ui().open === 'abandon'"
+      (openChange)="closeDialog()"
+      zTitle="Abandon worktree?"
+    >
       <p class="text-sm text-muted-foreground">
-        Discard <span class="font-medium">{{ ui().selected?.worktreeId }}</span>? This cannot be undone.
+        Discard <span class="font-medium">{{ ui().selected?.worktreeId }}</span
+        >? This cannot be undone.
       </p>
       <div class="flex items-center gap-2">
-        <button z-button zType="destructive" [zLoading]="discardMutation.isPending()" (click)="onAbandon()">
+        <button
+          z-button
+          zType="destructive"
+          [zLoading]="discardMutation.isPending()"
+          (click)="onAbandon()"
+        >
           Abandon
         </button>
         <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
@@ -142,10 +172,16 @@ interface CreateWorktreeForm {
     <!-- Delete branch -->
     <z-dialog [open]="ui().open === 'delete'" (openChange)="closeDialog()" zTitle="Delete branch?">
       <p class="text-sm text-muted-foreground">
-        Delete branch <span class="font-medium">{{ ui().branch }}</span>? This cannot be undone.
+        Delete branch <span class="font-medium">{{ ui().branch }}</span
+        >? This cannot be undone.
       </p>
       <div class="flex items-center gap-2">
-        <button z-button zType="destructive" [zLoading]="deleteBranchMutation.isPending()" (click)="onDelete()">
+        <button
+          z-button
+          zType="destructive"
+          [zLoading]="deleteBranchMutation.isPending()"
+          (click)="onDelete()"
+        >
           Delete
         </button>
         <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
@@ -226,9 +262,7 @@ export class BranchListComponent {
   });
 
   /** A branch can't be integrated into itself, so the source is removed from the target list. */
-  readonly integrateTargets = computed(() =>
-    this.branches().filter((b) => b !== this.ui.branch()),
-  );
+  readonly integrateTargets = computed(() => this.branches().filter((b) => b !== this.ui.branch()));
 
   /**
    * Builds the nested worktree tree for `z-tree`. A worktree's `parent` is the
@@ -245,14 +279,18 @@ export class BranchListComponent {
     const branchNames = new Set(branches);
 
     const nodes = new Map<string, BranchTreeNode>(
-      branches.map((branch) => [branch, { key: branch, label: branch, data: byBranch.get(branch) ?? null, children: [] }]),
+      branches.map((branch) => [
+        branch,
+        { key: branch, label: branch, data: byBranch.get(branch) ?? null, children: [] },
+      ]),
     );
 
     const roots: BranchTreeNode[] = [];
     for (const branch of branches) {
       const node = nodes.get(branch)!;
       const parent = node.data?.parent;
-      const parentNode = parent && parent !== branch && branchNames.has(parent) ? nodes.get(parent) : undefined;
+      const parentNode =
+        parent && parent !== branch && branchNames.has(parent) ? nodes.get(parent) : undefined;
       if (parentNode) {
         parentNode.children!.push(node);
       } else {
@@ -288,21 +326,30 @@ export class BranchListComponent {
   readonly discardMutation = injectMutation(() => ({
     mutationFn: (worktreeId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(this.repoId(), worktreeId, {}),
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(
+          this.repoId(),
+          worktreeId,
+          {},
+        ),
       ),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly deleteBranchMutation = injectMutation(() => ({
     mutationFn: (branch: string) =>
-      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdBranchesDelete(this.repoId(), branch)),
+      lastValueFrom(
+        this.repositoryService.apiRepositoriesRepoIdBranchesDelete(this.repoId(), branch),
+      ),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly fastForwardMutation = injectMutation(() => ({
     mutationFn: (worktreeId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFastForwardPost(this.repoId(), worktreeId),
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFastForwardPost(
+          this.repoId(),
+          worktreeId,
+        ),
       ),
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
@@ -354,7 +401,8 @@ export class BranchListComponent {
     const source = this.ui.branch();
     if (!source) return;
     await submit(this.integrateForm, {
-      action: async () => this.mergeMutation.mutate({ source, target: this.integrateModel().target }),
+      action: async () =>
+        this.mergeMutation.mutate({ source, target: this.integrateModel().target }),
     });
   }
 
