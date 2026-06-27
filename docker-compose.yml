@@ -1,20 +1,27 @@
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: qits-postgres
-    environment:
-      POSTGRES_DB: qits
-      POSTGRES_USER: qits
-      POSTGRES_PASSWORD: qits
-    ports:
-      - "5432:5432"
-    volumes:
-      - qits-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U qits -d qits"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  qits-postgres-data:
+# Dev runs against a file-based H2 (see service/src/main/resources/application-dev.properties),
+# so no Docker/Postgres is needed for `./mvnw -pl service quarkus:dev`.
+#
+# The Postgres service below is only for running against the prod datasource
+# (quarkus.datasource.db-kind=postgresql in application.properties). It is commented
+# out while we stay on H2 — uncomment to bring Postgres back.
+#
+# services:
+#   postgres:
+#     image: postgres:16-alpine
+#     container_name: qits-postgres
+#     environment:
+#       POSTGRES_DB: qits
+#       POSTGRES_USER: qits
+#       POSTGRES_PASSWORD: qits
+#     ports:
+#       - "5432:5432"
+#     volumes:
+#       - qits-postgres-data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U qits -d qits"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 5
+#
+# volumes:
+#   qits-postgres-data:
