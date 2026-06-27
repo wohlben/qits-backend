@@ -46,9 +46,12 @@ All Maven commands use the wrapper.
 # H2 file. One-step command-mode run, no web server (the cli pom binds quarkus:run's program args
 # to the cli.args property). Idempotent.
 ./mvnw -pl cli quarkus:run -Dcli.args=seed
+
+# Generate a starter Flyway migration after changing entities (writes PENDING_MIGRATION.sql).
+./mvnw install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=generate-migration
 ```
 
-The app runs on **H2 everywhere** — no Docker/Postgres needed. `service` and `cli` share one file-based H2 at a fixed, CWD-independent location (`${user.home}/.qits/data/h2/qits`, AUTO_SERVER) so the `cli` seed shows up in the running app; repos clone under `${user.home}/.qits/data/repositories`. **Tests** use in-memory H2 (each module's `src/test/resources/application.properties`; `domain` has no main config). The Postgres driver and the `docker-compose.yml` Postgres service are commented out — to switch back, uncomment `quarkus-jdbc-postgresql` in `domain/pom.xml`, restore the Postgres service in `docker-compose.yml`, and set `quarkus.datasource.*` back to postgresql. Flyway migrations live in `domain/src/main/resources/db/migration/` (on the classpath of both apps); they're written to be portable, but `generate-flyway-migration.sh` may emit Postgres-dialect DDL, so hand-edit a generated migration for H2 portability when that happens.
+The app runs on **H2 everywhere** — no Docker/Postgres needed. `service` and `cli` share one file-based H2 at a fixed, CWD-independent location (`${user.home}/.qits/data/h2/qits`, AUTO_SERVER) so the `cli` seed shows up in the running app; repos clone under `${user.home}/.qits/data/repositories`. **Tests** use in-memory H2 (each module's `src/test/resources/application.properties`; `domain` has no main config). The Postgres driver and the `docker-compose.yml` Postgres service are commented out — to switch back, uncomment `quarkus-jdbc-postgresql` in `domain/pom.xml`, restore the Postgres service in `docker-compose.yml`, and set `quarkus.datasource.*` back to postgresql. Flyway migrations live in `domain/src/main/resources/db/migration/` (on the classpath of both apps); see the Database migrations section for the `generate-migration` cli command that produces a starter.
 
 ## Architecture
 
@@ -78,7 +81,14 @@ Domain areas: `project` (the aggregate root), `repository` (repos + worktrees + 
 
 ### Database migrations (Flyway)
 
-Migrations live in `domain/src/main/resources/db/migration/` and run at startup (`migrate-at-start=true`) for whichever app (service or cli) boots. **Write migrations by hand.** The helper `scripts/generate-flyway-migration.sh` boots dev mode, asks Hibernate to diff the schema, and drops a starter at `service/PENDING_MIGRATION.sql` for you to review — turn that into a proper hand-written `V#__name.sql` and delete `PENDING_MIGRATION.sql`. Hand-written files use `V1__init.sql` style; auto-generated ones use a dotted `V1.2026.05.01.xxxxxx__service.sql` pattern and are cleaned up automatically.
+Migrations live in `domain/src/main/resources/db/migration/` and run at startup (`migrate-at-start=true`) for whichever app (service or cli) boots. **Write migrations by hand.** To get a starter, after changing entities rebuild and run the cli `generate-migration` command:
+
+```bash
+./mvnw install -DskipTests
+./mvnw -pl cli quarkus:run -Dcli.args=generate-migration
+```
+
+It applies the committed migrations to a throwaway in-memory H2, diffs the entity model against it (Hibernate `SchemaMigrator`), and writes the delta DDL to `PENDING_MIGRATION.sql` at the repo root (or prints "No schema changes"). Turn that into a proper hand-written `V#__name.sql` and delete `PENDING_MIGRATION.sql`. (Implemented in `cli`'s `GenerateMigrationService`, replacing the old `scripts/generate-flyway-migration.sh`.)
 
 ### Git operations
 
