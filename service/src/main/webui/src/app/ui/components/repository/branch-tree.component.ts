@@ -41,7 +41,9 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
                 <ng-icon
                   name="lucideCircleAlert"
                   class="size-3 text-destructive"
-                  [attr.title]="'Diverged from ' + (node.data.parent ?? 'parent') + ' — cannot fast-forward'"
+                  [attr.title]="
+                    'Diverged from ' + (node.data.parent ?? 'parent') + ' — cannot fast-forward'
+                  "
                 />
               } @else {
                 <span class="invisible">-{{ node.data.behind ?? 0 }}</span>

@@ -84,7 +84,9 @@ describe('BranchTreeComponent', () => {
     fixture.detectChanges();
 
     const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
-    buttons.find((b) => b.textContent?.includes('Branch off worktree') && b.closest('[title]') === null)?.click();
+    buttons
+      .find((b) => b.textContent?.includes('Branch off worktree') && b.closest('[title]') === null)
+      ?.click();
     // a branch-off button exists for every card; just assert the event carries a branch name
     buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
     expect(typeof branchedOff).toBe('string');
