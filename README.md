@@ -80,12 +80,19 @@ git submodule update --init --recursive
 
 The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI directory. It is built and served via [Quarkus Quinoa](https://quarkiverse.github.io/quarkiverse-docs/quarkus-quinoa/dev/index.html) during development and packaged into the application at build time. Quinoa auto-detects the Angular framework and the pnpm package manager, so no extra `quarkus.quinoa.*` path configuration is required.
 
-## Building
+## Building & running
 
 ```bash
-# Full build (frontend + backend)
+# Full build (all modules, frontend + backend)
 ./mvnw package
 
-# Run in dev mode (live-reload for both Java and Angular)
-cd service && ./mvnw quarkus:dev
+# First on a fresh checkout, build so the `domain` module is resolvable:
+./mvnw install -DskipTests
+
+# Run the web app in dev mode (live-reload for both Java and Angular, UI on :4200)
+./mvnw -pl service quarkus:dev
+
+# Seed demo data (a project + branch tree, incl. fast-forwardable / diverged worktrees) into the
+# shared local H2 DB so it shows up in the running app. One-step command-mode run, no web server.
+./mvnw -pl cli quarkus:run -Dcli.args=seed
 ```
