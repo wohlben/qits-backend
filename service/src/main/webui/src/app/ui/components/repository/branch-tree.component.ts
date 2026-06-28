@@ -135,6 +135,18 @@ export interface CommitsPreview {
                       } @else {
                         <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
                       }
+                      <!-- Pull the parent's commits in (fast-forward or merge). -->
+                      <div class="border-t p-2">
+                        <button
+                          z-button
+                          zType="secondary"
+                          zSize="sm"
+                          class="w-full"
+                          (click)="runAction(node.data)"
+                        >
+                          {{ actionLabel(node.data) }}
+                        </button>
+                      </div>
                     </z-tab>
                   }
                   @if ((node.data.ahead ?? 0) > 0) {
@@ -151,24 +163,21 @@ export interface CommitsPreview {
                       } @else {
                         <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
                       }
+                      <!-- Integrate this branch's commits into a target (defaults to the main branch). -->
+                      <div class="border-t p-2">
+                        <button
+                          z-button
+                          zType="secondary"
+                          zSize="sm"
+                          class="w-full"
+                          (click)="runIntegrate(node.label)"
+                        >
+                          Integrate
+                        </button>
+                      </div>
                     </z-tab>
                   }
                 </z-tab-group>
-
-                <!-- The integrate action lives at the bottom, only when there's something to pull. -->
-                @if ((node.data.behind ?? 0) > 0) {
-                  <div class="border-t p-2">
-                    <button
-                      z-button
-                      zType="secondary"
-                      zSize="sm"
-                      class="w-full"
-                      (click)="runAction(node.data)"
-                    >
-                      {{ actionLabel(node.data) }}
-                    </button>
-                  </div>
-                }
               </z-popover>
             </ng-template>
 
@@ -279,6 +288,12 @@ export class BranchTreeComponent {
     } else {
       this.update.emit(wt);
     }
+    this.closePopover();
+  }
+
+  /** Integrate this branch into a target (the Forward tab's action); the parent opens the dialog. */
+  runIntegrate(branch: string): void {
+    this.integrate.emit(branch);
     this.closePopover();
   }
 

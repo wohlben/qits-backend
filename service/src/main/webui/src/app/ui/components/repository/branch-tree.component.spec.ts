@@ -126,6 +126,21 @@ describe('BranchTreeComponent', () => {
     expect(component.openWorktreeId()).toBeNull();
   });
 
+  it('runs the Forward-tab Integrate action, emitting the branch name and closing', () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    const component = fixture.componentInstance;
+
+    let integrated: string | undefined;
+    component.integrate.subscribe((b) => (integrated = b));
+
+    component.togglePopover({ worktreeId: 'x' });
+    expect(component.openWorktreeId()).toBe('x');
+
+    component.runIntegrate('feature/x');
+    expect(integrated).toBe('feature/x');
+    expect(component.openWorktreeId()).toBeNull();
+  });
+
   it('emits peek only when a behind-count popover opens, and exposes incoming commits per worktree', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     fixture.componentRef.setInput('nodes', tree(2, 0));
