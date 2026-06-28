@@ -1,15 +1,7 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideCircleAlert } from '@ng-icons/lucide';
+import { lucideCircleAlert, lucideX } from '@ng-icons/lucide';
 
 import { CommitDto } from '@/api/model/commitDto';
 import { WorktreeDto } from '@/api/model/worktreeDto';
@@ -74,9 +66,9 @@ export interface CommitsPreview {
                 <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
               </div>
             } @else if ((node.data.behind ?? 0) > 0 || (node.data.ahead ?? 0) > 0) {
-              <!-- Hovering or clicking the count opens a tabbed popover (Behind / Forward) with the
-                   integrate action pinned at the bottom. Visibility is driven programmatically so
-                   the popover stays open while the cursor moves onto it to reach that action. -->
+              <!-- Clicking the count toggles a tabbed popover (Behind / Forward) with the integrate
+                   action pinned at the bottom. It stays open until the × (or another click on the
+                   count) — no hover, since closing on mouse-leave was disruptive. -->
               <button
                 type="button"
                 class="flex shrink-0 cursor-pointer flex-col items-center justify-center font-mono text-[0.7rem] leading-none text-muted-foreground hover:text-foreground"
@@ -87,9 +79,7 @@ export interface CommitsPreview {
                 zPlacement="top"
                 [zVisible]="openWorktreeId() === node.data.worktreeId"
                 (zVisibleChange)="onPeek(node.data, $event)"
-                (mouseenter)="openPopover(node.data)"
-                (mouseleave)="scheduleClose()"
-                (click)="openPopover(node.data)"
+                (click)="togglePopover(node.data)"
               >
                 @if ((node.data.behind ?? 0) > 0) {
                   <span>-{{ node.data.behind ?? 0 }}</span>
@@ -113,15 +103,21 @@ export interface CommitsPreview {
                  the default when present; otherwise Forward is the only (and default) tab. Defined
                  per node so it closes over the node; commits load lazily when it opens. -->
             <ng-template #commitsTpl>
-              <z-popover
-                class="w-80 p-0"
-                (mouseenter)="cancelClose()"
-                (mouseleave)="scheduleClose()"
-              >
-                <!-- Make the two tabs share the popover width equally (grow from a 0 basis). The
-                     tab buttons live inside the [role=tablist] nav (z-button renders role=button). -->
+              <z-popover class="relative w-80 p-0">
+                <!-- Explicit close, vertically centered on the tab strip (~33px tall) on the right. -->
+                <button
+                  type="button"
+                  class="absolute right-1 top-0.5 z-10 flex size-8 cursor-pointer items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                  aria-label="Close"
+                  (click)="closePopover()"
+                >
+                  <ng-icon name="lucideX" class="size-4" />
+                </button>
+                <!-- Tabs share the width equally (grow from a 0 basis) and leave room on the right
+                     for the × button. The tab buttons live inside the [role=tablist] nav (z-button
+                     renders role=button). -->
                 <z-tab-group
-                  class="[&_[role=tablist]_button]:grow [&_[role=tablist]_button]:basis-0"
+                  class="[&_[role=tablist]]:pr-8 [&_[role=tablist]_button]:grow [&_[role=tablist]_button]:basis-0"
                 >
                   @if ((node.data.behind ?? 0) > 0) {
                     <z-tab [label]="'Behind · -' + (node.data.behind ?? 0)">
@@ -215,7 +211,7 @@ export interface CommitsPreview {
       </ng-template>
     </z-tree>
   `,
-  viewProviders: [provideIcons({ lucideCircleAlert })],
+  viewProviders: [provideIcons({ lucideCircleAlert, lucideX })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BranchTreeComponent {
@@ -239,12 +235,6 @@ export class BranchTreeComponent {
 
   /** The worktree whose popover is currently open (drives the popover's programmatic visibility). */
   readonly openWorktreeId = signal<string | null>(null);
-  /** Pending close, so moving the cursor between the count and the popover doesn't close it. */
-  private closeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor() {
-    inject(DestroyRef).onDestroy(() => this.cancelClose());
-  }
 
   /** Commits to pull in for {@code wt}, or null while they're still loading for this worktree. */
   incomingFor(wt: WorktreeDto): CommitDto[] | null {
@@ -264,23 +254,16 @@ export class BranchTreeComponent {
     }
   }
 
-  /** Open the popover for a worktree (hover or click); cancels any pending close. */
-  openPopover(wt: WorktreeDto): void {
-    this.cancelClose();
-    this.openWorktreeId.set(wt.worktreeId ?? null);
+  /** Toggle the popover open/closed for a worktree (the count is click-only — no hover). */
+  togglePopover(wt: WorktreeDto): void {
+    this.openWorktreeId.set(
+      this.openWorktreeId() === wt.worktreeId ? null : (wt.worktreeId ?? null),
+    );
   }
 
-  /** Close shortly, unless the cursor reaches the popover (which cancels it) first. */
-  scheduleClose(): void {
-    this.cancelClose();
-    this.closeTimer = setTimeout(() => this.openWorktreeId.set(null), 150);
-  }
-
-  cancelClose(): void {
-    if (this.closeTimer) {
-      clearTimeout(this.closeTimer);
-      this.closeTimer = null;
-    }
+  /** Close the popover (the explicit × button, and after running the action). */
+  closePopover(): void {
+    this.openWorktreeId.set(null);
   }
 
   /** The footer action label: a fast-forward when level, otherwise a merge of the parent in. */
@@ -296,8 +279,7 @@ export class BranchTreeComponent {
     } else {
       this.update.emit(wt);
     }
-    this.cancelClose();
-    this.openWorktreeId.set(null);
+    this.closePopover();
   }
 
   title(wt: WorktreeDto): string {
