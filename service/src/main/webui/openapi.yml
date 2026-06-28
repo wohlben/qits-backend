@@ -71,6 +71,10 @@ components:
           type: string
         message:
           type: string
+        files:
+          type: array
+          items:
+            type: string
     CommitFileChangeDto:
       type: object
       properties:
