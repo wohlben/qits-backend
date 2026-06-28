@@ -140,7 +140,7 @@ interface NodeSummary {
                   class="[&_[role=tablist]]:pr-8 [&_[role=tablist]_button]:grow [&_[role=tablist]_button]:basis-0"
                 >
                   @if (s.worktree && s.behind > 0) {
-                    <z-tab [label]="'Behind · -' + s.behind">
+                    <z-tab [label]="s.behind + ' behind'">
                       @if (incomingFor(s.branch); as commits) {
                         @if (commits.length === 0) {
                           <div class="px-3 py-2 text-sm text-muted-foreground">
@@ -170,7 +170,7 @@ interface NodeSummary {
                     </z-tab>
                   }
                   @if (s.ahead > 0) {
-                    <z-tab [label]="'Forward · +' + s.ahead">
+                    <z-tab [label]="s.ahead + ' forward'">
                       @if (outgoingFor(s.branch); as commits) {
                         @if (commits.length === 0) {
                           <div class="px-3 py-2 text-sm text-muted-foreground">No commits yet</div>
