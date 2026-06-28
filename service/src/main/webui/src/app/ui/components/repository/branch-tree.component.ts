@@ -15,6 +15,7 @@ import { CommitDto } from '@/api/model/commitDto';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardPopoverComponent, ZardPopoverDirective } from '@/shared/components/popover';
+import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import { TreeNode } from '@/shared/components/tree/tree.types';
 import { BranchRowComponent } from './branch-row.component';
@@ -46,6 +47,8 @@ export interface CommitsPreview {
     ZardPopoverDirective,
     ZardPopoverComponent,
     ZardButtonComponent,
+    ZardTabGroupComponent,
+    ZardTabComponent,
     DatePipe,
     NgTemplateOutlet,
   ],
@@ -54,11 +57,11 @@ export interface CommitsPreview {
       <ng-template #nodeTemplate let-node let-level="level">
         <div class="flex flex-1 items-center gap-2">
           @if (level > 0 && node.data) {
-            <div
-              class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none"
-              [attr.title]="title(node.data)"
-            >
-              @if (wouldConflict(node.data)) {
+            @if (wouldConflict(node.data)) {
+              <div
+                class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none"
+                [attr.title]="title(node.data)"
+              >
                 <ng-icon
                   name="lucideCircleAlert"
                   class="size-3 text-destructive"
@@ -68,64 +71,92 @@ export interface CommitsPreview {
                     ' — cannot integrate without resolving merge conflicts'
                   "
                 />
-              } @else if ((node.data.behind ?? 0) > 0) {
-                <!-- Behind the parent (clean): hovering or clicking the count opens the popover,
-                     which holds the list of incoming commits and the integrate action in its footer.
-                     Visibility is driven programmatically so the popover stays open while the cursor
-                     moves onto it to reach that action. -->
-                <button
-                  type="button"
-                  class="cursor-pointer text-muted-foreground hover:text-foreground"
-                  [attr.title]="
-                    (node.data.behind ?? 0) +
-                    ' commit(s) to pull from ' +
-                    (node.data.parent ?? 'parent')
-                  "
-                  zPopover
-                  [zContent]="incomingTpl"
-                  [zTrigger]="null"
-                  zPlacement="top"
-                  [zVisible]="openWorktreeId() === node.data.worktreeId"
-                  (zVisibleChange)="onPeek(node.data, $event)"
-                  (mouseenter)="openPopover(node.data)"
-                  (mouseleave)="scheduleClose()"
-                  (click)="openPopover(node.data)"
-                >
-                  -{{ node.data.behind ?? 0 }}
-                </button>
-              } @else {
-                <span class="invisible">-{{ node.data.behind ?? 0 }}</span>
-              }
+                <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
+              </div>
+            } @else if ((node.data.behind ?? 0) > 0 || (node.data.ahead ?? 0) > 0) {
+              <!-- Hovering or clicking the count opens a tabbed popover (Behind / Forward) with the
+                   integrate action pinned at the bottom. Visibility is driven programmatically so
+                   the popover stays open while the cursor moves onto it to reach that action. -->
+              <button
+                type="button"
+                class="flex shrink-0 cursor-pointer flex-col items-center justify-center font-mono text-[0.7rem] leading-none text-muted-foreground hover:text-foreground"
+                [attr.title]="title(node.data)"
+                zPopover
+                [zContent]="commitsTpl"
+                [zTrigger]="null"
+                zPlacement="top"
+                [zVisible]="openWorktreeId() === node.data.worktreeId"
+                (zVisibleChange)="onPeek(node.data, $event)"
+                (mouseenter)="openPopover(node.data)"
+                (mouseleave)="scheduleClose()"
+                (click)="openPopover(node.data)"
+              >
+                @if ((node.data.behind ?? 0) > 0) {
+                  <span>-{{ node.data.behind ?? 0 }}</span>
+                } @else {
+                  <span class="invisible">-0</span>
+                }
+                <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
+              </button>
+            } @else {
+              <div
+                class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none text-muted-foreground"
+                [attr.title]="title(node.data)"
+              >
+                <span class="invisible">-0</span>
+                <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
+              </div>
+            }
 
-              <!-- Popover listing the commits a fast-forward / merge would pull in, with the action
-                   in its footer. Defined per node so it closes over the node; commits load lazily
-                   when it opens. mouseenter/leave keep it open while the cursor is over it. -->
-              <ng-template #incomingTpl>
-                <z-popover
-                  class="w-80 p-0"
-                  (mouseenter)="cancelClose()"
-                  (mouseleave)="scheduleClose()"
-                >
-                  <!-- Incoming: commits the parent has that a fast-forward/merge would pull in. -->
-                  <div class="border-b px-3 py-2 text-xs font-medium">
-                    Commits to pull from {{ node.data.parent ?? 'parent' }} (-{{
-                      node.data.behind ?? 0
-                    }})
-                  </div>
-                  @if (incomingFor(node.data); as commits) {
-                    @if (commits.length === 0) {
-                      <div class="px-3 py-2 text-sm text-muted-foreground">Already up to date</div>
-                    } @else {
-                      <ng-container
-                        [ngTemplateOutlet]="commitList"
-                        [ngTemplateOutletContext]="{ $implicit: commits }"
-                      />
-                    }
-                  } @else {
-                    <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
+            <!-- Tabbed popover: Behind (commits to pull) / Forward (this branch's own commits),
+                 with the integrate action at the bottom. The Behind tab is rendered first so it is
+                 the default when present; otherwise Forward is the only (and default) tab. Defined
+                 per node so it closes over the node; commits load lazily when it opens. -->
+            <ng-template #commitsTpl>
+              <z-popover
+                class="w-80 p-0"
+                (mouseenter)="cancelClose()"
+                (mouseleave)="scheduleClose()"
+              >
+                <z-tab-group>
+                  @if ((node.data.behind ?? 0) > 0) {
+                    <z-tab [label]="'Behind · -' + (node.data.behind ?? 0)">
+                      @if (incomingFor(node.data); as commits) {
+                        @if (commits.length === 0) {
+                          <div class="px-3 py-2 text-sm text-muted-foreground">
+                            Already up to date
+                          </div>
+                        } @else {
+                          <ng-container
+                            [ngTemplateOutlet]="commitList"
+                            [ngTemplateOutletContext]="{ $implicit: commits }"
+                          />
+                        }
+                      } @else {
+                        <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
+                      }
+                    </z-tab>
                   }
+                  @if ((node.data.ahead ?? 0) > 0) {
+                    <z-tab [label]="'Forward · +' + (node.data.ahead ?? 0)">
+                      @if (outgoingFor(node.data); as commits) {
+                        @if (commits.length === 0) {
+                          <div class="px-3 py-2 text-sm text-muted-foreground">No commits yet</div>
+                        } @else {
+                          <ng-container
+                            [ngTemplateOutlet]="commitList"
+                            [ngTemplateOutletContext]="{ $implicit: commits }"
+                          />
+                        }
+                      } @else {
+                        <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
+                      }
+                    </z-tab>
+                  }
+                </z-tab-group>
 
-                  <!-- The integrate action lives here now (moved off the count's click). -->
+                <!-- The integrate action lives at the bottom, only when there's something to pull. -->
+                @if ((node.data.behind ?? 0) > 0) {
                   <div class="border-t p-2">
                     <button
                       z-button
@@ -137,48 +168,30 @@ export interface CommitsPreview {
                       {{ actionLabel(node.data) }}
                     </button>
                   </div>
+                }
+              </z-popover>
+            </ng-template>
 
-                  <!-- Outgoing: this branch's own commits over its parent (the plus count). -->
-                  @if ((node.data.ahead ?? 0) > 0) {
-                    <div class="border-t px-3 py-2 text-xs font-medium">
-                      Commits on {{ node.data.branch ?? 'this branch' }} (+{{
-                        node.data.ahead ?? 0
-                      }})
-                    </div>
-                    @if (outgoingFor(node.data); as commits) {
-                      <ng-container
-                        [ngTemplateOutlet]="commitList"
-                        [ngTemplateOutletContext]="{ $implicit: commits }"
-                      />
-                    } @else {
-                      <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
-                    }
-                  }
-                </z-popover>
-              </ng-template>
-
-              <!-- Shared renderer for a commit list, reused for the incoming and outgoing sections. -->
-              <ng-template #commitList let-commits>
-                <ul class="max-h-48 overflow-auto py-1">
-                  @for (c of commits; track c.hash) {
-                    <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
-                      <span class="shrink-0 font-mono text-xs text-muted-foreground">
-                        {{ c.shortHash }}
-                      </span>
-                      <span class="flex min-w-0 flex-1 flex-col">
-                        <span class="truncate">{{ c.message }}</span>
-                        @if (c.date) {
-                          <span class="text-xs text-muted-foreground">
-                            {{ c.author }} · {{ c.date | date: 'short' }}
-                          </span>
-                        }
-                      </span>
-                    </li>
-                  }
-                </ul>
-              </ng-template>
-              <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
-            </div>
+            <!-- Shared renderer for a commit list, reused for the Behind and Forward tabs. -->
+            <ng-template #commitList let-commits>
+              <ul class="max-h-48 overflow-auto py-1">
+                @for (c of commits; track c.hash) {
+                  <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
+                    <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                      {{ c.shortHash }}
+                    </span>
+                    <span class="flex min-w-0 flex-1 flex-col">
+                      <span class="truncate">{{ c.message }}</span>
+                      @if (c.date) {
+                        <span class="text-xs text-muted-foreground">
+                          {{ c.author }} · {{ c.date | date: 'short' }}
+                        </span>
+                      }
+                    </span>
+                  </li>
+                }
+              </ul>
+            </ng-template>
           }
           <app-branch-row
             class="flex-1"
