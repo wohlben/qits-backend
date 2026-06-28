@@ -67,10 +67,9 @@ describe('BranchTreeComponent', () => {
     expect(connector.querySelector('ng-icon')).toBeTruthy();
   });
 
-  it('offers an update (merge parent in) action when diverged but the merge is clean', async () => {
+  it('opens the popover when the behind count is clicked instead of running the action directly', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
-    // behind 2, ahead 5, no conflict → a fast-forward can't apply, but merging the parent in can,
-    // so the behind count is a clickable update action (not the conflict icon).
+    // behind 2, ahead 5, no conflict → behind, not a conflict, so the count is a popover trigger.
     fixture.componentRef.setInput('nodes', tree(2, 5, false));
     let updated: { worktreeId?: string } | undefined;
     fixture.componentInstance.update.subscribe((w) => (updated = w));
@@ -81,12 +80,41 @@ describe('BranchTreeComponent', () => {
     const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
     expect(connector.textContent).toContain('+5');
     expect(connector.querySelector('ng-icon')).toBeFalsy();
-    const updateButton = Array.from(connector.querySelectorAll('button')).find((b) =>
+    const countButton = Array.from(connector.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('-2'),
     )!;
-    expect(updateButton).toBeTruthy();
-    updateButton.click();
-    expect(updated?.worktreeId).toBe('x');
+    expect(countButton).toBeTruthy();
+
+    // Clicking the count opens the popover; it must NOT run the integration action anymore.
+    countButton.click();
+    expect(fixture.componentInstance.openWorktreeId()).toBe('x');
+    expect(updated).toBeUndefined();
+  });
+
+  it('runs the footer action: merge for a diverged branch, fast-forward when only behind', () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    const component = fixture.componentInstance;
+
+    let updated: { worktreeId?: string } | undefined;
+    let fastForwarded: { worktreeId?: string } | undefined;
+    component.update.subscribe((w) => (updated = w));
+    component.fastForward.subscribe((w) => (fastForwarded = w));
+
+    // Diverged (ahead + behind) → the footer offers a merge.
+    const diverged = { worktreeId: 'd', branch: 'd', parent: 'master', behind: 2, ahead: 5 };
+    expect(component.actionLabel(diverged)).toContain('Merge');
+    component.runAction(diverged);
+    expect(updated?.worktreeId).toBe('d');
+    expect(fastForwarded).toBeUndefined();
+
+    // Only behind → the footer offers a fast-forward.
+    const behindOnly = { worktreeId: 'b', branch: 'b', parent: 'master', behind: 2, ahead: 0 };
+    expect(component.actionLabel(behindOnly)).toContain('Fast-forward');
+    component.runAction(behindOnly);
+    expect(fastForwarded?.worktreeId).toBe('b');
+
+    // Running the action closes the popover.
+    expect(component.openWorktreeId()).toBeNull();
   });
 
   it('emits peek only when a behind-count popover opens, and exposes incoming commits per worktree', async () => {
