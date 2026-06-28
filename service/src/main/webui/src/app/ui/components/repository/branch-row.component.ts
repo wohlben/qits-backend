@@ -41,8 +41,8 @@ import { ZardButtonComponent } from '@/shared/components/button';
                cleanup instead of Integrate/Abandon (the backend re-verifies before deleting). -->
           <button z-button zType="secondary" (click)="cleanup.emit()">Cleanup</button>
         } @else {
-          <!-- Any branch can be integrated into a target (defaults to the repo's main branch). -->
-          <button z-button zType="secondary" (click)="integrate.emit()">Integrate</button>
+          <!-- Integrate moved into the commit popover (Forward tab); here we keep only the
+               destructive remove action. -->
           @if (worktree()) {
             <button z-button zType="destructive" (click)="abandon.emit()">Abandon</button>
           } @else if (!hasChildren()) {
@@ -68,7 +68,6 @@ export class BranchRowComponent {
   readonly viewCommits = output<void>();
   readonly viewTerminal = output<void>();
   readonly branchOff = output<void>();
-  readonly integrate = output<void>();
   readonly abandon = output<void>();
   readonly delete = output<void>();
   readonly cleanup = output<void>();
