@@ -44,15 +44,19 @@ export class RepositorySyncComponent {
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncStatusGet(this.repoId())),
   }));
 
+  // Shares the ['branches', repoId] cache entry with BranchListComponent, so the queryFn must
+  // return the raw BranchDto[] (the API shape); the name list for the selector is derived below.
   readonly branchesQuery = injectQuery(() => ({
     queryKey: ['branches', this.repoId()],
     queryFn: () =>
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdBranchesGet(this.repoId())).then(
-        (r) => (r.branches ?? []).map((b) => b.name).filter((n): n is string => !!n),
+        (r) => r.branches ?? [],
       ),
   }));
 
-  readonly branches = computed(() => this.branchesQuery.data() ?? []);
+  readonly branches = computed(() =>
+    (this.branchesQuery.data() ?? []).map((b) => b.name).filter((n): n is string => !!n),
+  );
   readonly branch = computed(() => this.syncStatusQuery.data()?.branch ?? '');
 
   readonly pullMutation = injectMutation(() => ({
