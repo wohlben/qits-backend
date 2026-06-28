@@ -88,6 +88,16 @@ describe('BranchTreeComponent', () => {
     countButton.click();
     expect(fixture.componentInstance.openWorktreeId()).toBe('x');
     expect(updated).toBeUndefined();
+
+    // Click-to-toggle: clicking again closes it (no hover/auto-close).
+    countButton.click();
+    expect(fixture.componentInstance.openWorktreeId()).toBeNull();
+
+    // The explicit close action also closes it.
+    fixture.componentInstance.togglePopover({ worktreeId: 'x' });
+    expect(fixture.componentInstance.openWorktreeId()).toBe('x');
+    fixture.componentInstance.closePopover();
+    expect(fixture.componentInstance.openWorktreeId()).toBeNull();
   });
 
   it('runs the footer action: merge for a diverged branch, fast-forward when only behind', () => {
