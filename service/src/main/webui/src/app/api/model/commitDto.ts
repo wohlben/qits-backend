@@ -16,5 +16,6 @@ export interface CommitDto {
     email?: string;
     date?: string;
     message?: string;
+    files?: Array<string>;
 }
 

@@ -201,16 +201,17 @@ interface NodeSummary {
               </z-popover>
             </ng-template>
 
-            <!-- Shared renderer for a commit list, reused for the Behind and Forward tabs. Capped at
-                 5 rows (48px each) + the list's py-1; more commits scroll within the list only. Each
-                 row links to the commit's detail view, in the context of the branch it belongs to
-                 (the parent for incoming commits, this branch for outgoing ones). -->
+            <!-- Shared renderer for a commit list, reused for the Behind and Forward tabs. The list
+                 scrolls within itself when tall. Each row links to the commit's detail view, in the
+                 context of the branch it belongs to (the parent for incoming commits, this branch
+                 for outgoing ones), and shows: hash · author · date, the subject, then the files the
+                 commit changed, one per line. -->
             <ng-template #commitList let-commits let-branch="branch">
-              <ul class="max-h-[248px] overflow-auto py-1">
+              <ul class="max-h-80 overflow-auto py-1">
                 @for (c of commits; track c.hash) {
                   <li>
                     <a
-                      class="flex w-full items-start gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                      class="flex w-full flex-col gap-1 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                       [routerLink]="[
                         '/repositories',
                         repoId(),
@@ -220,17 +221,21 @@ interface NodeSummary {
                         c.hash,
                       ]"
                     >
-                      <span class="shrink-0 font-mono text-xs text-muted-foreground">
-                        {{ c.shortHash }}
-                      </span>
-                      <span class="flex min-w-0 flex-1 flex-col">
-                        <span class="truncate">{{ c.message }}</span>
+                      <span class="flex items-baseline gap-2 text-xs text-muted-foreground">
+                        <span class="font-mono">{{ c.shortHash }}</span>
+                        <span class="min-w-0 flex-1 truncate">{{ c.author }}</span>
                         @if (c.date) {
-                          <span class="text-xs text-muted-foreground">
-                            {{ c.author }} · {{ c.date | date: 'short' }}
-                          </span>
+                          <span class="shrink-0">{{ c.date | date: 'short' }}</span>
                         }
                       </span>
+                      <span class="break-words">{{ c.message }}</span>
+                      @if (c.files?.length) {
+                        <ul class="font-mono text-xs text-muted-foreground">
+                          @for (f of c.files ?? []; track f) {
+                            <li class="truncate">{{ f }}</li>
+                          }
+                        </ul>
+                      }
                     </a>
                   </li>
                 }
