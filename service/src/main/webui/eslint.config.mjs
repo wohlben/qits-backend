@@ -46,6 +46,9 @@ export default tseslint.config(
       // attribute directives (e.g. `z-input`) but some are camelCase (e.g. `zPopover`). We don't
       // hand-edit vendored components, so the selector-style rule is off for this directory.
       '@angular-eslint/directive-selector': 'off',
+      // Same reason: some vendored zard primitives (e.g. the dialog service/ref) use `any` in their
+      // generic plumbing. We don't hand-edit them, so the rule is off for this directory.
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {

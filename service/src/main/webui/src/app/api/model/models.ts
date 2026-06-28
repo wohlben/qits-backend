@@ -1,4 +1,5 @@
 export * from './actionConfigurationDto';
+export * from './actionScope';
 export * from './actionType';
 export * from './branchDto';
 export * from './cleanupBranchRequest';

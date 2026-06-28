@@ -31,7 +31,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button z-button zType="ghost" (click)="viewCommits.emit()">View commits</button>
         @if (worktree()) {
-          <button z-button zType="ghost" (click)="viewTerminal.emit()">Web terminal</button>
+          <button z-button zType="ghost" (click)="run.emit()">Run…</button>
         }
         <button z-button [zType]="worktree() ? 'secondary' : 'default'" (click)="branchOff.emit()">
           Branch off worktree
@@ -66,7 +66,8 @@ export class BranchRowComponent {
    */
   readonly canCleanup = input(false);
   readonly viewCommits = output<void>();
-  readonly viewTerminal = output<void>();
+  /** Open the "Run…" dialog to pick a preconfigured action to run in this worktree. */
+  readonly run = output<void>();
   readonly branchOff = output<void>();
   readonly abandon = output<void>();
   readonly delete = output<void>();

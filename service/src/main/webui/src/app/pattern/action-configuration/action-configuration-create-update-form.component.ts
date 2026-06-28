@@ -32,7 +32,7 @@ export class ActionConfigurationCreateUpdateFormComponent {
   private readonly queryClient = inject(QueryClient);
   private readonly router = inject(Router);
 
-  readonly initialData = computed(() => {
+  readonly initialData = computed<ActionConfigurationFormData | undefined>(() => {
     const a = this.action();
     return a
       ? {
@@ -40,6 +40,8 @@ export class ActionConfigurationCreateUpdateFormComponent {
           description: a.description ?? '',
           executeScript: a.executeScript ?? '',
           checkScript: a.checkScript ?? '',
+          interactive: a.interactive ?? false,
+          environment: Object.entries(a.environment ?? {}).map(([key, value]) => ({ key, value })),
         }
       : undefined;
   });
@@ -67,11 +69,30 @@ export class ActionConfigurationCreateUpdateFormComponent {
   }));
 
   onSubmitted(data: ActionConfigurationFormData) {
+    const request = {
+      name: data.name,
+      description: data.description,
+      executeScript: data.executeScript,
+      // Send "" (not undefined) so an emptied check script clears the stored value on update.
+      checkScript: data.checkScript,
+      interactive: data.interactive,
+      environment: this.toEnvMap(data.environment),
+    };
     if (this.action()) {
-      this.updateMutation.mutate(data);
+      this.updateMutation.mutate(request);
     } else {
-      this.createMutation.mutate(data);
+      this.createMutation.mutate(request);
     }
+  }
+
+  /** Collapse the editor rows into a map, dropping rows with a blank key and keeping the last dup. */
+  private toEnvMap(rows: { key: string; value: string }[]): { [key: string]: string } {
+    const map: { [key: string]: string } = {};
+    for (const row of rows) {
+      const key = row.key.trim();
+      if (key) map[key] = row.value;
+    }
+    return map;
   }
 
   onCancel() {

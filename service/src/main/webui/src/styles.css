@@ -1,5 +1,6 @@
 @layer ng-icon, theme, base, components, utilities;
 @import 'tailwindcss';
+@import '@angular/cdk/overlay-prebuilt.css';
 @import 'diff2html/bundles/css/diff2html.min.css';
 @plugin "tailwindcss-animate";
 

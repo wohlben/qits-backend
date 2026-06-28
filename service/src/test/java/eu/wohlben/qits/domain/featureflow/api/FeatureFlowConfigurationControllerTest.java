@@ -169,7 +169,7 @@ public class FeatureFlowConfigurationControllerTest {
     var step = featureFlowPhaseStepService.create(phase.id, "Lint", 0);
     var action =
         actionConfigurationService.create(
-            "Lint Frontend", "Runs eslint", "eslint .", "echo required");
+            "Lint Frontend", "Runs eslint", "eslint .", "echo required", false, null);
     featureFlowPhaseActionService.create(
         step.id, action.id, ActionType.PREREQUISITE, 0, "lint-group");
 
@@ -206,7 +206,9 @@ public class FeatureFlowConfigurationControllerTest {
     var parent = featureFlowPhaseService.create(config.id, "Development", null, 0, null);
     var child = featureFlowPhaseService.create(config.id, "Work Package A", null, 0, parent.id);
     var step = featureFlowPhaseStepService.create(child.id, "Test", 0);
-    var action = actionConfigurationService.create("Test WP", "Desc", "pytest", "echo required");
+    var action =
+        actionConfigurationService.create(
+            "Test WP", "Desc", "pytest", "echo required", false, null);
     featureFlowPhaseActionService.create(step.id, action.id, ActionType.QUALITY_GATE, 0, null);
 
     given()
@@ -232,14 +234,17 @@ public class FeatureFlowConfigurationControllerTest {
     var config = featureFlowConfigurationService.createUnderProject(project.id, "Cascade Flow");
     var phase = featureFlowPhaseService.create(config.id, "Dev", null, 0, null);
     var step = featureFlowPhaseStepService.create(phase.id, "Build", 0);
-    var action = actionConfigurationService.create("Build", "Desc", "mvn build", "echo required");
+    var action =
+        actionConfigurationService.create(
+            "Build", "Desc", "mvn build", "echo required", false, null);
     var link =
         featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, null);
 
     // Add a sub-phase with its own step and action
     var child = featureFlowPhaseService.create(config.id, "Sub-Dev", null, 0, phase.id);
     var childStep = featureFlowPhaseStepService.create(child.id, "Lint", 0);
-    var childAction = actionConfigurationService.create("Lint", "Desc", "eslint", "echo required");
+    var childAction =
+        actionConfigurationService.create("Lint", "Desc", "eslint", "echo required", false, null);
     var childLink =
         featureFlowPhaseActionService.create(
             childStep.id, childAction.id, ActionType.PREREQUISITE, 0, null);

@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -132,6 +133,18 @@ public class WorktreeService {
       }
     }
     return false;
+  }
+
+  /**
+   * The on-disk path of the worktree currently checked out on {@code branch}, if any. Used by the
+   * sync code so a pull of the main branch fast-forwards its worktree rather than trying to update
+   * a ref that is checked out (which git refuses).
+   */
+  public Optional<Path> worktreePathForBranch(String repoId, String branch) {
+    Worktree wt = findWorktreeByBranch(repoId, branch);
+    return wt == null
+        ? Optional.empty()
+        : Optional.of(Path.of(dataDir, repoId, "worktrees", wt.worktreeId));
   }
 
   /** The worktree whose checked-out branch is {@code branch}, or null when none matches. */
@@ -295,6 +308,77 @@ public class WorktreeService {
     metadataService.writeWorktreeMetadata(repoId, metadata);
 
     return worktree;
+  }
+
+  /**
+   * Creates the default worktree for a repository's main branch: a checkout of the
+   * <em>existing</em> main branch (not a fork of a new branch), so working in it commits directly
+   * to main. The worktree id is the branch name as a slug; it has no parent, since the main branch
+   * is the root of the branch tree. Idempotent: returns the existing worktree if one with the
+   * derived id is already present. Called by {@link RepositoryService} so every freshly added
+   * repository starts with its main branch workable.
+   */
+  @Transactional
+  public Worktree createMainWorktree(String repoId, String branch) {
+    var repo =
+        repositoryRepository
+            .findByIdOptional(repoId)
+            .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
+    if (branch == null || branch.isBlank() || branch.startsWith("-")) {
+      throw new BadRequestException("Invalid main branch: " + branch);
+    }
+    String worktreeId = toWorktreeSlug(branch);
+
+    Path originPath = Path.of(dataDir, repoId, "origin");
+    if (!Files.exists(originPath)) {
+      throw new NotFoundException("Repository origin not found on disk");
+    }
+    if (worktreeRepository.existsByRepositoryAndWorktreeId(repoId, worktreeId)) {
+      return worktreeRepository.findByRepositoryAndWorktreeId(repoId, worktreeId).orElseThrow();
+    }
+
+    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
+    try {
+      Files.createDirectories(worktreePath.getParent());
+      // No `-b`: check out the existing main branch rather than fork a new one off it.
+      git.exec(
+          originPath.toFile(),
+          "git",
+          "worktree",
+          "add",
+          "--end-of-options",
+          worktreePath.toString(),
+          branch);
+    } catch (Exception e) {
+      throw new InternalServerErrorException("Git worktree add failed: " + e.getMessage());
+    }
+
+    Worktree worktree = new Worktree();
+    worktree.worktreeId = worktreeId;
+    worktree.repository = repo;
+    worktree.parent = null; // the main branch is the tree root — it has no fork point
+    worktreeRepository.persist(worktree);
+
+    WorktreeMetadata metadata = new WorktreeMetadata();
+    metadata.worktreeId = worktreeId;
+    metadata.parent = null;
+    metadataService.writeWorktreeMetadata(repoId, metadata);
+
+    return worktree;
+  }
+
+  /**
+   * Sanitizes a branch name into a worktree-id slug ([A-Za-z0-9_-], ≤64 chars, not dash-leading).
+   */
+  private static String toWorktreeSlug(String branch) {
+    String slug = branch.replaceAll("[^A-Za-z0-9_-]", "-");
+    if (slug.length() > 64) {
+      slug = slug.substring(0, 64);
+    }
+    if (slug.isBlank() || slug.startsWith("-")) {
+      slug = "main";
+    }
+    return slug;
   }
 
   @Transactional

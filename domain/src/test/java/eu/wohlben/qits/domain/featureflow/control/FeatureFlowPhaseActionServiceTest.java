@@ -41,7 +41,8 @@ public class FeatureFlowPhaseActionServiceTest {
   }
 
   private ActionConfiguration createAction(String suffix) {
-    return actionConfigurationService.create("Action " + suffix, "Desc", "echo exec", "echo check");
+    return actionConfigurationService.create(
+        "Action " + suffix, "Desc", "echo exec", "echo check", false, null);
   }
 
   @Test

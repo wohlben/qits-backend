@@ -1,15 +1,26 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  TemplateRef,
+  computed,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { FormField, form, required, submit } from '@angular/forms/signals';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 import { patchState, signalState } from '@ngrx/signals';
 
+import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { ZardDialogComponent } from '@/shared/components/dialog';
+import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 import { ZardSelectImports } from '@/shared/components/select/select.imports';
 import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.component';
 import {
@@ -21,7 +32,6 @@ import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-fie
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
 import { invalidateRepository } from './invalidate-repository';
 
-type OpenDialog = 'none' | 'create' | 'integrate' | 'abandon' | 'delete';
 interface CreateWorktreeForm {
   id: string;
   branch: string;
@@ -31,13 +41,13 @@ interface CreateWorktreeForm {
   selector: 'app-branch-list',
   imports: [
     ZardButtonComponent,
-    ZardDialogComponent,
     ZardSelectImports,
     EmptyStateComponent,
     BranchTreeComponent,
     FormFieldLayoutComponent,
     FormFieldSlotDirective,
     FormField,
+    RouterLink,
   ],
   template: `
     <div class="flex flex-col gap-4">
@@ -61,7 +71,7 @@ interface CreateWorktreeForm {
             [cleanupable]="cleanupableBranches()"
             [branchSummaries]="branchSummaries()"
             (viewCommits)="viewCommits($event)"
-            (viewTerminal)="viewTerminal($event)"
+            (run)="openRun($event)"
             (branchOff)="openCreate($event)"
             (integrate)="openIntegrate($event)"
             (abandon)="openAbandon($event)"
@@ -86,11 +96,7 @@ interface CreateWorktreeForm {
     </div>
 
     <!-- Branch off (create) -->
-    <z-dialog
-      [open]="ui().open === 'create'"
-      (openChange)="closeDialog()"
-      [zTitle]="'New worktree from ' + (ui().parent ?? '')"
-    >
+    <ng-template #createTpl>
       <p class="text-sm text-muted-foreground">
         Fork a new worktree from <span class="font-medium">{{ ui().parent }}</span
         >. The worktree gets its own branch so it never shares commits with another worktree.
@@ -118,14 +124,10 @@ interface CreateWorktreeForm {
           <span class="text-sm text-destructive">Failed to create worktree</span>
         }
       </form>
-    </z-dialog>
+    </ng-template>
 
     <!-- Integrate (merge) -->
-    <z-dialog
-      [open]="ui().open === 'integrate'"
-      (openChange)="closeDialog()"
-      zTitle="Integrate Change"
-    >
+    <ng-template #integrateTpl>
       <p class="text-sm text-muted-foreground">
         Merge <span class="font-medium">{{ ui().branch }}</span> into a target branch (defaults to
         the main branch).
@@ -155,14 +157,10 @@ interface CreateWorktreeForm {
           <span class="text-sm text-destructive">Failed to integrate worktree</span>
         }
       </form>
-    </z-dialog>
+    </ng-template>
 
     <!-- Abandon (discard) -->
-    <z-dialog
-      [open]="ui().open === 'abandon'"
-      (openChange)="closeDialog()"
-      zTitle="Abandon worktree?"
-    >
+    <ng-template #abandonTpl>
       <p class="text-sm text-muted-foreground">
         Discard <span class="font-medium">{{ ui().selected?.worktreeId }}</span
         >? This cannot be undone.
@@ -181,10 +179,10 @@ interface CreateWorktreeForm {
       @if (discardMutation.isError()) {
         <span class="text-sm text-destructive">Failed to abandon worktree</span>
       }
-    </z-dialog>
+    </ng-template>
 
     <!-- Delete branch -->
-    <z-dialog [open]="ui().open === 'delete'" (openChange)="closeDialog()" zTitle="Delete branch?">
+    <ng-template #deleteTpl>
       <p class="text-sm text-muted-foreground">
         Delete branch <span class="font-medium">{{ ui().branch }}</span
         >? This cannot be undone.
@@ -203,7 +201,47 @@ interface CreateWorktreeForm {
       @if (deleteBranchMutation.isError()) {
         <span class="text-sm text-destructive">Failed to delete branch</span>
       }
-    </z-dialog>
+    </ng-template>
+
+    <!-- Run… (pick a preconfigured action to run in the worktree) -->
+    <ng-template #runTpl>
+      <p class="text-sm text-muted-foreground">
+        Pick an action to run in <span class="font-medium">{{ ui().branch }}</span
+        >. Manage actions under
+        <a class="underline" routerLink="/action-configurations">Action Configurations</a>.
+      </p>
+      @if (actionConfigsQuery.isPending()) {
+        <div class="text-sm text-muted-foreground">Loading actions…</div>
+      } @else if (actionConfigsQuery.isError()) {
+        <div class="text-sm text-destructive">Failed to load actions</div>
+      } @else {
+        @let actions = interactiveActions();
+        @if (actions.length === 0) {
+          <div class="text-sm text-muted-foreground">
+            No interactive actions yet — create one (and tick “Interactive”) under Action
+            Configurations.
+          </div>
+        } @else {
+          <div class="flex flex-col gap-2">
+            @for (action of actions; track action.id) {
+              <button
+                z-button
+                zType="secondary"
+                class="w-full justify-start"
+                (click)="runAction(action.id!)"
+              >
+                <span class="flex flex-col items-start">
+                  <span class="font-medium">{{ action.name }}</span>
+                  @if (action.description) {
+                    <span class="text-xs text-muted-foreground">{{ action.description }}</span>
+                  }
+                </span>
+              </button>
+            }
+          </div>
+        }
+      }
+    </ng-template>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -212,16 +250,29 @@ export class BranchListComponent {
 
   private readonly worktreeService = inject(WorktreeControllerService);
   private readonly repositoryService = inject(RepositoryControllerService);
+  private readonly actionConfigService = inject(ActionConfigurationControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly router = inject(Router);
+  private readonly dialog = inject(ZardDialogService);
 
+  // The dialog bodies live as templates so we can open them via the official ZardDialogService
+  // (overlay/portal) while keeping the forms, mutations and error state in this smart component.
+  private readonly createTpl = viewChild.required<TemplateRef<unknown>>('createTpl');
+  private readonly integrateTpl = viewChild.required<TemplateRef<unknown>>('integrateTpl');
+  private readonly abandonTpl = viewChild.required<TemplateRef<unknown>>('abandonTpl');
+  private readonly deleteTpl = viewChild.required<TemplateRef<unknown>>('deleteTpl');
+  private readonly runTpl = viewChild.required<TemplateRef<unknown>>('runTpl');
+
+  /** The currently-open dialog, so success/cancel handlers can close it. */
+  private activeDialogRef?: ZardDialogRef<unknown>;
+
+  // Context for whichever dialog is open, read by its template (parent to fork, branch to act on,
+  // worktree to discard). Not a dialog-open flag — the overlay owns visibility now.
   readonly ui = signalState<{
-    open: OpenDialog;
     selected: WorktreeDto | null;
     parent: string | null;
     branch: string | null;
   }>({
-    open: 'none',
     selected: null,
     parent: null,
     branch: null,
@@ -252,6 +303,25 @@ export class BranchListComponent {
         (r) => r.entries?.map((e) => e.worktree!).filter((w): w is WorktreeDto => !!w) ?? [],
       ),
   }));
+
+  // The actions offered by the Run… dialog. Same key/shape as the action-configurations list so the
+  // two share one cache entry.
+  readonly actionConfigsQuery = injectQuery(() => ({
+    queryKey: ['action-configurations'],
+    queryFn: () =>
+      lastValueFrom(this.actionConfigService.apiActionConfigurationsGet()).then(
+        (r) =>
+          r.entries
+            ?.map((e) => e.actionConfiguration!)
+            .filter((a): a is ActionConfigurationDto => !!a) ?? [],
+      ),
+  }));
+
+  // The Run… terminal is interactive, so only interactive actions (a shell, Claude Code) are
+  // offered. One-off commands (e.g. mvn test) are excluded.
+  readonly interactiveActions = computed(() =>
+    (this.actionConfigsQuery.data() ?? []).filter((a) => a.interactive),
+  );
 
   /** The branch whose popover is open, driving the lazy incoming/outgoing commit fetch. */
   readonly peekedBranch = signal<string | null>(null);
@@ -472,13 +542,24 @@ export class BranchListComponent {
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'commits']);
   }
 
-  viewTerminal(branch: string) {
-    this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal']);
+  /** Open the Run… dialog for a branch; the action list comes from actionConfigsQuery. */
+  openRun(branch: string) {
+    patchState(this.ui, { branch });
+    this.openDialog('Run in worktree', this.runTpl());
+  }
+
+  /** Run the chosen action in the branch's worktree by navigating to the terminal page. */
+  runAction(actionId: string) {
+    const branch = this.ui.branch();
+    if (!branch) return;
+    this.closeDialog();
+    this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal', actionId]);
   }
 
   openCreate(parent: string) {
     this.createModel.set({ id: '', branch: '' });
-    patchState(this.ui, { open: 'create', selected: null, parent });
+    patchState(this.ui, { selected: null, parent });
+    this.openDialog('New worktree from ' + parent, this.createTpl());
   }
 
   openIntegrate(branch: string) {
@@ -486,19 +567,33 @@ export class BranchListComponent {
     // to the repository's configured main branch.
     const worktree = this.worktreeByBranch().get(branch) ?? null;
     this.integrateModel.set({ target: worktree?.parent ?? this.mainBranch() });
-    patchState(this.ui, { open: 'integrate', selected: worktree, branch });
+    patchState(this.ui, { selected: worktree, branch });
+    this.openDialog('Integrate Change', this.integrateTpl());
   }
 
   openAbandon(worktree: WorktreeDto) {
-    patchState(this.ui, { open: 'abandon', selected: worktree });
+    patchState(this.ui, { selected: worktree });
+    this.openDialog('Abandon worktree?', this.abandonTpl());
   }
 
   openDelete(branch: string) {
-    patchState(this.ui, { open: 'delete', branch });
+    patchState(this.ui, { branch });
+    this.openDialog('Delete branch?', this.deleteTpl());
+  }
+
+  /** Open a dialog body via the official service; hides the built-in footer (templates own buttons). */
+  private openDialog(title: string, content: TemplateRef<unknown>) {
+    this.activeDialogRef = this.dialog.create({
+      zTitle: title,
+      zContent: content,
+      zHideFooter: true,
+    });
   }
 
   closeDialog() {
-    patchState(this.ui, { open: 'none', selected: null, parent: null, branch: null });
+    this.activeDialogRef?.close();
+    this.activeDialogRef = undefined;
+    patchState(this.ui, { selected: null, parent: null, branch: null });
   }
 
   async onCreate(event: Event) {
