@@ -15,7 +15,7 @@ import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.com
 import {
   BranchTreeComponent,
   BranchTreeNode,
-  IncomingCommits,
+  CommitsPreview,
 } from '@/ui/components/repository/branch-tree.component';
 import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-field-layout.component';
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
@@ -67,7 +67,7 @@ interface CreateWorktreeForm {
             (delete)="openDelete($event)"
             (fastForward)="onFastForward($event)"
             (update)="onUpdate($event)"
-            [incoming]="incomingResult()"
+            [commitsPreview]="commitsPreview()"
             (peek)="onPeek($event)"
           />
           @if (fastForwardMutation.isError()) {
@@ -254,6 +254,13 @@ export class BranchListComponent {
   /** The worktree whose behind-count popover is open, driving the lazy incoming-commits fetch. */
   readonly peekedWorktreeId = signal<string | null>(null);
 
+  /** The branch of the open worktree — needed to fetch its outgoing (own) commits. */
+  readonly peekedBranch = computed(() => {
+    const id = this.peekedWorktreeId();
+    return (this.worktreesQuery.data() ?? []).find((w) => w.worktreeId === id)?.branch ?? null;
+  });
+
+  // Commits the parent has that the branch lacks (what a fast-forward/merge pulls in).
   readonly incomingQuery = injectQuery(() => ({
     queryKey: ['incoming-commits', this.repoId(), this.peekedWorktreeId()],
     enabled: !!this.peekedWorktreeId(),
@@ -266,12 +273,26 @@ export class BranchListComponent {
       ),
   }));
 
-  /** The fetched incoming commits tagged with the worktree they belong to (null while loading). */
-  readonly incomingResult = computed<IncomingCommits | null>(() => {
+  // The branch's own commits over its parent (the `+` count) — the existing commit-log endpoint.
+  readonly outgoingQuery = injectQuery(() => ({
+    queryKey: ['outgoing-commits', this.repoId(), this.peekedBranch()],
+    enabled: !!this.peekedBranch(),
+    queryFn: () =>
+      lastValueFrom(
+        this.repositoryService.apiRepositoriesRepoIdCommitsGet(this.repoId(), this.peekedBranch()!),
+      ),
+  }));
+
+  /** The fetched incoming/outgoing commits tagged with the worktree they belong to. */
+  readonly commitsPreview = computed<CommitsPreview | null>(() => {
     const worktreeId = this.peekedWorktreeId();
-    const data = this.incomingQuery.data();
-    if (!worktreeId || !data) return null;
-    return { worktreeId, commits: data.commits ?? [] };
+    const incoming = this.incomingQuery.data();
+    if (!worktreeId || !incoming) return null;
+    return {
+      worktreeId,
+      incoming: incoming.commits ?? [],
+      outgoing: this.outgoingQuery.data()?.commits ?? [],
+    };
   });
 
   readonly repositoryQuery = injectQuery(() => ({

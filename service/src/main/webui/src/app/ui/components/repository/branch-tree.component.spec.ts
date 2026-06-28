@@ -132,16 +132,23 @@ describe('BranchTreeComponent', () => {
     fixture.componentInstance.onPeek(wt, true);
     expect(peeked).toEqual(['x']);
 
-    // incomingFor returns the commits only for the matching worktree (null otherwise = loading).
+    // incomingFor/outgoingFor return commits only for the matching worktree (null = still loading).
     expect(fixture.componentInstance.incomingFor(wt)).toBeNull();
-    fixture.componentRef.setInput('incoming', {
+    expect(fixture.componentInstance.outgoingFor(wt)).toBeNull();
+    fixture.componentRef.setInput('commitsPreview', {
       worktreeId: 'x',
-      commits: [
+      incoming: [
         { hash: 'h1', shortHash: 'h1', message: 'incoming', author: 'a', date: '', email: '' },
+      ],
+      outgoing: [
+        { hash: 'o1', shortHash: 'o1', message: 'outgoing', author: 'a', date: '', email: '' },
+        { hash: 'o2', shortHash: 'o2', message: 'outgoing 2', author: 'a', date: '', email: '' },
       ],
     });
     expect(fixture.componentInstance.incomingFor(wt)?.length).toBe(1);
+    expect(fixture.componentInstance.outgoingFor(wt)?.length).toBe(2);
     expect(fixture.componentInstance.incomingFor({ ...wt, worktreeId: 'other' })).toBeNull();
+    expect(fixture.componentInstance.outgoingFor({ ...wt, worktreeId: 'other' })).toBeNull();
   });
 
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {
