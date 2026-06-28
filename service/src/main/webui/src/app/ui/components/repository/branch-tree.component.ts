@@ -52,7 +52,7 @@ export interface IncomingCommits {
                   zPopover
                   [zContent]="incomingTpl"
                   zTrigger="hover"
-                  zPlacement="right"
+                  zPlacement="top"
                   (zVisibleChange)="onPeek(node.data, $event)"
                   (click)="fastForward.emit(node.data)"
                 >
@@ -80,7 +80,7 @@ export interface IncomingCommits {
                   zPopover
                   [zContent]="incomingTpl"
                   zTrigger="hover"
-                  zPlacement="right"
+                  zPlacement="top"
                   (zVisibleChange)="onPeek(node.data, $event)"
                   (click)="update.emit(node.data)"
                 >
