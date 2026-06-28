@@ -37,14 +37,20 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
                 >
                   -{{ node.data.behind ?? 0 }}
                 </button>
-              } @else if (isDiverged(node.data)) {
+              } @else if (wouldConflict(node.data)) {
                 <ng-icon
                   name="lucideCircleAlert"
                   class="size-3 text-destructive"
                   [attr.title]="
-                    'Diverged from ' + (node.data.parent ?? 'parent') + ' — cannot fast-forward'
+                    'Conflicts with ' +
+                    (node.data.parent ?? 'parent') +
+                    ' — cannot integrate without resolving merge conflicts'
                   "
                 />
+              } @else if ((node.data.behind ?? 0) > 0) {
+                <!-- Diverged but a merge would apply cleanly: show the behind count as a quiet,
+                     non-actionable hint (a fast-forward isn't possible, but there's no conflict). -->
+                <span class="text-muted-foreground">-{{ node.data.behind ?? 0 }}</span>
               } @else {
                 <span class="invisible">-{{ node.data.behind ?? 0 }}</span>
               }
@@ -94,8 +100,12 @@ export class BranchTreeComponent {
     return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) === 0;
   }
 
-  /** Behind *and* ahead — histories diverged, so a fast-forward can't apply. */
-  isDiverged(wt: WorktreeDto): boolean {
-    return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) > 0;
+  /**
+   * Histories diverged (behind *and* ahead) *and* the server's trial merge found conflicts, so the
+   * branch can't be integrated without manual resolution. Diverged branches that merge cleanly are
+   * not flagged — only genuine conflicts warrant the warning.
+   */
+  wouldConflict(wt: WorktreeDto): boolean {
+    return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) > 0 && wt.conflictsWithParent === true;
   }
 }

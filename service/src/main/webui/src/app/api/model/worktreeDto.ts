@@ -15,5 +15,6 @@ export interface WorktreeDto {
     branch?: string;
     ahead?: number;
     behind?: number;
+    conflictsWithParent?: boolean;
 }
 

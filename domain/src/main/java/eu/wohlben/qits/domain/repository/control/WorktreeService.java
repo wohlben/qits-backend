@@ -41,7 +41,16 @@ public class WorktreeService {
             wt -> {
               String branch = currentBranchOrNull(repoId, wt.worktreeId);
               AheadBehind ab = aheadBehind(originPath, wt.parent, branch);
-              return new WorktreeDto(wt.worktreeId, wt.parent, branch, ab.ahead(), ab.behind());
+              // Only diverged branches (both ahead and behind) can't fast-forward and so risk a
+              // conflict; everything else integrates cleanly, so skip the extra merge-tree probe.
+              boolean conflicts =
+                  ab.ahead() != null
+                      && ab.behind() != null
+                      && ab.ahead() > 0
+                      && ab.behind() > 0
+                      && wouldConflict(originPath, wt.parent, branch);
+              return new WorktreeDto(
+                  wt.worktreeId, wt.parent, branch, ab.ahead(), ab.behind(), conflicts);
             })
         .toList();
   }
@@ -169,6 +178,34 @@ public class WorktreeService {
   }
 
   private record AheadBehind(Integer ahead, Integer behind) {}
+
+  /**
+   * Whether merging {@code parent} into {@code branch} would produce conflicts, decided by a real
+   * three-way merge in the object store via {@code git merge-tree --write-tree} (no working tree
+   * touched). It exits 0 when the merge is clean and 1 when it conflicts; any other outcome (error,
+   * unresolvable ref) is treated as "no conflict" so we never raise a false warning. Runs in the
+   * bare origin, which holds every branch ref.
+   */
+  private boolean wouldConflict(Path originPath, String parent, String branch) {
+    if (parent == null
+        || branch == null
+        || parent.isBlank()
+        || branch.isBlank()
+        || parent.equals(branch)
+        || parent.startsWith("-")
+        || branch.startsWith("-")
+        || !Files.exists(originPath)) {
+      return false;
+    }
+    try {
+      GitExecutor.ExecResult result =
+          git.execAllowNonZero(
+              originPath.toFile(), "git", "merge-tree", "--write-tree", branch, parent);
+      return result.exitCode() == 1;
+    } catch (Exception e) {
+      return false;
+    }
+  }
 
   @Transactional
   public Worktree createWorktree(String repoId, String worktreeId, String parent, String branch) {
