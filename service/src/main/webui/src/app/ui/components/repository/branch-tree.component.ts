@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -21,10 +21,13 @@ import { BranchRowComponent } from './branch-row.component';
 
 export type BranchTreeNode = TreeNode<WorktreeDto | null>;
 
-/** The commits a worktree would pull in from its parent, for the hover popover. */
-export interface IncomingCommits {
+/** The commits shown in a worktree's popover: incoming (to pull) and outgoing (this branch's own). */
+export interface CommitsPreview {
   worktreeId: string;
-  commits: CommitDto[];
+  /** Commits the parent has that this branch lacks — what a fast-forward/merge would pull in. */
+  incoming: CommitDto[];
+  /** Commits this branch has that the parent lacks — the branch's own work (the `+` count). */
+  outgoing: CommitDto[];
 }
 
 /**
@@ -44,6 +47,7 @@ export interface IncomingCommits {
     ZardPopoverComponent,
     ZardButtonComponent,
     DatePipe,
+    NgTemplateOutlet,
   ],
   template: `
     <z-tree [zData]="nodes()" zExpandAll class="gap-2">
@@ -102,34 +106,25 @@ export interface IncomingCommits {
                   (mouseenter)="cancelClose()"
                   (mouseleave)="scheduleClose()"
                 >
+                  <!-- Incoming: commits the parent has that a fast-forward/merge would pull in. -->
                   <div class="border-b px-3 py-2 text-xs font-medium">
-                    Commits to pull from {{ node.data.parent ?? 'parent' }}
+                    Commits to pull from {{ node.data.parent ?? 'parent' }} (-{{
+                      node.data.behind ?? 0
+                    }})
                   </div>
                   @if (incomingFor(node.data); as commits) {
                     @if (commits.length === 0) {
                       <div class="px-3 py-2 text-sm text-muted-foreground">Already up to date</div>
                     } @else {
-                      <ul class="max-h-64 overflow-auto py-1">
-                        @for (c of commits; track c.hash) {
-                          <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
-                            <span class="shrink-0 font-mono text-xs text-muted-foreground">
-                              {{ c.shortHash }}
-                            </span>
-                            <span class="flex min-w-0 flex-1 flex-col">
-                              <span class="truncate">{{ c.message }}</span>
-                              @if (c.date) {
-                                <span class="text-xs text-muted-foreground">
-                                  {{ c.author }} · {{ c.date | date: 'short' }}
-                                </span>
-                              }
-                            </span>
-                          </li>
-                        }
-                      </ul>
+                      <ng-container
+                        [ngTemplateOutlet]="commitList"
+                        [ngTemplateOutletContext]="{ $implicit: commits }"
+                      />
                     }
                   } @else {
                     <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
                   }
+
                   <!-- The integrate action lives here now (moved off the count's click). -->
                   <div class="border-t p-2">
                     <button
@@ -142,7 +137,45 @@ export interface IncomingCommits {
                       {{ actionLabel(node.data) }}
                     </button>
                   </div>
+
+                  <!-- Outgoing: this branch's own commits over its parent (the plus count). -->
+                  @if ((node.data.ahead ?? 0) > 0) {
+                    <div class="border-t px-3 py-2 text-xs font-medium">
+                      Commits on {{ node.data.branch ?? 'this branch' }} (+{{
+                        node.data.ahead ?? 0
+                      }})
+                    </div>
+                    @if (outgoingFor(node.data); as commits) {
+                      <ng-container
+                        [ngTemplateOutlet]="commitList"
+                        [ngTemplateOutletContext]="{ $implicit: commits }"
+                      />
+                    } @else {
+                      <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
+                    }
+                  }
                 </z-popover>
+              </ng-template>
+
+              <!-- Shared renderer for a commit list, reused for the incoming and outgoing sections. -->
+              <ng-template #commitList let-commits>
+                <ul class="max-h-48 overflow-auto py-1">
+                  @for (c of commits; track c.hash) {
+                    <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
+                      <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                        {{ c.shortHash }}
+                      </span>
+                      <span class="flex min-w-0 flex-1 flex-col">
+                        <span class="truncate">{{ c.message }}</span>
+                        @if (c.date) {
+                          <span class="text-xs text-muted-foreground">
+                            {{ c.author }} · {{ c.date | date: 'short' }}
+                          </span>
+                        }
+                      </span>
+                    </li>
+                  }
+                </ul>
               </ng-template>
               <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
             </div>
@@ -182,8 +215,8 @@ export class BranchTreeComponent {
   readonly fastForward = output<WorktreeDto>();
   /** Merge the parent into a diverged-but-cleanly-mergeable worktree to catch it up. */
   readonly update = output<WorktreeDto>();
-  /** The commits to pull in for the currently-hovered worktree (loaded lazily by the parent). */
-  readonly incoming = input<IncomingCommits | null>(null);
+  /** The incoming/outgoing commits for the currently-open worktree (loaded lazily by the parent). */
+  readonly commitsPreview = input<CommitsPreview | null>(null);
   /** Emitted when a behind-count popover opens, so the parent can fetch that worktree's commits. */
   readonly peek = output<WorktreeDto>();
 
@@ -198,8 +231,14 @@ export class BranchTreeComponent {
 
   /** Commits to pull in for {@code wt}, or null while they're still loading for this worktree. */
   incomingFor(wt: WorktreeDto): CommitDto[] | null {
-    const inc = this.incoming();
-    return inc && inc.worktreeId === wt.worktreeId ? inc.commits : null;
+    const preview = this.commitsPreview();
+    return preview && preview.worktreeId === wt.worktreeId ? preview.incoming : null;
+  }
+
+  /** This branch's own commits over its parent (the `+` count), or null while still loading. */
+  outgoingFor(wt: WorktreeDto): CommitDto[] | null {
+    const preview = this.commitsPreview();
+    return preview && preview.worktreeId === wt.worktreeId ? preview.outgoing : null;
   }
 
   onPeek(wt: WorktreeDto, visible: boolean): void {
