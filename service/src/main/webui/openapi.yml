@@ -747,6 +747,8 @@ components:
         behind:
           type: integer
           format: int32
+        conflictsWithParent:
+          type: boolean
 paths:
   /api/action-configurations:
     get:

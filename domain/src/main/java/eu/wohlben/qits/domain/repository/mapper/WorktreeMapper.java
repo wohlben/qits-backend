@@ -12,5 +12,6 @@ public interface WorktreeMapper {
   @Mapping(target = "branch", ignore = true)
   @Mapping(target = "ahead", ignore = true)
   @Mapping(target = "behind", ignore = true)
+  @Mapping(target = "conflictsWithParent", ignore = true)
   WorktreeDto toDto(Worktree entity);
 }

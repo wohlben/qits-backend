@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { BranchTreeComponent, BranchTreeNode } from './branch-tree.component';
 
-function tree(behind: number, ahead: number): BranchTreeNode[] {
+function tree(behind: number, ahead: number, conflictsWithParent = false): BranchTreeNode[] {
   return [
     {
       key: 'master',
@@ -12,7 +12,14 @@ function tree(behind: number, ahead: number): BranchTreeNode[] {
         {
           key: 'feature/x',
           label: 'feature/x',
-          data: { worktreeId: 'x', branch: 'feature/x', parent: 'master', ahead, behind },
+          data: {
+            worktreeId: 'x',
+            branch: 'feature/x',
+            parent: 'master',
+            ahead,
+            behind,
+            conflictsWithParent,
+          },
           children: [],
         },
       ],
@@ -45,10 +52,11 @@ describe('BranchTreeComponent', () => {
     expect(behindButton.classList.contains('invisible')).toBe(false);
   });
 
-  it('shows a divergence alert instead of the behind number when both ahead and behind', async () => {
+  it('shows a conflict alert instead of the behind number when diverged and merge would conflict', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
-    // behind 2, ahead 5 → diverged: a fast-forward cannot apply, so an alert replaces the count.
-    fixture.componentRef.setInput('nodes', tree(2, 5));
+    // behind 2, ahead 5, conflicts → integration needs manual resolution, so an alert replaces the
+    // count.
+    fixture.componentRef.setInput('nodes', tree(2, 5, true));
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -57,6 +65,23 @@ describe('BranchTreeComponent', () => {
     expect(connector.textContent).toContain('+5');
     expect(connector.textContent).not.toContain('-2');
     expect(connector.querySelector('ng-icon')).toBeTruthy();
+  });
+
+  it('shows a quiet behind number (no alert) when diverged but the merge is clean', async () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    // behind 2, ahead 5, no conflict → a fast-forward can't apply, but a merge is clean, so the
+    // behind count shows as a non-alarming hint rather than the conflict icon.
+    fixture.componentRef.setInput('nodes', tree(2, 5, false));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
+    expect(connector.textContent).toContain('+5');
+    expect(connector.textContent).toContain('-2');
+    expect(connector.querySelector('ng-icon')).toBeFalsy();
+    // diverged → the behind count is a plain hint, not the clickable fast-forward button
+    expect(connector.querySelector('button')).toBeFalsy();
   });
 
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {
