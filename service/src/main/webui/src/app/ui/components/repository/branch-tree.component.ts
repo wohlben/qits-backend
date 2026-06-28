@@ -181,9 +181,10 @@ export interface CommitsPreview {
               </z-popover>
             </ng-template>
 
-            <!-- Shared renderer for a commit list, reused for the Behind and Forward tabs. -->
+            <!-- Shared renderer for a commit list, reused for the Behind and Forward tabs. Capped at
+                 5 rows (48px each) + the list's py-1; more commits scroll within the list only. -->
             <ng-template #commitList let-commits>
-              <ul class="max-h-48 overflow-auto py-1">
+              <ul class="max-h-[248px] overflow-auto py-1">
                 @for (c of commits; track c.hash) {
                   <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
                     <span class="shrink-0 font-mono text-xs text-muted-foreground">
