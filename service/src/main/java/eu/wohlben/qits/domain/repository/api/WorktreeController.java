@@ -1,6 +1,8 @@
 package eu.wohlben.qits.domain.repository.api;
 
+import eu.wohlben.qits.domain.repository.control.CommitService;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.dto.CommitLogDto;
 import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
 import eu.wohlben.qits.domain.repository.mapper.WorktreeMapper;
 import jakarta.inject.Inject;
@@ -21,6 +23,8 @@ import java.util.List;
 public class WorktreeController {
 
   @Inject WorktreeService worktreeService;
+
+  @Inject CommitService commitService;
 
   @Inject WorktreeMapper worktreeMapper;
 
@@ -76,6 +80,13 @@ public class WorktreeController {
       @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
     var output = worktreeService.fastForwardWorktree(repoId, worktreeId);
     return new FastForwardWorktreeRequest.Response(output);
+  }
+
+  @GET
+  @Path("/{worktreeId}/incoming-commits")
+  public CommitLogDto incomingCommits(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    return commitService.listIncomingCommits(repoId, worktreeId);
   }
 
   public static record UpdateFromParentRequest() {

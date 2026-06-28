@@ -1,13 +1,22 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleAlert } from '@ng-icons/lucide';
 
+import { CommitDto } from '@/api/model/commitDto';
 import { WorktreeDto } from '@/api/model/worktreeDto';
+import { ZardPopoverComponent, ZardPopoverDirective } from '@/shared/components/popover';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import { TreeNode } from '@/shared/components/tree/tree.types';
 import { BranchRowComponent } from './branch-row.component';
 
 export type BranchTreeNode = TreeNode<WorktreeDto | null>;
+
+/** The commits a worktree would pull in from its parent, for the hover popover. */
+export interface IncomingCommits {
+  worktreeId: string;
+  commits: CommitDto[];
+}
 
 /**
  * Renders the worktree forest with zard's `z-tree`, which owns the nesting:
@@ -18,7 +27,14 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
  */
 @Component({
   selector: 'app-branch-tree',
-  imports: [ZardTreeImports, BranchRowComponent, NgIcon],
+  imports: [
+    ZardTreeImports,
+    BranchRowComponent,
+    NgIcon,
+    ZardPopoverDirective,
+    ZardPopoverComponent,
+    DatePipe,
+  ],
   template: `
     <z-tree [zData]="nodes()" zExpandAll class="gap-2">
       <ng-template #nodeTemplate let-node let-level="level">
@@ -33,6 +49,11 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
                   type="button"
                   class="cursor-pointer text-muted-foreground hover:text-foreground"
                   [attr.title]="'Fast-forward to ' + (node.data.parent ?? 'parent')"
+                  zPopover
+                  [zContent]="incomingTpl"
+                  zTrigger="hover"
+                  zPlacement="right"
+                  (zVisibleChange)="onPeek(node.data, $event)"
                   (click)="fastForward.emit(node.data)"
                 >
                   -{{ node.data.behind ?? 0 }}
@@ -56,6 +77,11 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
                   [attr.title]="
                     'Merge ' + (node.data.parent ?? 'parent') + ' in to catch up (no fast-forward)'
                   "
+                  zPopover
+                  [zContent]="incomingTpl"
+                  zTrigger="hover"
+                  zPlacement="right"
+                  (zVisibleChange)="onPeek(node.data, $event)"
                   (click)="update.emit(node.data)"
                 >
                   -{{ node.data.behind ?? 0 }}
@@ -63,6 +89,41 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
               } @else {
                 <span class="invisible">-{{ node.data.behind ?? 0 }}</span>
               }
+
+              <!-- Hover popover listing the commits a fast-forward / merge would pull in. Defined
+                   per node so it closes over the node; loaded lazily when the popover opens. -->
+              <ng-template #incomingTpl>
+                <z-popover class="w-80 p-0">
+                  <div class="border-b px-3 py-2 text-xs font-medium">
+                    Commits to pull from {{ node.data.parent ?? 'parent' }}
+                  </div>
+                  @if (incomingFor(node.data); as commits) {
+                    @if (commits.length === 0) {
+                      <div class="px-3 py-2 text-sm text-muted-foreground">Already up to date</div>
+                    } @else {
+                      <ul class="max-h-64 overflow-auto py-1">
+                        @for (c of commits; track c.hash) {
+                          <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
+                            <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                              {{ c.shortHash }}
+                            </span>
+                            <span class="flex min-w-0 flex-1 flex-col">
+                              <span class="truncate">{{ c.message }}</span>
+                              @if (c.date) {
+                                <span class="text-xs text-muted-foreground">
+                                  {{ c.author }} · {{ c.date | date: 'short' }}
+                                </span>
+                              }
+                            </span>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  } @else {
+                    <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
+                  }
+                </z-popover>
+              </ng-template>
               <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
             </div>
           }
@@ -101,6 +162,22 @@ export class BranchTreeComponent {
   readonly fastForward = output<WorktreeDto>();
   /** Merge the parent into a diverged-but-cleanly-mergeable worktree to catch it up. */
   readonly update = output<WorktreeDto>();
+  /** The commits to pull in for the currently-hovered worktree (loaded lazily by the parent). */
+  readonly incoming = input<IncomingCommits | null>(null);
+  /** Emitted when a behind-count popover opens, so the parent can fetch that worktree's commits. */
+  readonly peek = output<WorktreeDto>();
+
+  /** Commits to pull in for {@code wt}, or null while they're still loading for this worktree. */
+  incomingFor(wt: WorktreeDto): CommitDto[] | null {
+    const inc = this.incoming();
+    return inc && inc.worktreeId === wt.worktreeId ? inc.commits : null;
+  }
+
+  onPeek(wt: WorktreeDto, visible: boolean): void {
+    if (visible) {
+      this.peek.emit(wt);
+    }
+  }
 
   title(wt: WorktreeDto): string {
     return `${wt.ahead ?? 0} commit(s) ahead of ${wt.parent ?? 'parent'}, ${wt.behind ?? 0} behind`;
