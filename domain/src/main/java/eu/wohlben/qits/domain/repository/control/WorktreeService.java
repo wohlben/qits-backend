@@ -486,6 +486,70 @@ public class WorktreeService {
     }
   }
 
+  /**
+   * Merges a worktree's parent branch into it so a diverged branch (one with its own commits) can
+   * catch up to the parent. Unlike {@link #fastForwardWorktree}, this creates a merge commit, so it
+   * works when {@code git merge --ff-only} can't. Runs inside the worktree. If the merge hits
+   * conflicts it is aborted — leaving the worktree exactly as it was — and a 400 is returned. The
+   * UI only offers this when the trial merge was clean, but the abort keeps the worktree usable
+   * should state have changed underneath.
+   */
+  public String updateWorktreeFromParent(String repoId, String worktreeId) {
+    repositoryRepository
+        .findByIdOptional(repoId)
+        .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
+
+    Worktree worktree =
+        worktreeRepository
+            .findByRepositoryAndWorktreeId(repoId, worktreeId)
+            .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
+
+    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
+    if (!Files.exists(worktreePath)) {
+      throw new NotFoundException("Worktree not found on disk");
+    }
+
+    String parent = worktree.parent;
+    if (parent == null || parent.isBlank()) {
+      throw new BadRequestException("Worktree '" + worktreeId + "' has no parent to update from");
+    }
+    if (parent.startsWith("-")) {
+      throw new BadRequestException("Invalid parent branch");
+    }
+
+    GitExecutor.ExecResult result;
+    try {
+      // Identity is supplied inline so the merge commit can be created even on a clone with no
+      // configured user.
+      result =
+          git.execAllowNonZero(
+              worktreePath.toFile(),
+              "git",
+              "-c",
+              "user.email=qits@local",
+              "-c",
+              "user.name=qits",
+              "merge",
+              "--no-edit",
+              parent);
+    } catch (Exception e) {
+      throw new InternalServerErrorException(
+          "Failed to merge '" + parent + "' into '" + worktreeId + "': " + e.getMessage());
+    }
+
+    if (result.exitCode() != 0) {
+      // Conflicts (or any other failure): undo the half-applied merge so the worktree stays usable.
+      try {
+        git.exec(worktreePath.toFile(), "git", "merge", "--abort");
+      } catch (Exception ignored) {
+        // best effort — nothing more we can safely do here
+      }
+      throw new BadRequestException(
+          "Cannot merge '" + parent + "' into '" + worktreeId + "' without conflicts");
+    }
+    return result.output();
+  }
+
   @Transactional
   public void discardWorktree(String repoId, String worktreeId) {
     repositoryRepository

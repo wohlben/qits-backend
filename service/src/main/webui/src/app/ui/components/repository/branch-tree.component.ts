@@ -48,9 +48,18 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
                   "
                 />
               } @else if ((node.data.behind ?? 0) > 0) {
-                <!-- Diverged but a merge would apply cleanly: show the behind count as a quiet,
-                     non-actionable hint (a fast-forward isn't possible, but there's no conflict). -->
-                <span class="text-muted-foreground">-{{ node.data.behind ?? 0 }}</span>
+                <!-- Diverged but a merge applies cleanly: a fast-forward can't (the branch has its
+                     own commits), but merging the parent in catches it up. -->
+                <button
+                  type="button"
+                  class="cursor-pointer text-muted-foreground hover:text-foreground"
+                  [attr.title]="
+                    'Merge ' + (node.data.parent ?? 'parent') + ' in to catch up (no fast-forward)'
+                  "
+                  (click)="update.emit(node.data)"
+                >
+                  -{{ node.data.behind ?? 0 }}
+                </button>
               } @else {
                 <span class="invisible">-{{ node.data.behind ?? 0 }}</span>
               }
@@ -90,6 +99,8 @@ export class BranchTreeComponent {
   readonly cleanup = output<string>();
   readonly delete = output<string>();
   readonly fastForward = output<WorktreeDto>();
+  /** Merge the parent into a diverged-but-cleanly-mergeable worktree to catch it up. */
+  readonly update = output<WorktreeDto>();
 
   title(wt: WorktreeDto): string {
     return `${wt.ahead ?? 0} commit(s) ahead of ${wt.parent ?? 'parent'}, ${wt.behind ?? 0} behind`;
