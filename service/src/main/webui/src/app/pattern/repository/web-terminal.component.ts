@@ -40,6 +40,8 @@ import { WorktreeDto } from '@/api/model/worktreeDto';
 export class WebTerminalComponent implements OnDestroy {
   readonly repoId = input.required<string>();
   readonly branchName = input.required<string>();
+  /** The run action (ActionConfiguration id) whose executeScript the terminal spawns. */
+  readonly actionId = input.required<string>();
 
   private readonly worktreeService = inject(WorktreeControllerService);
   private readonly host = viewChild<ElementRef<HTMLDivElement>>('host');
@@ -94,7 +96,7 @@ export class WebTerminalComponent implements OnDestroy {
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(
-      `${proto}://${window.location.host}/api/terminal/${this.repoId()}/${worktreeId}`,
+      `${proto}://${window.location.host}/api/terminal/${this.repoId()}/${worktreeId}/${this.actionId()}`,
     );
     this.ws = ws;
 

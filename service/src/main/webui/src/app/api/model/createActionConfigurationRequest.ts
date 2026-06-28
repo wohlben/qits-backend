@@ -13,6 +13,8 @@ export interface CreateActionConfigurationRequest {
     name: string;
     description?: string;
     executeScript: string;
-    checkScript: string;
+    checkScript?: string;
+    interactive?: boolean;
+    environment?: { [key: string]: string; };
 }
 

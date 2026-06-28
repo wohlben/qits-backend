@@ -17,7 +17,7 @@ export const repositoriesRoutes: Routes = [
       import('./commit-detail/commit-detail.page').then((m) => m.CommitDetailPage),
   },
   {
-    path: ':repoId/branch/:branchName/terminal',
+    path: ':repoId/branch/:branchName/terminal/:actionId',
     loadComponent: () =>
       import('./branch-terminal/branch-terminal.page').then((m) => m.BranchTerminalPage),
   },

@@ -249,7 +249,7 @@ interface NodeSummary {
             [hasChildren]="(node.children?.length ?? 0) > 0"
             [canCleanup]="cleanupable().has(node.label)"
             (viewCommits)="viewCommits.emit(node.label)"
-            (viewTerminal)="viewTerminal.emit(node.label)"
+            (run)="run.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
             (abandon)="abandon.emit(node.data)"
             (cleanup)="cleanup.emit(node.label)"
@@ -271,7 +271,8 @@ export class BranchTreeComponent {
   /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no worktree. */
   readonly branchSummaries = input<Record<string, BranchSummary>>({});
   readonly viewCommits = output<string>();
-  readonly viewTerminal = output<string>();
+  /** Open the "Run…" dialog for a worktree-backed branch (carries the branch name). */
+  readonly run = output<string>();
   readonly branchOff = output<string>();
   readonly integrate = output<string>();
   readonly abandon = output<WorktreeDto>();

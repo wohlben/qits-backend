@@ -17,6 +17,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
+import java.util.Map;
 
 @Path("/action-configurations")
 @Produces(MediaType.APPLICATION_JSON)
@@ -31,7 +32,9 @@ public class ActionConfigurationController {
       @NotBlank String name,
       String description,
       @NotBlank String executeScript,
-      @NotBlank String checkScript) {
+      String checkScript,
+      Boolean interactive,
+      Map<String, String> environment) {
     public record Response(ActionConfigurationDto actionConfiguration) {}
   }
 
@@ -40,7 +43,12 @@ public class ActionConfigurationController {
       @Valid CreateActionConfigurationRequest request) {
     var config =
         actionConfigurationService.create(
-            request.name(), request.description(), request.executeScript(), request.checkScript());
+            request.name(),
+            request.description(),
+            request.executeScript(),
+            request.checkScript(),
+            request.interactive() != null && request.interactive(),
+            request.environment());
     return new CreateActionConfigurationRequest.Response(actionConfigurationMapper.toDto(config));
   }
 
@@ -78,7 +86,9 @@ public class ActionConfigurationController {
       @NotBlankIfPresent String name,
       String description,
       @NotBlankIfPresent String executeScript,
-      @NotBlankIfPresent String checkScript) {
+      String checkScript,
+      Boolean interactive,
+      Map<String, String> environment) {
     public record Response(ActionConfigurationDto actionConfiguration) {}
   }
 
@@ -92,7 +102,9 @@ public class ActionConfigurationController {
             request.name(),
             request.description(),
             request.executeScript(),
-            request.checkScript());
+            request.checkScript(),
+            request.interactive(),
+            request.environment());
     return new UpdateActionConfigurationRequest.Response(actionConfigurationMapper.toDto(config));
   }
 

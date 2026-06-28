@@ -3,7 +3,6 @@ import { computed, Injectable, signal } from '@angular/core';
 import type { FlatTreeNode, TreeCheckState, TreeNode } from './tree.types';
 
 @Injectable()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- vendored zard component
 export class ZardTreeService<T = any> {
   readonly expandedKeys = signal<Set<string>>(new Set());
   readonly selectedKeys = signal<Set<string>>(new Set());

@@ -17,6 +17,21 @@ components:
           type: string
         checkScript:
           type: string
+        interactive:
+          type: boolean
+        scope:
+          $ref: "#/components/schemas/ActionScope"
+        repositoryId:
+          type: string
+        environment:
+          type: object
+          additionalProperties:
+            type: string
+    ActionScope:
+      type: string
+      enum:
+      - GLOBAL
+      - REPOSITORY
     ActionType:
       type: string
       enum:
@@ -109,7 +124,6 @@ components:
       required:
       - name
       - executeScript
-      - checkScript
       properties:
         name:
           type: string
@@ -121,7 +135,12 @@ components:
           pattern: \S
         checkScript:
           type: string
-          pattern: \S
+        interactive:
+          type: boolean
+        environment:
+          type: object
+          additionalProperties:
+            type: string
     CreateFeatureFlowPhaseActionRequest:
       type: object
       required:
@@ -707,6 +726,12 @@ components:
           type: string
         checkScript:
           type: string
+        interactive:
+          type: boolean
+        environment:
+          type: object
+          additionalProperties:
+            type: string
     UpdateFeatureFlowConfigurationRequest:
       type: object
       properties:

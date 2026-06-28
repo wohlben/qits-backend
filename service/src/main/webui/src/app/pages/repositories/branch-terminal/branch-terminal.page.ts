@@ -20,7 +20,7 @@ import { RouterLink } from '@angular/router';
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId]">Back to repository</a>
       </div>
 
-      <app-web-terminal [repoId]="repoId" [branchName]="branchName" />
+      <app-web-terminal [repoId]="repoId" [branchName]="branchName" [actionId]="actionId" />
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -30,4 +30,5 @@ export class BranchTerminalPage {
 
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
   readonly branchName = this.route.snapshot.paramMap.get('branchName')!;
+  readonly actionId = this.route.snapshot.paramMap.get('actionId')!;
 }

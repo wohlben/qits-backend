@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ActionScope } from './actionScope';
 
 
 export interface ActionConfigurationDto { 
@@ -15,5 +16,12 @@ export interface ActionConfigurationDto {
     description?: string;
     executeScript?: string;
     checkScript?: string;
+    interactive?: boolean;
+    scope?: ActionScope;
+    repositoryId?: string;
+    environment?: { [key: string]: string; };
 }
+export namespace ActionConfigurationDto {
+}
+
 

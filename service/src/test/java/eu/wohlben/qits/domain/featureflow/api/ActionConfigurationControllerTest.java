@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.*;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import jakarta.ws.rs.core.Response;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
@@ -19,7 +20,12 @@ public class ActionConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(
                 new ActionConfigurationController.CreateActionConfigurationRequest(
-                    "Ctrl Action", "Desc", "echo run", "echo required"))
+                    "Ctrl Action",
+                    "Desc",
+                    "echo run",
+                    "echo required",
+                    true,
+                    Map.of("EDITOR", "vim")))
             .when()
             .post("/api/action-configurations")
             .then()
@@ -29,6 +35,8 @@ public class ActionConfigurationControllerTest {
             .body("actionConfiguration.description", equalTo("Desc"))
             .body("actionConfiguration.executeScript", equalTo("echo run"))
             .body("actionConfiguration.checkScript", equalTo("echo required"))
+            .body("actionConfiguration.interactive", equalTo(true))
+            .body("actionConfiguration.environment.EDITOR", equalTo("vim"))
             .extract()
             .path("actionConfiguration.id");
 
@@ -56,7 +64,7 @@ public class ActionConfigurationControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new ActionConfigurationController.UpdateActionConfigurationRequest(
-                "Updated Name", "Updated Desc", "echo updated", "echo suggested"))
+                "Updated Name", "Updated Desc", "echo updated", "echo suggested", false, null))
         .when()
         .put("/api/action-configurations/" + id)
         .then()
@@ -88,7 +96,9 @@ public class ActionConfigurationControllerTest {
   public void testCreateValidationErrors() {
     given()
         .contentType(ContentType.JSON)
-        .body(new ActionConfigurationController.CreateActionConfigurationRequest("", null, "", ""))
+        .body(
+            new ActionConfigurationController.CreateActionConfigurationRequest(
+                "", null, "", "", null, null))
         .when()
         .post("/api/action-configurations")
         .then()
@@ -101,7 +111,7 @@ public class ActionConfigurationControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new ActionConfigurationController.UpdateActionConfigurationRequest(
-                "Name", null, "echo", "echo"))
+                "Name", null, "echo", "echo", null, null))
         .when()
         .put("/api/action-configurations/non-existent")
         .then()

@@ -14,5 +14,7 @@ export interface UpdateActionConfigurationRequest {
     description?: string;
     executeScript?: string;
     checkScript?: string;
+    interactive?: boolean;
+    environment?: { [key: string]: string; };
 }
 

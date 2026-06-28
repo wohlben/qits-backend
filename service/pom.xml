@@ -22,6 +22,20 @@
             <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
+            <!-- MCP server (Streamable HTTP + legacy SSE). Not in the platform BOM, so the version
+                 is pinned here; 1.13.0 is built against Quarkus 3.33.x (≈ our 3.34.6). Exposes the
+                 repository-context tools under a named "repository" server (see RepositoryMcpTools). -->
+            <groupId>io.quarkiverse.mcp</groupId>
+            <artifactId>quarkus-mcp-server-http</artifactId>
+            <version>1.13.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.mcp</groupId>
+            <artifactId>quarkus-mcp-server-test</artifactId>
+            <version>1.13.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-websockets-next</artifactId>
         </dependency>
