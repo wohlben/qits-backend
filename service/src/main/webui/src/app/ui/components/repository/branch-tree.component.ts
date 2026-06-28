@@ -1,10 +1,19 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleAlert } from '@ng-icons/lucide';
 
 import { CommitDto } from '@/api/model/commitDto';
 import { WorktreeDto } from '@/api/model/worktreeDto';
+import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardPopoverComponent, ZardPopoverDirective } from '@/shared/components/popover';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import { TreeNode } from '@/shared/components/tree/tree.types';
@@ -33,6 +42,7 @@ export interface IncomingCommits {
     NgIcon,
     ZardPopoverDirective,
     ZardPopoverComponent,
+    ZardButtonComponent,
     DatePipe,
   ],
   template: `
@@ -44,21 +54,7 @@ export interface IncomingCommits {
               class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none"
               [attr.title]="title(node.data)"
             >
-              @if (canFastForward(node.data)) {
-                <button
-                  type="button"
-                  class="cursor-pointer text-muted-foreground hover:text-foreground"
-                  [attr.title]="'Fast-forward to ' + (node.data.parent ?? 'parent')"
-                  zPopover
-                  [zContent]="incomingTpl"
-                  zTrigger="hover"
-                  zPlacement="top"
-                  (zVisibleChange)="onPeek(node.data, $event)"
-                  (click)="fastForward.emit(node.data)"
-                >
-                  -{{ node.data.behind ?? 0 }}
-                </button>
-              } @else if (wouldConflict(node.data)) {
+              @if (wouldConflict(node.data)) {
                 <ng-icon
                   name="lucideCircleAlert"
                   class="size-3 text-destructive"
@@ -69,20 +65,27 @@ export interface IncomingCommits {
                   "
                 />
               } @else if ((node.data.behind ?? 0) > 0) {
-                <!-- Diverged but a merge applies cleanly: a fast-forward can't (the branch has its
-                     own commits), but merging the parent in catches it up. -->
+                <!-- Behind the parent (clean): hovering or clicking the count opens the popover,
+                     which holds the list of incoming commits and the integrate action in its footer.
+                     Visibility is driven programmatically so the popover stays open while the cursor
+                     moves onto it to reach that action. -->
                 <button
                   type="button"
                   class="cursor-pointer text-muted-foreground hover:text-foreground"
                   [attr.title]="
-                    'Merge ' + (node.data.parent ?? 'parent') + ' in to catch up (no fast-forward)'
+                    (node.data.behind ?? 0) +
+                    ' commit(s) to pull from ' +
+                    (node.data.parent ?? 'parent')
                   "
                   zPopover
                   [zContent]="incomingTpl"
-                  zTrigger="hover"
+                  [zTrigger]="null"
                   zPlacement="top"
+                  [zVisible]="openWorktreeId() === node.data.worktreeId"
                   (zVisibleChange)="onPeek(node.data, $event)"
-                  (click)="update.emit(node.data)"
+                  (mouseenter)="openPopover(node.data)"
+                  (mouseleave)="scheduleClose()"
+                  (click)="openPopover(node.data)"
                 >
                   -{{ node.data.behind ?? 0 }}
                 </button>
@@ -90,10 +93,15 @@ export interface IncomingCommits {
                 <span class="invisible">-{{ node.data.behind ?? 0 }}</span>
               }
 
-              <!-- Hover popover listing the commits a fast-forward / merge would pull in. Defined
-                   per node so it closes over the node; loaded lazily when the popover opens. -->
+              <!-- Popover listing the commits a fast-forward / merge would pull in, with the action
+                   in its footer. Defined per node so it closes over the node; commits load lazily
+                   when it opens. mouseenter/leave keep it open while the cursor is over it. -->
               <ng-template #incomingTpl>
-                <z-popover class="w-80 p-0">
+                <z-popover
+                  class="w-80 p-0"
+                  (mouseenter)="cancelClose()"
+                  (mouseleave)="scheduleClose()"
+                >
                   <div class="border-b px-3 py-2 text-xs font-medium">
                     Commits to pull from {{ node.data.parent ?? 'parent' }}
                   </div>
@@ -122,6 +130,18 @@ export interface IncomingCommits {
                   } @else {
                     <div class="px-3 py-2 text-sm text-muted-foreground">Loading commits…</div>
                   }
+                  <!-- The integrate action lives here now (moved off the count's click). -->
+                  <div class="border-t p-2">
+                    <button
+                      z-button
+                      zType="secondary"
+                      zSize="sm"
+                      class="w-full"
+                      (click)="runAction(node.data)"
+                    >
+                      {{ actionLabel(node.data) }}
+                    </button>
+                  </div>
                 </z-popover>
               </ng-template>
               <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
@@ -167,6 +187,15 @@ export class BranchTreeComponent {
   /** Emitted when a behind-count popover opens, so the parent can fetch that worktree's commits. */
   readonly peek = output<WorktreeDto>();
 
+  /** The worktree whose popover is currently open (drives the popover's programmatic visibility). */
+  readonly openWorktreeId = signal<string | null>(null);
+  /** Pending close, so moving the cursor between the count and the popover doesn't close it. */
+  private closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.cancelClose());
+  }
+
   /** Commits to pull in for {@code wt}, or null while they're still loading for this worktree. */
   incomingFor(wt: WorktreeDto): CommitDto[] | null {
     const inc = this.incoming();
@@ -177,6 +206,42 @@ export class BranchTreeComponent {
     if (visible) {
       this.peek.emit(wt);
     }
+  }
+
+  /** Open the popover for a worktree (hover or click); cancels any pending close. */
+  openPopover(wt: WorktreeDto): void {
+    this.cancelClose();
+    this.openWorktreeId.set(wt.worktreeId ?? null);
+  }
+
+  /** Close shortly, unless the cursor reaches the popover (which cancels it) first. */
+  scheduleClose(): void {
+    this.cancelClose();
+    this.closeTimer = setTimeout(() => this.openWorktreeId.set(null), 150);
+  }
+
+  cancelClose(): void {
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer);
+      this.closeTimer = null;
+    }
+  }
+
+  /** The footer action label: a fast-forward when level, otherwise a merge of the parent in. */
+  actionLabel(wt: WorktreeDto): string {
+    const parent = wt.parent ?? 'parent';
+    return this.canFastForward(wt) ? `Fast-forward to ${parent}` : `Merge ${parent} in`;
+  }
+
+  /** Run the footer action: fast-forward when possible, otherwise merge the parent in. */
+  runAction(wt: WorktreeDto): void {
+    if (this.canFastForward(wt)) {
+      this.fastForward.emit(wt);
+    } else {
+      this.update.emit(wt);
+    }
+    this.cancelClose();
+    this.openWorktreeId.set(null);
   }
 
   title(wt: WorktreeDto): string {
