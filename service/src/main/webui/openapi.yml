@@ -22,6 +22,21 @@ components:
       enum:
       - PREREQUISITE
       - QUALITY_GATE
+    BranchDto:
+      type: object
+      properties:
+        name:
+          type: string
+        canCleanup:
+          type: boolean
+    CleanupBranchRequest:
+      type: object
+      required:
+      - branch
+      properties:
+        branch:
+          type: string
+          pattern: \S
     CommitChangesDto:
       type: object
       properties:
@@ -542,6 +557,8 @@ components:
           type: boolean
         output:
           type: string
+        cleanedUp:
+          type: boolean
     Response38:
       type: object
       properties:
@@ -565,11 +582,16 @@ components:
     Response41:
       type: object
       properties:
+        success:
+          type: boolean
+    Response42:
+      type: object
+      properties:
         branches:
           type: array
           items:
-            type: string
-    Response42:
+            $ref: "#/components/schemas/BranchDto"
+    Response43:
       type: object
       properties:
         commitHash:
@@ -578,24 +600,24 @@ components:
           type: boolean
         output:
           type: string
-    Response43:
+    Response44:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry8"
-    Response44:
+    Response45:
       type: object
       properties:
         output:
           type: string
-    Response45:
+    Response46:
       type: object
       properties:
         success:
           type: boolean
-    Response46:
+    Response47:
       type: object
       properties:
         worktree:
@@ -1498,8 +1520,34 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response41"
+                $ref: "#/components/schemas/Response42"
       summary: Branches
+      tags:
+      - Repository Controller
+  /api/repositories/{repoId}/branches/cleanup:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CleanupBranchRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response41"
+        "400":
+          description: Bad Request
+      summary: Cleanup Branch
       tags:
       - Repository Controller
   /api/repositories/{repoId}/branches/merge:
@@ -1724,7 +1772,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response43"
+                $ref: "#/components/schemas/Response44"
       summary: List
       tags:
       - Worktree Controller
@@ -1747,7 +1795,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response46"
+                $ref: "#/components/schemas/Response47"
         "400":
           description: Bad Request
       summary: Create
@@ -1778,7 +1826,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response45"
+                $ref: "#/components/schemas/Response46"
         "400":
           description: Bad Request
       summary: Discard
@@ -1803,7 +1851,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response44"
+                $ref: "#/components/schemas/Response45"
       summary: Fast Forward
       tags:
       - Worktree Controller
@@ -1832,7 +1880,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response42"
+                $ref: "#/components/schemas/Response43"
         "400":
           description: Bad Request
       summary: Merge

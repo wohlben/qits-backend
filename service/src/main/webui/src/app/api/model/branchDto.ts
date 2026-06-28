@@ -9,9 +9,8 @@
  */
 
 
-export interface Response43 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+export interface BranchDto { 
+    name?: string;
+    canCleanup?: boolean;
 }
 

@@ -40,14 +40,15 @@ export class RepositorySyncComponent {
 
   readonly syncStatusQuery = injectQuery(() => ({
     queryKey: ['sync-status', this.repoId()],
-    queryFn: () => lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncStatusGet(this.repoId())),
+    queryFn: () =>
+      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncStatusGet(this.repoId())),
   }));
 
   readonly branchesQuery = injectQuery(() => ({
     queryKey: ['branches', this.repoId()],
     queryFn: () =>
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdBranchesGet(this.repoId())).then(
-        (r) => r.branches ?? [],
+        (r) => (r.branches ?? []).map((b) => b.name).filter((n): n is string => !!n),
       ),
   }));
 
@@ -55,23 +56,28 @@ export class RepositorySyncComponent {
   readonly branch = computed(() => this.syncStatusQuery.data()?.branch ?? '');
 
   readonly pullMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.repositoryService.apiRepositoriesRepoIdPullPost(this.repoId())),
+    mutationFn: () =>
+      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdPullPost(this.repoId())),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly pushMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.repositoryService.apiRepositoriesRepoIdPushPost(this.repoId())),
+    mutationFn: () =>
+      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdPushPost(this.repoId())),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly syncMutation = injectMutation(() => ({
-    mutationFn: () => lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncPost(this.repoId())),
+    mutationFn: () =>
+      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncPost(this.repoId())),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly setMainBranchMutation = injectMutation(() => ({
     mutationFn: (branch: string) =>
-      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdMainBranchPut(this.repoId(), { branch })),
+      lastValueFrom(
+        this.repositoryService.apiRepositoriesRepoIdMainBranchPut(this.repoId(), { branch }),
+      ),
     onSuccess: () => this.onMutationSuccess(),
   }));
 

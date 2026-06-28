@@ -56,16 +56,21 @@ interface CreateWorktreeForm {
         } @else {
           <app-branch-tree
             [nodes]="branchRows"
+            [cleanupable]="cleanupableBranches()"
             (viewCommits)="viewCommits($event)"
             (viewTerminal)="viewTerminal($event)"
             (branchOff)="openCreate($event)"
             (integrate)="openIntegrate($event)"
             (abandon)="openAbandon($event)"
+            (cleanup)="onCleanup($event)"
             (delete)="openDelete($event)"
             (fastForward)="onFastForward($event)"
           />
           @if (fastForwardMutation.isError()) {
             <div class="text-sm text-destructive">Failed to fast-forward branch</div>
+          }
+          @if (cleanupMutation.isError()) {
+            <div class="text-sm text-destructive">Failed to clean up branch</div>
           }
         }
       }
@@ -247,7 +252,20 @@ export class BranchListComponent {
       ),
   }));
 
-  readonly branches = computed(() => this.branchesQuery.data() ?? []);
+  readonly branches = computed(() =>
+    (this.branchesQuery.data() ?? []).map((b) => b.name).filter((n): n is string => !!n),
+  );
+
+  /** Branch names the backend reports as safe to clean up (drives the per-row Cleanup action). */
+  readonly cleanupableBranches = computed(
+    () =>
+      new Set(
+        (this.branchesQuery.data() ?? [])
+          .filter((b) => b.canCleanup)
+          .map((b) => b.name)
+          .filter((n): n is string => !!n),
+      ),
+  );
 
   /** The repository's configured main branch — the default integration target. */
   readonly mainBranch = computed(() => this.repositoryQuery.data()?.mainBranch ?? '');
@@ -354,6 +372,14 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
+  readonly cleanupMutation = injectMutation(() => ({
+    mutationFn: (branch: string) =>
+      lastValueFrom(
+        this.repositoryService.apiRepositoriesRepoIdBranchesCleanupPost(this.repoId(), { branch }),
+      ),
+    onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+  }));
+
   viewCommits(branch: string) {
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'commits']);
   }
@@ -424,6 +450,11 @@ export class BranchListComponent {
     if (worktree.worktreeId) {
       this.fastForwardMutation.mutate(worktree.worktreeId);
     }
+  }
+
+  /** No confirmation: the backend re-checks safety and refuses if any data would be lost. */
+  onCleanup(branch: string) {
+    this.cleanupMutation.mutate(branch);
   }
 
   private onMutationSuccess() {

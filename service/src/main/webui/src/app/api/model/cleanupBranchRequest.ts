@@ -9,9 +9,7 @@
  */
 
 
-export interface Response43 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+export interface CleanupBranchRequest { 
+    branch: string;
 }
 
