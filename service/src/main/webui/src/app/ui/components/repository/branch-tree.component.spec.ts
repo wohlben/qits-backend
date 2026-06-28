@@ -41,15 +41,14 @@ describe('BranchTreeComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
-    expect(connector.textContent).toContain('+0');
-    // behind renders as a negative number on the fast-forward button
-    expect(connector.textContent).toContain('-2');
-    const behindButton = Array.from(connector.querySelectorAll('button')).find((b) =>
+    // The count itself is the popover-trigger button, showing both -behind and +ahead.
+    const el = fixture.nativeElement as HTMLElement;
+    const countButton = Array.from(el.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('-2'),
     )!;
-    expect(behindButton).toBeTruthy();
-    expect(behindButton.classList.contains('invisible')).toBe(false);
+    expect(countButton).toBeTruthy();
+    expect(countButton.textContent).toContain('+0');
+    expect(countButton.classList.contains('invisible')).toBe(false);
   });
 
   it('shows a conflict alert instead of the behind number when diverged and merge would conflict', async () => {
@@ -77,13 +76,13 @@ describe('BranchTreeComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
-    expect(connector.textContent).toContain('+5');
-    expect(connector.querySelector('ng-icon')).toBeFalsy();
-    const countButton = Array.from(connector.querySelectorAll('button')).find((b) =>
+    const el = fixture.nativeElement as HTMLElement;
+    const countButton = Array.from(el.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('-2'),
     )!;
     expect(countButton).toBeTruthy();
+    expect(countButton.textContent).toContain('+5');
+    expect(countButton.querySelector('ng-icon')).toBeFalsy();
 
     // Clicking the count opens the popover; it must NOT run the integration action anymore.
     countButton.click();
