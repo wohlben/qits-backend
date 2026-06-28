@@ -594,30 +594,35 @@ components:
     Response43:
       type: object
       properties:
+        output:
+          type: string
+    Response44:
+      type: object
+      properties:
         commitHash:
           type: string
         hasConflicts:
           type: boolean
         output:
           type: string
-    Response44:
+    Response45:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry8"
-    Response45:
+    Response46:
       type: object
       properties:
         output:
           type: string
-    Response46:
+    Response47:
       type: object
       properties:
         success:
           type: boolean
-    Response47:
+    Response48:
       type: object
       properties:
         worktree:
@@ -1774,7 +1779,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response44"
+                $ref: "#/components/schemas/Response45"
       summary: List
       tags:
       - Worktree Controller
@@ -1797,7 +1802,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response47"
+                $ref: "#/components/schemas/Response48"
         "400":
           description: Bad Request
       summary: Create
@@ -1828,7 +1833,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response46"
+                $ref: "#/components/schemas/Response47"
         "400":
           description: Bad Request
       summary: Discard
@@ -1853,7 +1858,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response45"
+                $ref: "#/components/schemas/Response46"
       summary: Fast Forward
       tags:
       - Worktree Controller
@@ -1882,10 +1887,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response43"
+                $ref: "#/components/schemas/Response44"
         "400":
           description: Bad Request
       summary: Merge
+      tags:
+      - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/update-from-parent:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response43"
+      summary: Update From Parent
       tags:
       - Worktree Controller
 info:

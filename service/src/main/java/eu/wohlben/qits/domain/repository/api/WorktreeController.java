@@ -78,6 +78,18 @@ public class WorktreeController {
     return new FastForwardWorktreeRequest.Response(output);
   }
 
+  public static record UpdateFromParentRequest() {
+    public record Response(String output) {}
+  }
+
+  @POST
+  @Path("/{worktreeId}/update-from-parent")
+  public UpdateFromParentRequest.Response updateFromParent(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    var output = worktreeService.updateWorktreeFromParent(repoId, worktreeId);
+    return new UpdateFromParentRequest.Response(output);
+  }
+
   public static record DiscardWorktreeRequest() {
     public record Response(boolean success) {}
   }

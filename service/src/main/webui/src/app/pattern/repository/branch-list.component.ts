@@ -65,9 +65,13 @@ interface CreateWorktreeForm {
             (cleanup)="onCleanup($event)"
             (delete)="openDelete($event)"
             (fastForward)="onFastForward($event)"
+            (update)="onUpdate($event)"
           />
           @if (fastForwardMutation.isError()) {
             <div class="text-sm text-destructive">Failed to fast-forward branch</div>
+          }
+          @if (updateMutation.isError()) {
+            <div class="text-sm text-destructive">Failed to merge parent into branch</div>
           }
           @if (cleanupMutation.isError()) {
             <div class="text-sm text-destructive">Failed to clean up branch</div>
@@ -372,6 +376,17 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
+  readonly updateMutation = injectMutation(() => ({
+    mutationFn: (worktreeId: string) =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdUpdateFromParentPost(
+          this.repoId(),
+          worktreeId,
+        ),
+      ),
+    onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+  }));
+
   readonly cleanupMutation = injectMutation(() => ({
     mutationFn: (branch: string) =>
       lastValueFrom(
@@ -449,6 +464,13 @@ export class BranchListComponent {
   onFastForward(worktree: WorktreeDto) {
     if (worktree.worktreeId) {
       this.fastForwardMutation.mutate(worktree.worktreeId);
+    }
+  }
+
+  /** Merge the parent into a diverged-but-clean worktree (no fast-forward possible). */
+  onUpdate(worktree: WorktreeDto) {
+    if (worktree.worktreeId) {
+      this.updateMutation.mutate(worktree.worktreeId);
     }
   }
 

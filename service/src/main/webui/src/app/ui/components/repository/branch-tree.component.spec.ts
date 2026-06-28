@@ -67,21 +67,26 @@ describe('BranchTreeComponent', () => {
     expect(connector.querySelector('ng-icon')).toBeTruthy();
   });
 
-  it('shows a quiet behind number (no alert) when diverged but the merge is clean', async () => {
+  it('offers an update (merge parent in) action when diverged but the merge is clean', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
-    // behind 2, ahead 5, no conflict → a fast-forward can't apply, but a merge is clean, so the
-    // behind count shows as a non-alarming hint rather than the conflict icon.
+    // behind 2, ahead 5, no conflict → a fast-forward can't apply, but merging the parent in can,
+    // so the behind count is a clickable update action (not the conflict icon).
     fixture.componentRef.setInput('nodes', tree(2, 5, false));
+    let updated: { worktreeId?: string } | undefined;
+    fixture.componentInstance.update.subscribe((w) => (updated = w));
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
     const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
     expect(connector.textContent).toContain('+5');
-    expect(connector.textContent).toContain('-2');
     expect(connector.querySelector('ng-icon')).toBeFalsy();
-    // diverged → the behind count is a plain hint, not the clickable fast-forward button
-    expect(connector.querySelector('button')).toBeFalsy();
+    const updateButton = Array.from(connector.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('-2'),
+    )!;
+    expect(updateButton).toBeTruthy();
+    updateButton.click();
+    expect(updated?.worktreeId).toBe('x');
   });
 
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {
