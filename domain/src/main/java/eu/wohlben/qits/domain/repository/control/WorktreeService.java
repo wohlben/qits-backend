@@ -90,6 +90,30 @@ public class WorktreeService {
     return !hasChildren(repoId, branch);
   }
 
+  /** The parent a branch is compared against and how far it is ahead/behind it. */
+  public record BranchSummary(String parent, Integer ahead, Integer behind) {}
+
+  /**
+   * Resolves a branch's parent — its worktree's fork point when worktree-backed, otherwise the
+   * repository's {@code mainBranch} — and how far it is ahead of and behind that parent. Returns a
+   * {@code null} parent (and zero counts) for the main branch itself or when no parent resolves.
+   * Used to drive the branch tree's ahead/behind connector and commits popover for every branch,
+   * including those without a worktree.
+   */
+  public BranchSummary summarize(String repoId, Path originPath, String branch, String mainBranch) {
+    if (branch == null || branch.isBlank() || branch.startsWith("-")) {
+      return new BranchSummary(null, 0, 0);
+    }
+    Worktree wt = findWorktreeByBranch(repoId, branch);
+    String parent =
+        (wt != null && wt.parent != null && !wt.parent.isBlank()) ? wt.parent : mainBranch;
+    if (parent == null || parent.isBlank() || parent.equals(branch)) {
+      return new BranchSummary(null, 0, 0);
+    }
+    AheadBehind ab = aheadBehind(originPath, parent, branch);
+    return new BranchSummary(parent, ab.ahead(), ab.behind());
+  }
+
   /** True when the worktree's working tree has no staged or unstaged changes. */
   private boolean isWorktreeClean(Path worktreePath) {
     try {
