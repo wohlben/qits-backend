@@ -84,7 +84,7 @@ public class ValidationTest {
         .contentType(ContentType.JSON)
         .body(
             new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController
-                .CreateActionConfigurationRequest("name", null, "", "check", null, null))
+                .CreateActionConfigurationRequest("name", null, "", "check", null, null, null))
         .when()
         .post("/api/action-configurations")
         .then()
@@ -220,7 +220,7 @@ public class ValidationTest {
             .body(
                 new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController
                     .CreateActionConfigurationRequest(
-                    "Original Name", "desc", "exec", "check", null, null))
+                    "Original Name", "desc", "exec", "check", null, null, null))
             .when()
             .post("/api/action-configurations")
             .then()
@@ -233,7 +233,8 @@ public class ValidationTest {
         .contentType(ContentType.JSON)
         .body(
             new eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController
-                .UpdateActionConfigurationRequest(null, "Updated Desc", null, null, null, null))
+                .UpdateActionConfigurationRequest(
+                null, "Updated Desc", null, null, null, null, null))
         .when()
         .put("/api/action-configurations/" + id)
         .then()

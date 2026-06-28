@@ -2,6 +2,8 @@ package eu.wohlben.qits.domain.featureflow.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -45,6 +47,15 @@ public abstract class AbstractActionDefinition extends PanacheEntityBase {
    */
   @Column(nullable = false)
   public boolean interactive = false;
+
+  /**
+   * The typed variant of this action. {@link ActionVariant#SHELL} runs {@code executeScript}
+   * verbatim; special variants are rendered by the backend from run context (see {@code
+   * ActionResolutionService}), so the UI never supplies the resulting flags/shell.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  public ActionVariant variant = ActionVariant.SHELL;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

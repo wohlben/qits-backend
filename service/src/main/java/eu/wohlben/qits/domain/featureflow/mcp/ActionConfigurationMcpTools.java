@@ -4,6 +4,7 @@ import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService;
 import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
 import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
+import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
 import eu.wohlben.qits.domain.featureflow.mapper.RepositoryActionMapper;
 import io.quarkiverse.mcp.server.McpServer;
@@ -94,6 +95,8 @@ public class ActionConfigurationMcpTools {
       @ToolArg(required = false, description = "optional probe script") String checkScript,
       @ToolArg(required = false, description = "runs in a worktree terminal (default false)")
           Boolean interactive,
+      @ToolArg(required = false, description = "variant: SHELL (default) or CLAUDE_ACTIONS_MCP")
+          ActionVariant variant,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment) {
     var config =
@@ -103,6 +106,7 @@ public class ActionConfigurationMcpTools {
             executeScript,
             checkScript,
             interactive != null && interactive,
+            variant,
             environment);
     return actionConfigurationMapper.toDto(config);
   }
@@ -121,11 +125,13 @@ public class ActionConfigurationMcpTools {
       @ToolArg(required = false, description = "new probe script ('' clears it)")
           String checkScript,
       @ToolArg(required = false, description = "new interactive flag") Boolean interactive,
+      @ToolArg(required = false, description = "new variant: SHELL or CLAUDE_ACTIONS_MCP")
+          ActionVariant variant,
       @ToolArg(required = false, description = "replacement environment, as key/value pairs")
           Map<String, String> environment) {
     var config =
         actionConfigurationService.update(
-            id, name, description, executeScript, checkScript, interactive, environment);
+            id, name, description, executeScript, checkScript, interactive, variant, environment);
     return actionConfigurationMapper.toDto(config);
   }
 
@@ -177,6 +183,8 @@ public class ActionConfigurationMcpTools {
       @ToolArg(required = false, description = "optional probe script") String checkScript,
       @ToolArg(required = false, description = "runs in a worktree terminal (default false)")
           Boolean interactive,
+      @ToolArg(required = false, description = "variant: SHELL (default) or CLAUDE_ACTIONS_MCP")
+          ActionVariant variant,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment) {
     var action =
@@ -187,6 +195,7 @@ public class ActionConfigurationMcpTools {
             executeScript,
             checkScript,
             interactive != null && interactive,
+            variant,
             environment);
     return repositoryActionMapper.toDto(action);
   }
@@ -206,6 +215,8 @@ public class ActionConfigurationMcpTools {
       @ToolArg(required = false, description = "new probe script ('' clears it)")
           String checkScript,
       @ToolArg(required = false, description = "new interactive flag") Boolean interactive,
+      @ToolArg(required = false, description = "new variant: SHELL or CLAUDE_ACTIONS_MCP")
+          ActionVariant variant,
       @ToolArg(required = false, description = "replacement environment, as key/value pairs")
           Map<String, String> environment) {
     var action =
@@ -217,6 +228,7 @@ public class ActionConfigurationMcpTools {
             executeScript,
             checkScript,
             interactive,
+            variant,
             environment);
     return repositoryActionMapper.toDto(action);
   }

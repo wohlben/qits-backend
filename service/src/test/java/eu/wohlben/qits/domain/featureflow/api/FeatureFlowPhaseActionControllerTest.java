@@ -38,7 +38,7 @@ public class FeatureFlowPhaseActionControllerTest {
 
   private String createActionId(String suffix) {
     return actionConfigurationService.create(
-            "Action " + suffix, "Desc", "echo exec", "echo check", false, null)
+            "Action " + suffix, "Desc", "echo exec", "echo check", false, null, null)
         .id;
   }
 

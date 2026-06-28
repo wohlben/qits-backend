@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ActionVariant } from './actionVariant';
 
 
 export interface UpdateActionConfigurationRequest { 
@@ -15,6 +16,10 @@ export interface UpdateActionConfigurationRequest {
     executeScript?: string;
     checkScript?: string;
     interactive?: boolean;
+    variant?: ActionVariant;
     environment?: { [key: string]: string; };
 }
+export namespace UpdateActionConfigurationRequest {
+}
+
 

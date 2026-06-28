@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { ActionScope } from './actionScope';
+import { ActionVariant } from './actionVariant';
 
 
 export interface ActionConfigurationDto { 
@@ -17,6 +18,7 @@ export interface ActionConfigurationDto {
     executeScript?: string;
     checkScript?: string;
     interactive?: boolean;
+    variant?: ActionVariant;
     scope?: ActionScope;
     repositoryId?: string;
     environment?: { [key: string]: string; };

@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.featureflow.dto;
 
 import eu.wohlben.qits.domain.featureflow.entity.ActionScope;
+import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import java.util.Map;
 
 /**
@@ -15,6 +16,7 @@ public record ActionConfigurationDto(
     String executeScript,
     String checkScript,
     boolean interactive,
+    ActionVariant variant,
     ActionScope scope,
     String repositoryId,
     Map<String, String> environment) {}
