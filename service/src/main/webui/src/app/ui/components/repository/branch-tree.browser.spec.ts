@@ -40,10 +40,20 @@ const NODES: BranchTreeNode[] = [
             label: 'feature/a-1',
             data: wt('feature/a-1', 'feature/a', 2, 0),
             children: [
-              { key: 'feature/a-1-x', label: 'feature/a-1-x', data: wt('feature/a-1-x', 'feature/a-1', 1, 4), children: [] },
+              {
+                key: 'feature/a-1-x',
+                label: 'feature/a-1-x',
+                data: wt('feature/a-1-x', 'feature/a-1', 1, 4),
+                children: [],
+              },
             ],
           },
-          { key: 'feature/a-2', label: 'feature/a-2', data: wt('feature/a-2', 'feature/a', 0, 2), children: [] },
+          {
+            key: 'feature/a-2',
+            label: 'feature/a-2',
+            data: wt('feature/a-2', 'feature/a', 0, 2),
+            children: [],
+          },
         ],
       },
       { key: 'feature/b', label: 'feature/b', data: wt('feature/b', 'master', 0, 5), children: [] },
@@ -57,7 +67,7 @@ const NODES: BranchTreeNode[] = [
   imports: [BranchTreeComponent],
   template: `
     <div data-testid="tree" class="bg-background p-6" style="width: 720px">
-      <app-branch-tree [nodes]="nodes" />
+      <app-branch-tree [nodes]="nodes" [repoId]="'r1'" />
     </div>
   `,
 })
