@@ -20,6 +20,7 @@ index.ts
 model/actionConfigurationDto.ts
 model/actionScope.ts
 model/actionType.ts
+model/actionVariant.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commitChangesDto.ts

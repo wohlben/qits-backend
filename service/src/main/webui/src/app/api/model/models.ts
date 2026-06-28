@@ -1,6 +1,7 @@
 export * from './actionConfigurationDto';
 export * from './actionScope';
 export * from './actionType';
+export * from './actionVariant';
 export * from './branchDto';
 export * from './cleanupBranchRequest';
 export * from './commitChangesDto';

@@ -2,9 +2,11 @@ import { ChangeDetectionStrategy, Component, effect, input, output, signal } fro
 import { form, required, submit } from '@angular/forms/signals';
 
 import { FormField } from '@angular/forms/signals';
+import { ActionVariant } from '@/api/model/actionVariant';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardCheckboxComponent } from '@/shared/components/checkbox';
 import { ZardInputDirective } from '@/shared/components/input';
+import { ZardSelectImports } from '@/shared/components/select/select.imports';
 import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-field-layout.component';
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
 
@@ -19,6 +21,7 @@ export interface ActionConfigurationFormData {
   executeScript: string;
   checkScript: string;
   interactive: boolean;
+  variant: ActionVariant;
   environment: EnvVarRow[];
 }
 
@@ -31,6 +34,7 @@ export interface ActionConfigurationFormData {
     ZardButtonComponent,
     ZardCheckboxComponent,
     ZardInputDirective,
+    ZardSelectImports,
   ],
   template: `
     <form (submit)="onSubmit($event)" class="flex flex-col gap-4 max-w-xl">
@@ -46,6 +50,17 @@ export interface ActionConfigurationFormData {
 
       <app-form-field-layout [field]="form.checkScript" id="action-check-script" label="Check Script (optional)">
         <textarea appFormFieldSlot="input" z-input rows="4" [formField]="form.checkScript"></textarea>
+      </app-form-field-layout>
+
+      <!-- The variant is a typed, backend-rendered parameterization. Shell runs the script as-is;
+           special variants (e.g. Claude + actions MCP) have their flags built by the backend. -->
+      <app-form-field-layout [field]="form.variant" id="action-variant" label="Variant">
+        <z-select appFormFieldSlot="input" [formField]="form.variant">
+          <z-select-item zValue="SHELL">Shell — run the script verbatim</z-select-item>
+          <z-select-item zValue="CLAUDE_ACTIONS_MCP">
+            Claude Code + actions MCP (scoped to the repository)
+          </z-select-item>
+        </z-select>
       </app-form-field-layout>
 
       <!-- Interactive actions (a shell, Claude Code) run in the worktree terminal and are offered by
@@ -114,6 +129,7 @@ export class ActionConfigurationFormComponent {
     executeScript: '',
     checkScript: '',
     interactive: false,
+    variant: ActionVariant.Shell,
     environment: [],
   });
   readonly form = form(this.model, (schemaPath) => {

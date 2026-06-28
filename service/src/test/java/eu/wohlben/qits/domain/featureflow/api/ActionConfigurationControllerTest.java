@@ -25,6 +25,7 @@ public class ActionConfigurationControllerTest {
                     "echo run",
                     "echo required",
                     true,
+                    eu.wohlben.qits.domain.featureflow.entity.ActionVariant.CLAUDE_ACTIONS_MCP,
                     Map.of("EDITOR", "vim")))
             .when()
             .post("/api/action-configurations")
@@ -36,6 +37,7 @@ public class ActionConfigurationControllerTest {
             .body("actionConfiguration.executeScript", equalTo("echo run"))
             .body("actionConfiguration.checkScript", equalTo("echo required"))
             .body("actionConfiguration.interactive", equalTo(true))
+            .body("actionConfiguration.variant", equalTo("CLAUDE_ACTIONS_MCP"))
             .body("actionConfiguration.environment.EDITOR", equalTo("vim"))
             .extract()
             .path("actionConfiguration.id");
@@ -64,7 +66,13 @@ public class ActionConfigurationControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new ActionConfigurationController.UpdateActionConfigurationRequest(
-                "Updated Name", "Updated Desc", "echo updated", "echo suggested", false, null))
+                "Updated Name",
+                "Updated Desc",
+                "echo updated",
+                "echo suggested",
+                false,
+                null,
+                null))
         .when()
         .put("/api/action-configurations/" + id)
         .then()
@@ -98,7 +106,7 @@ public class ActionConfigurationControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new ActionConfigurationController.CreateActionConfigurationRequest(
-                "", null, "", "", null, null))
+                "", null, "", "", null, null, null))
         .when()
         .post("/api/action-configurations")
         .then()
@@ -111,7 +119,7 @@ public class ActionConfigurationControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new ActionConfigurationController.UpdateActionConfigurationRequest(
-                "Name", null, "echo", "echo", null, null))
+                "Name", null, "echo", "echo", null, null, null))
         .when()
         .put("/api/action-configurations/non-existent")
         .then()

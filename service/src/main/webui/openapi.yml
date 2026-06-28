@@ -19,6 +19,8 @@ components:
           type: string
         interactive:
           type: boolean
+        variant:
+          $ref: "#/components/schemas/ActionVariant"
         scope:
           $ref: "#/components/schemas/ActionScope"
         repositoryId:
@@ -37,6 +39,11 @@ components:
       enum:
       - PREREQUISITE
       - QUALITY_GATE
+    ActionVariant:
+      type: string
+      enum:
+      - SHELL
+      - CLAUDE_ACTIONS_MCP
     BranchDto:
       type: object
       properties:
@@ -137,6 +144,8 @@ components:
           type: string
         interactive:
           type: boolean
+        variant:
+          $ref: "#/components/schemas/ActionVariant"
         environment:
           type: object
           additionalProperties:
@@ -728,6 +737,8 @@ components:
           type: string
         interactive:
           type: boolean
+        variant:
+          $ref: "#/components/schemas/ActionVariant"
         environment:
           type: object
           additionalProperties:

@@ -24,6 +24,11 @@ import { ZardButtonComponent } from '@/shared/components/button';
               Interactive
             </span>
           }
+          @if (action.variant && action.variant !== 'SHELL') {
+            <span class="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+              {{ action.variant }}
+            </span>
+          }
         </div>
         @if (action.description) {
           <p class="text-sm text-muted-foreground">{{ action.description }}</p>

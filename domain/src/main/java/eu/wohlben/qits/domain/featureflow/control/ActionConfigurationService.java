@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.featureflow.control;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
+import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -23,6 +24,7 @@ public class ActionConfigurationService {
       String executeScript,
       String checkScript,
       boolean interactive,
+      ActionVariant variant,
       Map<String, String> environment) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
@@ -37,6 +39,7 @@ public class ActionConfigurationService {
     config.executeScript = executeScript;
     config.checkScript = checkScript;
     config.interactive = interactive;
+    config.variant = variant != null ? variant : ActionVariant.SHELL;
     config.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     actionConfigurationRepository.persist(config);
 
@@ -61,6 +64,7 @@ public class ActionConfigurationService {
       String executeScript,
       String checkScript,
       Boolean interactive,
+      ActionVariant variant,
       Map<String, String> environment) {
     ActionConfiguration config =
         actionConfigurationRepository
@@ -82,6 +86,9 @@ public class ActionConfigurationService {
     }
     if (interactive != null) {
       config.interactive = interactive;
+    }
+    if (variant != null) {
+      config.variant = variant;
     }
     if (environment != null) {
       config.environment = new HashMap<>(environment);
