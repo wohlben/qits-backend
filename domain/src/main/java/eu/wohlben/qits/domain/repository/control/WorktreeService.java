@@ -465,8 +465,8 @@ public class WorktreeService {
 
   /**
    * Removes a worktree from disk, deletes its branch and forgets it in the DB. Callers own the
-   * policy (discard is unconditional; cleanup gates on {@link #canCleanup}); this is the shared
-   * mechanics.
+   * policy (discard is unconditional; cleanup gates on {@link #canCleanupBranch}); this is the
+   * shared mechanics.
    */
   private void doDiscard(String repoId, Worktree worktree) {
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktree.worktreeId);
