@@ -118,7 +118,11 @@ export interface CommitsPreview {
                 (mouseenter)="cancelClose()"
                 (mouseleave)="scheduleClose()"
               >
-                <z-tab-group>
+                <!-- Make the two tabs share the popover width equally (grow from a 0 basis). The
+                     tab buttons live inside the [role=tablist] nav (z-button renders role=button). -->
+                <z-tab-group
+                  class="[&_[role=tablist]_button]:grow [&_[role=tablist]_button]:basis-0"
+                >
                   @if ((node.data.behind ?? 0) > 0) {
                     <z-tab [label]="'Behind · -' + (node.data.behind ?? 0)">
                       @if (incomingFor(node.data); as commits) {
