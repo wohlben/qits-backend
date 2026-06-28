@@ -57,6 +57,7 @@ interface CreateWorktreeForm {
         } @else {
           <app-branch-tree
             [nodes]="branchRows"
+            [repoId]="repoId()"
             [cleanupable]="cleanupableBranches()"
             (viewCommits)="viewCommits($event)"
             (viewTerminal)="viewTerminal($event)"

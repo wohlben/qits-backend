@@ -1,5 +1,6 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleAlert, lucideX } from '@ng-icons/lucide';
 
@@ -43,6 +44,7 @@ export interface CommitsPreview {
     ZardTabComponent,
     DatePipe,
     NgTemplateOutlet,
+    RouterLink,
   ],
   template: `
     <z-tree [zData]="nodes()" zExpandAll class="gap-2">
@@ -129,7 +131,10 @@ export interface CommitsPreview {
                         } @else {
                           <ng-container
                             [ngTemplateOutlet]="commitList"
-                            [ngTemplateOutletContext]="{ $implicit: commits }"
+                            [ngTemplateOutletContext]="{
+                              $implicit: commits,
+                              branch: node.data.parent,
+                            }"
                           />
                         }
                       } @else {
@@ -157,7 +162,7 @@ export interface CommitsPreview {
                         } @else {
                           <ng-container
                             [ngTemplateOutlet]="commitList"
-                            [ngTemplateOutletContext]="{ $implicit: commits }"
+                            [ngTemplateOutletContext]="{ $implicit: commits, branch: node.label }"
                           />
                         }
                       } @else {
@@ -182,22 +187,36 @@ export interface CommitsPreview {
             </ng-template>
 
             <!-- Shared renderer for a commit list, reused for the Behind and Forward tabs. Capped at
-                 5 rows (48px each) + the list's py-1; more commits scroll within the list only. -->
-            <ng-template #commitList let-commits>
+                 5 rows (48px each) + the list's py-1; more commits scroll within the list only. Each
+                 row links to the commit's detail view, in the context of the branch it belongs to
+                 (the parent for incoming commits, this branch for outgoing ones). -->
+            <ng-template #commitList let-commits let-branch="branch">
               <ul class="max-h-[248px] overflow-auto py-1">
                 @for (c of commits; track c.hash) {
-                  <li class="flex items-start gap-2 px-3 py-1.5 text-sm">
-                    <span class="shrink-0 font-mono text-xs text-muted-foreground">
-                      {{ c.shortHash }}
-                    </span>
-                    <span class="flex min-w-0 flex-1 flex-col">
-                      <span class="truncate">{{ c.message }}</span>
-                      @if (c.date) {
-                        <span class="text-xs text-muted-foreground">
-                          {{ c.author }} · {{ c.date | date: 'short' }}
-                        </span>
-                      }
-                    </span>
+                  <li>
+                    <a
+                      class="flex w-full items-start gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                      [routerLink]="[
+                        '/repositories',
+                        repoId(),
+                        'branch',
+                        branch,
+                        'commits',
+                        c.hash,
+                      ]"
+                    >
+                      <span class="shrink-0 font-mono text-xs text-muted-foreground">
+                        {{ c.shortHash }}
+                      </span>
+                      <span class="flex min-w-0 flex-1 flex-col">
+                        <span class="truncate">{{ c.message }}</span>
+                        @if (c.date) {
+                          <span class="text-xs text-muted-foreground">
+                            {{ c.author }} · {{ c.date | date: 'short' }}
+                          </span>
+                        }
+                      </span>
+                    </a>
                   </li>
                 }
               </ul>
@@ -226,6 +245,8 @@ export interface CommitsPreview {
 })
 export class BranchTreeComponent {
   readonly nodes = input.required<BranchTreeNode[]>();
+  /** The repository id, used to build commit-detail router links from the popover. */
+  readonly repoId = input.required<string>();
   /** Branch names that are safe to clean up (drives the per-row Cleanup action). */
   readonly cleanupable = input<ReadonlySet<string>>(new Set());
   readonly viewCommits = output<string>();

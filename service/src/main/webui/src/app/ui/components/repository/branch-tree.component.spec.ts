@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { BranchTreeComponent, BranchTreeNode } from './branch-tree.component';
 
@@ -29,7 +30,10 @@ function tree(behind: number, ahead: number, conflictsWithParent = false): Branc
 
 describe('BranchTreeComponent', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [BranchTreeComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [BranchTreeComponent],
+      providers: [provideRouter([])],
+    }).compileComponents();
   });
 
   it('shows the behind number as a fast-forward action when behind but not ahead', async () => {
@@ -37,6 +41,7 @@ describe('BranchTreeComponent', () => {
     // behind 2, ahead 0 → a clean fast-forward is possible, so the behind count renders as a
     // clickable action rather than the diverged alert icon.
     fixture.componentRef.setInput('nodes', tree(2, 0));
+    fixture.componentRef.setInput('repoId', 'r1');
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -56,6 +61,7 @@ describe('BranchTreeComponent', () => {
     // behind 2, ahead 5, conflicts → integration needs manual resolution, so an alert replaces the
     // count.
     fixture.componentRef.setInput('nodes', tree(2, 5, true));
+    fixture.componentRef.setInput('repoId', 'r1');
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -70,6 +76,7 @@ describe('BranchTreeComponent', () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     // behind 2, ahead 5, no conflict → behind, not a conflict, so the count is a popover trigger.
     fixture.componentRef.setInput('nodes', tree(2, 5, false));
+    fixture.componentRef.setInput('repoId', 'r1');
     let updated: { worktreeId?: string } | undefined;
     fixture.componentInstance.update.subscribe((w) => (updated = w));
     fixture.detectChanges();
@@ -144,6 +151,7 @@ describe('BranchTreeComponent', () => {
   it('emits peek only when a behind-count popover opens, and exposes incoming commits per worktree', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     fixture.componentRef.setInput('nodes', tree(2, 0));
+    fixture.componentRef.setInput('repoId', 'r1');
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -178,6 +186,7 @@ describe('BranchTreeComponent', () => {
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     fixture.componentRef.setInput('nodes', tree(0, 0));
+    fixture.componentRef.setInput('repoId', 'r1');
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -193,6 +202,7 @@ describe('BranchTreeComponent', () => {
   it('bubbles the branch name when a card asks to branch off', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     fixture.componentRef.setInput('nodes', tree(0, 1));
+    fixture.componentRef.setInput('repoId', 'r1');
     let branchedOff: string | undefined;
     fixture.componentInstance.branchOff.subscribe((b) => (branchedOff = b));
     fixture.detectChanges();
