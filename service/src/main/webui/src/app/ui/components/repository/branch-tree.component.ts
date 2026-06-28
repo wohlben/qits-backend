@@ -56,11 +56,13 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
             [branch]="node.label"
             [worktree]="node.data ?? null"
             [hasChildren]="(node.children?.length ?? 0) > 0"
+            [canCleanup]="cleanupable().has(node.label)"
             (viewCommits)="viewCommits.emit(node.label)"
             (viewTerminal)="viewTerminal.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
             (integrate)="integrate.emit(node.label)"
             (abandon)="abandon.emit(node.data)"
+            (cleanup)="cleanup.emit(node.label)"
             (delete)="delete.emit(node.label)"
           />
         </div>
@@ -72,11 +74,14 @@ export type BranchTreeNode = TreeNode<WorktreeDto | null>;
 })
 export class BranchTreeComponent {
   readonly nodes = input.required<BranchTreeNode[]>();
+  /** Branch names that are safe to clean up (drives the per-row Cleanup action). */
+  readonly cleanupable = input<ReadonlySet<string>>(new Set());
   readonly viewCommits = output<string>();
   readonly viewTerminal = output<string>();
   readonly branchOff = output<string>();
   readonly integrate = output<string>();
   readonly abandon = output<WorktreeDto>();
+  readonly cleanup = output<string>();
   readonly delete = output<string>();
   readonly fastForward = output<WorktreeDto>();
 

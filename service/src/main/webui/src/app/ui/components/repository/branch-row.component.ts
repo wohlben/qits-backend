@@ -36,12 +36,18 @@ import { ZardButtonComponent } from '@/shared/components/button';
         <button z-button [zType]="worktree() ? 'secondary' : 'default'" (click)="branchOff.emit()">
           Branch off worktree
         </button>
-        <!-- Any branch can be integrated into a target (defaults to the repo's main branch). -->
-        <button z-button zType="secondary" (click)="integrate.emit()">Integrate</button>
-        @if (worktree()) {
-          <button z-button zType="destructive" (click)="abandon.emit()">Abandon</button>
-        } @else if (!hasChildren()) {
-          <button z-button zType="destructive" (click)="delete.emit()">Delete</button>
+        @if (canCleanup()) {
+          <!-- Fully integrated with nothing unmerged and no dependents: offer a safe, no-confirm
+               cleanup instead of Integrate/Abandon (the backend re-verifies before deleting). -->
+          <button z-button zType="secondary" (click)="cleanup.emit()">Cleanup</button>
+        } @else {
+          <!-- Any branch can be integrated into a target (defaults to the repo's main branch). -->
+          <button z-button zType="secondary" (click)="integrate.emit()">Integrate</button>
+          @if (worktree()) {
+            <button z-button zType="destructive" (click)="abandon.emit()">Abandon</button>
+          } @else if (!hasChildren()) {
+            <button z-button zType="destructive" (click)="delete.emit()">Delete</button>
+          }
         }
       </div>
     </div>
@@ -53,10 +59,17 @@ export class BranchRowComponent {
   readonly worktree = input<WorktreeDto | null>(null);
   /** A branch with children is a parent of another worktree, so it cannot be deleted. */
   readonly hasChildren = input(false);
+  /**
+   * The branch is fully integrated and safe to remove (clean tree, nothing unmerged, no
+   * dependents). Computed server-side per branch — worktree-backed or plain — so a fully merged
+   * branch offers a no-confirm Cleanup in place of Integrate/Abandon.
+   */
+  readonly canCleanup = input(false);
   readonly viewCommits = output<void>();
   readonly viewTerminal = output<void>();
   readonly branchOff = output<void>();
   readonly integrate = output<void>();
   readonly abandon = output<void>();
   readonly delete = output<void>();
+  readonly cleanup = output<void>();
 }

@@ -89,4 +89,28 @@ describe('BranchRowComponent', () => {
     expect(integrated).toBe(true);
     expect(abandoned).toBe(true);
   });
+
+  it('replaces integrate/abandon with cleanup when the worktree can be cleaned up', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/done');
+    fixture.componentRef.setInput('worktree', {
+      worktreeId: 'done',
+      branch: 'feature/done',
+      parent: 'master',
+      ahead: 0,
+      behind: 1,
+    });
+    fixture.componentRef.setInput('canCleanup', true);
+    fixture.detectChanges();
+
+    let cleaned = false;
+    fixture.componentInstance.cleanup.subscribe(() => (cleaned = true));
+
+    const el = fixture.nativeElement as HTMLElement;
+    const buttons = Array.from(el.querySelectorAll('button'));
+    expect(buttons.some((b) => b.textContent?.includes('Integrate'))).toBe(false);
+    expect(buttons.some((b) => b.textContent?.includes('Abandon'))).toBe(false);
+    buttons.find((b) => b.textContent?.includes('Cleanup'))!.click();
+    expect(cleaned).toBe(true);
+  });
 });

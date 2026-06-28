@@ -46,6 +46,81 @@ public class WorktreeService {
         .toList();
   }
 
+  /**
+   * Whether {@code branch} — worktree-backed or plain — can be removed with no data loss: it is not
+   * its own parent (the main branch can't be cleaned up), has no unmerged commits ({@code ahead ==
+   * 0} against its parent), a clean working tree when worktree-backed, and no other worktree forks
+   * from it. A plain branch's parent is the repository's main branch; a worktree's is its fork
+   * point. This is the single criterion the UI, the cleanup endpoint and post-integrate cleanup all
+   * use.
+   */
+  public boolean canCleanupBranch(
+      String repoId, Path originPath, String branch, String mainBranch) {
+    if (branch == null || branch.isBlank() || branch.startsWith("-")) {
+      return false;
+    }
+    Worktree wt = findWorktreeByBranch(repoId, branch);
+    String parent =
+        (wt != null && wt.parent != null && !wt.parent.isBlank()) ? wt.parent : mainBranch;
+    // No usable parent, or the branch *is* its parent (e.g. main): nothing to merge into, never
+    // safe.
+    if (parent == null || parent.isBlank() || parent.equals(branch)) {
+      return false;
+    }
+    // ahead == null means git couldn't compare; ahead > 0 means commits not yet in the parent.
+    Integer ahead = aheadBehind(originPath, parent, branch).ahead();
+    if (ahead == null || ahead != 0) {
+      return false;
+    }
+    if (wt != null) {
+      Path worktreePath = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
+      if (!Files.exists(worktreePath) || !isWorktreeClean(worktreePath)) {
+        return false;
+      }
+    }
+    return !hasChildren(repoId, branch);
+  }
+
+  /** True when the worktree's working tree has no staged or unstaged changes. */
+  private boolean isWorktreeClean(Path worktreePath) {
+    try {
+      String status = git.exec(worktreePath.toFile(), "git", "status", "--porcelain");
+      return status == null || status.isBlank();
+    } catch (Exception e) {
+      return false; // unknown state — treat as not clean so we never delete blindly
+    }
+  }
+
+  /** True when another worktree forks from {@code branch} (i.e. lists it as its parent). */
+  private boolean hasChildren(String repoId, String branch) {
+    for (Worktree other : worktreeRepository.findByRepositoryId(repoId)) {
+      if (branch.equals(other.parent)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The worktree whose checked-out branch is {@code branch}, or null when none matches. */
+  private Worktree findWorktreeByBranch(String repoId, String branch) {
+    if (branch == null) {
+      return null;
+    }
+    for (Worktree wt : worktreeRepository.findByRepositoryId(repoId)) {
+      Path p = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
+      if (Files.exists(p)) {
+        try {
+          if (branch.equals(git.getCurrentBranch(p))) {
+            return wt;
+          }
+        } catch (Exception ignored) {
+          // unreadable checkout — skip
+        }
+      }
+    }
+    return null;
+  }
+
   private String currentBranchOrNull(String repoId, String worktreeId) {
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
     if (!Files.exists(worktreePath)) {
@@ -198,6 +273,7 @@ public class WorktreeService {
    * worktree of its own — its branch ref is merged into the target's worktree (a temporary one is
    * created and removed when the target isn't checked out anywhere).
    */
+  @Transactional
   public MergeResult mergeBranch(String repoId, String source, String target) {
     // `source`/`target` are user-supplied: reject blank or dash-leading names so a value like
     // "-D" can't be smuggled to git as a flag (argv flag injection).
@@ -218,7 +294,66 @@ public class WorktreeService {
       throw new BadRequestException("Cannot integrate '" + source + "' into itself");
     }
 
-    return mergeIntoTarget(repoId, source, resolvedTarget);
+    MergeResult merged = mergeIntoTarget(repoId, source, resolvedTarget);
+
+    // After a clean integration the source branch's commits live in the target, so when the source
+    // is now safe to remove (fully merged, clean if worktree-backed, no dependents) we clean it up
+    // —
+    // whether it is a worktree or a plain branch.
+    boolean cleanedUp = false;
+    if (!merged.hasConflicts()) {
+      Path originPath = Path.of(dataDir, repoId, "origin");
+      if (canCleanupBranch(repoId, originPath, source, repo.mainBranch)) {
+        doCleanupBranch(repoId, source);
+        cleanedUp = true;
+      }
+    }
+
+    return new MergeResult(merged.commitHash(), merged.hasConflicts(), merged.output(), cleanedUp);
+  }
+
+  /**
+   * Removes a branch (and its worktree, if any) only when it is safe to do so — fully merged, clean
+   * working tree when worktree-backed, no dependent worktrees (see {@link #canCleanupBranch}).
+   * Because the UI performs this without a confirmation, the safety is enforced here: an ineligible
+   * branch yields a 400 and is left untouched.
+   */
+  @Transactional
+  public void cleanupBranch(String repoId, String branch) {
+    Repository repo =
+        repositoryRepository
+            .findByIdOptional(repoId)
+            .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
+
+    Path originPath = Path.of(dataDir, repoId, "origin");
+    if (!canCleanupBranch(repoId, originPath, branch, repo.mainBranch)) {
+      throw new BadRequestException(
+          "Branch '"
+              + branch
+              + "' cannot be cleaned up: it has uncommitted changes, unmerged commits, or dependent"
+              + " worktrees");
+    }
+
+    doCleanupBranch(repoId, branch);
+  }
+
+  /**
+   * Deletes a branch: removes its worktree when one is checked out (reusing the discard mechanics),
+   * otherwise just deletes the bare branch ref. Callers gate on {@link #canCleanupBranch}.
+   */
+  private void doCleanupBranch(String repoId, String branch) {
+    Worktree wt = findWorktreeByBranch(repoId, branch);
+    if (wt != null) {
+      doDiscard(repoId, wt);
+      return;
+    }
+    Path originPath = Path.of(dataDir, repoId, "origin");
+    try {
+      git.exec(originPath.toFile(), "git", "branch", "-D", branch);
+    } catch (Exception e) {
+      throw new InternalServerErrorException(
+          "Failed to delete branch '" + branch + "': " + e.getMessage());
+    }
   }
 
   /**
@@ -260,7 +395,7 @@ public class WorktreeService {
       if (isTemp) {
         git.exec(originPath.toFile(), "git", "worktree", "remove", mergeCwd.toString());
       }
-      return new MergeResult(commitHash, hasConflicts, output);
+      return new MergeResult(commitHash, hasConflicts, output, false);
     } catch (InternalServerErrorException e) {
       throw e;
     } catch (Exception e) {
@@ -325,7 +460,16 @@ public class WorktreeService {
             .findByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
+    doDiscard(repoId, worktree);
+  }
+
+  /**
+   * Removes a worktree from disk, deletes its branch and forgets it in the DB. Callers own the
+   * policy (discard is unconditional; cleanup gates on {@link #canCleanup}); this is the shared
+   * mechanics.
+   */
+  private void doDiscard(String repoId, Worktree worktree) {
+    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktree.worktreeId);
     Path originPath = Path.of(dataDir, repoId, "origin");
 
     try {
@@ -342,7 +486,7 @@ public class WorktreeService {
       }
 
       worktreeRepository.delete(worktree);
-      metadataService.deleteWorktreeMetadata(repoId, worktreeId);
+      metadataService.deleteWorktreeMetadata(repoId, worktree.worktreeId);
     } catch (InternalServerErrorException e) {
       throw e;
     } catch (Exception e) {
@@ -366,5 +510,6 @@ public class WorktreeService {
     return null;
   }
 
-  public record MergeResult(String commitHash, boolean hasConflicts, String output) {}
+  public record MergeResult(
+      String commitHash, boolean hasConflicts, String output, boolean cleanedUp) {}
 }

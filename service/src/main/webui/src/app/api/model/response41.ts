@@ -10,6 +10,6 @@
 
 
 export interface Response41 { 
-    branches?: Array<string>;
+    success?: boolean;
 }
 
