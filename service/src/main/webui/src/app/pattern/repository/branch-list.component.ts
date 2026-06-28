@@ -15,6 +15,7 @@ import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.com
 import {
   BranchTreeComponent,
   BranchTreeNode,
+  IncomingCommits,
 } from '@/ui/components/repository/branch-tree.component';
 import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-field-layout.component';
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
@@ -66,6 +67,8 @@ interface CreateWorktreeForm {
             (delete)="openDelete($event)"
             (fastForward)="onFastForward($event)"
             (update)="onUpdate($event)"
+            [incoming]="incomingResult()"
+            (peek)="onPeek($event)"
           />
           @if (fastForwardMutation.isError()) {
             <div class="text-sm text-destructive">Failed to fast-forward branch</div>
@@ -247,6 +250,29 @@ export class BranchListComponent {
         (r) => r.entries?.map((e) => e.worktree!).filter((w): w is WorktreeDto => !!w) ?? [],
       ),
   }));
+
+  /** The worktree whose behind-count popover is open, driving the lazy incoming-commits fetch. */
+  readonly peekedWorktreeId = signal<string | null>(null);
+
+  readonly incomingQuery = injectQuery(() => ({
+    queryKey: ['incoming-commits', this.repoId(), this.peekedWorktreeId()],
+    enabled: !!this.peekedWorktreeId(),
+    queryFn: () =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdIncomingCommitsGet(
+          this.repoId(),
+          this.peekedWorktreeId()!,
+        ),
+      ),
+  }));
+
+  /** The fetched incoming commits tagged with the worktree they belong to (null while loading). */
+  readonly incomingResult = computed<IncomingCommits | null>(() => {
+    const worktreeId = this.peekedWorktreeId();
+    const data = this.incomingQuery.data();
+    if (!worktreeId || !data) return null;
+    return { worktreeId, commits: data.commits ?? [] };
+  });
 
   readonly repositoryQuery = injectQuery(() => ({
     queryKey: ['repository', this.repoId()],
@@ -471,6 +497,13 @@ export class BranchListComponent {
   onUpdate(worktree: WorktreeDto) {
     if (worktree.worktreeId) {
       this.updateMutation.mutate(worktree.worktreeId);
+    }
+  }
+
+  /** A behind-count popover opened: fetch that worktree's incoming commits lazily. */
+  onPeek(worktree: WorktreeDto) {
+    if (worktree.worktreeId) {
+      this.peekedWorktreeId.set(worktree.worktreeId);
     }
   }
 

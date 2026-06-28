@@ -1862,6 +1862,29 @@ paths:
       summary: Fast Forward
       tags:
       - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/incoming-commits:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommitLogDto"
+      summary: Incoming Commits
+      tags:
+      - Worktree Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/merge:
     post:
       parameters:

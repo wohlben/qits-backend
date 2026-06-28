@@ -89,6 +89,33 @@ describe('BranchTreeComponent', () => {
     expect(updated?.worktreeId).toBe('x');
   });
 
+  it('emits peek only when a behind-count popover opens, and exposes incoming commits per worktree', async () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    fixture.componentRef.setInput('nodes', tree(2, 0));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const peeked: string[] = [];
+    fixture.componentInstance.peek.subscribe((w) => peeked.push(w.worktreeId!));
+
+    // zVisibleChange(true) when the popover opens → peek; false (close) is ignored.
+    const wt = { worktreeId: 'x', branch: 'feature/x', parent: 'master', behind: 2, ahead: 0 };
+    fixture.componentInstance.onPeek(wt, false);
+    fixture.componentInstance.onPeek(wt, true);
+    expect(peeked).toEqual(['x']);
+
+    // incomingFor returns the commits only for the matching worktree (null otherwise = loading).
+    expect(fixture.componentInstance.incomingFor(wt)).toBeNull();
+    fixture.componentRef.setInput('incoming', {
+      worktreeId: 'x',
+      commits: [
+        { hash: 'h1', shortHash: 'h1', message: 'incoming', author: 'a', date: '', email: '' },
+      ],
+    });
+    expect(fixture.componentInstance.incomingFor(wt)?.length).toBe(1);
+    expect(fixture.componentInstance.incomingFor({ ...wt, worktreeId: 'other' })).toBeNull();
+  });
+
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     fixture.componentRef.setInput('nodes', tree(0, 0));

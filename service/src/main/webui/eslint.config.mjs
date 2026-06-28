@@ -42,11 +42,10 @@ export default tseslint.config(
         'error',
         { type: 'element', prefix: ['z', 'app'], style: 'kebab-case' },
       ],
-      // zard primitives expose kebab-case attribute directives (e.g. `z-input`).
-      '@angular-eslint/directive-selector': [
-        'error',
-        { type: 'attribute', prefix: ['z', 'zard', 'app'], style: 'kebab-case' },
-      ],
+      // zard primitives are CLI-managed and inconsistent in selector style — most are kebab-case
+      // attribute directives (e.g. `z-input`) but some are camelCase (e.g. `zPopover`). We don't
+      // hand-edit vendored components, so the selector-style rule is off for this directory.
+      '@angular-eslint/directive-selector': 'off',
     },
   },
   {
