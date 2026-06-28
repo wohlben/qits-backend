@@ -9,24 +9,21 @@ describe('BranchRowComponent', () => {
     }).compileComponents();
   });
 
-  it('offers to branch off and integrate a branch that has no worktree', () => {
+  it('offers to branch off a branch that has no worktree, without an inline Integrate', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'develop');
     fixture.componentRef.setInput('worktree', null);
     fixture.detectChanges();
 
     let branchedOff = false;
-    let integrated = false;
     fixture.componentInstance.branchOff.subscribe(() => (branchedOff = true));
-    fixture.componentInstance.integrate.subscribe(() => (integrated = true));
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('develop');
     const buttons = Array.from(el.querySelectorAll('button'));
-    // Integrate is offered on every branch, worktree-backed or not.
-    buttons.find((b) => b.textContent?.includes('Integrate'))!.click();
+    // Integrate moved into the commit popover (Forward tab) — not on the row anymore.
+    expect(buttons.some((b) => b.textContent?.includes('Integrate'))).toBe(false);
     buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
-    expect(integrated).toBe(true);
     expect(branchedOff).toBe(true);
   });
 
@@ -58,7 +55,7 @@ describe('BranchRowComponent', () => {
     expect(buttons.some((b) => b.textContent?.includes('Delete'))).toBe(false);
   });
 
-  it('shows the worktree and emits branch off/integrate/abandon when one is present', () => {
+  it('shows the worktree and emits branch off/abandon when one is present', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
     fixture.componentRef.setInput('worktree', {
@@ -69,24 +66,20 @@ describe('BranchRowComponent', () => {
     fixture.detectChanges();
 
     let branchedOff = false;
-    let integrated = false;
     let abandoned = false;
     fixture.componentInstance.branchOff.subscribe(() => (branchedOff = true));
-    fixture.componentInstance.integrate.subscribe(() => (integrated = true));
     fixture.componentInstance.abandon.subscribe(() => (abandoned = true));
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('login-fix');
     expect(el.textContent).toContain('develop');
-    // A worktree can be branched off again so worktrees can nest into a tree.
     const buttons = Array.from(el.querySelectorAll('button'));
-    // Worktree-backed branches use Abandon, not Delete.
+    // Worktree-backed branches use Abandon, not Delete; Integrate lives in the commit popover.
     expect(buttons.some((b) => b.textContent?.includes('Delete'))).toBe(false);
+    expect(buttons.some((b) => b.textContent?.includes('Integrate'))).toBe(false);
     buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
-    buttons.find((b) => b.textContent?.includes('Integrate'))!.click();
     buttons.find((b) => b.textContent?.includes('Abandon'))!.click();
     expect(branchedOff).toBe(true);
-    expect(integrated).toBe(true);
     expect(abandoned).toBe(true);
   });
 

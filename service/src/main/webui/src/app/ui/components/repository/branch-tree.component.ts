@@ -231,7 +231,6 @@ export interface CommitsPreview {
             (viewCommits)="viewCommits.emit(node.label)"
             (viewTerminal)="viewTerminal.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
-            (integrate)="integrate.emit(node.label)"
             (abandon)="abandon.emit(node.data)"
             (cleanup)="cleanup.emit(node.label)"
             (delete)="delete.emit(node.label)"
