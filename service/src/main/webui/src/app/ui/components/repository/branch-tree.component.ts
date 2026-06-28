@@ -15,21 +15,39 @@ import { BranchRowComponent } from './branch-row.component';
 
 export type BranchTreeNode = TreeNode<WorktreeDto | null>;
 
-/** The commits shown in a worktree's popover: incoming (to pull) and outgoing (this branch's own). */
+/** Per-branch ahead/behind vs its parent — supplied for branches without a worktree (the parent is
+ * the repository's main branch). Worktree-backed branches get this from their {@link WorktreeDto}. */
+export interface BranchSummary {
+  parent: string | null;
+  ahead: number | null;
+  behind: number | null;
+}
+
+/** The commits shown in a branch's popover: incoming (to pull) and outgoing (this branch's own). */
 export interface CommitsPreview {
-  worktreeId: string;
+  branch: string;
   /** Commits the parent has that this branch lacks — what a fast-forward/merge would pull in. */
   incoming: CommitDto[];
   /** Commits this branch has that the parent lacks — the branch's own work (the `+` count). */
   outgoing: CommitDto[];
 }
 
+/** Normalized view of a node for the connector/popover, unifying worktree and plain branches. */
+interface NodeSummary {
+  branch: string;
+  parent: string;
+  ahead: number;
+  behind: number;
+  conflictsWithParent: boolean;
+  /** The backing worktree, or null for a plain branch (no in-place pull, integrate-only). */
+  worktree: WorktreeDto | null;
+}
+
 /**
- * Renders the worktree forest with zard's `z-tree`, which owns the nesting:
- * recursion, per-level indentation, expand/collapse and tree a11y. Each node's
- * `#nodeTemplate` hosts our branch card plus, for nested nodes, the commit-count
- * connector — `behind` above (hidden when the branch isn't behind its parent),
- * `ahead` below (always, `+0` when level). Events bubble to the smart parent.
+ * Renders the branch forest with zard's `z-tree`, which owns the nesting: recursion, per-level
+ * indentation, expand/collapse and tree a11y. Each node's `#nodeTemplate` hosts our branch card
+ * plus, for branches with a parent, the commit-count connector — `behind` above, `ahead` below —
+ * which opens a tabbed commits popover. Events bubble to the smart parent.
  */
 @Component({
   selector: 'app-branch-tree',
@@ -48,62 +66,62 @@ export interface CommitsPreview {
   ],
   template: `
     <z-tree [zData]="nodes()" zExpandAll class="gap-2">
-      <ng-template #nodeTemplate let-node let-level="level">
+      <ng-template #nodeTemplate let-node>
         <div class="flex flex-1 items-center gap-2">
-          @if (level > 0 && node.data) {
-            @if (wouldConflict(node.data)) {
+          @if (nodeSummary(node); as s) {
+            @if (showConflict(s)) {
               <div
                 class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none"
-                [attr.title]="title(node.data)"
+                [attr.title]="summaryTitle(s)"
               >
                 <ng-icon
                   name="lucideCircleAlert"
                   class="size-3 text-destructive"
                   [attr.title]="
                     'Conflicts with ' +
-                    (node.data.parent ?? 'parent') +
+                    s.parent +
                     ' — cannot integrate without resolving merge conflicts'
                   "
                 />
-                <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
+                <span class="font-semibold text-foreground">+{{ s.ahead }}</span>
               </div>
-            } @else if ((node.data.behind ?? 0) > 0 || (node.data.ahead ?? 0) > 0) {
+            } @else if (hasTrigger(s)) {
               <!-- Clicking the count toggles a tabbed popover (Behind / Forward) with the integrate
                    action pinned at the bottom. It stays open until the × (or another click on the
                    count) — no hover, since closing on mouse-leave was disruptive. -->
               <button
                 type="button"
                 class="flex shrink-0 cursor-pointer flex-col items-center justify-center font-mono text-[0.7rem] leading-none text-muted-foreground hover:text-foreground"
-                [attr.title]="title(node.data)"
+                [attr.title]="summaryTitle(s)"
                 zPopover
                 [zContent]="commitsTpl"
                 [zTrigger]="null"
                 zPlacement="top"
-                [zVisible]="openWorktreeId() === node.data.worktreeId"
-                (zVisibleChange)="onPeek(node.data, $event)"
-                (click)="togglePopover(node.data)"
+                [zVisible]="openBranch() === s.branch"
+                (zVisibleChange)="onPeek(s.branch, $event)"
+                (click)="togglePopover(s.branch)"
               >
-                @if ((node.data.behind ?? 0) > 0) {
-                  <span>-{{ node.data.behind ?? 0 }}</span>
+                @if (s.worktree && s.behind > 0) {
+                  <span>-{{ s.behind }}</span>
                 } @else {
                   <span class="invisible">-0</span>
                 }
-                <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
+                <span class="font-semibold text-foreground">+{{ s.ahead }}</span>
               </button>
             } @else {
               <div
                 class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none text-muted-foreground"
-                [attr.title]="title(node.data)"
+                [attr.title]="summaryTitle(s)"
               >
                 <span class="invisible">-0</span>
-                <span class="font-semibold text-foreground">+{{ node.data.ahead ?? 0 }}</span>
+                <span class="font-semibold text-foreground">+{{ s.ahead }}</span>
               </div>
             }
 
-            <!-- Tabbed popover: Behind (commits to pull) / Forward (this branch's own commits),
-                 with the integrate action at the bottom. The Behind tab is rendered first so it is
-                 the default when present; otherwise Forward is the only (and default) tab. Defined
-                 per node so it closes over the node; commits load lazily when it opens. -->
+            <!-- Tabbed popover: Behind (commits to pull, worktree-backed only) / Forward (this
+                 branch's own commits). Behind is rendered first so it is the default when present;
+                 otherwise Forward is the only (and default) tab. Defined per node so it closes over
+                 the node; commits load lazily when it opens. -->
             <ng-template #commitsTpl>
               <z-popover class="relative w-80 p-0">
                 <!-- Explicit close, vertically centered on the tab strip (~33px tall) on the right. -->
@@ -121,9 +139,9 @@ export interface CommitsPreview {
                 <z-tab-group
                   class="[&_[role=tablist]]:pr-8 [&_[role=tablist]_button]:grow [&_[role=tablist]_button]:basis-0"
                 >
-                  @if ((node.data.behind ?? 0) > 0) {
-                    <z-tab [label]="'Behind · -' + (node.data.behind ?? 0)">
-                      @if (incomingFor(node.data); as commits) {
+                  @if (s.worktree && s.behind > 0) {
+                    <z-tab [label]="'Behind · -' + s.behind">
+                      @if (incomingFor(s.branch); as commits) {
                         @if (commits.length === 0) {
                           <div class="px-3 py-2 text-sm text-muted-foreground">
                             Already up to date
@@ -131,10 +149,7 @@ export interface CommitsPreview {
                         } @else {
                           <ng-container
                             [ngTemplateOutlet]="commitList"
-                            [ngTemplateOutletContext]="{
-                              $implicit: commits,
-                              branch: node.data.parent,
-                            }"
+                            [ngTemplateOutletContext]="{ $implicit: commits, branch: s.parent }"
                           />
                         }
                       } @else {
@@ -147,22 +162,22 @@ export interface CommitsPreview {
                           zType="secondary"
                           zSize="sm"
                           class="w-full"
-                          (click)="runAction(node.data)"
+                          (click)="runAction(s.worktree)"
                         >
-                          {{ actionLabel(node.data) }}
+                          {{ actionLabel(s.worktree) }}
                         </button>
                       </div>
                     </z-tab>
                   }
-                  @if ((node.data.ahead ?? 0) > 0) {
-                    <z-tab [label]="'Forward · +' + (node.data.ahead ?? 0)">
-                      @if (outgoingFor(node.data); as commits) {
+                  @if (s.ahead > 0) {
+                    <z-tab [label]="'Forward · +' + s.ahead">
+                      @if (outgoingFor(s.branch); as commits) {
                         @if (commits.length === 0) {
                           <div class="px-3 py-2 text-sm text-muted-foreground">No commits yet</div>
                         } @else {
                           <ng-container
                             [ngTemplateOutlet]="commitList"
-                            [ngTemplateOutletContext]="{ $implicit: commits, branch: node.label }"
+                            [ngTemplateOutletContext]="{ $implicit: commits, branch: s.branch }"
                           />
                         }
                       } @else {
@@ -175,7 +190,7 @@ export interface CommitsPreview {
                           zType="secondary"
                           zSize="sm"
                           class="w-full"
-                          (click)="runIntegrate(node.label)"
+                          (click)="runIntegrate(s.branch)"
                         >
                           Integrate
                         </button>
@@ -248,6 +263,8 @@ export class BranchTreeComponent {
   readonly repoId = input.required<string>();
   /** Branch names that are safe to clean up (drives the per-row Cleanup action). */
   readonly cleanupable = input<ReadonlySet<string>>(new Set());
+  /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no worktree. */
+  readonly branchSummaries = input<Record<string, BranchSummary>>({});
   readonly viewCommits = output<string>();
   readonly viewTerminal = output<string>();
   readonly branchOff = output<string>();
@@ -258,52 +275,95 @@ export class BranchTreeComponent {
   readonly fastForward = output<WorktreeDto>();
   /** Merge the parent into a diverged-but-cleanly-mergeable worktree to catch it up. */
   readonly update = output<WorktreeDto>();
-  /** The incoming/outgoing commits for the currently-open worktree (loaded lazily by the parent). */
+  /** The incoming/outgoing commits for the currently-open branch (loaded lazily by the parent). */
   readonly commitsPreview = input<CommitsPreview | null>(null);
-  /** Emitted when a behind-count popover opens, so the parent can fetch that worktree's commits. */
-  readonly peek = output<WorktreeDto>();
+  /** Emitted when a branch's popover opens, so the parent can fetch that branch's commits. */
+  readonly peek = output<string>();
 
-  /** The worktree whose popover is currently open (drives the popover's programmatic visibility). */
-  readonly openWorktreeId = signal<string | null>(null);
+  /** The branch whose popover is currently open (drives the popover's programmatic visibility). */
+  readonly openBranch = signal<string | null>(null);
 
-  /** Commits to pull in for {@code wt}, or null while they're still loading for this worktree. */
-  incomingFor(wt: WorktreeDto): CommitDto[] | null {
+  /**
+   * Normalizes a node into a {@link NodeSummary}, or null when there's nothing to compare (the main
+   * branch, or a branch with no resolvable parent). Worktree-backed branches use their worktree;
+   * plain branches use {@link branchSummaries} with the main branch as their parent.
+   */
+  nodeSummary(node: BranchTreeNode): NodeSummary | null {
+    const wt = node.data;
+    if (wt) {
+      if (!wt.parent) return null;
+      return {
+        branch: node.label,
+        parent: wt.parent,
+        ahead: wt.ahead ?? 0,
+        behind: wt.behind ?? 0,
+        conflictsWithParent: wt.conflictsWithParent === true,
+        worktree: wt,
+      };
+    }
+    const s = this.branchSummaries()[node.label];
+    if (!s || !s.parent) return null;
+    return {
+      branch: node.label,
+      parent: s.parent,
+      ahead: s.ahead ?? 0,
+      behind: s.behind ?? 0,
+      conflictsWithParent: false,
+      worktree: null,
+    };
+  }
+
+  /** A worktree-backed branch that has diverged with real conflicts — can't fast-forward cleanly. */
+  showConflict(s: NodeSummary): boolean {
+    return !!s.worktree && s.behind > 0 && s.ahead > 0 && s.conflictsWithParent;
+  }
+
+  /** Whether there's anything to act on: a worktree to pull into, or commits to integrate. */
+  hasTrigger(s: NodeSummary): boolean {
+    return (!!s.worktree && s.behind > 0) || s.ahead > 0;
+  }
+
+  summaryTitle(s: NodeSummary): string {
+    return `${s.ahead} commit(s) ahead of ${s.parent}, ${s.behind} behind`;
+  }
+
+  /** Commits to pull in for {@code branch}, or null while they're still loading. */
+  incomingFor(branch: string): CommitDto[] | null {
     const preview = this.commitsPreview();
-    return preview && preview.worktreeId === wt.worktreeId ? preview.incoming : null;
+    return preview && preview.branch === branch ? preview.incoming : null;
   }
 
   /** This branch's own commits over its parent (the `+` count), or null while still loading. */
-  outgoingFor(wt: WorktreeDto): CommitDto[] | null {
+  outgoingFor(branch: string): CommitDto[] | null {
     const preview = this.commitsPreview();
-    return preview && preview.worktreeId === wt.worktreeId ? preview.outgoing : null;
+    return preview && preview.branch === branch ? preview.outgoing : null;
   }
 
-  onPeek(wt: WorktreeDto, visible: boolean): void {
+  onPeek(branch: string, visible: boolean): void {
     if (visible) {
-      this.peek.emit(wt);
+      this.peek.emit(branch);
     }
   }
 
-  /** Toggle the popover open/closed for a worktree (the count is click-only — no hover). */
-  togglePopover(wt: WorktreeDto): void {
-    this.openWorktreeId.set(
-      this.openWorktreeId() === wt.worktreeId ? null : (wt.worktreeId ?? null),
-    );
+  /** Toggle the popover open/closed for a branch (the count is click-only — no hover). */
+  togglePopover(branch: string): void {
+    this.openBranch.set(this.openBranch() === branch ? null : branch);
   }
 
-  /** Close the popover (the explicit × button, and after running the action). */
+  /** Close the popover (the explicit × button, and after running an action). */
   closePopover(): void {
-    this.openWorktreeId.set(null);
+    this.openBranch.set(null);
   }
 
   /** The footer action label: a fast-forward when level, otherwise a merge of the parent in. */
-  actionLabel(wt: WorktreeDto): string {
-    const parent = wt.parent ?? 'parent';
+  actionLabel(wt: WorktreeDto | null): string {
+    const parent = wt?.parent ?? 'parent';
     return this.canFastForward(wt) ? `Fast-forward to ${parent}` : `Merge ${parent} in`;
   }
 
-  /** Run the footer action: fast-forward when possible, otherwise merge the parent in. */
-  runAction(wt: WorktreeDto): void {
+  /** Run the Behind-tab action: fast-forward when possible, otherwise merge the parent in. */
+  runAction(wt: WorktreeDto | null): void {
+    if (!wt) return;
     if (this.canFastForward(wt)) {
       this.fastForward.emit(wt);
     } else {
@@ -318,21 +378,8 @@ export class BranchTreeComponent {
     this.closePopover();
   }
 
-  title(wt: WorktreeDto): string {
-    return `${wt.ahead ?? 0} commit(s) ahead of ${wt.parent ?? 'parent'}, ${wt.behind ?? 0} behind`;
-  }
-
   /** Behind the parent with no commits of its own — a clean fast-forward is possible. */
-  canFastForward(wt: WorktreeDto): boolean {
-    return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) === 0;
-  }
-
-  /**
-   * Histories diverged (behind *and* ahead) *and* the server's trial merge found conflicts, so the
-   * branch can't be integrated without manual resolution. Diverged branches that merge cleanly are
-   * not flagged — only genuine conflicts warrant the warning.
-   */
-  wouldConflict(wt: WorktreeDto): boolean {
-    return (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) > 0 && wt.conflictsWithParent === true;
+  canFastForward(wt: WorktreeDto | null): boolean {
+    return !!wt && (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) === 0;
   }
 }

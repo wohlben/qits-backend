@@ -91,20 +91,20 @@ describe('BranchTreeComponent', () => {
     expect(countButton.textContent).toContain('+5');
     expect(countButton.querySelector('ng-icon')).toBeFalsy();
 
-    // Clicking the count opens the popover; it must NOT run the integration action anymore.
+    // Clicking the count opens the popover (keyed by branch); it must NOT run the action anymore.
     countButton.click();
-    expect(fixture.componentInstance.openWorktreeId()).toBe('x');
+    expect(fixture.componentInstance.openBranch()).toBe('feature/x');
     expect(updated).toBeUndefined();
 
     // Click-to-toggle: clicking again closes it (no hover/auto-close).
     countButton.click();
-    expect(fixture.componentInstance.openWorktreeId()).toBeNull();
+    expect(fixture.componentInstance.openBranch()).toBeNull();
 
     // The explicit close action also closes it.
-    fixture.componentInstance.togglePopover({ worktreeId: 'x' });
-    expect(fixture.componentInstance.openWorktreeId()).toBe('x');
+    fixture.componentInstance.togglePopover('feature/x');
+    expect(fixture.componentInstance.openBranch()).toBe('feature/x');
     fixture.componentInstance.closePopover();
-    expect(fixture.componentInstance.openWorktreeId()).toBeNull();
+    expect(fixture.componentInstance.openBranch()).toBeNull();
   });
 
   it('runs the footer action: merge for a diverged branch, fast-forward when only behind', () => {
@@ -130,7 +130,7 @@ describe('BranchTreeComponent', () => {
     expect(fastForwarded?.worktreeId).toBe('b');
 
     // Running the action closes the popover.
-    expect(component.openWorktreeId()).toBeNull();
+    expect(component.openBranch()).toBeNull();
   });
 
   it('runs the Forward-tab Integrate action, emitting the branch name and closing', () => {
@@ -140,15 +140,36 @@ describe('BranchTreeComponent', () => {
     let integrated: string | undefined;
     component.integrate.subscribe((b) => (integrated = b));
 
-    component.togglePopover({ worktreeId: 'x' });
-    expect(component.openWorktreeId()).toBe('x');
+    component.togglePopover('feature/x');
+    expect(component.openBranch()).toBe('feature/x');
 
     component.runIntegrate('feature/x');
     expect(integrated).toBe('feature/x');
-    expect(component.openWorktreeId()).toBeNull();
+    expect(component.openBranch()).toBeNull();
   });
 
-  it('emits peek only when a behind-count popover opens, and exposes incoming commits per worktree', async () => {
+  it('summarizes a plain (non-worktree) branch against main, integrate-only', () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    const c = fixture.componentInstance;
+    fixture.componentRef.setInput('branchSummaries', {
+      develop: { parent: 'master', ahead: 3, behind: 0 },
+      master: { parent: null, ahead: 0, behind: 0 },
+    });
+
+    const plain = { key: 'develop', label: 'develop', data: null, children: [] } as BranchTreeNode;
+    const s = c.nodeSummary(plain)!;
+    expect(s.parent).toBe('master');
+    expect(s.ahead).toBe(3);
+    expect(s.worktree).toBeNull();
+    expect(c.hasTrigger(s)).toBe(true); // ahead > 0 → Forward tab / Integrate
+    expect(c.showConflict(s)).toBe(false); // no worktree → never the conflict icon
+
+    // The main branch has no parent → nothing to compare → no connector.
+    const main = { key: 'master', label: 'master', data: null, children: [] } as BranchTreeNode;
+    expect(c.nodeSummary(main)).toBeNull();
+  });
+
+  it('emits peek when a popover opens, and exposes incoming/outgoing commits per branch', async () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     fixture.componentRef.setInput('nodes', tree(2, 0));
     fixture.componentRef.setInput('repoId', 'r1');
@@ -156,19 +177,18 @@ describe('BranchTreeComponent', () => {
     await fixture.whenStable();
 
     const peeked: string[] = [];
-    fixture.componentInstance.peek.subscribe((w) => peeked.push(w.worktreeId!));
+    fixture.componentInstance.peek.subscribe((b) => peeked.push(b));
 
-    // zVisibleChange(true) when the popover opens → peek; false (close) is ignored.
-    const wt = { worktreeId: 'x', branch: 'feature/x', parent: 'master', behind: 2, ahead: 0 };
-    fixture.componentInstance.onPeek(wt, false);
-    fixture.componentInstance.onPeek(wt, true);
-    expect(peeked).toEqual(['x']);
+    // zVisibleChange(true) when the popover opens → peek(branch); false (close) is ignored.
+    fixture.componentInstance.onPeek('feature/x', false);
+    fixture.componentInstance.onPeek('feature/x', true);
+    expect(peeked).toEqual(['feature/x']);
 
-    // incomingFor/outgoingFor return commits only for the matching worktree (null = still loading).
-    expect(fixture.componentInstance.incomingFor(wt)).toBeNull();
-    expect(fixture.componentInstance.outgoingFor(wt)).toBeNull();
+    // incomingFor/outgoingFor return commits only for the matching branch (null = still loading).
+    expect(fixture.componentInstance.incomingFor('feature/x')).toBeNull();
+    expect(fixture.componentInstance.outgoingFor('feature/x')).toBeNull();
     fixture.componentRef.setInput('commitsPreview', {
-      worktreeId: 'x',
+      branch: 'feature/x',
       incoming: [
         { hash: 'h1', shortHash: 'h1', message: 'incoming', author: 'a', date: '', email: '' },
       ],
@@ -177,10 +197,10 @@ describe('BranchTreeComponent', () => {
         { hash: 'o2', shortHash: 'o2', message: 'outgoing 2', author: 'a', date: '', email: '' },
       ],
     });
-    expect(fixture.componentInstance.incomingFor(wt)?.length).toBe(1);
-    expect(fixture.componentInstance.outgoingFor(wt)?.length).toBe(2);
-    expect(fixture.componentInstance.incomingFor({ ...wt, worktreeId: 'other' })).toBeNull();
-    expect(fixture.componentInstance.outgoingFor({ ...wt, worktreeId: 'other' })).toBeNull();
+    expect(fixture.componentInstance.incomingFor('feature/x')?.length).toBe(1);
+    expect(fixture.componentInstance.outgoingFor('feature/x')?.length).toBe(2);
+    expect(fixture.componentInstance.incomingFor('other')).toBeNull();
+    expect(fixture.componentInstance.outgoingFor('other')).toBeNull();
   });
 
   it('hides the behind number when level with the parent but still shows +0 ahead', async () => {

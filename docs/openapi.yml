@@ -29,6 +29,14 @@ components:
           type: string
         canCleanup:
           type: boolean
+        parent:
+          type: string
+        ahead:
+          type: integer
+          format: int32
+        behind:
+          type: integer
+          format: int32
     CleanupBranchRequest:
       type: object
       required:

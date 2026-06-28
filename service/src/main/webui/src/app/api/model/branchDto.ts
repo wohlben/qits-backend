@@ -12,5 +12,8 @@
 export interface BranchDto { 
     name?: string;
     canCleanup?: boolean;
+    parent?: string;
+    ahead?: number;
+    behind?: number;
 }
 

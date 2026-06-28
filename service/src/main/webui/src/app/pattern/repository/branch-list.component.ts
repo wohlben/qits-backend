@@ -59,6 +59,7 @@ interface CreateWorktreeForm {
             [nodes]="branchRows"
             [repoId]="repoId()"
             [cleanupable]="cleanupableBranches()"
+            [branchSummaries]="branchSummaries()"
             (viewCommits)="viewCommits($event)"
             (viewTerminal)="viewTerminal($event)"
             (branchOff)="openCreate($event)"
@@ -252,16 +253,18 @@ export class BranchListComponent {
       ),
   }));
 
-  /** The worktree whose behind-count popover is open, driving the lazy incoming-commits fetch. */
-  readonly peekedWorktreeId = signal<string | null>(null);
+  /** The branch whose popover is open, driving the lazy incoming/outgoing commit fetch. */
+  readonly peekedBranch = signal<string | null>(null);
 
-  /** The branch of the open worktree — needed to fetch its outgoing (own) commits. */
-  readonly peekedBranch = computed(() => {
-    const id = this.peekedWorktreeId();
-    return (this.worktreesQuery.data() ?? []).find((w) => w.worktreeId === id)?.branch ?? null;
+  /** The worktree backing the open branch, if any (plain branches have none). */
+  readonly peekedWorktreeId = computed(() => {
+    const branch = this.peekedBranch();
+    if (!branch) return null;
+    return (this.worktreesQuery.data() ?? []).find((w) => w.branch === branch)?.worktreeId ?? null;
   });
 
-  // Commits the parent has that the branch lacks (what a fast-forward/merge pulls in).
+  // Commits the parent has that the branch lacks (what a fast-forward/merge pulls in). Only
+  // worktree-backed branches can pull, so this is fetched only when the open branch has a worktree.
   readonly incomingQuery = injectQuery(() => ({
     queryKey: ['incoming-commits', this.repoId(), this.peekedWorktreeId()],
     enabled: !!this.peekedWorktreeId(),
@@ -274,7 +277,8 @@ export class BranchListComponent {
       ),
   }));
 
-  // The branch's own commits over its parent (the `+` count) — the existing commit-log endpoint.
+  // The branch's own commits over its parent (the `+` count) — the existing commit-log endpoint,
+  // which resolves the parent (worktree parent or main) server-side, so it works for any branch.
   readonly outgoingQuery = injectQuery(() => ({
     queryKey: ['outgoing-commits', this.repoId(), this.peekedBranch()],
     enabled: !!this.peekedBranch(),
@@ -284,16 +288,36 @@ export class BranchListComponent {
       ),
   }));
 
-  /** The fetched incoming/outgoing commits tagged with the worktree they belong to. */
+  /** The fetched incoming/outgoing commits tagged with the branch they belong to. */
   readonly commitsPreview = computed<CommitsPreview | null>(() => {
-    const worktreeId = this.peekedWorktreeId();
+    const branch = this.peekedBranch();
+    if (!branch) return null;
     const incoming = this.incomingQuery.data();
-    if (!worktreeId || !incoming) return null;
-    return {
-      worktreeId,
-      incoming: incoming.commits ?? [],
-      outgoing: this.outgoingQuery.data()?.commits ?? [],
-    };
+    const outgoing = this.outgoingQuery.data();
+    // Wait for the query that drives the visible tabs: incoming for worktree branches (Behind tab),
+    // outgoing for plain branches (Forward only).
+    const ready = this.peekedWorktreeId() ? incoming !== undefined : outgoing !== undefined;
+    if (!ready) return null;
+    return { branch, incoming: incoming?.commits ?? [], outgoing: outgoing?.commits ?? [] };
+  });
+
+  /** Per-branch ahead/behind vs parent (from the branches endpoint), for branches with no worktree. */
+  readonly branchSummaries = computed<
+    Record<string, { parent: string | null; ahead: number | null; behind: number | null }>
+  >(() => {
+    const rec: Record<
+      string,
+      { parent: string | null; ahead: number | null; behind: number | null }
+    > = {};
+    for (const b of this.branchesQuery.data() ?? []) {
+      if (b.name)
+        rec[b.name] = {
+          parent: b.parent ?? null,
+          ahead: b.ahead ?? null,
+          behind: b.behind ?? null,
+        };
+    }
+    return rec;
   });
 
   readonly repositoryQuery = injectQuery(() => ({
@@ -335,16 +359,17 @@ export class BranchListComponent {
   readonly integrateTargets = computed(() => this.branches().filter((b) => b !== this.ui.branch()));
 
   /**
-   * Builds the nested worktree tree for `z-tree`. A worktree's `parent` is the
-   * branch it forked from, so a worktree whose branch is itself another
-   * worktree's parent nests underneath it. Branches with no resolvable parent
-   * (e.g. master) are roots. Each node carries its worktree (or null) as `data`.
+   * Builds the nested branch tree for `z-tree`. A branch's parent is its worktree's fork point when
+   * worktree-backed, otherwise the repository's main branch (from the branches endpoint) — so plain
+   * branches nest under main too. Branches with no resolvable parent (e.g. master) are roots. Each
+   * node carries its worktree (or null) as `data`.
    */
   readonly treeNodes = computed<BranchTreeNode[]>(() => {
     const byBranch = new Map<string, WorktreeDto>();
     for (const wt of this.worktreesQuery.data() ?? []) {
       if (wt.branch) byBranch.set(wt.branch, wt);
     }
+    const summaries = this.branchSummaries();
     const branches = this.branches();
     const branchNames = new Set(branches);
 
@@ -358,7 +383,7 @@ export class BranchListComponent {
     const roots: BranchTreeNode[] = [];
     for (const branch of branches) {
       const node = nodes.get(branch)!;
-      const parent = node.data?.parent;
+      const parent = byBranch.get(branch)?.parent ?? summaries[branch]?.parent ?? null;
       const parentNode =
         parent && parent !== branch && branchNames.has(parent) ? nodes.get(parent) : undefined;
       if (parentNode) {
@@ -522,11 +547,9 @@ export class BranchListComponent {
     }
   }
 
-  /** A behind-count popover opened: fetch that worktree's incoming commits lazily. */
-  onPeek(worktree: WorktreeDto) {
-    if (worktree.worktreeId) {
-      this.peekedWorktreeId.set(worktree.worktreeId);
-    }
+  /** A branch's popover opened: fetch that branch's incoming/outgoing commits lazily. */
+  onPeek(branch: string) {
+    this.peekedBranch.set(branch);
   }
 
   /** No confirmation: the backend re-checks safety and refuses if any data would be lost. */
