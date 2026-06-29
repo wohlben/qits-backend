@@ -248,8 +248,10 @@ interface NodeSummary {
             [worktree]="node.data ?? null"
             [hasChildren]="(node.children?.length ?? 0) > 0"
             [canCleanup]="cleanupable().has(node.label)"
+            [claudeConfigurable]="claudeConfigurable()"
             (viewCommits)="viewCommits.emit(node.label)"
             (run)="run.emit(node.label)"
+            (configureWithClaude)="configureWithClaude.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
             (abandon)="abandon.emit(node.data)"
             (cleanup)="cleanup.emit(node.label)"
@@ -268,11 +270,15 @@ export class BranchTreeComponent {
   readonly repoId = input.required<string>();
   /** Branch names that are safe to clean up (drives the per-row Cleanup action). */
   readonly cleanupable = input<ReadonlySet<string>>(new Set());
+  /** Whether the per-subtree "Configure with Claude" button is offered (repository-MCP action exists). */
+  readonly claudeConfigurable = input(false);
   /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no worktree. */
   readonly branchSummaries = input<Record<string, BranchSummary>>({});
   readonly viewCommits = output<string>();
   /** Open the "Run…" dialog for a worktree-backed branch (carries the branch name). */
   readonly run = output<string>();
+  /** Launch the repository-MCP Claude action in a subtree's terminal (carries the branch name). */
+  readonly configureWithClaude = output<string>();
   readonly branchOff = output<string>();
   readonly integrate = output<string>();
   readonly abandon = output<WorktreeDto>();

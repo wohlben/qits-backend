@@ -1,9 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
+import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
 import { ProjectControllerService } from '@/api/api/projectController.service';
+import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
+import { ActionVariant } from '@/api/model/actionVariant';
+import { RepositoryDto } from '@/api/model/repositoryDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { ProjectDetailHeaderComponent } from '@/ui/components/project/project-detail-header.component';
 import { ProjectRepositoryListComponent } from '@/pattern/project/project-repository-list.component';
@@ -44,6 +48,16 @@ import { ZardButtonComponent } from '@/shared/components/button';
           New Feature Flow
         </a>
         <a z-button [routerLink]="['/projects', projectId, 'edit']">Edit</a>
+        <!-- Launches Claude Code in a repository's main worktree with the repository MCP scoped to
+             the whole project (no single-repository narrowing), so every repository is in reach. -->
+        <button
+          z-button
+          zType="secondary"
+          (click)="configureWithClaude()"
+          [zDisabled]="!canConfigureWithClaude()"
+        >
+          Configure project with Claude
+        </button>
         <button
           z-button
           zType="destructive"
@@ -63,6 +77,7 @@ export class ProjectDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectControllerService);
+  private readonly actionConfigService = inject(ActionConfigurationControllerService);
   private readonly queryClient = inject(QueryClient);
 
   readonly projectId = this.route.snapshot.paramMap.get('id')!;
@@ -73,6 +88,47 @@ export class ProjectDetailPage {
       lastValueFrom(this.projectService.apiProjectsIdGet(this.projectId)).then((r) => r.project!),
   }));
 
+  // The project's repositories — same key/shape as app-project-repository-list so they share a
+  // cache entry. Used to pick a main worktree to start the project-scoped Claude session in.
+  readonly repositoriesQuery = injectQuery(() => ({
+    queryKey: ['project-repositories', this.projectId],
+    queryFn: () =>
+      lastValueFrom(this.projectService.apiProjectsProjectIdRepositoriesGet(this.projectId)).then(
+        (r) =>
+          r.entries?.map((e) => e.repository!).filter((p): p is RepositoryDto => !!p) ?? [],
+      ),
+  }));
+
+  // Global actions, same key/shape as elsewhere — used to find the CLAUDE_PROJECT_MCP action.
+  readonly actionConfigsQuery = injectQuery(() => ({
+    queryKey: ['action-configurations'],
+    queryFn: () =>
+      lastValueFrom(this.actionConfigService.apiActionConfigurationsGet()).then(
+        (r) =>
+          r.entries
+            ?.map((e) => e.actionConfiguration!)
+            .filter((a): a is ActionConfigurationDto => !!a) ?? [],
+      ),
+  }));
+
+  /** The seeded "Claude Code (project MCP)" action, found by its typed variant (not its name). */
+  readonly claudeProjectActionId = computed(
+    () =>
+      (this.actionConfigsQuery.data() ?? []).find(
+        (a) => a.variant === ActionVariant.ClaudeProjectMcp,
+      )?.id ?? null,
+  );
+
+  // The project session still runs in a checkout, so pick the first repository that has a main
+  // branch to host the terminal — the MCP scope spans the whole project regardless of which one.
+  readonly launchTarget = computed(
+    () => (this.repositoriesQuery.data() ?? []).find((r) => !!r.id && !!r.mainBranch) ?? null,
+  );
+
+  readonly canConfigureWithClaude = computed(
+    () => !!this.claudeProjectActionId() && !!this.launchTarget(),
+  );
+
   readonly deleteMutation = injectMutation(() => ({
     mutationFn: () =>
       lastValueFrom(this.projectService.apiProjectsIdDelete(this.projectId)),
@@ -81,6 +137,21 @@ export class ProjectDetailPage {
       this.router.navigate(['/projects']);
     },
   }));
+
+  /** Open the project-scoped Claude session in a repository's main worktree terminal. */
+  configureWithClaude() {
+    const actionId = this.claudeProjectActionId();
+    const target = this.launchTarget();
+    if (!actionId || !target?.id || !target.mainBranch) return;
+    this.router.navigate([
+      '/repositories',
+      target.id,
+      'branch',
+      target.mainBranch,
+      'terminal',
+      actionId,
+    ]);
+  }
 
   onDelete() {
     if (confirm('Are you sure you want to delete this project?')) {

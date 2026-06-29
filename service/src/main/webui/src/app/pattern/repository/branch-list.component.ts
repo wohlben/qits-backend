@@ -18,6 +18,7 @@ import { ActionConfigurationControllerService } from '@/api/api/actionConfigurat
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
+import { ActionVariant } from '@/api/model/actionVariant';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
@@ -70,8 +71,10 @@ interface CreateWorktreeForm {
             [repoId]="repoId()"
             [cleanupable]="cleanupableBranches()"
             [branchSummaries]="branchSummaries()"
+            [claudeConfigurable]="!!claudeRepositoryActionId()"
             (viewCommits)="viewCommits($event)"
             (run)="openRun($event)"
+            (configureWithClaude)="configureWithClaude($event)"
             (branchOff)="openCreate($event)"
             (integrate)="openIntegrate($event)"
             (abandon)="openAbandon($event)"
@@ -323,6 +326,14 @@ export class BranchListComponent {
     (this.actionConfigsQuery.data() ?? []).filter((a) => a.interactive),
   );
 
+  /** The seeded "Claude Code (repository MCP)" action, found by its typed variant (not its name). */
+  readonly claudeRepositoryActionId = computed(
+    () =>
+      (this.actionConfigsQuery.data() ?? []).find(
+        (a) => a.variant === ActionVariant.ClaudeRepositoryMcp,
+      )?.id ?? null,
+  );
+
   /** The branch whose popover is open, driving the lazy incoming/outgoing commit fetch. */
   readonly peekedBranch = signal<string | null>(null);
 
@@ -553,6 +564,13 @@ export class BranchListComponent {
     const branch = this.ui.branch();
     if (!branch) return;
     this.closeDialog();
+    this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal', actionId]);
+  }
+
+  /** Launch the repository-MCP Claude action in this subtree's terminal (project-scoped). */
+  configureWithClaude(branch: string) {
+    const actionId = this.claudeRepositoryActionId();
+    if (!actionId) return;
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal', actionId]);
   }
 
