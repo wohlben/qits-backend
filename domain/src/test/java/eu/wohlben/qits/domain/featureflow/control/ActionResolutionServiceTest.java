@@ -43,6 +43,14 @@ public class ActionResolutionServiceTest {
     assertTrue(cmd.contains("--strict-mcp-config"), cmd);
     assertTrue(cmd.contains("--mcp-config"), cmd);
     assertTrue(cmd.contains("/mcp/actions?repositoryId=" + repoId), cmd);
+    // Read-only tools are pre-approved; mutating ones are left to prompt.
+    assertTrue(cmd.contains("--allowedTools"), cmd);
+    assertTrue(cmd.contains("mcp__actions__listGlobalActions"), cmd);
+    assertTrue(cmd.contains("mcp__actions__getGlobalAction"), cmd);
+    assertTrue(cmd.contains("mcp__actions__listRepositoryActions"), cmd);
+    assertTrue(cmd.contains("mcp__actions__getRepositoryAction"), cmd);
+    assertTrue(cmd.contains("mcp__actions__createGlobalAction") == false, cmd);
+    assertTrue(cmd.contains("mcp__actions__deleteRepositoryAction") == false, cmd);
     // The flags are built by the backend — the action's stored script doesn't contain them.
     assertEquals("exec claude", action.executeScript);
   }

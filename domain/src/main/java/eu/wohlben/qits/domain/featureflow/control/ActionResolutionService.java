@@ -31,6 +31,20 @@ public class ActionResolutionService {
   /** Repository ids are generated UUIDs; only hex and dashes ever appear. */
   private static final Pattern REPOSITORY_ID = Pattern.compile("[0-9a-fA-F-]{36}");
 
+  /**
+   * The read-only tools of the {@code actions} MCP server, pre-approved for the Claude launch so
+   * the session can list/inspect actions without a permission prompt. The mutating tools ({@code
+   * create*}/{@code update*}/{@code delete*}) are deliberately left out so Claude still prompts
+   * before changing anything. Names are Claude's MCP tool ids: {@code mcp__<server>__<tool>} where
+   * the server is {@code actions} (the key in the rendered {@code --mcp-config} JSON below).
+   */
+  private static final List<String> READ_ONLY_ACTION_TOOLS =
+      List.of(
+          "mcp__actions__listGlobalActions",
+          "mcp__actions__getGlobalAction",
+          "mcp__actions__listRepositoryActions",
+          "mcp__actions__getRepositoryAction");
+
   @Inject ActionConfigurationRepository actionConfigurationRepository;
 
   @Inject RepositoryActionRepository repositoryActionRepository;
@@ -113,8 +127,9 @@ public class ActionResolutionService {
    * Renders the shell command for an action's variant. {@link ActionVariant#SHELL} runs the script
    * verbatim; {@link ActionVariant#CLAUDE_ACTIONS_MCP} appends Claude Code's MCP flags pointing at
    * the actions server scoped to {@code repositoryId} (via the {@code ?repositoryId=} query param
-   * that {@code RepositoryScope} accepts). The whole thing is built here, in backend code — the UI
-   * never supplies these flags.
+   * that {@code RepositoryScope} accepts), plus an {@code --allowedTools} list that pre-approves
+   * the read-only action tools while leaving the mutating ones to prompt. The whole thing is built
+   * here, in backend code — the UI never supplies these flags.
    */
   private String renderCommand(ActionVariant variant, String executeScript, String repositoryId) {
     if (variant != ActionVariant.CLAUDE_ACTIONS_MCP) {
@@ -133,6 +148,14 @@ public class ActionResolutionService {
             + "?repositoryId="
             + repositoryId
             + "\"}}}";
-    return executeScript + " --strict-mcp-config --mcp-config '" + json + "'";
+    // Pre-approve the read-only tools (comma-separated, single fixed-string arg — no untrusted
+    // input). Create/update/delete are intentionally omitted so Claude prompts before mutating.
+    String allowedTools = String.join(",", READ_ONLY_ACTION_TOOLS);
+    return executeScript
+        + " --strict-mcp-config --mcp-config '"
+        + json
+        + "' --allowedTools '"
+        + allowedTools
+        + "'";
   }
 }
