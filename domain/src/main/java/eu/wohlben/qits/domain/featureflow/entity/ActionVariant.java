@@ -7,10 +7,16 @@ package eu.wohlben.qits.domain.featureflow.entity;
  * than as user-supplied shell.
  *
  * <p>{@link #CLAUDE_ACTIONS_MCP} renders a Claude Code launch with the "actions" MCP server
- * attached and scoped to the repository it runs in — see {@code
+ * attached and scoped to the repository it runs in. {@link #CLAUDE_REPOSITORY_MCP} renders one with
+ * the "repository" MCP server attached, scoped to the worktree's project and narrowed to that one
+ * repository — for driving a single repository from within a subtree. {@link #CLAUDE_PROJECT_MCP}
+ * renders the same repository server scoped to the whole project (no repository narrowing) — for
+ * driving every repository in a project. All are built by {@code
  * ActionResolutionService#renderCommand}.
  */
 public enum ActionVariant {
   SHELL,
-  CLAUDE_ACTIONS_MCP
+  CLAUDE_ACTIONS_MCP,
+  CLAUDE_REPOSITORY_MCP,
+  CLAUDE_PROJECT_MCP
 }

@@ -60,6 +60,12 @@ export interface ActionConfigurationFormData {
           <z-select-item zValue="CLAUDE_ACTIONS_MCP">
             Claude Code + actions MCP (scoped to the repository)
           </z-select-item>
+          <z-select-item zValue="CLAUDE_REPOSITORY_MCP">
+            Claude Code + repository MCP (narrowed to one repository)
+          </z-select-item>
+          <z-select-item zValue="CLAUDE_PROJECT_MCP">
+            Claude Code + repository MCP (scoped to the whole project)
+          </z-select-item>
         </z-select>
       </app-form-field-layout>
 

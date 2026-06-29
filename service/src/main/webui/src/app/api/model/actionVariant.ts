@@ -11,7 +11,9 @@
 
 export const ActionVariant = {
     Shell: 'SHELL',
-    ClaudeActionsMcp: 'CLAUDE_ACTIONS_MCP'
+    ClaudeActionsMcp: 'CLAUDE_ACTIONS_MCP',
+    ClaudeRepositoryMcp: 'CLAUDE_REPOSITORY_MCP',
+    ClaudeProjectMcp: 'CLAUDE_PROJECT_MCP'
 } as const;
 export type ActionVariant = typeof ActionVariant[keyof typeof ActionVariant];
 

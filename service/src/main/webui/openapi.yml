@@ -44,6 +44,8 @@ components:
       enum:
       - SHELL
       - CLAUDE_ACTIONS_MCP
+      - CLAUDE_REPOSITORY_MCP
+      - CLAUDE_PROJECT_MCP
     BranchDto:
       type: object
       properties:

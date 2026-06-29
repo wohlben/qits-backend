@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideBot } from '@ng-icons/lucide';
 
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -13,7 +15,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
  */
 @Component({
   selector: 'app-branch-row',
-  imports: [ZardButtonComponent],
+  imports: [ZardButtonComponent, NgIcon],
   template: `
     <div class="flex w-full flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
       <div class="flex min-w-0 flex-col gap-1">
@@ -32,6 +34,19 @@ import { ZardButtonComponent } from '@/shared/components/button';
         <button z-button zType="ghost" (click)="viewCommits.emit()">View commits</button>
         @if (worktree()) {
           <button z-button zType="ghost" (click)="run.emit()">Run…</button>
+          @if (claudeConfigurable()) {
+            <!-- Launches Claude Code in this worktree with the repository MCP attached, scoped to the
+                 project — for driving branches/worktrees/commits/actions from within the subtree. -->
+            <button
+              z-button
+              zType="ghost"
+              title="Configure this subtree with Claude (repository MCP)"
+              (click)="configureWithClaude.emit()"
+            >
+              <ng-icon name="lucideBot" class="size-4" />
+              Configure with Claude
+            </button>
+          }
         }
         <button z-button [zType]="worktree() ? 'secondary' : 'default'" (click)="branchOff.emit()">
           Branch off worktree
@@ -52,6 +67,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </div>
     </div>
   `,
+  viewProviders: [provideIcons({ lucideBot })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BranchRowComponent {
@@ -59,6 +75,8 @@ export class BranchRowComponent {
   readonly worktree = input<WorktreeDto | null>(null);
   /** A branch with children is a parent of another worktree, so it cannot be deleted. */
   readonly hasChildren = input(false);
+  /** Whether a repository-MCP Claude action exists to offer the per-subtree "Configure" button. */
+  readonly claudeConfigurable = input(false);
   /**
    * The branch is fully integrated and safe to remove (clean tree, nothing unmerged, no
    * dependents). Computed server-side per branch — worktree-backed or plain — so a fully merged
@@ -68,6 +86,8 @@ export class BranchRowComponent {
   readonly viewCommits = output<void>();
   /** Open the "Run…" dialog to pick a preconfigured action to run in this worktree. */
   readonly run = output<void>();
+  /** Launch the repository-MCP Claude action in this worktree's terminal. */
+  readonly configureWithClaude = output<void>();
   readonly branchOff = output<void>();
   readonly abandon = output<void>();
   readonly delete = output<void>();

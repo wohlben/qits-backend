@@ -53,6 +53,20 @@ public class ActionConfigurationSeeder {
         "exec claude",
         ActionVariant.CLAUDE_ACTIONS_MCP,
         Map.of());
+    ensure(
+        "Claude Code (repository MCP)",
+        "Claude Code with the repository MCP server attached, narrowed to this one repository — for"
+            + " driving its branches, worktrees, commits and actions from within a subtree",
+        "exec claude",
+        ActionVariant.CLAUDE_REPOSITORY_MCP,
+        Map.of());
+    ensure(
+        "Claude Code (project MCP)",
+        "Claude Code with the repository MCP server attached, scoped to the whole project — for"
+            + " driving every repository in the project",
+        "exec claude",
+        ActionVariant.CLAUDE_PROJECT_MCP,
+        Map.of());
   }
 
   private void ensure(
