@@ -9,9 +9,7 @@
  */
 
 
-export interface Response44 { 
-    worktreeId?: string;
-    branch?: string;
-    actionId?: string;
+export interface Response50 { 
+    files?: Array<string>;
 }
 

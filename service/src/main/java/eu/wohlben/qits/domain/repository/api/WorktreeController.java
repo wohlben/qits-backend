@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.repository.api;
 
 import eu.wohlben.qits.domain.repository.control.CommitService;
+import eu.wohlben.qits.domain.repository.control.ResolveConflictService;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.dto.CommitLogDto;
 import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
@@ -25,6 +26,8 @@ public class WorktreeController {
   @Inject WorktreeService worktreeService;
 
   @Inject CommitService commitService;
+
+  @Inject ResolveConflictService resolveConflictService;
 
   @Inject WorktreeMapper worktreeMapper;
 
@@ -99,6 +102,32 @@ public class WorktreeController {
       @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
     var output = worktreeService.updateWorktreeFromParent(repoId, worktreeId);
     return new UpdateFromParentRequest.Response(output);
+  }
+
+  public static record ConflictingFilesRequest() {
+    public record Response(List<String> files) {}
+  }
+
+  @GET
+  @Path("/{worktreeId}/conflicts")
+  public ConflictingFilesRequest.Response conflicts(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    return new ConflictingFilesRequest.Response(
+        resolveConflictService.listConflictingFiles(repoId, worktreeId));
+  }
+
+  public static record ResolveConflictRequest() {
+    /** The resolution worktree to watch Claude work in, and the action that launches it. */
+    public record Response(String worktreeId, String branch, String actionId) {}
+  }
+
+  @POST
+  @Path("/{worktreeId}/resolve-conflict")
+  public ResolveConflictRequest.Response resolveConflict(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    var result = resolveConflictService.resolveConflict(repoId, worktreeId);
+    return new ResolveConflictRequest.Response(
+        result.worktreeId(), result.branch(), result.actionId());
   }
 
   public static record DiscardWorktreeRequest() {
