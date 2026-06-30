@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { WorktreeHistoryDetailDto } from './worktreeHistoryDetailDto';
 
 
-export interface MergeBranchRequest { 
-    source: string;
-    target?: string;
-    result?: string;
+export interface Response58 { 
+    worktree?: WorktreeHistoryDetailDto;
 }
 

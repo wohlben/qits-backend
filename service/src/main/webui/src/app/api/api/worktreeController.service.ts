@@ -21,6 +21,8 @@ import { CommitLogDto } from '../model/commitLogDto';
 // @ts-ignore
 import { CreateWorktreeRequest } from '../model/createWorktreeRequest';
 // @ts-ignore
+import { DiscardWorktreeRequest } from '../model/discardWorktreeRequest';
+// @ts-ignore
 import { MergeWorktreeRequest } from '../model/mergeWorktreeRequest';
 // @ts-ignore
 import { Response48 } from '../model/response48';
@@ -246,23 +248,23 @@ export class WorktreeControllerService extends BaseService {
      * @endpoint post /api/repositories/{repoId}/worktrees/{worktreeId}/discard
      * @param repoId 
      * @param worktreeId 
-     * @param body 
+     * @param discardWorktreeRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, body: object, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response53>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, body: object, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response53>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, body: object, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response53>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, body: object, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, discardWorktreeRequest: DiscardWorktreeRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response53>;
+    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, discardWorktreeRequest: DiscardWorktreeRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response53>>;
+    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, discardWorktreeRequest: DiscardWorktreeRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response53>>;
+    public apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(repoId: string, worktreeId: string, discardWorktreeRequest: DiscardWorktreeRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost.');
         }
         if (worktreeId === null || worktreeId === undefined) {
             throw new Error('Required parameter worktreeId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost.');
         }
-        if (body === null || body === undefined) {
-            throw new Error('Required parameter body was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost.');
+        if (discardWorktreeRequest === null || discardWorktreeRequest === undefined) {
+            throw new Error('Required parameter discardWorktreeRequest was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -304,7 +306,7 @@ export class WorktreeControllerService extends BaseService {
         return this.httpClient.request<Response53>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: body,
+                body: discardWorktreeRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

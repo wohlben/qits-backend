@@ -69,6 +69,8 @@ components:
         branch:
           type: string
           pattern: \S
+        result:
+          type: string
     CommandDto:
       type: object
       properties:
@@ -298,8 +300,13 @@ components:
           type: string
         branch:
           type: string
+        preamble:
+          type: string
     DiscardWorktreeRequest:
       type: object
+      properties:
+        result:
+          type: string
     EchoRequest:
       type: object
       properties:
@@ -323,6 +330,11 @@ components:
       properties:
         actionConfiguration:
           $ref: "#/components/schemas/ActionConfigurationDto"
+    Entry10:
+      type: object
+      properties:
+        worktree:
+          $ref: "#/components/schemas/WorktreeHistoryDto"
     Entry2:
       type: object
       properties:
@@ -466,6 +478,8 @@ components:
           type: string
           pattern: \S
         target:
+          type: string
+        result:
           type: string
     MergeWorktreeRequest:
       type: object
@@ -800,6 +814,23 @@ components:
           type: array
           items:
             type: string
+    Response56:
+      type: object
+      properties:
+        worktree:
+          $ref: "#/components/schemas/WorktreeHistoryDetailDto"
+    Response57:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry10"
+    Response58:
+      type: object
+      properties:
+        worktree:
+          $ref: "#/components/schemas/WorktreeHistoryDetailDto"
     Response6:
       type: object
       properties:
@@ -906,6 +937,13 @@ components:
         sortOrder:
           type: integer
           format: int32
+    UpdateHistoryRequest:
+      type: object
+      properties:
+        preamble:
+          type: string
+        result:
+          type: string
     UpdateProjectRequest:
       type: object
       properties:
@@ -930,6 +968,89 @@ components:
           format: int32
         conflictsWithParent:
           type: boolean
+        status:
+          $ref: "#/components/schemas/WorktreeStatus"
+        preamble:
+          type: string
+        result:
+          type: string
+        resolvedAt:
+          $ref: "#/components/schemas/Instant"
+    WorktreeEventDto:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/WorktreeEventType"
+        branch:
+          type: string
+        parent:
+          type: string
+        target:
+          type: string
+        commit:
+          type: string
+        note:
+          type: string
+        at:
+          $ref: "#/components/schemas/Instant"
+    WorktreeEventType:
+      type: string
+      enum:
+      - CREATED
+      - MERGED
+      - UPDATED_FROM_PARENT
+      - INTEGRATED
+      - ABANDONED
+    WorktreeHistoryDetailDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        worktreeId:
+          type: string
+        parent:
+          type: string
+        status:
+          $ref: "#/components/schemas/WorktreeStatus"
+        preamble:
+          type: string
+        result:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        resolvedAt:
+          $ref: "#/components/schemas/Instant"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorktreeEventDto"
+        commands:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommandDto"
+    WorktreeHistoryDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        worktreeId:
+          type: string
+        parent:
+          type: string
+        status:
+          $ref: "#/components/schemas/WorktreeStatus"
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        resolvedAt:
+          $ref: "#/components/schemas/Instant"
+    WorktreeStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - INTEGRATED
+      - ABANDONED
 paths:
   /api/action-configurations:
     get:
@@ -1937,6 +2058,77 @@ paths:
       summary: Commit File Diff
       tags:
       - Repository Controller
+  /api/repositories/{repoId}/history:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response57"
+      summary: List
+      tags:
+      - Worktree History Controller
+  /api/repositories/{repoId}/history/{id}:
+    patch:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateHistoryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response56"
+      summary: Update
+      tags:
+      - Worktree History Controller
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response58"
+      summary: Get
+      tags:
+      - Worktree History Controller
   /api/repositories/{repoId}/main-branch:
     put:
       parameters:

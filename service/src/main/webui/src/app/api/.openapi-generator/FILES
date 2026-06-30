@@ -14,6 +14,7 @@ api/projectController.service.ts
 api/reactiveEchoController.service.ts
 api/repositoryController.service.ts
 api/worktreeController.service.ts
+api/worktreeHistoryController.service.ts
 configuration.ts
 encoder.ts
 git_push.sh
@@ -40,10 +41,12 @@ model/createProjectFeatureFlowConfigurationRequest.ts
 model/createProjectRepositoryRequest.ts
 model/createProjectRequest.ts
 model/createWorktreeRequest.ts
+model/discardWorktreeRequest.ts
 model/echoRequest.ts
 model/echoResponse.ts
 model/entry.ts
 model/entry1.ts
+model/entry10.ts
 model/entry2.ts
 model/entry3.ts
 model/entry4.ts
@@ -116,6 +119,9 @@ model/response52.ts
 model/response53.ts
 model/response54.ts
 model/response55.ts
+model/response56.ts
+model/response57.ts
+model/response58.ts
 model/response6.ts
 model/response7.ts
 model/response8.ts
@@ -128,8 +134,14 @@ model/updateFeatureFlowConfigurationRequest.ts
 model/updateFeatureFlowPhaseActionRequest.ts
 model/updateFeatureFlowPhaseRequest.ts
 model/updateFeatureFlowPhaseStepRequest.ts
+model/updateHistoryRequest.ts
 model/updateProjectRequest.ts
 model/worktreeDto.ts
+model/worktreeEventDto.ts
+model/worktreeEventType.ts
+model/worktreeHistoryDetailDto.ts
+model/worktreeHistoryDto.ts
+model/worktreeStatus.ts
 param.ts
 provide-api.ts
 query.params.ts

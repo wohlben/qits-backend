@@ -38,7 +38,7 @@ public class CommandLifecycleService {
       String repoId, String worktreeId, String branch, String commitHash, ResolvedAction action) {
     Worktree worktree =
         worktreeRepository
-            .findByRepositoryAndWorktreeId(repoId, worktreeId)
+            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
     Command command =
         Command.builder()

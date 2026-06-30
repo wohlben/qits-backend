@@ -11,5 +11,6 @@
 
 export interface CleanupBranchRequest { 
     branch: string;
+    result?: string;
 }
 

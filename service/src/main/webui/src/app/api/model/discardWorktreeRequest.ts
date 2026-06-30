@@ -9,9 +9,7 @@
  */
 
 
-export interface MergeBranchRequest { 
-    source: string;
-    target?: string;
+export interface DiscardWorktreeRequest { 
     result?: string;
 }
 

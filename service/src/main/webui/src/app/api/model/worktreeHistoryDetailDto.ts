@@ -8,21 +8,23 @@
  * Do not edit the class manually.
  */
 import { WorktreeStatus } from './worktreeStatus';
+import { CommandDto } from './commandDto';
+import { WorktreeEventDto } from './worktreeEventDto';
 
 
-export interface WorktreeDto { 
+export interface WorktreeHistoryDetailDto { 
+    id?: number;
     worktreeId?: string;
     parent?: string;
-    branch?: string;
-    ahead?: number;
-    behind?: number;
-    conflictsWithParent?: boolean;
     status?: WorktreeStatus;
     preamble?: string;
     result?: string;
+    createdAt?: string;
     resolvedAt?: string;
+    events?: Array<WorktreeEventDto>;
+    commands?: Array<CommandDto>;
 }
-export namespace WorktreeDto {
+export namespace WorktreeHistoryDetailDto {
 }
 
 

@@ -67,7 +67,7 @@ public class CommandControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .body(new CreateWorktreeRequest("cmd-wt", "master", "cmd-wt"))
+        .body(new CreateWorktreeRequest("cmd-wt", "master", "cmd-wt", null))
         .when()
         .post("/api/repositories/" + repoId + "/worktrees")
         .then()

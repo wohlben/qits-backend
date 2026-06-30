@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Entry10 } from './entry10';
 
 
-export interface MergeBranchRequest { 
-    source: string;
-    target?: string;
-    result?: string;
+export interface Response57 { 
+    entries?: Array<Entry10>;
 }
 

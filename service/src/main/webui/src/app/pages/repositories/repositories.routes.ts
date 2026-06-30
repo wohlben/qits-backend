@@ -16,4 +16,16 @@ export const repositoriesRoutes: Routes = [
     loadComponent: () =>
       import('./commit-detail/commit-detail.page').then((m) => m.CommitDetailPage),
   },
+  {
+    path: ':repoId/history',
+    loadComponent: () =>
+      import('./worktree-history/worktree-history.page').then((m) => m.WorktreeHistoryPage),
+  },
+  {
+    path: ':repoId/history/:id',
+    loadComponent: () =>
+      import('./worktree-history-detail/worktree-history-detail.page').then(
+        (m) => m.WorktreeHistoryDetailPage,
+      ),
+  },
 ];

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -23,6 +23,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
     BranchListComponent,
     RepositorySyncComponent,
     ZardButtonComponent,
+    RouterLink,
   ],
   template: `
     <app-page-layout
@@ -35,6 +36,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </ng-template>
 
       <div pageActions class="flex items-center gap-2">
+        <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
         <!-- Launches Claude Code in the main worktree with the actions MCP scoped to this repo, so
              repository-specific actions can be created from inside Claude. -->
         <button
