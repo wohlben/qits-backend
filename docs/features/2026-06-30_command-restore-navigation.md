@@ -8,10 +8,10 @@ and terminated processes, and click-to-reattach for running ones. This phase is 
 the backend already supports it after Phase 1.
 
 Related / dependent plans:
-- **Phase 1 — [command-registry.md](command-registry.md)** (required): provides `GET /api/commands`,
+- **Phase 1 — [2026-06-30_command-registry.md](2026-06-30_command-registry.md)** (required): provides `GET /api/commands`,
   the durable command ids, and the re-attachable `/api/terminal/commands/{commandId}` socket this
   phase consumes.
-- **Phase 3 — [command-audit-logs.md](command-audit-logs.md)** (follow-on): makes terminated rows
+- **Phase 3 — [command-audit-logs.md](../feature-ideas/command-audit-logs.md)** (follow-on): makes terminated rows
   open into a log view. Until then, clicking a terminated command is a no-op / metadata only.
 
 ## Goal

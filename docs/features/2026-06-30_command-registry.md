@@ -7,7 +7,7 @@ connection-bound process lifecycle with an app-scoped registry that owns process
 any WebSocket, so clients can detach and re-attach freely.
 
 Related / dependent plans:
-- **Phase 2 — [command-restore-navigation.md](../feature-ideas/command-restore-navigation.md)** (depends on this): the
+- **Phase 2 — [command-restore-navigation.md](2026-06-30_command-restore-navigation.md)** (depends on this): the
   global "Commands" nav, the running/terminated list, and click-to-reattach. Frontend-only; relies on
   this phase's `GET /api/commands` and re-attachable socket.
 - **Phase 3 — [command-audit-logs.md](../feature-ideas/command-audit-logs.md)** (depends on this): persists the per-line
