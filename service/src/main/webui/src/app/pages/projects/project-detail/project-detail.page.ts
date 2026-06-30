@@ -4,7 +4,9 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { lastValueFrom } from 'rxjs';
 
 import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
+import { CommandControllerService } from '@/api/api/commandController.service';
 import { ProjectControllerService } from '@/api/api/projectController.service';
+import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
 import { ActionVariant } from '@/api/model/actionVariant';
 import { RepositoryDto } from '@/api/model/repositoryDto';
@@ -77,6 +79,8 @@ export class ProjectDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectControllerService);
+  private readonly worktreeService = inject(WorktreeControllerService);
+  private readonly commandService = inject(CommandControllerService);
   private readonly actionConfigService = inject(ActionConfigurationControllerService);
   private readonly queryClient = inject(QueryClient);
 
@@ -138,19 +142,41 @@ export class ProjectDetailPage {
     },
   }));
 
-  /** Open the project-scoped Claude session in a repository's main worktree terminal. */
+  // Launch the project-scoped Claude session in a host repository's main worktree (resolving the
+  // worktree from its branch), then open its command terminal. The process is owned by the registry.
+  readonly launchMutation = injectMutation(() => ({
+    mutationFn: async (vars: { repoId: string; branch: string; actionId: string }) => {
+      const worktrees = await lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesGet(vars.repoId),
+      );
+      const worktreeId = worktrees.entries
+        ?.map((e) => e.worktree)
+        .find((w) => w?.branch === vars.branch)?.worktreeId;
+      if (!worktreeId) {
+        throw new Error('No worktree backs branch ' + vars.branch);
+      }
+      return lastValueFrom(
+        this.commandService.apiCommandsPost({
+          repoId: vars.repoId,
+          worktreeId,
+          actionId: vars.actionId,
+        }),
+      );
+    },
+    onSuccess: (res) => {
+      const commandId = res.command?.id;
+      if (commandId) {
+        this.router.navigate(['/commands', commandId]);
+      }
+    },
+  }));
+
+  /** Open the project-scoped Claude session in a host repository's main worktree. */
   configureWithClaude() {
     const actionId = this.claudeProjectActionId();
     const target = this.launchTarget();
     if (!actionId || !target?.id || !target.mainBranch) return;
-    this.router.navigate([
-      '/repositories',
-      target.id,
-      'branch',
-      target.mainBranch,
-      'terminal',
-      actionId,
-    ]);
+    this.launchMutation.mutate({ repoId: target.id, branch: target.mainBranch, actionId });
   }
 
   onDelete() {

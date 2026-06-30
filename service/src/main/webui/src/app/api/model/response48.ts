@@ -10,6 +10,8 @@
 
 
 export interface Response48 { 
-    success?: boolean;
+    worktreeId?: string;
+    branch?: string;
+    actionId?: string;
 }
 

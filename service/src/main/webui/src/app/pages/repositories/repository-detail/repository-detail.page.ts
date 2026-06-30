@@ -4,7 +4,9 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { lastValueFrom } from 'rxjs';
 
 import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
+import { CommandControllerService } from '@/api/api/commandController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
+import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
 import { ActionVariant } from '@/api/model/actionVariant';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
@@ -65,6 +67,8 @@ export class RepositoryDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly repositoryService = inject(RepositoryControllerService);
+  private readonly worktreeService = inject(WorktreeControllerService);
+  private readonly commandService = inject(CommandControllerService);
   private readonly actionConfigService = inject(ActionConfigurationControllerService);
   private readonly queryClient = inject(QueryClient);
 
@@ -112,12 +116,41 @@ export class RepositoryDetailPage {
     },
   }));
 
+  // Launch an action in the worktree backing a branch (resolving the worktree from the branch), then
+  // open its command terminal. The process is owned by the backend registry and survives navigation.
+  readonly launchMutation = injectMutation(() => ({
+    mutationFn: async (vars: { branch: string; actionId: string }) => {
+      const worktrees = await lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesGet(this.repoId),
+      );
+      const worktreeId = worktrees.entries
+        ?.map((e) => e.worktree)
+        .find((w) => w?.branch === vars.branch)?.worktreeId;
+      if (!worktreeId) {
+        throw new Error('No worktree backs branch ' + vars.branch);
+      }
+      return lastValueFrom(
+        this.commandService.apiCommandsPost({
+          repoId: this.repoId,
+          worktreeId,
+          actionId: vars.actionId,
+        }),
+      );
+    },
+    onSuccess: (res) => {
+      const commandId = res.command?.id;
+      if (commandId) {
+        this.router.navigate(['/commands', commandId]);
+      }
+    },
+  }));
+
   /** Open Claude Code in the main worktree's terminal, scoped to this repo's actions MCP. */
   configureWithClaude() {
     const actionId = this.claudeActionId();
     const branch = this.mainBranch();
     if (!actionId || !branch) return;
-    this.router.navigate(['/repositories', this.repoId, 'branch', branch, 'terminal', actionId]);
+    this.launchMutation.mutate({ branch, actionId });
   }
 
   onDelete() {

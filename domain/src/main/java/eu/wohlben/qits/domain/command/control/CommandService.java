@@ -1,0 +1,187 @@
+package eu.wohlben.qits.domain.command.control;
+
+import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.command.entity.Command;
+import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.mapper.CommandMapper;
+import eu.wohlben.qits.domain.command.persistence.CommandRepository;
+import eu.wohlben.qits.domain.error.BadRequestException;
+import eu.wohlben.qits.domain.error.NotFoundException;
+import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService;
+import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService.ResolvedAction;
+import eu.wohlben.qits.domain.repository.control.GitExecutor;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
+/**
+ * The public API for launching and managing registry-backed commands. A "launch" persists a {@link
+ * Command} row (RUNNING) and spawns its process in the {@link CommandRegistry}, decoupled from any
+ * connection — interactive runs are then watched by attaching a terminal to the returned command
+ * id, non-interactive runs ({@link #launchAndAwait}) block for the result. Process end is reported
+ * back through {@link #onExit} to {@link CommandLifecycleService}, the single writer of terminal
+ * status.
+ */
+@ApplicationScoped
+public class CommandService {
+
+  private static final Logger LOG = Logger.getLogger(CommandService.class);
+
+  /** Worktree ids are path segments, so they must be strict slugs (mirrors WorktreeService). */
+  private static final String WORKTREE_ID_PATTERN = "[A-Za-z0-9_-]{1,64}";
+
+  /**
+   * How long {@link #launchAndAwait} blocks before returning a still-running result. The process is
+   * <em>not</em> killed on timeout — it keeps running in the registry and is manageable from the
+   * Commands UI — this only bounds the synchronous caller (e.g. the MCP runAction tool).
+   */
+  private static final long AWAIT_TIMEOUT_MINUTES = 10;
+
+  @Inject CommandRegistry registry;
+
+  @Inject CommandLifecycleService lifecycle;
+
+  @Inject CommandRepository commandRepository;
+
+  @Inject CommandMapper commandMapper;
+
+  @Inject ActionResolutionService actionResolutionService;
+
+  @Inject GitExecutor git;
+
+  @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
+  String dataDir;
+
+  /** The outcome of a non-interactive run: combined output and exit code. */
+  public record RunOutcome(String actionId, String actionName, int exitCode, String output) {}
+
+  /** Reconcile orphaned RUNNING rows from a previous JVM before anything new is launched. */
+  void onStart(@Observes StartupEvent event) {
+    int reconciled = lifecycle.reconcileRunningAsInterrupted();
+    if (reconciled > 0) {
+      LOG.infof("Reconciled %d interrupted command(s) from a previous run", reconciled);
+    }
+  }
+
+  /** Launch an action as a registry command and return it; a terminal attaches by its id. */
+  public CommandDto launch(String repoId, String worktreeId, String actionId) {
+    return start(
+        repoId, worktreeId, actionResolutionService.resolveForRepository(repoId, actionId));
+  }
+
+  /**
+   * Launch a non-interactive action and block for its result (the one-off run path). The command is
+   * still registered and persisted, so it shows up in the Commands list and survives as history.
+   */
+  public RunOutcome launchAndAwait(String repoId, String worktreeId, String actionId) {
+    ResolvedAction action = actionResolutionService.resolveForRepository(repoId, actionId);
+    if (action.interactive()) {
+      throw new BadRequestException(
+          "Action '"
+              + action.name()
+              + "' is interactive — run it from the terminal, not as a one-off command.");
+    }
+    AccumulatingSink sink = new AccumulatingSink();
+    CommandDto dto = start(repoId, worktreeId, action, sink);
+    int exitCode = registry.awaitExit(dto.id(), TimeUnit.MINUTES.toMillis(AWAIT_TIMEOUT_MINUTES));
+    return new RunOutcome(action.id(), action.name(), exitCode, sink.text().stripTrailing());
+  }
+
+  private CommandDto start(
+      String repoId, String worktreeId, ResolvedAction action, CommandOutputSink... initialSinks) {
+    // Reject path-traversal in worktreeId before it ever reaches a filesystem path or git.
+    if (!worktreeId.matches(WORKTREE_ID_PATTERN)) {
+      throw new BadRequestException("Invalid worktree id: " + worktreeId);
+    }
+    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
+    if (!Files.exists(worktreePath)) {
+      throw new BadRequestException("Worktree checkout missing on disk");
+    }
+
+    String branch = git.getCurrentBranch(worktreePath);
+    String commitHash = git.getCurrentCommit(worktreePath);
+
+    // Persist RUNNING first (this also validates the worktree belongs to the repo). If the spawn
+    // fails afterwards the registry marks it via the exit listener; the row is never left dangling.
+    CommandDto dto = lifecycle.createRunning(repoId, worktreeId, branch, commitHash, action);
+
+    Map<String, String> env = new HashMap<>(System.getenv());
+    env.put("TERM", "xterm-256color");
+    env.putAll(action.environment());
+
+    registry.spawn(dto.id(), worktreePath, action.executeScript(), env, this::onExit, initialSinks);
+    return dto;
+  }
+
+  /** The single bridge from a process ending to its persisted status (via the lifecycle proxy). */
+  private void onExit(String commandId, int exitCode, boolean terminatedManually) {
+    if (terminatedManually) {
+      lifecycle.markTerminated(commandId, exitCode);
+    } else {
+      lifecycle.markExited(commandId, exitCode);
+    }
+  }
+
+  /** Terminate a running command; returns its (now finished) state. No-op if already finished. */
+  public CommandDto terminate(String commandId) {
+    get(commandId); // validates existence
+    registry.terminate(commandId); // kills + joins the reader, whose exit listener marks TERMINATED
+    return get(commandId); // fresh read reflecting the committed status
+  }
+
+  @Transactional
+  public CommandDto get(String commandId) {
+    Command command = commandRepository.findById(commandId);
+    if (command == null) {
+      throw new NotFoundException("Command not found: " + commandId);
+    }
+    return commandMapper.toDto(command);
+  }
+
+  @Transactional
+  public List<CommandDto> list(String repoId, CommandStatus status) {
+    List<Command> commands;
+    if (repoId != null && !repoId.isBlank()) {
+      commands = commandRepository.findByRepository(repoId);
+    } else if (status != null) {
+      commands = commandRepository.findByStatus(status);
+    } else {
+      commands = commandRepository.listAllByLaunchedAtDesc();
+    }
+    return commands.stream()
+        .filter(c -> status == null || c.status == status)
+        .map(commandMapper::toDto)
+        .toList();
+  }
+
+  /**
+   * Captures a non-interactive command's full output for the synchronous {@link #launchAndAwait}.
+   */
+  private static final class AccumulatingSink implements CommandOutputSink {
+    private final StringBuilder buffer = new StringBuilder();
+
+    @Override
+    public synchronized void write(String data) {
+      buffer.append(data);
+    }
+
+    @Override
+    public boolean isOpen() {
+      return true;
+    }
+
+    synchronized String text() {
+      return buffer.toString();
+    }
+  }
+}

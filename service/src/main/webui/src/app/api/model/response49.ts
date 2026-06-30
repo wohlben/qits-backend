@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorktreeDto } from './worktreeDto';
 
 
 export interface Response49 { 
-    worktree?: WorktreeDto;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
 }
 

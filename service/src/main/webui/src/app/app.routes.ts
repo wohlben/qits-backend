@@ -18,6 +18,10 @@ export const routes: Routes = [
         loadChildren: () => import('./pages/repositories/repositories.routes').then(m => m.repositoriesRoutes),
       },
       {
+        path: 'commands',
+        loadChildren: () => import('./pages/commands/commands.routes').then(m => m.commandsRoutes),
+      },
+      {
         path: 'action-configurations',
         loadChildren: () => import('./pages/action-configurations/action-configurations.routes').then(m => m.actionConfigurationsRoutes),
       },

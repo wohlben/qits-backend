@@ -10,6 +10,6 @@
 
 
 export interface Response33 { 
-    output?: string;
+    success?: boolean;
 }
 

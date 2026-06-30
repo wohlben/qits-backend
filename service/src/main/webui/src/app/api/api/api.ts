@@ -1,5 +1,7 @@
 export * from './actionConfigurationController.service';
 import { ActionConfigurationControllerService } from './actionConfigurationController.service';
+export * from './commandController.service';
+import { CommandControllerService } from './commandController.service';
 export * from './contextPropagationController.service';
 import { ContextPropagationControllerService } from './contextPropagationController.service';
 export * from './featureFlowConfigurationController.service';
@@ -18,4 +20,4 @@ export * from './repositoryController.service';
 import { RepositoryControllerService } from './repositoryController.service';
 export * from './worktreeController.service';
 import { WorktreeControllerService } from './worktreeController.service';
-export const APIS = [ActionConfigurationControllerService, ContextPropagationControllerService, FeatureFlowConfigurationControllerService, FeatureFlowPhaseActionControllerService, FeatureFlowPhaseControllerService, FeatureFlowPhaseStepControllerService, ProjectControllerService, ReactiveEchoControllerService, RepositoryControllerService, WorktreeControllerService];
+export const APIS = [ActionConfigurationControllerService, CommandControllerService, ContextPropagationControllerService, FeatureFlowConfigurationControllerService, FeatureFlowPhaseActionControllerService, FeatureFlowPhaseControllerService, FeatureFlowPhaseStepControllerService, ProjectControllerService, ReactiveEchoControllerService, RepositoryControllerService, WorktreeControllerService];
