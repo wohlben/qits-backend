@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.command.control;
 
 import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.Command;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
@@ -51,6 +52,8 @@ public class CommandService {
 
   @Inject CommandLifecycleService lifecycle;
 
+  @Inject CommandLogService commandLogService;
+
   @Inject CommandRepository commandRepository;
 
   @Inject CommandMapper commandMapper;
@@ -73,10 +76,17 @@ public class CommandService {
     }
   }
 
+  /** A persisted RUNNING command plus what the registry needs to spawn its process. */
+  private record Prepared(
+      CommandDto dto, Path worktreePath, String script, Map<String, String> env) {}
+
   /** Launch an action as a registry command and return it; a terminal attaches by its id. */
   public CommandDto launch(String repoId, String worktreeId, String actionId) {
-    return start(
-        repoId, worktreeId, actionResolutionService.resolveForRepository(repoId, actionId));
+    ResolvedAction action = actionResolutionService.resolveForRepository(repoId, actionId);
+    Prepared p = prepare(repoId, worktreeId, action);
+    registry.spawn(
+        p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
+    return p.dto();
   }
 
   /**
@@ -91,14 +101,25 @@ public class CommandService {
               + action.name()
               + "' is interactive — run it from the terminal, not as a one-off command.");
     }
+    Prepared p = prepare(repoId, worktreeId, action);
     AccumulatingSink sink = new AccumulatingSink();
-    CommandDto dto = start(repoId, worktreeId, action, sink);
-    int exitCode = registry.awaitExit(dto.id(), TimeUnit.MINUTES.toMillis(AWAIT_TIMEOUT_MINUTES));
+    int exitCode =
+        registry.spawnAndAwait(
+            p.dto().id(),
+            p.worktreePath(),
+            p.script(),
+            p.env(),
+            this::onExit,
+            commandLogService,
+            TimeUnit.MINUTES.toMillis(AWAIT_TIMEOUT_MINUTES),
+            sink);
     return new RunOutcome(action.id(), action.name(), exitCode, sink.text().stripTrailing());
   }
 
-  private CommandDto start(
-      String repoId, String worktreeId, ResolvedAction action, CommandOutputSink... initialSinks) {
+  /**
+   * Validate the worktree, snapshot its branch/commit, and persist a RUNNING row — but don't spawn.
+   */
+  private Prepared prepare(String repoId, String worktreeId, ResolvedAction action) {
     // Reject path-traversal in worktreeId before it ever reaches a filesystem path or git.
     if (!worktreeId.matches(WORKTREE_ID_PATTERN)) {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
@@ -119,8 +140,7 @@ public class CommandService {
     env.put("TERM", "xterm-256color");
     env.putAll(action.environment());
 
-    registry.spawn(dto.id(), worktreePath, action.executeScript(), env, this::onExit, initialSinks);
-    return dto;
+    return new Prepared(dto, worktreePath, action.executeScript(), env);
   }
 
   /** The single bridge from a process ending to its persisted status (via the lifecycle proxy). */
@@ -146,6 +166,12 @@ public class CommandService {
       throw new NotFoundException("Command not found: " + commandId);
     }
     return commandMapper.toDto(command);
+  }
+
+  /** A command's captured per-line log (the audit history). */
+  public List<CommandLogLineDto> log(String commandId) {
+    get(commandId); // validates existence (404 if unknown)
+    return commandLogService.log(commandId);
   }
 
   @Transactional

@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ActionConfigurationDto } from './actionConfigurationDto';
 
 
 export interface Response8 { 
-    actionConfiguration?: ActionConfigurationDto;
+    success?: boolean;
 }
 

@@ -10,7 +10,7 @@ Related / dependent plans:
 - **Phase 2 — [command-restore-navigation.md](2026-06-30_command-restore-navigation.md)** (depends on this): the
   global "Commands" nav, the running/terminated list, and click-to-reattach. Frontend-only; relies on
   this phase's `GET /api/commands` and re-attachable socket.
-- **Phase 3 — [command-audit-logs.md](../feature-ideas/command-audit-logs.md)** (depends on this): persists the per-line
+- **Phase 3 — [command-audit-logs.md](2026-06-30_command-audit-logs.md)** (depends on this): persists the per-line
   MitM log and adds the terminated-command log view. Builds on this phase's capture tee.
 - Supersedes the connection-bound lifecycle in `service/.../repository/api/TerminalSocket.java`.
 - Directly improves the headless run from the resolve-conflict feature

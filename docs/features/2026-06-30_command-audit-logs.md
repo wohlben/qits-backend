@@ -7,10 +7,10 @@ interaction log (every STDIN and OUTPUT line, with a per-line timestamp) and let
 command be opened to review its complete history.
 
 Related / dependent plans:
-- **Phase 1 — [command-registry.md](../features/2026-06-30_command-registry.md)** (required): owns the capture tee in
+- **Phase 1 — [command-registry.md](2026-06-30_command-registry.md)** (required): owns the capture tee in
   `CommandRegistry`/`CommandSession` that this phase extends with line-framing + persistence, and the
   `Command` entity these log lines FK to.
-- **Phase 2 — [command-restore-navigation.md](../features/2026-06-30_command-restore-navigation.md)** (required): provides the
+- **Phase 2 — [command-restore-navigation.md](2026-06-30_command-restore-navigation.md)** (required): provides the
   Commands list whose terminated rows now navigate into this log view.
 
 ## Goal

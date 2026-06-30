@@ -19,8 +19,6 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { CreateFeatureFlowPhaseStepRequest } from '../model/createFeatureFlowPhaseStepRequest';
 // @ts-ignore
-import { Response23 } from '../model/response23';
-// @ts-ignore
 import { Response24 } from '../model/response24';
 // @ts-ignore
 import { Response25 } from '../model/response25';
@@ -28,6 +26,8 @@ import { Response25 } from '../model/response25';
 import { Response26 } from '../model/response26';
 // @ts-ignore
 import { Response27 } from '../model/response27';
+// @ts-ignore
+import { Response28 } from '../model/response28';
 // @ts-ignore
 import { UpdateFeatureFlowPhaseStepRequest } from '../model/updateFeatureFlowPhaseStepRequest';
 
@@ -55,9 +55,9 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response24>;
-    public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response24>>;
-    public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response24>>;
+    public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response25>;
+    public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response25>>;
+    public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response25>>;
     public apiFeatureFlowPhaseStepsGet(phaseId?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
@@ -98,7 +98,7 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
 
         let localVarPath = `/api/feature-flow-phase-steps`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response24>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response25>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),
@@ -120,9 +120,9 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeatureFlowPhaseStepsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response26>;
-    public apiFeatureFlowPhaseStepsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response26>>;
-    public apiFeatureFlowPhaseStepsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response26>>;
+    public apiFeatureFlowPhaseStepsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response27>;
+    public apiFeatureFlowPhaseStepsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response27>>;
+    public apiFeatureFlowPhaseStepsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response27>>;
     public apiFeatureFlowPhaseStepsIdDelete(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiFeatureFlowPhaseStepsIdDelete.');
@@ -155,7 +155,7 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
 
         let localVarPath = `/api/feature-flow-phase-steps/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response26>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response27>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -176,9 +176,9 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeatureFlowPhaseStepsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response25>;
-    public apiFeatureFlowPhaseStepsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response25>>;
-    public apiFeatureFlowPhaseStepsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response25>>;
+    public apiFeatureFlowPhaseStepsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response26>;
+    public apiFeatureFlowPhaseStepsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response26>>;
+    public apiFeatureFlowPhaseStepsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response26>>;
     public apiFeatureFlowPhaseStepsIdGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiFeatureFlowPhaseStepsIdGet.');
@@ -211,7 +211,7 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
 
         let localVarPath = `/api/feature-flow-phase-steps/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response25>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response26>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -233,9 +233,9 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response23>;
-    public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response23>>;
-    public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response23>>;
+    public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response24>;
+    public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response24>>;
+    public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response24>>;
     public apiFeatureFlowPhaseStepsIdPut(id: string, updateFeatureFlowPhaseStepRequest: UpdateFeatureFlowPhaseStepRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiFeatureFlowPhaseStepsIdPut.');
@@ -280,7 +280,7 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
 
         let localVarPath = `/api/feature-flow-phase-steps/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response23>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response24>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateFeatureFlowPhaseStepRequest,
@@ -302,9 +302,9 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response27>;
-    public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response27>>;
-    public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response27>>;
+    public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response28>;
+    public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response28>>;
+    public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response28>>;
     public apiFeatureFlowPhaseStepsPost(createFeatureFlowPhaseStepRequest: CreateFeatureFlowPhaseStepRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (createFeatureFlowPhaseStepRequest === null || createFeatureFlowPhaseStepRequest === undefined) {
             throw new Error('Required parameter createFeatureFlowPhaseStepRequest was null or undefined when calling apiFeatureFlowPhaseStepsPost.');
@@ -346,7 +346,7 @@ export class FeatureFlowPhaseStepControllerService extends BaseService {
 
         let localVarPath = `/api/feature-flow-phase-steps`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response27>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response28>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createFeatureFlowPhaseStepRequest,

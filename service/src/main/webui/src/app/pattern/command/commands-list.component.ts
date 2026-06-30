@@ -73,10 +73,13 @@ import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.com
           <h2 class="text-sm font-semibold text-muted-foreground">History</h2>
           <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             @for (command of finished(); track command.id) {
-              <app-card-layout [hasActions]="false">
+              <app-card-layout [hasActions]="true">
                 <div cardTitle class="flex items-center gap-2">
                   <h3 class="font-semibold">{{ command.actionName }}</h3>
                   <z-badge [zType]="badgeType(command.status)">{{ statusLabel(command.status) }}</z-badge>
+                </div>
+                <div cardActions>
+                  <button z-button zType="secondary" (click)="open(command)">View log</button>
                 </div>
                 <ng-container [ngTemplateOutlet]="meta" [ngTemplateOutletContext]="{ $implicit: command }" />
               </app-card-layout>
@@ -133,7 +136,7 @@ export class CommandsListComponent {
     onSuccess: () => this.queryClient.invalidateQueries({ queryKey: ['commands'] }),
   }));
 
-  /** Re-open a running command's terminal — the backend re-attaches and replays scrollback. */
+  /** Open a command: a running one re-attaches to its live terminal, a finished one shows its log. */
   open(command: CommandDto) {
     if (command.id) {
       this.router.navigate(['/commands', command.id]);

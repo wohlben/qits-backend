@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.command.api;
 
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -63,6 +64,16 @@ public class CommandController {
   @Path("/{commandId}")
   public GetCommandRequest.Response get(@PathParam("commandId") String commandId) {
     return new GetCommandRequest.Response(commandService.get(commandId));
+  }
+
+  public static record GetCommandLogRequest() {
+    public record Response(List<CommandLogLineDto> lines) {}
+  }
+
+  @GET
+  @Path("/{commandId}/log")
+  public GetCommandLogRequest.Response log(@PathParam("commandId") String commandId) {
+    return new GetCommandLogRequest.Response(commandService.log(commandId));
   }
 
   public static record TerminateCommandRequest() {

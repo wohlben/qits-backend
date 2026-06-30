@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
 import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.project.control.ProjectService;
@@ -89,6 +91,33 @@ public class CommandServiceTest {
     assertEquals("work", command.worktreeId());
     assertEquals("work", command.branch());
     assertEquals(40, command.commitHash().length(), "full SHA captured: " + command.commitHash());
+  }
+
+  @Test
+  public void capturesTheOutputLog() throws Exception {
+    String repoId = repoWithWorktree();
+    String actionId = createAction(repoId, "echo", "echo hello-log", false);
+
+    commandService.launchAndAwait(repoId, "work", actionId);
+    String commandId = commandService.list(repoId, null).get(0).id();
+
+    // The line log is written asynchronously, so poll briefly for it to flush.
+    List<CommandLogLineDto> lines = awaitLog(commandId);
+    assertTrue(
+        lines.stream()
+            .anyMatch(l -> l.channel() == LogChannel.OUTPUT && l.content().contains("hello-log")),
+        "captured output should contain the echoed line: " + lines);
+  }
+
+  private List<CommandLogLineDto> awaitLog(String commandId) throws InterruptedException {
+    for (int i = 0; i < 40; i++) {
+      List<CommandLogLineDto> lines = commandService.log(commandId);
+      if (!lines.isEmpty()) {
+        return lines;
+      }
+      Thread.sleep(100);
+    }
+    return commandService.log(commandId);
   }
 
   @Test

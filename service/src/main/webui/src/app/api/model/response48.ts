@@ -10,8 +10,6 @@
 
 
 export interface Response48 { 
-    worktreeId?: string;
-    branch?: string;
-    actionId?: string;
+    output?: string;
 }
 

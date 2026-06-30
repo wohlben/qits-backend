@@ -2,14 +2,18 @@ package eu.wohlben.qits.domain.command.control;
 
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;
+import eu.wohlben.qits.domain.command.entity.LogChannel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jboss.logging.Logger;
 
 /**
@@ -31,10 +35,24 @@ final class CommandSession {
   /** How much recent raw output to retain for replay on re-attach. */
   private static final int RING_CAPACITY_BYTES = 256 * 1024;
 
+  /** A runaway no-newline line is truncated to this many characters when persisted. */
+  private static final int MAX_LOG_LINE_CHARS = 16 * 1024;
+
   private final String commandId;
   private final PtyProcess process;
   private final CommandExitListener exitListener;
   private final Runnable onComplete;
+
+  /** Persists captured lines (may be null to disable logging); see line-framing below. */
+  private final CommandLogWriter logWriter;
+
+  /** Monotonic ordinal shared by both channels, so the log has a stable total order. */
+  private final AtomicLong logSeq = new AtomicLong();
+
+  /** In-progress OUTPUT line (reader thread only) and STDIN line (under {@link #stdinLock}). */
+  private final StringBuilder outLine = new StringBuilder();
+
+  private final StringBuilder inLine = new StringBuilder();
 
   /** Recent raw output chunks, total bounded by {@link #RING_CAPACITY_BYTES}, for replay. */
   private final Deque<byte[]> ring = new ArrayDeque<>();
@@ -50,12 +68,24 @@ final class CommandSession {
   private volatile boolean terminatedManually;
   private Thread reader;
 
+  /**
+   * Signalled once the reader has computed the authoritative exit code and run the exit listener.
+   */
+  private final CountDownLatch finished = new CountDownLatch(1);
+
+  private volatile int exitCode = -1;
+
   CommandSession(
-      String commandId, PtyProcess process, CommandExitListener exitListener, Runnable onComplete) {
+      String commandId,
+      PtyProcess process,
+      CommandExitListener exitListener,
+      Runnable onComplete,
+      CommandLogWriter logWriter) {
     this.commandId = commandId;
     this.process = process;
     this.exitListener = exitListener;
     this.onComplete = onComplete;
+    this.logWriter = logWriter;
   }
 
   /** Adds a sink before the reader starts (no replay needed — the ring is still empty). */
@@ -80,6 +110,9 @@ final class CommandSession {
           appendToRing(buffer, read);
           broadcast(text);
         }
+        // Raw bytes still drive xterm (above); the framer additionally captures completed lines for
+        // the audit log. Done outside the monitor — outLine is touched only by this reader thread.
+        frameOutput(text);
       }
     } catch (Exception e) {
       LOG.debugf(e, "Output pump ended for command %s", commandId);
@@ -121,6 +154,7 @@ final class CommandSession {
       } catch (IOException e) {
         LOG.debugf(e, "stdin write failed for command %s", commandId);
       }
+      frameInput(new String(data, StandardCharsets.UTF_8));
     }
   }
 
@@ -152,14 +186,16 @@ final class CommandSession {
     return process.isAlive();
   }
 
-  /** Block until the process exits (or the timeout elapses); returns its exit code, or -1. */
+  /**
+   * Block until the reader has finished and computed the exit code (or the timeout elapses).
+   * Returns the authoritative exit code, or -1 if it is still running when the timeout elapses.
+   * Waiting on the reader's latch — rather than {@code process.exitValue()} — avoids the race where
+   * the PTY hits EOF before the OS process is reaped, which would make {@code exitValue()} throw.
+   */
   int awaitExit(long timeoutMillis) {
     try {
-      if (process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)) {
-        if (reader != null) {
-          reader.join(TimeUnit.SECONDS.toMillis(2));
-        }
-        return safeExitValue();
+      if (finished.await(timeoutMillis, TimeUnit.MILLISECONDS)) {
+        return exitCode;
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -193,14 +229,101 @@ final class CommandSession {
   }
 
   private void finish() {
-    int exitCode = safeExitValue();
+    flushPartialLines();
+    exitCode = blockingExitCode();
     try {
       exitListener.onExit(commandId, exitCode, terminatedManually);
     } catch (RuntimeException e) {
       LOG.errorf(e, "Exit listener failed for command %s", commandId);
     } finally {
       onComplete.run();
+      finished.countDown();
     }
+  }
+
+  /**
+   * Block until the OS process is reaped so the exit code is reliable (PTY EOF can precede
+   * reaping).
+   */
+  private int blockingExitCode() {
+    try {
+      return process.waitFor();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return safeExitValue();
+    }
+  }
+
+  // --- Line framing for the audit log
+  // -------------------------------------------------------------
+  // OUTPUT is framed on '\n' (a trailing '\r' is stripped); a bare '\r' stays in the line so a
+  // progress bar's content is preserved rather than over-split. STDIN is framed on Enter
+  // ('\r'/'\n').
+  // The session assigns the sequence and timestamp at capture time so the async writer can't
+  // reorder.
+
+  private void frameOutput(String text) {
+    if (logWriter == null) {
+      return;
+    }
+    for (int i = 0; i < text.length(); i++) {
+      char ch = text.charAt(i);
+      if (ch == '\n') {
+        String line = outLine.toString();
+        if (line.endsWith("\r")) {
+          line = line.substring(0, line.length() - 1);
+        }
+        emitLog(LogChannel.OUTPUT, line);
+        outLine.setLength(0);
+      } else {
+        outLine.append(ch);
+      }
+    }
+  }
+
+  /** Called under {@link #stdinLock}. */
+  private void frameInput(String text) {
+    if (logWriter == null) {
+      return;
+    }
+    for (int i = 0; i < text.length(); i++) {
+      char ch = text.charAt(i);
+      if (ch == '\r' || ch == '\n') {
+        if (inLine.length() > 0) {
+          emitLog(LogChannel.STDIN, inLine.toString());
+          inLine.setLength(0);
+        }
+      } else {
+        inLine.append(ch);
+      }
+    }
+  }
+
+  /** Flush any trailing partial lines when the process ends (no final newline). */
+  private void flushPartialLines() {
+    if (logWriter == null) {
+      return;
+    }
+    if (outLine.length() > 0) {
+      String line = outLine.toString();
+      if (line.endsWith("\r")) {
+        line = line.substring(0, line.length() - 1);
+      }
+      emitLog(LogChannel.OUTPUT, line);
+      outLine.setLength(0);
+    }
+    synchronized (stdinLock) {
+      if (inLine.length() > 0) {
+        emitLog(LogChannel.STDIN, inLine.toString());
+        inLine.setLength(0);
+      }
+    }
+  }
+
+  private void emitLog(LogChannel channel, String content) {
+    String capped =
+        content.length() > MAX_LOG_LINE_CHARS ? content.substring(0, MAX_LOG_LINE_CHARS) : content;
+    logWriter.append(commandId, logSeq.getAndIncrement(), channel, capped, Instant.now());
   }
 
   private int safeExitValue() {

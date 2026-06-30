@@ -10,8 +10,8 @@
 
 
 export interface Response49 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    worktreeId?: string;
+    branch?: string;
+    actionId?: string;
 }
 

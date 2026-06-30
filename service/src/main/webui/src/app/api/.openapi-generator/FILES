@@ -25,6 +25,7 @@ model/actionVariant.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
+model/commandLogLineDto.ts
 model/commandStatus.ts
 model/commitChangesDto.ts
 model/commitDto.ts
@@ -56,6 +57,7 @@ model/featureFlowPhaseActionDto.ts
 model/featureFlowPhaseDto.ts
 model/featureFlowPhaseStepDto.ts
 model/launchCommandRequest.ts
+model/logChannel.ts
 model/mergeBranchRequest.ts
 model/mergeWorktreeRequest.ts
 model/models.ts
@@ -113,6 +115,7 @@ model/response51.ts
 model/response52.ts
 model/response53.ts
 model/response54.ts
+model/response55.ts
 model/response6.ts
 model/response7.ts
 model/response8.ts

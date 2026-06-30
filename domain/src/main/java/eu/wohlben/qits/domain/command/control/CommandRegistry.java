@@ -32,6 +32,40 @@ public class CommandRegistry {
       String script,
       Map<String, String> environment,
       CommandExitListener exitListener,
+      CommandLogWriter logWriter,
+      CommandOutputSink... initialSinks) {
+    startSession(
+        commandId, worktreePath, script, environment, exitListener, logWriter, initialSinks);
+  }
+
+  /**
+   * Spawn a process and block until it exits (or the timeout elapses), returning its exit code.
+   * Used for the synchronous non-interactive path. Holds the session reference directly, so a fast
+   * command that finishes and removes itself from the registry before this returns is still awaited
+   * correctly.
+   */
+  public int spawnAndAwait(
+      String commandId,
+      Path worktreePath,
+      String script,
+      Map<String, String> environment,
+      CommandExitListener exitListener,
+      CommandLogWriter logWriter,
+      long timeoutMillis,
+      CommandOutputSink... initialSinks) {
+    CommandSession session =
+        startSession(
+            commandId, worktreePath, script, environment, exitListener, logWriter, initialSinks);
+    return session.awaitExit(timeoutMillis);
+  }
+
+  private CommandSession startSession(
+      String commandId,
+      Path worktreePath,
+      String script,
+      Map<String, String> environment,
+      CommandExitListener exitListener,
+      CommandLogWriter logWriter,
       CommandOutputSink... initialSinks) {
     PtyProcess process;
     try {
@@ -50,12 +84,14 @@ public class CommandRegistry {
     }
 
     CommandSession session =
-        new CommandSession(commandId, process, exitListener, () -> sessions.remove(commandId));
+        new CommandSession(
+            commandId, process, exitListener, () -> sessions.remove(commandId), logWriter);
     for (CommandOutputSink sink : initialSinks) {
       session.addInitialSink(sink);
     }
     sessions.put(commandId, session);
     session.startReader();
+    return session;
   }
 
   /** Attach a live client to a running command; false if no such command is running. */
@@ -106,11 +142,5 @@ public class CommandRegistry {
   public boolean isRunning(String commandId) {
     CommandSession session = sessions.get(commandId);
     return session != null && session.isAlive();
-  }
-
-  /** Block until the command's process exits (or timeout); returns the exit code, or -1. */
-  public int awaitExit(String commandId, long timeoutMillis) {
-    CommandSession session = sessions.get(commandId);
-    return session == null ? -1 : session.awaitExit(timeoutMillis);
   }
 }
