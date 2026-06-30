@@ -75,6 +75,7 @@ interface CreateWorktreeForm {
             (viewCommits)="viewCommits($event)"
             (run)="openRun($event)"
             (configureWithClaude)="configureWithClaude($event)"
+            (resolveConflict)="openResolveConflict($event)"
             (branchOff)="openCreate($event)"
             (integrate)="openIntegrate($event)"
             (abandon)="openAbandon($event)"
@@ -206,6 +207,46 @@ interface CreateWorktreeForm {
       }
     </ng-template>
 
+    <!-- Resolve merge conflict (fork a worktree + have Claude merge the parent in and fix it) -->
+    <ng-template #resolveTpl>
+      <p class="text-sm text-muted-foreground">
+        <span class="font-medium">{{ ui().selected?.worktreeId }}</span> has diverged from
+        <span class="font-medium">{{ ui().selected?.parent }}</span> with conflicts. Resolving forks
+        a new worktree off this branch and runs Claude to merge
+        <span class="font-medium">{{ ui().selected?.parent }}</span> in and fix the conflicts.
+      </p>
+
+      @if (conflictFilesQuery.isPending()) {
+        <div class="text-sm text-muted-foreground">Loading conflicting files…</div>
+      } @else if (conflictFilesQuery.isError()) {
+        <div class="text-sm text-destructive">Failed to load conflicting files</div>
+      } @else {
+        @let files = conflictFilesQuery.data() ?? [];
+        @if (files.length) {
+          <div class="flex flex-col gap-1">
+            <span class="text-sm font-medium">Conflicting files</span>
+            <ul class="font-mono text-xs text-muted-foreground">
+              @for (f of files; track f) {
+                <li class="truncate">{{ f }}</li>
+              }
+            </ul>
+          </div>
+        } @else {
+          <div class="text-sm text-muted-foreground">No conflicting files detected.</div>
+        }
+      }
+
+      <div class="flex items-center gap-2">
+        <button z-button [zLoading]="resolveMutation.isPending()" (click)="onResolveConflict()">
+          Resolve conflict
+        </button>
+        <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
+      </div>
+      @if (resolveMutation.isError()) {
+        <span class="text-sm text-destructive">Failed to start conflict resolution</span>
+      }
+    </ng-template>
+
     <!-- Run… (pick a preconfigured action to run in the worktree) -->
     <ng-template #runTpl>
       <p class="text-sm text-muted-foreground">
@@ -264,6 +305,7 @@ export class BranchListComponent {
   private readonly integrateTpl = viewChild.required<TemplateRef<unknown>>('integrateTpl');
   private readonly abandonTpl = viewChild.required<TemplateRef<unknown>>('abandonTpl');
   private readonly deleteTpl = viewChild.required<TemplateRef<unknown>>('deleteTpl');
+  private readonly resolveTpl = viewChild.required<TemplateRef<unknown>>('resolveTpl');
   private readonly runTpl = viewChild.required<TemplateRef<unknown>>('runTpl');
 
   /** The currently-open dialog, so success/cancel handlers can close it. */
@@ -333,6 +375,19 @@ export class BranchListComponent {
         (a) => a.variant === ActionVariant.ClaudeRepositoryMcp,
       )?.id ?? null,
   );
+
+  // The conflicting files for the worktree in the open resolve dialog (the merge-tree preview).
+  readonly conflictFilesQuery = injectQuery(() => ({
+    queryKey: ['worktree-conflicts', this.repoId(), this.ui.selected()?.worktreeId],
+    enabled: !!this.ui.selected()?.worktreeId,
+    queryFn: () =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdConflictsGet(
+          this.repoId(),
+          this.ui.selected()!.worktreeId!,
+        ),
+      ).then((r) => r.files ?? []),
+  }));
 
   /** The branch whose popover is open, driving the lazy incoming/outgoing commit fetch. */
   readonly peekedBranch = signal<string | null>(null);
@@ -541,6 +596,31 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
+  readonly resolveMutation = injectMutation(() => ({
+    mutationFn: (worktreeId: string) =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdResolveConflictPost(
+          this.repoId(),
+          worktreeId,
+        ),
+      ),
+    onSuccess: (res) => {
+      invalidateRepository(this.queryClient, this.repoId());
+      this.closeDialog();
+      // Open the resolution worktree's terminal so the human watches Claude resolve the conflict.
+      if (res.branch && res.actionId) {
+        this.router.navigate([
+          '/repositories',
+          this.repoId(),
+          'branch',
+          res.branch,
+          'terminal',
+          res.actionId,
+        ]);
+      }
+    },
+  }));
+
   readonly cleanupMutation = injectMutation(() => ({
     mutationFn: (branch: string) =>
       lastValueFrom(
@@ -572,6 +652,24 @@ export class BranchListComponent {
     const actionId = this.claudeRepositoryActionId();
     if (!actionId) return;
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal', actionId]);
+  }
+
+  /** Open the resolve-conflict dialog (file preview + the action button) for a conflicting worktree. */
+  openResolveConflict(worktree: WorktreeDto) {
+    patchState(this.ui, {
+      selected: worktree,
+      branch: worktree.branch ?? null,
+      parent: worktree.parent ?? null,
+    });
+    this.openDialog('Resolve merge conflict', this.resolveTpl());
+  }
+
+  /** Fork a resolution worktree and launch Claude on it (navigation happens on success). */
+  onResolveConflict() {
+    const worktreeId = this.ui.selected()?.worktreeId;
+    if (worktreeId) {
+      this.resolveMutation.mutate(worktreeId);
+    }
   }
 
   openCreate(parent: string) {

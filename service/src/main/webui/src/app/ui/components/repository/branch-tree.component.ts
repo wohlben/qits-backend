@@ -70,21 +70,19 @@ interface NodeSummary {
         <div class="flex flex-1 items-center gap-2">
           @if (nodeSummary(node); as s) {
             @if (showConflict(s)) {
-              <div
-                class="flex shrink-0 flex-col items-center justify-center font-mono text-[0.7rem] leading-none"
-                [attr.title]="summaryTitle(s)"
+              <!-- Clicking the conflict marker opens the resolve dialog: it forks a worktree and
+                   has Claude merge the parent in and fix the conflicts. -->
+              <button
+                type="button"
+                class="flex shrink-0 cursor-pointer flex-col items-center justify-center font-mono text-[0.7rem] leading-none hover:opacity-80"
+                [attr.title]="
+                  'Conflicts with ' + s.parent + ' — click to resolve the merge conflict with Claude'
+                "
+                (click)="resolveConflict.emit(s.worktree!)"
               >
-                <ng-icon
-                  name="lucideCircleAlert"
-                  class="size-3 text-destructive"
-                  [attr.title]="
-                    'Conflicts with ' +
-                    s.parent +
-                    ' — cannot integrate without resolving merge conflicts'
-                  "
-                />
+                <ng-icon name="lucideCircleAlert" class="size-3 text-destructive" />
                 <span class="font-semibold text-foreground">+{{ s.ahead }}</span>
-              </div>
+              </button>
             } @else if (hasTrigger(s)) {
               <!-- Clicking the count toggles a tabbed popover (Behind / Forward) with the integrate
                    action pinned at the bottom. It stays open until the × (or another click on the
@@ -280,6 +278,8 @@ export class BranchTreeComponent {
   /** Launch the repository-MCP Claude action in a subtree's terminal (carries the branch name). */
   readonly configureWithClaude = output<string>();
   readonly branchOff = output<string>();
+  /** Open the resolve-conflict flow for a conflicting worktree (carries the worktree). */
+  readonly resolveConflict = output<WorktreeDto>();
   readonly integrate = output<string>();
   readonly abandon = output<WorktreeDto>();
   readonly cleanup = output<string>();
