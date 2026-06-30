@@ -4,19 +4,27 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { CommandStatus } from '@/api/model/commandStatus';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
+import { CommandLogComponent } from '@/pattern/command/command-log.component';
 import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 
 /**
- * The terminal for a single registry command: re-attaches to the running process (replaying its
- * scrollback) and shows where it came from — its action, branch and the commit that was checked out
- * at launch. Reached both right after launching an action and by re-opening a running command, so
- * navigating here is "picking back up where you left off".
+ * The view for a single registry command. A running command re-attaches to its live process
+ * (replaying scrollback) so navigating here is "picking back up where you left off"; a finished
+ * command shows its read-only captured log instead. Either way the header shows where it came from —
+ * the action, branch and the commit checked out at launch.
  */
 @Component({
   selector: 'app-command-terminal-page',
-  imports: [PageLayoutComponent, WebTerminalComponent, ZardButtonComponent, RouterLink],
+  imports: [
+    PageLayoutComponent,
+    WebTerminalComponent,
+    CommandLogComponent,
+    ZardButtonComponent,
+    RouterLink,
+  ],
   template: `
     <app-page-layout>
       <div pageTitle class="flex flex-col gap-1">
@@ -37,7 +45,17 @@ import { ZardButtonComponent } from '@/shared/components/button';
         }
       </div>
 
-      <app-web-terminal [commandId]="commandId" />
+      @if (commandQuery.data(); as command) {
+        @if (command.status === CommandStatus.Running) {
+          <app-web-terminal [commandId]="commandId" />
+        } @else {
+          <app-command-log [commandId]="commandId" />
+        }
+      } @else if (commandQuery.isError()) {
+        <div class="text-sm text-destructive">Failed to load command</div>
+      } @else {
+        <div class="text-sm text-muted-foreground">Loading command…</div>
+      }
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,6 +63,8 @@ import { ZardButtonComponent } from '@/shared/components/button';
 export class CommandTerminalPage {
   private readonly route = inject(ActivatedRoute);
   private readonly commandService = inject(CommandControllerService);
+
+  protected readonly CommandStatus = CommandStatus;
 
   readonly commandId = this.route.snapshot.paramMap.get('commandId')!;
 

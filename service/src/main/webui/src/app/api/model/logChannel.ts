@@ -7,10 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { FeatureFlowPhaseDto } from './featureFlowPhaseDto';
 
 
-export interface Response19 { 
-    featureFlowPhase?: FeatureFlowPhaseDto;
-}
+export const LogChannel = {
+    Stdin: 'STDIN',
+    Output: 'OUTPUT',
+    Stderr: 'STDERR'
+} as const;
+export type LogChannel = typeof LogChannel[keyof typeof LogChannel];
 

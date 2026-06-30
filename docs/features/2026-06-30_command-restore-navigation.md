@@ -11,7 +11,7 @@ Related / dependent plans:
 - **Phase 1 — [2026-06-30_command-registry.md](2026-06-30_command-registry.md)** (required): provides `GET /api/commands`,
   the durable command ids, and the re-attachable `/api/terminal/commands/{commandId}` socket this
   phase consumes.
-- **Phase 3 — [command-audit-logs.md](../feature-ideas/command-audit-logs.md)** (follow-on): makes terminated rows
+- **Phase 3 — [command-audit-logs.md](2026-06-30_command-audit-logs.md)** (follow-on): makes terminated rows
   open into a log view. Until then, clicking a terminated command is a no-op / metadata only.
 
 ## Goal

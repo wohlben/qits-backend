@@ -15,6 +15,7 @@ import io.restassured.http.ContentType;
 import jakarta.ws.rs.core.Response;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -135,6 +136,55 @@ public class CommandControllerTest {
         .then()
         .statusCode(Response.Status.OK.getStatusCode())
         .body("command.status", equalTo("TERMINATED"));
+  }
+
+  private String createEchoAction() {
+    return given()
+        .contentType(ContentType.JSON)
+        .body(
+            new CreateActionConfigurationRequest(
+                "echo-action", null, "echo hello-http", null, false, ActionVariant.SHELL, null))
+        .when()
+        .post("/api/action-configurations")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .extract()
+        .path("actionConfiguration.id");
+  }
+
+  @Test
+  public void capturesAndServesTheLog() throws Exception {
+    String repoId = repoWithWorktree();
+    String actionId = createEchoAction();
+
+    String commandId =
+        given()
+            .contentType(ContentType.JSON)
+            .body(new CommandController.LaunchCommandRequest(repoId, "cmd-wt", actionId))
+            .when()
+            .post("/api/commands")
+            .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .extract()
+            .path("command.id");
+
+    // The echo exits immediately and its log is written asynchronously; poll for it to flush.
+    boolean captured = false;
+    for (int i = 0; i < 30 && !captured; i++) {
+      List<String> contents =
+          given()
+              .when()
+              .get("/api/commands/" + commandId + "/log")
+              .then()
+              .statusCode(Response.Status.OK.getStatusCode())
+              .extract()
+              .path("lines.content");
+      captured = contents != null && contents.stream().anyMatch(c -> c.contains("hello-http"));
+      if (!captured) {
+        Thread.sleep(100);
+      }
+    }
+    org.junit.jupiter.api.Assertions.assertTrue(captured, "the echoed output should be in the log");
   }
 
   @Test
