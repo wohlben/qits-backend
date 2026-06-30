@@ -6,13 +6,18 @@ import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
+import eu.wohlben.qits.domain.repository.entity.WorktreeEvent;
+import eu.wohlben.qits.domain.repository.entity.WorktreeEventType;
+import eu.wohlben.qits.domain.repository.entity.WorktreeStatus;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
+import eu.wohlben.qits.domain.repository.persistence.WorktreeEventRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -24,6 +29,8 @@ public class WorktreeService {
 
   @Inject WorktreeRepository worktreeRepository;
 
+  @Inject WorktreeEventRepository worktreeEventRepository;
+
   @Inject MetadataService metadataService;
 
   @Inject GitExecutor git;
@@ -31,13 +38,29 @@ public class WorktreeService {
   @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
   String dataDir;
 
+  /** Appends a history event to a worktree's timeline. */
+  private void recordEvent(
+      Worktree worktree, WorktreeEventType type, String branch, String target, String commit) {
+    worktreeEventRepository.persist(
+        WorktreeEvent.builder()
+            .worktree(worktree)
+            .type(type)
+            .branch(branch)
+            .parent(worktree.parent)
+            .target(target)
+            .commit(commit)
+            .at(Instant.now())
+            .build());
+  }
+
   public List<WorktreeDto> listWorktrees(String repoId) {
     repositoryRepository
         .findByIdOptional(repoId)
         .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
 
     Path originPath = Path.of(dataDir, repoId, "origin");
-    return worktreeRepository.findByRepositoryId(repoId).stream()
+    // The branch tree shows only live worktrees; resolved ones live in the history view.
+    return worktreeRepository.findActiveByRepositoryId(repoId).stream()
         .map(
             wt -> {
               String branch = currentBranchOrNull(repoId, wt.worktreeId);
@@ -51,7 +74,16 @@ public class WorktreeService {
                       && ab.behind() > 0
                       && wouldConflict(originPath, wt.parent, branch);
               return new WorktreeDto(
-                  wt.worktreeId, wt.parent, branch, ab.ahead(), ab.behind(), conflicts);
+                  wt.worktreeId,
+                  wt.parent,
+                  branch,
+                  ab.ahead(),
+                  ab.behind(),
+                  conflicts,
+                  wt.status,
+                  wt.preamble,
+                  wt.result,
+                  wt.resolvedAt);
             })
         .toList();
   }
@@ -127,7 +159,7 @@ public class WorktreeService {
 
   /** True when another worktree forks from {@code branch} (i.e. lists it as its parent). */
   private boolean hasChildren(String repoId, String branch) {
-    for (Worktree other : worktreeRepository.findByRepositoryId(repoId)) {
+    for (Worktree other : worktreeRepository.findActiveByRepositoryId(repoId)) {
       if (branch.equals(other.parent)) {
         return true;
       }
@@ -152,7 +184,7 @@ public class WorktreeService {
     if (branch == null) {
       return null;
     }
-    for (Worktree wt : worktreeRepository.findByRepositoryId(repoId)) {
+    for (Worktree wt : worktreeRepository.findActiveByRepositoryId(repoId)) {
       Path p = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
       if (Files.exists(p)) {
         try {
@@ -244,8 +276,13 @@ public class WorktreeService {
     }
   }
 
-  @Transactional
   public Worktree createWorktree(String repoId, String worktreeId, String parent, String branch) {
+    return createWorktree(repoId, worktreeId, parent, branch, null);
+  }
+
+  @Transactional
+  public Worktree createWorktree(
+      String repoId, String worktreeId, String parent, String branch, String preamble) {
     var repo =
         repositoryRepository
             .findByIdOptional(repoId)
@@ -263,7 +300,9 @@ public class WorktreeService {
       throw new NotFoundException("Repository origin not found on disk");
     }
 
-    if (worktreeRepository.existsByRepositoryAndWorktreeId(repoId, worktreeId)) {
+    // Resolved rows linger (soft delete), so only an ACTIVE worktree blocks the id — a resolved one
+    // can be reused.
+    if (worktreeRepository.existsActiveByRepositoryAndWorktreeId(repoId, worktreeId)) {
       throw new BadRequestException("Worktree already exists: " + worktreeId);
     }
 
@@ -300,7 +339,10 @@ public class WorktreeService {
     worktree.worktreeId = worktreeId;
     worktree.repository = repo;
     worktree.parent = parentBranch;
+    worktree.status = WorktreeStatus.ACTIVE;
+    worktree.preamble = preamble;
     worktreeRepository.persist(worktree);
+    recordEvent(worktree, WorktreeEventType.CREATED, newBranch, parentBranch, null);
 
     WorktreeMetadata metadata = new WorktreeMetadata();
     metadata.worktreeId = worktreeId;
@@ -333,8 +375,10 @@ public class WorktreeService {
     if (!Files.exists(originPath)) {
       throw new NotFoundException("Repository origin not found on disk");
     }
-    if (worktreeRepository.existsByRepositoryAndWorktreeId(repoId, worktreeId)) {
-      return worktreeRepository.findByRepositoryAndWorktreeId(repoId, worktreeId).orElseThrow();
+    if (worktreeRepository.existsActiveByRepositoryAndWorktreeId(repoId, worktreeId)) {
+      return worktreeRepository
+          .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+          .orElseThrow();
     }
 
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
@@ -357,7 +401,9 @@ public class WorktreeService {
     worktree.worktreeId = worktreeId;
     worktree.repository = repo;
     worktree.parent = null; // the main branch is the tree root — it has no fork point
+    worktree.status = WorktreeStatus.ACTIVE;
     worktreeRepository.persist(worktree);
+    recordEvent(worktree, WorktreeEventType.CREATED, branch, null, null);
 
     WorktreeMetadata metadata = new WorktreeMetadata();
     metadata.worktreeId = worktreeId;
@@ -387,9 +433,10 @@ public class WorktreeService {
         .findByIdOptional(repoId)
         .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
 
-    worktreeRepository
-        .findByRepositoryAndWorktreeId(repoId, worktreeId)
-        .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
+    Worktree worktree =
+        worktreeRepository
+            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+            .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
     if (!Files.exists(worktreePath)) {
@@ -400,7 +447,7 @@ public class WorktreeService {
 
     // Resolve target to a branch name
     Worktree targetWorktree =
-        worktreeRepository.findByRepositoryAndWorktreeId(repoId, resolvedTarget).orElse(null);
+        worktreeRepository.findActiveByRepositoryAndWorktreeId(repoId, resolvedTarget).orElse(null);
     if (targetWorktree != null) {
       Path targetWorktreePath = Path.of(dataDir, repoId, "worktrees", targetWorktree.worktreeId);
       if (Files.exists(targetWorktreePath)) {
@@ -409,7 +456,12 @@ public class WorktreeService {
     }
 
     String currentBranch = git.getCurrentBranch(worktreePath);
-    return mergeIntoTarget(repoId, currentBranch, resolvedTarget);
+    MergeResult result = mergeIntoTarget(repoId, currentBranch, resolvedTarget);
+    if (!result.hasConflicts()) {
+      recordEvent(
+          worktree, WorktreeEventType.MERGED, currentBranch, resolvedTarget, result.commitHash());
+    }
+    return result;
   }
 
   /**
@@ -418,8 +470,12 @@ public class WorktreeService {
    * worktree of its own — its branch ref is merged into the target's worktree (a temporary one is
    * created and removed when the target isn't checked out anywhere).
    */
-  @Transactional
   public MergeResult mergeBranch(String repoId, String source, String target) {
+    return mergeBranch(repoId, source, target, null);
+  }
+
+  @Transactional
+  public MergeResult mergeBranch(String repoId, String source, String target, String result) {
     // `source`/`target` are user-supplied: reject blank or dash-leading names so a value like
     // "-D" can't be smuggled to git as a flag (argv flag injection).
     if (source == null || source.isBlank() || source.startsWith("-")) {
@@ -449,7 +505,7 @@ public class WorktreeService {
     if (!merged.hasConflicts()) {
       Path originPath = Path.of(dataDir, repoId, "origin");
       if (canCleanupBranch(repoId, originPath, source, repo.mainBranch)) {
-        doCleanupBranch(repoId, source);
+        doCleanupBranch(repoId, source, result);
         cleanedUp = true;
       }
     }
@@ -463,8 +519,12 @@ public class WorktreeService {
    * Because the UI performs this without a confirmation, the safety is enforced here: an ineligible
    * branch yields a 400 and is left untouched.
    */
-  @Transactional
   public void cleanupBranch(String repoId, String branch) {
+    cleanupBranch(repoId, branch, null);
+  }
+
+  @Transactional
+  public void cleanupBranch(String repoId, String branch, String result) {
     Repository repo =
         repositoryRepository
             .findByIdOptional(repoId)
@@ -479,17 +539,18 @@ public class WorktreeService {
               + " worktrees");
     }
 
-    doCleanupBranch(repoId, branch);
+    doCleanupBranch(repoId, branch, result);
   }
 
   /**
-   * Deletes a branch: removes its worktree when one is checked out (reusing the discard mechanics),
-   * otherwise just deletes the bare branch ref. Callers gate on {@link #canCleanupBranch}.
+   * Deletes a branch: resolves its worktree as INTEGRATED when one is checked out (reusing the
+   * discard mechanics), otherwise just deletes the bare branch ref. Callers gate on {@link
+   * #canCleanupBranch}.
    */
-  private void doCleanupBranch(String repoId, String branch) {
+  private void doCleanupBranch(String repoId, String branch, String result) {
     Worktree wt = findWorktreeByBranch(repoId, branch);
     if (wt != null) {
-      doDiscard(repoId, wt);
+      doDiscard(repoId, wt, WorktreeStatus.INTEGRATED, result);
       return;
     }
     Path originPath = Path.of(dataDir, repoId, "origin");
@@ -567,7 +628,7 @@ public class WorktreeService {
 
     Worktree worktree =
         worktreeRepository
-            .findByRepositoryAndWorktreeId(repoId, worktreeId)
+            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
@@ -602,6 +663,7 @@ public class WorktreeService {
    * UI only offers this when the trial merge was clean, but the abort keeps the worktree usable
    * should state have changed underneath.
    */
+  @Transactional
   public String updateWorktreeFromParent(String repoId, String worktreeId) {
     repositoryRepository
         .findByIdOptional(repoId)
@@ -609,7 +671,7 @@ public class WorktreeService {
 
     Worktree worktree =
         worktreeRepository
-            .findByRepositoryAndWorktreeId(repoId, worktreeId)
+            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
@@ -655,29 +717,37 @@ public class WorktreeService {
       throw new BadRequestException(
           "Cannot merge '" + parent + "' into '" + worktreeId + "' without conflicts");
     }
+    recordEvent(worktree, WorktreeEventType.UPDATED_FROM_PARENT, null, parent, null);
     return result.output();
   }
 
-  @Transactional
   public void discardWorktree(String repoId, String worktreeId) {
+    discardWorktree(repoId, worktreeId, null);
+  }
+
+  @Transactional
+  public void discardWorktree(String repoId, String worktreeId, String result) {
     repositoryRepository
         .findByIdOptional(repoId)
         .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
 
     Worktree worktree =
         worktreeRepository
-            .findByRepositoryAndWorktreeId(repoId, worktreeId)
+            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
-    doDiscard(repoId, worktree);
+    doDiscard(repoId, worktree, WorktreeStatus.ABANDONED, result);
   }
 
   /**
-   * Removes a worktree from disk, deletes its branch and forgets it in the DB. Callers own the
-   * policy (discard is unconditional; cleanup gates on {@link #canCleanupBranch}); this is the
-   * shared mechanics.
+   * Removes a worktree from disk and deletes its branch, then <em>soft-deletes</em> the row: it is
+   * marked with its {@code resolution} status ({@code INTEGRATED} for cleanup, {@code ABANDONED}
+   * for discard) and kept as a persistent record (with its history events and the commands that ran
+   * in it) rather than deleted. The on-disk metadata file is removed so discovery won't re-process
+   * it.
    */
-  private void doDiscard(String repoId, Worktree worktree) {
+  private void doDiscard(
+      String repoId, Worktree worktree, WorktreeStatus resolution, String result) {
     Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktree.worktreeId);
     Path originPath = Path.of(dataDir, repoId, "origin");
 
@@ -694,7 +764,19 @@ public class WorktreeService {
         // branch may already be gone
       }
 
-      worktreeRepository.delete(worktree);
+      worktree.status = resolution;
+      worktree.resolvedAt = Instant.now();
+      if (result != null && !result.isBlank()) {
+        worktree.result = result;
+      }
+      recordEvent(
+          worktree,
+          resolution == WorktreeStatus.INTEGRATED
+              ? WorktreeEventType.INTEGRATED
+              : WorktreeEventType.ABANDONED,
+          branch,
+          null,
+          null);
       metadataService.deleteWorktreeMetadata(repoId, worktree.worktreeId);
     } catch (InternalServerErrorException e) {
       throw e;
@@ -704,7 +786,7 @@ public class WorktreeService {
   }
 
   private Path findWorktreePathForBranch(String repoId, String branch) {
-    for (Worktree wt : worktreeRepository.findByRepositoryId(repoId)) {
+    for (Worktree wt : worktreeRepository.findActiveByRepositoryId(repoId)) {
       Path p = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
       if (Files.exists(p)) {
         try {

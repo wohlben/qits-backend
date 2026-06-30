@@ -22,4 +22,9 @@ public class CommandRepository implements PanacheRepositoryBase<Command, String>
   public List<Command> findByRepository(String repositoryId) {
     return list("worktree.repository.id = ?1 order by launchedAt desc", repositoryId);
   }
+
+  /** Commands that ran in a worktree (by surrogate id), in launch order. */
+  public List<Command> findByWorktree(Long worktreeId) {
+    return list("worktree.id = ?1 order by launchedAt", worktreeId);
+  }
 }

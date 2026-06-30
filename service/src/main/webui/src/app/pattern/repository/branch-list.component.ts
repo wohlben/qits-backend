@@ -121,6 +121,18 @@ interface CreateWorktreeForm {
           autocomplete="off"
         />
 
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="font-medium">Goal / preamble (markdown, optional)</span>
+          <textarea
+            rows="4"
+            class="rounded-md border bg-background p-2 text-sm"
+            placeholder="Why this worktree exists and what 'done' means…"
+            [value]="createPreamble()"
+            (input)="createPreamble.set(preambleArea.value)"
+            #preambleArea
+          ></textarea>
+        </label>
+
         <div class="flex items-center gap-2">
           <button z-button type="submit" [zLoading]="createMutation.isPending()">Create</button>
           <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
@@ -154,6 +166,18 @@ interface CreateWorktreeForm {
           </z-select>
         </app-form-field-layout>
 
+        <label class="flex flex-col gap-1 text-sm">
+          <span class="font-medium">Result (markdown, optional)</span>
+          <textarea
+            rows="3"
+            class="rounded-md border bg-background p-2 text-sm"
+            placeholder="What was accomplished…"
+            [value]="integrateResult()"
+            (input)="integrateResult.set(integrateResultArea.value)"
+            #integrateResultArea
+          ></textarea>
+        </label>
+
         <div class="flex items-center gap-2">
           <button z-button type="submit" [zLoading]="mergeMutation.isPending()">Integrate</button>
           <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
@@ -168,8 +192,19 @@ interface CreateWorktreeForm {
     <ng-template #abandonTpl>
       <p class="text-sm text-muted-foreground">
         Discard <span class="font-medium">{{ ui().selected?.worktreeId }}</span
-        >? This cannot be undone.
+        >? The worktree and its branch are removed, but it stays in the repository history.
       </p>
+      <label class="mb-3 flex flex-col gap-1 text-sm">
+        <span class="font-medium">Reason / result (markdown, optional)</span>
+        <textarea
+          rows="3"
+          class="rounded-md border bg-background p-2 text-sm"
+          placeholder="Why abandon this worktree…"
+          [value]="abandonResult()"
+          (input)="abandonResult.set(abandonResultArea.value)"
+          #abandonResultArea
+        ></textarea>
+      </label>
       <div class="flex items-center gap-2">
         <button
           z-button
@@ -533,36 +568,44 @@ export class BranchListComponent {
     return roots;
   });
 
+  // Markdown the user types in the dialogs: the worktree's goal (preamble) at creation and its
+  // outcome (result) at integrate/abandon. Plain signals — not part of the validated forms.
+  readonly createPreamble = signal('');
+  readonly integrateResult = signal('');
+  readonly abandonResult = signal('');
+
   readonly createMutation = injectMutation(() => ({
-    mutationFn: (data: { id: string; parent: string; branch: string }) =>
+    mutationFn: (data: { id: string; parent: string; branch: string; preamble: string }) =>
       lastValueFrom(
         this.worktreeService.apiRepositoriesRepoIdWorktreesPost(this.repoId(), {
           id: data.id,
           parent: data.parent || undefined,
           branch: data.branch || undefined,
+          preamble: data.preamble || undefined,
         }),
       ),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly mergeMutation = injectMutation(() => ({
-    mutationFn: ({ source, target }: { source: string; target: string }) =>
+    mutationFn: ({ source, target, result }: { source: string; target: string; result: string }) =>
       lastValueFrom(
         this.repositoryService.apiRepositoriesRepoIdBranchesMergePost(this.repoId(), {
           source,
           target: target || undefined,
+          result: result || undefined,
         }),
       ),
     onSuccess: () => this.onMutationSuccess(),
   }));
 
   readonly discardMutation = injectMutation(() => ({
-    mutationFn: (worktreeId: string) =>
+    mutationFn: ({ worktreeId, result }: { worktreeId: string; result: string }) =>
       lastValueFrom(
         this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(
           this.repoId(),
           worktreeId,
-          {},
+          { result: result || undefined },
         ),
       ),
     onSuccess: () => this.onMutationSuccess(),
@@ -701,6 +744,7 @@ export class BranchListComponent {
 
   openCreate(parent: string) {
     this.createModel.set({ id: '', branch: '' });
+    this.createPreamble.set('');
     patchState(this.ui, { selected: null, parent });
     this.openDialog('New worktree from ' + parent, this.createTpl());
   }
@@ -710,11 +754,13 @@ export class BranchListComponent {
     // to the repository's configured main branch.
     const worktree = this.worktreeByBranch().get(branch) ?? null;
     this.integrateModel.set({ target: worktree?.parent ?? this.mainBranch() });
+    this.integrateResult.set('');
     patchState(this.ui, { selected: worktree, branch });
     this.openDialog('Integrate Change', this.integrateTpl());
   }
 
   openAbandon(worktree: WorktreeDto) {
+    this.abandonResult.set('');
     patchState(this.ui, { selected: worktree });
     this.openDialog('Abandon worktree?', this.abandonTpl());
   }
@@ -744,7 +790,12 @@ export class BranchListComponent {
     const parent = this.ui.parent();
     if (!parent) return;
     await submit(this.createForm, {
-      action: async () => this.createMutation.mutate({ ...this.createModel(), parent }),
+      action: async () =>
+        this.createMutation.mutate({
+          ...this.createModel(),
+          parent,
+          preamble: this.createPreamble(),
+        }),
     });
   }
 
@@ -754,14 +805,18 @@ export class BranchListComponent {
     if (!source) return;
     await submit(this.integrateForm, {
       action: async () =>
-        this.mergeMutation.mutate({ source, target: this.integrateModel().target }),
+        this.mergeMutation.mutate({
+          source,
+          target: this.integrateModel().target,
+          result: this.integrateResult(),
+        }),
     });
   }
 
   onAbandon() {
     const worktreeId = this.ui.selected()?.worktreeId;
     if (worktreeId) {
-      this.discardMutation.mutate(worktreeId);
+      this.discardMutation.mutate({ worktreeId, result: this.abandonResult() });
     }
   }
 

@@ -9,9 +9,8 @@
  */
 
 
-export interface MergeBranchRequest { 
-    source: string;
-    target?: string;
+export interface UpdateHistoryRequest { 
+    preamble?: string;
     result?: string;
 }
 

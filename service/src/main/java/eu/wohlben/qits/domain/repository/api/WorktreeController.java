@@ -46,7 +46,8 @@ public class WorktreeController {
     return new ListWorktreesRequest.Response(entries);
   }
 
-  public static record CreateWorktreeRequest(@NotBlank String id, String parent, String branch) {
+  public static record CreateWorktreeRequest(
+      @NotBlank String id, String parent, String branch, String preamble) {
     public record Response(WorktreeDto worktree) {}
   }
 
@@ -54,7 +55,8 @@ public class WorktreeController {
   public CreateWorktreeRequest.Response create(
       @PathParam("repoId") String repoId, @Valid CreateWorktreeRequest request) {
     var wt =
-        worktreeService.createWorktree(repoId, request.id(), request.parent(), request.branch());
+        worktreeService.createWorktree(
+            repoId, request.id(), request.parent(), request.branch(), request.preamble());
     return new CreateWorktreeRequest.Response(worktreeMapper.toDto(wt));
   }
 
@@ -130,7 +132,7 @@ public class WorktreeController {
         result.worktreeId(), result.branch(), result.actionId());
   }
 
-  public static record DiscardWorktreeRequest() {
+  public static record DiscardWorktreeRequest(String result) {
     public record Response(boolean success) {}
   }
 
@@ -140,7 +142,7 @@ public class WorktreeController {
       @PathParam("repoId") String repoId,
       @PathParam("worktreeId") String worktreeId,
       @Valid DiscardWorktreeRequest request) {
-    worktreeService.discardWorktree(repoId, worktreeId);
+    worktreeService.discardWorktree(repoId, worktreeId, request == null ? null : request.result());
     return new DiscardWorktreeRequest.Response(true);
   }
 }

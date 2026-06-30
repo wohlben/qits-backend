@@ -13,5 +13,6 @@ export interface CreateWorktreeRequest {
     id: string;
     parent?: string;
     branch?: string;
+    preamble?: string;
 }
 

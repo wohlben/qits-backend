@@ -10,19 +10,15 @@
 import { WorktreeStatus } from './worktreeStatus';
 
 
-export interface WorktreeDto { 
+export interface WorktreeHistoryDto { 
+    id?: number;
     worktreeId?: string;
     parent?: string;
-    branch?: string;
-    ahead?: number;
-    behind?: number;
-    conflictsWithParent?: boolean;
     status?: WorktreeStatus;
-    preamble?: string;
-    result?: string;
+    createdAt?: string;
     resolvedAt?: string;
 }
-export namespace WorktreeDto {
+export namespace WorktreeHistoryDto {
 }
 
 
