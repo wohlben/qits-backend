@@ -10,6 +10,6 @@
 
 
 export interface Response39 { 
-    success?: boolean;
+    output?: string;
 }
 

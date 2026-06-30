@@ -10,8 +10,6 @@
 
 
 export interface Response45 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    success?: boolean;
 }
 

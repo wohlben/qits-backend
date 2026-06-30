@@ -10,8 +10,6 @@
 
 
 export interface Response44 { 
-    worktreeId?: string;
-    branch?: string;
-    actionId?: string;
+    success?: boolean;
 }
 

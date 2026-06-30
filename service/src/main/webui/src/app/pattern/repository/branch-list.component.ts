@@ -15,6 +15,7 @@ import { lastValueFrom } from 'rxjs';
 import { patchState, signalState } from '@ngrx/signals';
 
 import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
+import { CommandControllerService } from '@/api/api/commandController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
@@ -295,6 +296,7 @@ export class BranchListComponent {
   private readonly worktreeService = inject(WorktreeControllerService);
   private readonly repositoryService = inject(RepositoryControllerService);
   private readonly actionConfigService = inject(ActionConfigurationControllerService);
+  private readonly commandService = inject(CommandControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly router = inject(Router);
   private readonly dialog = inject(ZardDialogService);
@@ -607,16 +609,9 @@ export class BranchListComponent {
     onSuccess: (res) => {
       invalidateRepository(this.queryClient, this.repoId());
       this.closeDialog();
-      // Open the resolution worktree's terminal so the human watches Claude resolve the conflict.
-      if (res.branch && res.actionId) {
-        this.router.navigate([
-          '/repositories',
-          this.repoId(),
-          'branch',
-          res.branch,
-          'terminal',
-          res.actionId,
-        ]);
+      // Launch Claude on the resolution worktree and open its terminal so the human watches it work.
+      if (res.worktreeId && res.actionId) {
+        this.launchCommand(res.worktreeId, res.actionId);
       }
     },
   }));
@@ -629,6 +624,35 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
+  // Launch an action as a registry command, then open its terminal. The process is owned by the
+  // backend and survives leaving the route, so the terminal page just re-attaches to it.
+  readonly launchMutation = injectMutation(() => ({
+    mutationFn: (vars: { worktreeId: string; actionId: string }) =>
+      lastValueFrom(
+        this.commandService.apiCommandsPost({
+          repoId: this.repoId(),
+          worktreeId: vars.worktreeId,
+          actionId: vars.actionId,
+        }),
+      ),
+    onSuccess: (res) => {
+      const commandId = res.command?.id;
+      if (commandId) {
+        this.router.navigate(['/commands', commandId]);
+      }
+    },
+  }));
+
+  /** Resolve the worktree backing a branch (run/launch act on the worktree, not the branch name). */
+  private worktreeIdForBranch(branch: string): string | null {
+    return (this.worktreesQuery.data() ?? []).find((w) => w.branch === branch)?.worktreeId ?? null;
+  }
+
+  /** Launch an action in a worktree and navigate to its command terminal. */
+  private launchCommand(worktreeId: string, actionId: string) {
+    this.launchMutation.mutate({ worktreeId, actionId });
+  }
+
   viewCommits(branch: string) {
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'commits']);
   }
@@ -639,19 +663,22 @@ export class BranchListComponent {
     this.openDialog('Run in worktree', this.runTpl());
   }
 
-  /** Run the chosen action in the branch's worktree by navigating to the terminal page. */
+  /** Run the chosen action in the branch's worktree by launching a command and opening its terminal. */
   runAction(actionId: string) {
     const branch = this.ui.branch();
     if (!branch) return;
+    const worktreeId = this.worktreeIdForBranch(branch);
+    if (!worktreeId) return;
     this.closeDialog();
-    this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal', actionId]);
+    this.launchCommand(worktreeId, actionId);
   }
 
-  /** Launch the repository-MCP Claude action in this subtree's terminal (project-scoped). */
+  /** Launch the repository-MCP Claude action in this subtree's worktree (project-scoped). */
   configureWithClaude(branch: string) {
     const actionId = this.claudeRepositoryActionId();
-    if (!actionId) return;
-    this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'terminal', actionId]);
+    const worktreeId = this.worktreeIdForBranch(branch);
+    if (!actionId || !worktreeId) return;
+    this.launchCommand(worktreeId, actionId);
   }
 
   /** Open the resolve-conflict dialog (file preview + the action button) for a conflicting worktree. */

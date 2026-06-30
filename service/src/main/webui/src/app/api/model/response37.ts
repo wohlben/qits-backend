@@ -10,9 +10,6 @@
 
 
 export interface Response37 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
     output?: string;
-    cleanedUp?: boolean;
 }
 
