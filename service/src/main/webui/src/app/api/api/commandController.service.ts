@@ -21,8 +21,6 @@ import { CommandStatus } from '../model/commandStatus';
 // @ts-ignore
 import { LaunchCommandRequest } from '../model/launchCommandRequest';
 // @ts-ignore
-import { Response } from '../model/response';
-// @ts-ignore
 import { Response1 } from '../model/response1';
 // @ts-ignore
 import { Response2 } from '../model/response2';
@@ -30,6 +28,8 @@ import { Response2 } from '../model/response2';
 import { Response3 } from '../model/response3';
 // @ts-ignore
 import { Response4 } from '../model/response4';
+// @ts-ignore
+import { Response5 } from '../model/response5';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -55,9 +55,9 @@ export class CommandControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsCommandIdGet(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response4>;
-    public apiCommandsCommandIdGet(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response4>>;
-    public apiCommandsCommandIdGet(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response4>>;
+    public apiCommandsCommandIdGet(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response5>;
+    public apiCommandsCommandIdGet(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response5>>;
+    public apiCommandsCommandIdGet(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response5>>;
     public apiCommandsCommandIdGet(commandId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (commandId === null || commandId === undefined) {
             throw new Error('Required parameter commandId was null or undefined when calling apiCommandsCommandIdGet.');
@@ -90,7 +90,7 @@ export class CommandControllerService extends BaseService {
 
         let localVarPath = `/api/commands/${this.configuration.encodeParam({name: "commandId", value: commandId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response4>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response5>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -111,9 +111,9 @@ export class CommandControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response1>;
-    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response1>>;
-    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response1>>;
+    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response2>;
+    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response2>>;
+    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response2>>;
     public apiCommandsCommandIdLogGet(commandId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (commandId === null || commandId === undefined) {
             throw new Error('Required parameter commandId was null or undefined when calling apiCommandsCommandIdLogGet.');
@@ -146,7 +146,7 @@ export class CommandControllerService extends BaseService {
 
         let localVarPath = `/api/commands/${this.configuration.encodeParam({name: "commandId", value: commandId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/log`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response1>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response2>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -167,9 +167,9 @@ export class CommandControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsCommandIdTerminatePost(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response>;
-    public apiCommandsCommandIdTerminatePost(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response>>;
-    public apiCommandsCommandIdTerminatePost(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response>>;
+    public apiCommandsCommandIdTerminatePost(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response1>;
+    public apiCommandsCommandIdTerminatePost(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response1>>;
+    public apiCommandsCommandIdTerminatePost(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response1>>;
     public apiCommandsCommandIdTerminatePost(commandId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (commandId === null || commandId === undefined) {
             throw new Error('Required parameter commandId was null or undefined when calling apiCommandsCommandIdTerminatePost.');
@@ -202,7 +202,7 @@ export class CommandControllerService extends BaseService {
 
         let localVarPath = `/api/commands/${this.configuration.encodeParam({name: "commandId", value: commandId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/terminate`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response1>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -224,9 +224,9 @@ export class CommandControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response2>;
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response2>>;
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response2>>;
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response3>;
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response3>>;
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response3>>;
     public apiCommandsGet(repoId?: string, status?: CommandStatus, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
@@ -276,7 +276,7 @@ export class CommandControllerService extends BaseService {
 
         let localVarPath = `/api/commands`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response2>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response3>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),
@@ -298,9 +298,9 @@ export class CommandControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response3>;
-    public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response3>>;
-    public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response3>>;
+    public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response4>;
+    public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response4>>;
+    public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response4>>;
     public apiCommandsPost(launchCommandRequest: LaunchCommandRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (launchCommandRequest === null || launchCommandRequest === undefined) {
             throw new Error('Required parameter launchCommandRequest was null or undefined when calling apiCommandsPost.');
@@ -342,7 +342,7 @@ export class CommandControllerService extends BaseService {
 
         let localVarPath = `/api/commands`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response3>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response4>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: launchCommandRequest,

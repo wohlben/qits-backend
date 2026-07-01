@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
-import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -22,7 +21,7 @@ public class ActionConfigurationServiceTest {
   public void testCreateAndGet() {
     var config =
         actionConfigurationService.create(
-            "Test Action", "A test action", "echo hello", "echo required", false, null, null);
+            "Test Action", "A test action", "echo hello", "echo required", false, null);
 
     assertNotNull(config.id);
     assertEquals("Test Action", config.name);
@@ -30,7 +29,6 @@ public class ActionConfigurationServiceTest {
     assertEquals("echo hello", config.executeScript);
     assertEquals("echo required", config.checkScript);
     assertFalse(config.interactive);
-    assertEquals(ActionVariant.SHELL, config.variant);
 
     var found = actionConfigurationService.get(config.id);
     assertEquals(config.id, found.id);
@@ -42,60 +40,38 @@ public class ActionConfigurationServiceTest {
         BadRequestException.class,
         () ->
             actionConfigurationService.create(
-                null, null, "echo hello", "echo required", false, null, null));
+                null, null, "echo hello", "echo required", false, null));
   }
 
   @Test
   public void testCreateMissingExecuteScriptThrows() {
     assertThrows(
         BadRequestException.class,
-        () ->
-            actionConfigurationService.create(
-                "Name", null, null, "echo required", false, null, null));
+        () -> actionConfigurationService.create("Name", null, null, "echo required", false, null));
   }
 
   @Test
   public void testCreateWithoutCheckScriptSucceeds() {
     // checkScript is optional: a run-only action (e.g. "Bash") has no meaningful check.
     var config =
-        actionConfigurationService.create("Run only", null, "exec bash", null, false, null, null);
+        actionConfigurationService.create("Run only", null, "exec bash", null, false, null);
     assertNotNull(config.id);
     assertNull(config.checkScript);
   }
 
   @Test
   public void testCreateInteractive() {
-    var config =
-        actionConfigurationService.create("Bash run", null, "exec bash", null, true, null, null);
+    var config = actionConfigurationService.create("Bash run", null, "exec bash", null, true, null);
 
     var found = actionConfigurationService.get(config.id);
     assertTrue(found.interactive);
   }
 
   @Test
-  public void testCreateVariantDefaultsToShellAndCanBeSet() {
-    var shell =
-        actionConfigurationService.create("Plain", null, "exec bash", null, true, null, null);
-    assertEquals(ActionVariant.SHELL, shell.variant);
-
-    var claude =
-        actionConfigurationService.create(
-            "Claude+MCP", null, "exec claude", null, true, ActionVariant.CLAUDE_ACTIONS_MCP, null);
-    assertEquals(
-        ActionVariant.CLAUDE_ACTIONS_MCP, actionConfigurationService.get(claude.id).variant);
-  }
-
-  @Test
   public void testCreateWithEnvironment() {
     var config =
         actionConfigurationService.create(
-            "With env",
-            null,
-            "exec claude",
-            null,
-            true,
-            null,
-            Map.of("EDITOR", "vim", "FOO", "bar"));
+            "With env", null, "exec claude", null, true, Map.of("EDITOR", "vim", "FOO", "bar"));
 
     var found = actionConfigurationService.get(config.id);
     assertEquals("vim", found.environment.get("EDITOR"));
@@ -110,8 +86,8 @@ public class ActionConfigurationServiceTest {
   @Test
   public void testList() {
     long before = actionConfigurationRepository.count();
-    actionConfigurationService.create("One", null, "echo 1", "echo required", false, null, null);
-    actionConfigurationService.create("Two", null, "echo 2", "echo suggested", false, null, null);
+    actionConfigurationService.create("One", null, "echo 1", "echo required", false, null);
+    actionConfigurationService.create("Two", null, "echo 2", "echo suggested", false, null);
 
     var list = actionConfigurationService.list();
     assertEquals(before + 2, list.size());
@@ -121,25 +97,17 @@ public class ActionConfigurationServiceTest {
   public void testUpdate() {
     var config =
         actionConfigurationService.create(
-            "Original", "Desc", "echo old", "echo optional", false, null, null);
+            "Original", "Desc", "echo old", "echo optional", false, null);
 
     var updated =
         actionConfigurationService.update(
-            config.id,
-            "Updated",
-            "New desc",
-            "echo new",
-            "echo required",
-            true,
-            ActionVariant.CLAUDE_ACTIONS_MCP,
-            Map.of("K", "V"));
+            config.id, "Updated", "New desc", "echo new", "echo required", true, Map.of("K", "V"));
 
     assertEquals("Updated", updated.name);
     assertEquals("New desc", updated.description);
     assertEquals("echo new", updated.executeScript);
     assertEquals("echo required", updated.checkScript);
     assertTrue(updated.interactive);
-    assertEquals(ActionVariant.CLAUDE_ACTIONS_MCP, updated.variant);
     assertEquals("V", updated.environment.get("K"));
   }
 
@@ -147,11 +115,10 @@ public class ActionConfigurationServiceTest {
   public void testUpdatePartial() {
     var config =
         actionConfigurationService.create(
-            "Original", "Desc", "echo old", "echo optional", true, null, null);
+            "Original", "Desc", "echo old", "echo optional", true, null);
 
     var updated =
-        actionConfigurationService.update(
-            config.id, null, "New desc", null, null, null, null, null);
+        actionConfigurationService.update(config.id, null, "New desc", null, null, null, null);
 
     assertEquals("Original", updated.name);
     assertEquals("New desc", updated.description);
@@ -165,10 +132,9 @@ public class ActionConfigurationServiceTest {
   public void testUpdateCanClearCheckScript() {
     var config =
         actionConfigurationService.create(
-            "Original", "Desc", "echo old", "echo optional", false, null, null);
+            "Original", "Desc", "echo old", "echo optional", false, null);
 
-    var updated =
-        actionConfigurationService.update(config.id, null, null, null, "", null, null, null);
+    var updated = actionConfigurationService.update(config.id, null, null, null, "", null, null);
 
     assertNull(updated.checkScript);
   }
@@ -179,14 +145,14 @@ public class ActionConfigurationServiceTest {
         NotFoundException.class,
         () ->
             actionConfigurationService.update(
-                "non-existent", "Name", null, "echo", "echo", null, null, null));
+                "non-existent", "Name", null, "echo", "echo", null, null));
   }
 
   @Test
   public void testDelete() {
     var config =
         actionConfigurationService.create(
-            "ToDelete", null, "echo hello", "echo unnecessary", false, null, null);
+            "ToDelete", null, "echo hello", "echo unnecessary", false, null);
 
     assertNotNull(actionConfigurationService.get(config.id));
 

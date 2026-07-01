@@ -80,10 +80,52 @@ public class CommandService {
   private record Prepared(
       CommandDto dto, Path worktreePath, String script, Map<String, String> env) {}
 
+  /**
+   * What a launch needs regardless of where it came from: an action or a coding agent. {@code
+   * actionId} is null for agent launches (they aren't backed by an action).
+   */
+  private record LaunchDescriptor(
+      String actionId,
+      String name,
+      String script,
+      boolean interactive,
+      Map<String, String> environment) {
+
+    static LaunchDescriptor of(ResolvedAction action) {
+      return new LaunchDescriptor(
+          action.id(),
+          action.name(),
+          action.executeScript(),
+          action.interactive(),
+          action.environment());
+    }
+  }
+
   /** Launch an action as a registry command and return it; a terminal attaches by its id. */
   public CommandDto launch(String repoId, String worktreeId, String actionId) {
     ResolvedAction action = actionResolutionService.resolveForRepository(repoId, actionId);
-    Prepared p = prepare(repoId, worktreeId, action);
+    Prepared p = prepare(repoId, worktreeId, LaunchDescriptor.of(action));
+    registry.spawn(
+        p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
+    return p.dto();
+  }
+
+  /**
+   * Launch a coding-agent session (rendered by the agent path) as a registry command. Like {@link
+   * #launch} but not backed by an action — the caller supplies the display name, the rendered
+   * script, and an environment overlay. The command shows up in the Commands list and a terminal
+   * attaches by its id, exactly like an action launch.
+   */
+  public CommandDto launchAgent(
+      String repoId,
+      String worktreeId,
+      String name,
+      String script,
+      boolean interactive,
+      Map<String, String> environment) {
+    Prepared p =
+        prepare(
+            repoId, worktreeId, new LaunchDescriptor(null, name, script, interactive, environment));
     registry.spawn(
         p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
@@ -101,7 +143,7 @@ public class CommandService {
               + action.name()
               + "' is interactive — run it from the terminal, not as a one-off command.");
     }
-    Prepared p = prepare(repoId, worktreeId, action);
+    Prepared p = prepare(repoId, worktreeId, LaunchDescriptor.of(action));
     AccumulatingSink sink = new AccumulatingSink();
     int exitCode =
         registry.spawnAndAwait(
@@ -119,7 +161,7 @@ public class CommandService {
   /**
    * Validate the worktree, snapshot its branch/commit, and persist a RUNNING row — but don't spawn.
    */
-  private Prepared prepare(String repoId, String worktreeId, ResolvedAction action) {
+  private Prepared prepare(String repoId, String worktreeId, LaunchDescriptor descriptor) {
     // Reject path-traversal in worktreeId before it ever reaches a filesystem path or git.
     if (!worktreeId.matches(WORKTREE_ID_PATTERN)) {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
@@ -134,13 +176,22 @@ public class CommandService {
 
     // Persist RUNNING first (this also validates the worktree belongs to the repo). If the spawn
     // fails afterwards the registry marks it via the exit listener; the row is never left dangling.
-    CommandDto dto = lifecycle.createRunning(repoId, worktreeId, branch, commitHash, action);
+    CommandDto dto =
+        lifecycle.createRunning(
+            repoId,
+            worktreeId,
+            branch,
+            commitHash,
+            descriptor.actionId(),
+            descriptor.name(),
+            descriptor.script(),
+            descriptor.interactive());
 
     Map<String, String> env = new HashMap<>(System.getenv());
     env.put("TERM", "xterm-256color");
-    env.putAll(action.environment());
+    env.putAll(descriptor.environment());
 
-    return new Prepared(dto, worktreePath, action.executeScript(), env);
+    return new Prepared(dto, worktreePath, descriptor.script(), env);
   }
 
   /** The single bridge from a process ending to its persisted status (via the lifecycle proxy). */

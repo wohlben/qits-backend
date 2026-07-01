@@ -6,7 +6,6 @@ import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import eu.wohlben.qits.domain.error.NotFoundException;
-import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService.ResolvedAction;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -32,10 +31,20 @@ public class CommandLifecycleService {
 
   @Inject CommandMapper commandMapper;
 
-  /** Persist a new RUNNING command and return its DTO (built in-tx so the worktree FK resolves). */
+  /**
+   * Persist a new RUNNING command and return its DTO (built in-tx so the worktree FK resolves).
+   * {@code actionId} is null for launches not backed by an action (e.g. an agent session).
+   */
   @Transactional
   public CommandDto createRunning(
-      String repoId, String worktreeId, String branch, String commitHash, ResolvedAction action) {
+      String repoId,
+      String worktreeId,
+      String branch,
+      String commitHash,
+      String actionId,
+      String actionName,
+      String executeScript,
+      boolean interactive) {
     Worktree worktree =
         worktreeRepository
             .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
@@ -45,10 +54,10 @@ public class CommandLifecycleService {
             .worktree(worktree)
             .branch(branch)
             .commitHash(commitHash)
-            .actionId(action.id())
-            .actionName(action.name())
-            .executeScript(action.executeScript())
-            .interactive(action.interactive())
+            .actionId(actionId)
+            .actionName(actionName)
+            .executeScript(executeScript)
+            .interactive(interactive)
             .status(CommandStatus.RUNNING)
             .build();
     commandRepository.persist(command);

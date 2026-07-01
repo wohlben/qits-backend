@@ -3,12 +3,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
-import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
-import { CommandControllerService } from '@/api/api/commandController.service';
+import { AgentControllerService } from '@/api/api/agentController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
-import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
-import { ActionVariant } from '@/api/model/actionVariant';
+import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { RepositoryDetailHeaderComponent } from '@/ui/components/repository/repository-detail-header.component';
 import { BranchListComponent } from '@/pattern/repository/branch-list.component';
@@ -70,8 +68,7 @@ export class RepositoryDetailPage {
   private readonly router = inject(Router);
   private readonly repositoryService = inject(RepositoryControllerService);
   private readonly worktreeService = inject(WorktreeControllerService);
-  private readonly commandService = inject(CommandControllerService);
-  private readonly actionConfigService = inject(ActionConfigurationControllerService);
+  private readonly agentService = inject(AgentControllerService);
   private readonly queryClient = inject(QueryClient);
 
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
@@ -84,29 +81,9 @@ export class RepositoryDetailPage {
       ).then((r) => r.repository!),
   }));
 
-  // Global actions, same key/shape as elsewhere — used to find the CLAUDE_ACTIONS_MCP action.
-  readonly actionConfigsQuery = injectQuery(() => ({
-    queryKey: ['action-configurations'],
-    queryFn: () =>
-      lastValueFrom(this.actionConfigService.apiActionConfigurationsGet()).then(
-        (r) =>
-          r.entries
-            ?.map((e) => e.actionConfiguration!)
-            .filter((a): a is ActionConfigurationDto => !!a) ?? [],
-      ),
-  }));
-
-  /** The seeded "Claude Code (actions MCP)" action, found by its typed variant (not its name). */
-  readonly claudeActionId = computed(
-    () =>
-      (this.actionConfigsQuery.data() ?? []).find(
-        (a) => a.variant === ActionVariant.ClaudeActionsMcp,
-      )?.id ?? null,
-  );
-
   readonly mainBranch = computed(() => this.repositoryQuery.data()?.mainBranch ?? null);
 
-  readonly canConfigureWithClaude = computed(() => !!this.claudeActionId() && !!this.mainBranch());
+  readonly canConfigureWithClaude = computed(() => !!this.mainBranch());
 
   readonly deleteMutation = injectMutation(() => ({
     mutationFn: () =>
@@ -118,10 +95,11 @@ export class RepositoryDetailPage {
     },
   }));
 
-  // Launch an action in the worktree backing a branch (resolving the worktree from the branch), then
-  // open its command terminal. The process is owned by the backend registry and survives navigation.
-  readonly launchMutation = injectMutation(() => ({
-    mutationFn: async (vars: { branch: string; actionId: string }) => {
+  // Launch a Claude agent in the worktree backing a branch (resolving the worktree from the branch),
+  // then open its command terminal. The process is owned by the backend registry and survives
+  // navigation.
+  readonly agentMutation = injectMutation(() => ({
+    mutationFn: async (vars: { branch: string; scope: AgentMcpScope }) => {
       const worktrees = await lastValueFrom(
         this.worktreeService.apiRepositoriesRepoIdWorktreesGet(this.repoId),
       );
@@ -132,11 +110,11 @@ export class RepositoryDetailPage {
         throw new Error('No worktree backs branch ' + vars.branch);
       }
       return lastValueFrom(
-        this.commandService.apiCommandsPost({
-          repoId: this.repoId,
+        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+          this.repoId,
           worktreeId,
-          actionId: vars.actionId,
-        }),
+          { scope: vars.scope },
+        ),
       );
     },
     onSuccess: (res) => {
@@ -149,10 +127,9 @@ export class RepositoryDetailPage {
 
   /** Open Claude Code in the main worktree's terminal, scoped to this repo's actions MCP. */
   configureWithClaude() {
-    const actionId = this.claudeActionId();
     const branch = this.mainBranch();
-    if (!actionId || !branch) return;
-    this.launchMutation.mutate({ branch, actionId });
+    if (!branch) return;
+    this.agentMutation.mutate({ branch, scope: AgentMcpScope.Actions });
   }
 
   onDelete() {

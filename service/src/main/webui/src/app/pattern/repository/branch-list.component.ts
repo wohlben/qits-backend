@@ -15,11 +15,12 @@ import { lastValueFrom } from 'rxjs';
 import { patchState, signalState } from '@ngrx/signals';
 
 import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
+import { AgentControllerService } from '@/api/api/agentController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
-import { ActionVariant } from '@/api/model/actionVariant';
+import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
@@ -72,7 +73,7 @@ interface CreateWorktreeForm {
             [repoId]="repoId()"
             [cleanupable]="cleanupableBranches()"
             [branchSummaries]="branchSummaries()"
-            [claudeConfigurable]="!!claudeRepositoryActionId()"
+            [claudeConfigurable]="true"
             (viewCommits)="viewCommits($event)"
             (run)="openRun($event)"
             (configureWithClaude)="configureWithClaude($event)"
@@ -332,6 +333,7 @@ export class BranchListComponent {
   private readonly repositoryService = inject(RepositoryControllerService);
   private readonly actionConfigService = inject(ActionConfigurationControllerService);
   private readonly commandService = inject(CommandControllerService);
+  private readonly agentService = inject(AgentControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly router = inject(Router);
   private readonly dialog = inject(ZardDialogService);
@@ -403,14 +405,6 @@ export class BranchListComponent {
   // offered. One-off commands (e.g. mvn test) are excluded.
   readonly interactiveActions = computed(() =>
     (this.actionConfigsQuery.data() ?? []).filter((a) => a.interactive),
-  );
-
-  /** The seeded "Claude Code (repository MCP)" action, found by its typed variant (not its name). */
-  readonly claudeRepositoryActionId = computed(
-    () =>
-      (this.actionConfigsQuery.data() ?? []).find(
-        (a) => a.variant === ActionVariant.ClaudeRepositoryMcp,
-      )?.id ?? null,
   );
 
   // The conflicting files for the worktree in the open resolve dialog (the merge-tree preview).
@@ -652,9 +646,10 @@ export class BranchListComponent {
     onSuccess: (res) => {
       invalidateRepository(this.queryClient, this.repoId());
       this.closeDialog();
-      // Launch Claude on the resolution worktree and open its terminal so the human watches it work.
-      if (res.worktreeId && res.actionId) {
-        this.launchCommand(res.worktreeId, res.actionId);
+      // The backend already spawned the autonomous Claude command on the resolution worktree; open
+      // its terminal so the human watches it work.
+      if (res.commandId) {
+        this.router.navigate(['/commands', res.commandId]);
       }
     },
   }));
@@ -677,6 +672,25 @@ export class BranchListComponent {
           worktreeId: vars.worktreeId,
           actionId: vars.actionId,
         }),
+      ),
+    onSuccess: (res) => {
+      const commandId = res.command?.id;
+      if (commandId) {
+        this.router.navigate(['/commands', commandId]);
+      }
+    },
+  }));
+
+  // Launch a Claude agent (repository MCP, narrowed to this repo) in a worktree, then open its
+  // terminal. Not backed by an action — the backend renders the launch and registers the command.
+  readonly agentMutation = injectMutation(() => ({
+    mutationFn: (vars: { worktreeId: string; scope: AgentMcpScope }) =>
+      lastValueFrom(
+        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+          this.repoId(),
+          vars.worktreeId,
+          { scope: vars.scope },
+        ),
       ),
     onSuccess: (res) => {
       const commandId = res.command?.id;
@@ -716,12 +730,11 @@ export class BranchListComponent {
     this.launchCommand(worktreeId, actionId);
   }
 
-  /** Launch the repository-MCP Claude action in this subtree's worktree (project-scoped). */
+  /** Launch a repository-MCP Claude agent in this subtree's worktree (narrowed to this repository). */
   configureWithClaude(branch: string) {
-    const actionId = this.claudeRepositoryActionId();
     const worktreeId = this.worktreeIdForBranch(branch);
-    if (!actionId || !worktreeId) return;
-    this.launchCommand(worktreeId, actionId);
+    if (!worktreeId) return;
+    this.agentMutation.mutate({ worktreeId, scope: AgentMcpScope.Repository });
   }
 
   /** Open the resolve-conflict dialog (file preview + the action button) for a conflicting worktree. */

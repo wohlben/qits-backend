@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry9 } from './entry9';
 
 
 export interface Response51 { 
-    entries?: Array<Entry9>;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
 }
 

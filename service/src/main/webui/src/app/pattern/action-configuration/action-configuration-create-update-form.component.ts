@@ -5,7 +5,6 @@ import { lastValueFrom } from 'rxjs';
 
 import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
-import { ActionVariant } from '@/api/model/actionVariant';
 import { CreateActionConfigurationRequest } from '@/api/model/createActionConfigurationRequest';
 import { UpdateActionConfigurationRequest } from '@/api/model/updateActionConfigurationRequest';
 import { ActionConfigurationFormComponent, ActionConfigurationFormData } from '@/ui/forms/action-configuration/action-configuration-form.component';
@@ -42,7 +41,6 @@ export class ActionConfigurationCreateUpdateFormComponent {
           executeScript: a.executeScript ?? '',
           checkScript: a.checkScript ?? '',
           interactive: a.interactive ?? false,
-          variant: a.variant ?? ActionVariant.Shell,
           environment: Object.entries(a.environment ?? {}).map(([key, value]) => ({ key, value })),
         }
       : undefined;
@@ -78,7 +76,6 @@ export class ActionConfigurationCreateUpdateFormComponent {
       // Send "" (not undefined) so an emptied check script clears the stored value on update.
       checkScript: data.checkScript,
       interactive: data.interactive,
-      variant: data.variant,
       environment: this.toEnvMap(data.environment),
     };
     if (this.action()) {

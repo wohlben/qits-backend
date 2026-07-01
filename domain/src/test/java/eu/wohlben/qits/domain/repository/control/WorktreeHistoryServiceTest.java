@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
-import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.dto.WorktreeHistoryDetailDto;
 import eu.wohlben.qits.domain.repository.dto.WorktreeHistoryDto;
@@ -124,9 +123,7 @@ public class WorktreeHistoryServiceTest {
     String repoId = clonedRepo();
     worktreeService.createWorktree(repoId, "feat", "master", "feat", null);
     String actionId =
-        repositoryActionService.create(
-                repoId, "echo", null, "echo hi", null, false, ActionVariant.SHELL, null)
-            .id;
+        repositoryActionService.create(repoId, "echo", null, "echo hi", null, false, null).id;
     commandService.launchAndAwait(repoId, "feat", actionId);
 
     // Previously the command's FK pinned the worktree row and this threw a constraint violation.

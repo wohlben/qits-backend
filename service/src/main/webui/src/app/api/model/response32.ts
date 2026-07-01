@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry8 } from './entry8';
+import { Entry7 } from './entry7';
 
 
 export interface Response32 { 
-    entries?: Array<Entry8>;
+    entries?: Array<Entry7>;
 }
 

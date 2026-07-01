@@ -3,12 +3,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
-import { ActionConfigurationControllerService } from '@/api/api/actionConfigurationController.service';
-import { CommandControllerService } from '@/api/api/commandController.service';
+import { AgentControllerService } from '@/api/api/agentController.service';
 import { ProjectControllerService } from '@/api/api/projectController.service';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
-import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
-import { ActionVariant } from '@/api/model/actionVariant';
+import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { RepositoryDto } from '@/api/model/repositoryDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { ProjectDetailHeaderComponent } from '@/ui/components/project/project-detail-header.component';
@@ -80,8 +78,7 @@ export class ProjectDetailPage {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectControllerService);
   private readonly worktreeService = inject(WorktreeControllerService);
-  private readonly commandService = inject(CommandControllerService);
-  private readonly actionConfigService = inject(ActionConfigurationControllerService);
+  private readonly agentService = inject(AgentControllerService);
   private readonly queryClient = inject(QueryClient);
 
   readonly projectId = this.route.snapshot.paramMap.get('id')!;
@@ -103,35 +100,13 @@ export class ProjectDetailPage {
       ),
   }));
 
-  // Global actions, same key/shape as elsewhere — used to find the CLAUDE_PROJECT_MCP action.
-  readonly actionConfigsQuery = injectQuery(() => ({
-    queryKey: ['action-configurations'],
-    queryFn: () =>
-      lastValueFrom(this.actionConfigService.apiActionConfigurationsGet()).then(
-        (r) =>
-          r.entries
-            ?.map((e) => e.actionConfiguration!)
-            .filter((a): a is ActionConfigurationDto => !!a) ?? [],
-      ),
-  }));
-
-  /** The seeded "Claude Code (project MCP)" action, found by its typed variant (not its name). */
-  readonly claudeProjectActionId = computed(
-    () =>
-      (this.actionConfigsQuery.data() ?? []).find(
-        (a) => a.variant === ActionVariant.ClaudeProjectMcp,
-      )?.id ?? null,
-  );
-
   // The project session still runs in a checkout, so pick the first repository that has a main
   // branch to host the terminal — the MCP scope spans the whole project regardless of which one.
   readonly launchTarget = computed(
     () => (this.repositoriesQuery.data() ?? []).find((r) => !!r.id && !!r.mainBranch) ?? null,
   );
 
-  readonly canConfigureWithClaude = computed(
-    () => !!this.claudeProjectActionId() && !!this.launchTarget(),
-  );
+  readonly canConfigureWithClaude = computed(() => !!this.launchTarget());
 
   readonly deleteMutation = injectMutation(() => ({
     mutationFn: () =>
@@ -144,8 +119,8 @@ export class ProjectDetailPage {
 
   // Launch the project-scoped Claude session in a host repository's main worktree (resolving the
   // worktree from its branch), then open its command terminal. The process is owned by the registry.
-  readonly launchMutation = injectMutation(() => ({
-    mutationFn: async (vars: { repoId: string; branch: string; actionId: string }) => {
+  readonly agentMutation = injectMutation(() => ({
+    mutationFn: async (vars: { repoId: string; branch: string }) => {
       const worktrees = await lastValueFrom(
         this.worktreeService.apiRepositoriesRepoIdWorktreesGet(vars.repoId),
       );
@@ -156,11 +131,11 @@ export class ProjectDetailPage {
         throw new Error('No worktree backs branch ' + vars.branch);
       }
       return lastValueFrom(
-        this.commandService.apiCommandsPost({
-          repoId: vars.repoId,
+        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+          vars.repoId,
           worktreeId,
-          actionId: vars.actionId,
-        }),
+          { scope: AgentMcpScope.Project },
+        ),
       );
     },
     onSuccess: (res) => {
@@ -173,10 +148,9 @@ export class ProjectDetailPage {
 
   /** Open the project-scoped Claude session in a host repository's main worktree. */
   configureWithClaude() {
-    const actionId = this.claudeProjectActionId();
     const target = this.launchTarget();
-    if (!actionId || !target?.id || !target.mainBranch) return;
-    this.launchMutation.mutate({ repoId: target.id, branch: target.mainBranch, actionId });
+    if (!target?.id || !target.mainBranch) return;
+    this.agentMutation.mutate({ repoId: target.id, branch: target.mainBranch });
   }
 
   onDelete() {
