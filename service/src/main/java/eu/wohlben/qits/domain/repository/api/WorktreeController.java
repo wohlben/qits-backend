@@ -119,8 +119,8 @@ public class WorktreeController {
   }
 
   public static record ResolveConflictRequest() {
-    /** The resolution worktree to watch Claude work in, and the action that launches it. */
-    public record Response(String worktreeId, String branch, String actionId) {}
+    /** The resolution worktree to watch Claude work in, and the launched command that runs it. */
+    public record Response(String worktreeId, String branch, String commandId) {}
   }
 
   @POST
@@ -129,7 +129,7 @@ public class WorktreeController {
       @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
     var result = resolveConflictService.resolveConflict(repoId, worktreeId);
     return new ResolveConflictRequest.Response(
-        result.worktreeId(), result.branch(), result.actionId());
+        result.worktreeId(), result.branch(), result.commandId());
   }
 
   public static record DiscardWorktreeRequest(String result) {

@@ -2,7 +2,6 @@ package eu.wohlben.qits.domain.featureflow.control;
 
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
-import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.featureflow.entity.RepositoryAction;
 import eu.wohlben.qits.domain.featureflow.persistence.RepositoryActionRepository;
 import eu.wohlben.qits.domain.repository.entity.Repository;
@@ -36,7 +35,6 @@ public class RepositoryActionService {
       String executeScript,
       String checkScript,
       boolean interactive,
-      ActionVariant variant,
       Map<String, String> environment) {
     Repository repository =
         repositoryRepository
@@ -56,7 +54,6 @@ public class RepositoryActionService {
     action.executeScript = executeScript;
     action.checkScript = checkScript;
     action.interactive = interactive;
-    action.variant = variant != null ? variant : ActionVariant.SHELL;
     action.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     repositoryActionRepository.persist(action);
     return action;
@@ -87,7 +84,6 @@ public class RepositoryActionService {
       String executeScript,
       String checkScript,
       Boolean interactive,
-      ActionVariant variant,
       Map<String, String> environment) {
     RepositoryAction action = get(repositoryId, actionId);
     if (name != null && !name.isBlank()) {
@@ -104,9 +100,6 @@ public class RepositoryActionService {
     }
     if (interactive != null) {
       action.interactive = interactive;
-    }
-    if (variant != null) {
-      action.variant = variant;
     }
     if (environment != null) {
       action.environment = new HashMap<>(environment);

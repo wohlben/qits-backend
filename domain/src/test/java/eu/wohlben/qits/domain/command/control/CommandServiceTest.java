@@ -9,7 +9,6 @@ import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
-import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
@@ -68,9 +67,7 @@ public class CommandServiceTest {
   }
 
   private String createAction(String repoId, String name, String script, boolean interactive) {
-    return repositoryActionService.create(
-            repoId, name, null, script, null, interactive, ActionVariant.SHELL, null)
-        .id;
+    return repositoryActionService.create(repoId, name, null, script, null, interactive, null).id;
   }
 
   @Test

@@ -3,6 +3,7 @@ README.md
 api.base.service.ts
 api.module.ts
 api/actionConfigurationController.service.ts
+api/agentController.service.ts
 api/api.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
@@ -22,7 +23,7 @@ index.ts
 model/actionConfigurationDto.ts
 model/actionScope.ts
 model/actionType.ts
-model/actionVariant.ts
+model/agentMcpScope.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
@@ -59,6 +60,7 @@ model/featureFlowConfigurationDto.ts
 model/featureFlowPhaseActionDto.ts
 model/featureFlowPhaseDto.ts
 model/featureFlowPhaseStepDto.ts
+model/launchAgentRequest.ts
 model/launchCommandRequest.ts
 model/logChannel.ts
 model/mergeBranchRequest.ts
@@ -122,6 +124,7 @@ model/response55.ts
 model/response56.ts
 model/response57.ts
 model/response58.ts
+model/response59.ts
 model/response6.ts
 model/response7.ts
 model/response8.ts

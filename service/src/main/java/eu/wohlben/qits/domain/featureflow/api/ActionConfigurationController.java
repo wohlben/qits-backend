@@ -2,7 +2,6 @@ package eu.wohlben.qits.domain.featureflow.api;
 
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
-import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
 import eu.wohlben.qits.validation.NotBlankIfPresent;
 import jakarta.inject.Inject;
@@ -35,7 +34,6 @@ public class ActionConfigurationController {
       @NotBlank String executeScript,
       String checkScript,
       Boolean interactive,
-      ActionVariant variant,
       Map<String, String> environment) {
     public record Response(ActionConfigurationDto actionConfiguration) {}
   }
@@ -50,7 +48,6 @@ public class ActionConfigurationController {
             request.executeScript(),
             request.checkScript(),
             request.interactive() != null && request.interactive(),
-            request.variant(),
             request.environment());
     return new CreateActionConfigurationRequest.Response(actionConfigurationMapper.toDto(config));
   }
@@ -91,7 +88,6 @@ public class ActionConfigurationController {
       @NotBlankIfPresent String executeScript,
       String checkScript,
       Boolean interactive,
-      ActionVariant variant,
       Map<String, String> environment) {
     public record Response(ActionConfigurationDto actionConfiguration) {}
   }
@@ -108,7 +104,6 @@ public class ActionConfigurationController {
             request.executeScript(),
             request.checkScript(),
             request.interactive(),
-            request.variant(),
             request.environment());
     return new UpdateActionConfigurationRequest.Response(actionConfigurationMapper.toDto(config));
   }

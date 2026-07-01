@@ -4,7 +4,6 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 import eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest;
-import eu.wohlben.qits.domain.featureflow.entity.ActionVariant;
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRepositoryRequest;
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest;
 import eu.wohlben.qits.domain.repository.api.WorktreeController.CreateWorktreeRequest;
@@ -81,7 +80,7 @@ public class CommandControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new CreateActionConfigurationRequest(
-                "sleep-action", null, "sleep 30", null, true, ActionVariant.SHELL, null))
+                "sleep-action", null, "sleep 30", null, true, null))
         .when()
         .post("/api/action-configurations")
         .then()
@@ -143,7 +142,7 @@ public class CommandControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new CreateActionConfigurationRequest(
-                "echo-action", null, "echo hello-http", null, false, ActionVariant.SHELL, null))
+                "echo-action", null, "echo hello-http", null, false, null))
         .when()
         .post("/api/action-configurations")
         .then()

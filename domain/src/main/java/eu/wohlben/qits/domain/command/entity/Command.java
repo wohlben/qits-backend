@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -52,15 +53,23 @@ public class Command extends PanacheEntityBase {
   @Column(name = "commit_hash", nullable = false)
   public String commitHash;
 
-  /** The resolved action's id (global or repository-owned — snapshotted, not FK'd). */
-  @Column(name = "action_id", nullable = false)
+  /**
+   * The resolved action's id (global or repository-owned — snapshotted, not FK'd). Null for
+   * launches that aren't backed by an action, e.g. a coding-agent session started via the agent
+   * path.
+   */
+  @Column(name = "action_id")
   public String actionId;
 
   @Column(name = "action_name", nullable = false)
   public String actionName;
 
-  /** The exact shell line that was run (already rendered by ActionResolutionService). */
-  @Column(name = "execute_script", nullable = false, length = 4000)
+  /**
+   * The exact shell line that was run. Stored as a large object because an agent launch embeds its
+   * prompt directly in the command, which can be long.
+   */
+  @Lob
+  @Column(name = "execute_script", nullable = false)
   public String executeScript;
 
   @Enumerated(EnumType.STRING)
