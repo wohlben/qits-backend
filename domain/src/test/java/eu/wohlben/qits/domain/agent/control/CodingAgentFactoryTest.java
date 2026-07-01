@@ -23,6 +23,14 @@ public class CodingAgentFactoryTest {
   }
 
   @Test
+  public void flatOutputAddsTheScreenReaderFlag() {
+    // Opt-in (off by default); renders flat text so a captured PTY session log stays readable.
+    LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE).flatOutput().start();
+
+    assertEquals("exec claude --ax-screen-reader", spec.script());
+  }
+
+  @Test
   public void interactiveWithMcpRendersStrictConfigAndAllowlist() {
     LaunchSpec spec =
         CodingAgentFactory.ofType(AgentType.CLAUDE)
@@ -75,6 +83,16 @@ public class CodingAgentFactoryTest {
     // —
     // no separator runs, no substitution expands.
     assertEquals("claude -p 'a'\\''b`c$(d);e'", spec.script());
+  }
+
+  @Test
+  public void chatRendersTheStreamJsonProtocol() {
+    LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE).chat();
+
+    assertEquals(
+        "exec claude --print --input-format stream-json --output-format stream-json --verbose",
+        spec.script());
+    assertFalse(spec.interactive());
   }
 
   @Test

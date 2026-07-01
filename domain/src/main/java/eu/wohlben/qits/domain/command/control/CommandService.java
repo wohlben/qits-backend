@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.command.control;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.Command;
+import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
@@ -89,7 +90,8 @@ public class CommandService {
       String name,
       String script,
       boolean interactive,
-      Map<String, String> environment) {
+      Map<String, String> environment,
+      CommandKind kind) {
 
     static LaunchDescriptor of(ResolvedAction action) {
       return new LaunchDescriptor(
@@ -97,7 +99,8 @@ public class CommandService {
           action.name(),
           action.executeScript(),
           action.interactive(),
-          action.environment());
+          action.environment(),
+          CommandKind.TERMINAL);
     }
   }
 
@@ -125,8 +128,32 @@ public class CommandService {
       Map<String, String> environment) {
     Prepared p =
         prepare(
-            repoId, worktreeId, new LaunchDescriptor(null, name, script, interactive, environment));
+            repoId,
+            worktreeId,
+            new LaunchDescriptor(
+                null, name, script, interactive, environment, CommandKind.TERMINAL));
     registry.spawn(
+        p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
+    return p.dto();
+  }
+
+  /**
+   * Launch a Claude stream-json chat session as a registry command (kind {@code CHAT}). Like {@link
+   * #launchAgent} but the process is driven over plain pipes and rendered as a conversation; the
+   * command is re-attachable and its stream-json events are persisted as its log.
+   */
+  public CommandDto launchChat(
+      String repoId,
+      String worktreeId,
+      String name,
+      String script,
+      Map<String, String> environment) {
+    Prepared p =
+        prepare(
+            repoId,
+            worktreeId,
+            new LaunchDescriptor(null, name, script, false, environment, CommandKind.CHAT));
+    registry.spawnChat(
         p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
   }
@@ -185,7 +212,8 @@ public class CommandService {
             descriptor.actionId(),
             descriptor.name(),
             descriptor.script(),
-            descriptor.interactive());
+            descriptor.interactive(),
+            descriptor.kind());
 
     Map<String, String> env = new HashMap<>(System.getenv());
     env.put("TERM", "xterm-256color");

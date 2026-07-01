@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { CommandKind } from './commandKind';
 import { CommandStatus } from './commandStatus';
 
 
@@ -22,6 +23,7 @@ export interface CommandDto {
     status?: CommandStatus;
     exitCode?: number;
     interactive?: boolean;
+    kind?: CommandKind;
     launchedAt?: string;
     finishedAt?: string;
 }

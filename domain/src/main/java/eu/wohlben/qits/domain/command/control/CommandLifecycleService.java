@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.command.control;
 
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.entity.Command;
+import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
@@ -44,7 +45,8 @@ public class CommandLifecycleService {
       String actionId,
       String actionName,
       String executeScript,
-      boolean interactive) {
+      boolean interactive,
+      CommandKind kind) {
     Worktree worktree =
         worktreeRepository
             .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
@@ -58,6 +60,7 @@ public class CommandLifecycleService {
             .actionName(actionName)
             .executeScript(executeScript)
             .interactive(interactive)
+            .kind(kind)
             .status(CommandStatus.RUNNING)
             .build();
     commandRepository.persist(command);

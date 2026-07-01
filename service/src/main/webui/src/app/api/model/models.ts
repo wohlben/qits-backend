@@ -5,6 +5,7 @@ export * from './agentMcpScope';
 export * from './branchDto';
 export * from './cleanupBranchRequest';
 export * from './commandDto';
+export * from './commandKind';
 export * from './commandLogLineDto';
 export * from './commandStatus';
 export * from './commitChangesDto';
