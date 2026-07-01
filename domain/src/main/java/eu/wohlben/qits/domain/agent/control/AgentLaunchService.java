@@ -71,10 +71,14 @@ public class AgentLaunchService {
   String repositoryMcpUrl;
 
   /**
-   * Launches Claude Code in {@code worktreeId} of {@code repoId} with the MCP server for {@code
-   * scope} attached, optionally seeded with {@code initialContext}. Returns the spawned command.
+   * Launches Claude Code as a stream-json <strong>chat</strong> command in {@code worktreeId} of
+   * {@code repoId}, with the MCP server for {@code scope} attached. The session is rendered as a
+   * conversation and tracked in the command registry (re-attachable, logged). Tools run
+   * auto-approved ({@code --dangerously-skip-permissions}): the CLI does not expose the stream-json
+   * permission-prompt protocol, so in-UI approval isn't currently possible; a networked deployment
+   * would want that. Returns the spawned command.
    */
-  public CommandDto launch(
+  public CommandDto launchChat(
       String repoId, String worktreeId, AgentMcpScope scope, String initialContext) {
     if (scope == null) {
       throw new BadRequestException("scope is required");
@@ -87,12 +91,11 @@ public class AgentLaunchService {
     LaunchSpec spec =
         CodingAgentFactory.ofType(AgentType.CLAUDE)
             .mcpServer(server.key(), McpServers.httpMcp(server.url()))
-            .allowedTools(server.allowedTools())
-            .initialContext(initialContext)
-            .start();
+            .skipPermissions()
+            .chat();
 
-    return commandService.launchAgent(
-        repoId, worktreeId, nameFor(scope), spec.script(), spec.interactive(), spec.environment());
+    return commandService.launchChat(
+        repoId, worktreeId, nameFor(scope), spec.script(), spec.environment());
   }
 
   /**

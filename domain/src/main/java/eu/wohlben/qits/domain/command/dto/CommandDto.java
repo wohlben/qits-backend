@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.command.dto;
 
+import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import java.time.Instant;
 
@@ -29,5 +30,6 @@ public record CommandDto(
     CommandStatus status,
     Integer exitCode,
     boolean interactive,
+    CommandKind kind,
     Instant launchedAt,
     Instant finishedAt) {}

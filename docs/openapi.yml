@@ -94,10 +94,17 @@ components:
           format: int32
         interactive:
           type: boolean
+        kind:
+          $ref: "#/components/schemas/CommandKind"
         launchedAt:
           $ref: "#/components/schemas/Instant"
         finishedAt:
           $ref: "#/components/schemas/Instant"
+    CommandKind:
+      type: string
+      enum:
+      - TERMINAL
+      - CHAT
     CommandLogLineDto:
       type: object
       properties:

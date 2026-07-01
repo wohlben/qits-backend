@@ -37,6 +37,7 @@ public class AgentController {
       @PathParam("worktreeId") String worktreeId,
       @Valid LaunchAgentRequest request) {
     return new LaunchAgentRequest.Response(
-        agentLaunchService.launch(repoId, worktreeId, request.scope(), request.initialContext()));
+        agentLaunchService.launchChat(
+            repoId, worktreeId, request.scope(), request.initialContext()));
   }
 }

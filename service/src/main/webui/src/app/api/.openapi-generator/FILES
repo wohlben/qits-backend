@@ -27,6 +27,7 @@ model/agentMcpScope.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
+model/commandKind.ts
 model/commandLogLineDto.ts
 model/commandStatus.ts
 model/commitChangesDto.ts

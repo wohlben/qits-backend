@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
+import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
@@ -104,6 +105,32 @@ public class CommandServiceTest {
         lines.stream()
             .anyMatch(l -> l.channel() == LogChannel.OUTPUT && l.content().contains("hello-log")),
         "captured output should contain the echoed line: " + lines);
+  }
+
+  @Test
+  public void launchChatRecordsAChatCommandAndCapturesItsJsonLines() throws Exception {
+    String repoId = repoWithWorktree();
+
+    // A stand-in stream-json process: emit two event lines and exit (no real claude in the test).
+    CommandDto command =
+        commandService.launchChat(
+            repoId,
+            "work",
+            "Claude chat",
+            "printf '%s\\n' '{\"type\":\"system\",\"subtype\":\"init\"}' '{\"type\":\"result\"}'",
+            Map.of());
+
+    assertEquals(CommandKind.CHAT, command.kind());
+
+    // The conversation is persisted as OUTPUT log lines (raw JSON) so a finished chat can be
+    // replayed.
+    List<CommandLogLineDto> lines = awaitLog(command.id());
+    assertTrue(
+        lines.stream().anyMatch(l -> l.content().contains("\"subtype\":\"init\"")),
+        "captured JSONL should include the init event: " + lines);
+    assertTrue(
+        lines.stream().anyMatch(l -> l.content().contains("\"type\":\"result\"")),
+        "captured JSONL should include the result event: " + lines);
   }
 
   private List<CommandLogLineDto> awaitLog(String commandId) throws InterruptedException {

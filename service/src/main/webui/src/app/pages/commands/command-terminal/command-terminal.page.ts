@@ -4,8 +4,11 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
+import { CommandChatComponent } from '@/pattern/command/command-chat.component';
+import { CommandChatLogComponent } from '@/pattern/command/command-chat-log.component';
 import { CommandLogComponent } from '@/pattern/command/command-log.component';
 import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -22,6 +25,8 @@ import { ZardButtonComponent } from '@/shared/components/button';
     PageLayoutComponent,
     WebTerminalComponent,
     CommandLogComponent,
+    CommandChatComponent,
+    CommandChatLogComponent,
     ZardButtonComponent,
     RouterLink,
   ],
@@ -46,7 +51,13 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </div>
 
       @if (commandQuery.data(); as command) {
-        @if (command.status === CommandStatus.Running) {
+        @if (command.kind === CommandKind.Chat) {
+          @if (command.status === CommandStatus.Running) {
+            <app-command-chat [commandId]="commandId" />
+          } @else {
+            <app-command-chat-log [commandId]="commandId" />
+          }
+        } @else if (command.status === CommandStatus.Running) {
           <app-web-terminal [commandId]="commandId" />
         } @else {
           <app-command-log [commandId]="commandId" />
@@ -65,6 +76,7 @@ export class CommandTerminalPage {
   private readonly commandService = inject(CommandControllerService);
 
   protected readonly CommandStatus = CommandStatus;
+  protected readonly CommandKind = CommandKind;
 
   readonly commandId = this.route.snapshot.paramMap.get('commandId')!;
 

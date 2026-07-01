@@ -22,6 +22,12 @@ public class ClaudeCodeAgent extends CodingAgent {
   @Override
   public LaunchSpec start() {
     StringBuilder command = new StringBuilder("exec claude");
+    if (flatOutput) {
+      // --ax-screen-reader renders flat text (no alternate-screen TUI/animations), so the PTY
+      // session log captures the readable conversation instead of terminal control sequences that
+      // get wiped when the interactive UI exits.
+      command.append(" --ax-screen-reader");
+    }
     if (initialContext != null && !initialContext.isBlank()) {
       command.append(' ').append(shellQuote(initialContext));
     }
@@ -32,6 +38,20 @@ public class ClaudeCodeAgent extends CodingAgent {
   @Override
   public LaunchSpec run(String prompt) {
     StringBuilder command = new StringBuilder("claude -p ").append(shellQuote(prompt));
+    appendFlags(command);
+    return new LaunchSpec(command.toString(), false, environment);
+  }
+
+  @Override
+  public LaunchSpec chat() {
+    // Bidirectional stream-json: user messages are fed on stdin as JSON, structured events
+    // (assistant
+    // messages, tool calls, result) come back on stdout — driven programmatically over plain pipes,
+    // not a PTY. --verbose emits every event, not just the final result. exec'd because the process
+    // is long-lived and managed.
+    StringBuilder command =
+        new StringBuilder(
+            "exec claude --print --input-format stream-json --output-format stream-json --verbose");
     appendFlags(command);
     return new LaunchSpec(command.toString(), false, environment);
   }

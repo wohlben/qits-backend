@@ -76,6 +76,12 @@ public class Command extends PanacheEntityBase {
   @Column(nullable = false)
   public CommandStatus status;
 
+  /** How the process is driven and rendered — a PTY terminal or a stream-json chat. */
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  @Builder.Default
+  public CommandKind kind = CommandKind.TERMINAL;
+
   /** The process exit code, once it has finished; null while running. */
   @Column(name = "exit_code")
   public Integer exitCode;

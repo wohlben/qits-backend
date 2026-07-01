@@ -43,6 +43,13 @@ public abstract class CodingAgent {
   /** Whether to run without permission prompts. */
   protected boolean skipPermissions;
 
+  /**
+   * Whether an interactive session renders flat text instead of a full-screen TUI (default false).
+   * Off everywhere for now; enable per-launch with {@link #flatOutput()} when a readable captured
+   * session log matters more than the interactive UI.
+   */
+  protected boolean flatOutput;
+
   /** Attaches an MCP server under {@code key} with a harness-agnostic {@link McpServers} config. */
   public CodingAgent mcpServer(String key, Object config) {
     this.mcpServers.put(key, config);
@@ -73,9 +80,25 @@ public abstract class CodingAgent {
     return this;
   }
 
+  /**
+   * Renders an interactive session as flat text (no full-screen TUI/animations), so a captured PTY
+   * session log stays readable. Off by default.
+   */
+  public CodingAgent flatOutput() {
+    this.flatOutput = true;
+    return this;
+  }
+
   /** Renders the configured agent as an interactive launch (a human attaches a terminal). */
   public abstract LaunchSpec start();
 
   /** Renders the configured agent as a one-off launch that runs {@code prompt} to completion. */
   public abstract LaunchSpec run(String prompt);
+
+  /**
+   * Renders the configured agent as a bidirectional streaming chat session: user messages in and
+   * structured events out over stdin/stdout (stream-json), driven programmatically over plain
+   * pipes.
+   */
+  public abstract LaunchSpec chat();
 }

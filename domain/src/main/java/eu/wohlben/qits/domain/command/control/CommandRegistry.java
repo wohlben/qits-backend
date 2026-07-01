@@ -25,6 +25,11 @@ public class CommandRegistry {
 
   private final Map<String, CommandSession> sessions = new ConcurrentHashMap<>();
 
+  /**
+   * Stream-json chat sessions (plain-pipe, line-oriented), keyed the same way as {@link #sessions}.
+   */
+  private final Map<String, ChatSession> chats = new ConcurrentHashMap<>();
+
   /** Spawn a process for {@code commandId} with optional sinks attached before output starts. */
   public void spawn(
       String commandId,
@@ -57,6 +62,49 @@ public class CommandRegistry {
         startSession(
             commandId, worktreePath, script, environment, exitListener, logWriter, initialSinks);
     return session.awaitExit(timeoutMillis);
+  }
+
+  /**
+   * Spawn a Claude stream-json chat process (kind {@code CHAT}) on plain pipes — not a PTY, which
+   * would echo input and corrupt the line-delimited JSON. Registry-tracked and re-attachable
+   * exactly like {@link #spawn}.
+   */
+  public void spawnChat(
+      String commandId,
+      Path worktreePath,
+      String script,
+      Map<String, String> environment,
+      CommandExitListener exitListener,
+      CommandLogWriter logWriter,
+      CommandOutputSink... initialSinks) {
+    Process process;
+    try {
+      ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-lc", script);
+      pb.directory(worktreePath.toFile());
+      pb.environment().putAll(environment);
+      // Keep stderr off the JSON stdout stream (it would corrupt parsing); route it to the log.
+      pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+      process = pb.start();
+    } catch (IOException e) {
+      throw new InternalServerErrorException("Failed to start chat: " + e.getMessage());
+    }
+    ChatSession session =
+        new ChatSession(commandId, process, exitListener, () -> chats.remove(commandId), logWriter);
+    for (CommandOutputSink sink : initialSinks) {
+      session.addInitialSink(sink);
+    }
+    chats.put(commandId, session);
+    session.startReader();
+  }
+
+  /** Send a user turn to a running chat command; false if it is not a running chat. */
+  public boolean chatSend(String commandId, String text) {
+    ChatSession session = chats.get(commandId);
+    if (session == null) {
+      return false;
+    }
+    session.sendUser(text);
+    return true;
   }
 
   private CommandSession startSession(
@@ -94,20 +142,29 @@ public class CommandRegistry {
     return session;
   }
 
-  /** Attach a live client to a running command; false if no such command is running. */
+  /** Attach a live client to a running command (terminal or chat); false if none is running. */
   public boolean attach(String commandId, CommandOutputSink sink) {
     CommandSession session = sessions.get(commandId);
-    if (session == null) {
-      return false;
+    if (session != null) {
+      session.attach(sink);
+      return true;
     }
-    session.attach(sink);
-    return true;
+    ChatSession chat = chats.get(commandId);
+    if (chat != null) {
+      chat.attach(sink);
+      return true;
+    }
+    return false;
   }
 
   public void detach(String commandId, CommandOutputSink sink) {
     CommandSession session = sessions.get(commandId);
     if (session != null) {
       session.detach(sink);
+    }
+    ChatSession chat = chats.get(commandId);
+    if (chat != null) {
+      chat.detach(sink);
     }
   }
 
@@ -129,18 +186,27 @@ public class CommandRegistry {
     return true;
   }
 
-  /** Force-kill a running command; false if it is not (or no longer) in the registry. */
+  /** Force-kill a running command (terminal or chat); false if it is not in the registry. */
   public boolean terminate(String commandId) {
     CommandSession session = sessions.get(commandId);
-    if (session == null) {
-      return false;
+    if (session != null) {
+      session.terminate();
+      return true;
     }
-    session.terminate();
-    return true;
+    ChatSession chat = chats.get(commandId);
+    if (chat != null) {
+      chat.terminate();
+      return true;
+    }
+    return false;
   }
 
   public boolean isRunning(String commandId) {
     CommandSession session = sessions.get(commandId);
-    return session != null && session.isAlive();
+    if (session != null) {
+      return session.isAlive();
+    }
+    ChatSession chat = chats.get(commandId);
+    return chat != null && chat.isAlive();
   }
 }
