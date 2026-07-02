@@ -56,8 +56,11 @@ public class ClaudeCodeAgent extends CodingAgent {
     return new LaunchSpec(command.toString(), false, environment);
   }
 
-  /** Appends the MCP config, the allowlist and the skip-permissions flag when configured. */
+  /** Appends the model, the MCP config, the allowlist and the skip-permissions flag. */
   private void appendFlags(StringBuilder command) {
+    if (model != null && !model.isBlank()) {
+      command.append(" --model ").append(shellQuote(model));
+    }
     if (!mcpServers.isEmpty()) {
       String json = writeJson(Map.of("mcpServers", mcpServers));
       command.append(" --strict-mcp-config --mcp-config ").append(shellQuote(json));

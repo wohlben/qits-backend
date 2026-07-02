@@ -83,6 +83,33 @@ describe('BranchRowComponent', () => {
     expect(abandoned).toBe(true);
   });
 
+  it('offers to open the WIP page only for worktree-backed branches', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('worktree', {
+      worktreeId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+    });
+    fixture.detectChanges();
+
+    let opened = false;
+    fixture.componentInstance.openWip.subscribe(() => (opened = true));
+
+    const el = fixture.nativeElement as HTMLElement;
+    const buttons = Array.from(el.querySelectorAll('button'));
+    buttons.find((b) => b.textContent?.includes('Work on it'))!.click();
+    expect(opened).toBe(true);
+
+    // A plain branch (no worktree) has nothing to work in.
+    fixture.componentRef.setInput('worktree', null);
+    fixture.detectChanges();
+    const plainButtons = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    );
+    expect(plainButtons.some((b) => b.textContent?.includes('Work on it'))).toBe(false);
+  });
+
   it('replaces integrate/abandon with cleanup when the worktree can be cleaned up', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/done');

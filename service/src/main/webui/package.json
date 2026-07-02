@@ -25,6 +25,7 @@
     "@ng-icons/lucide": "^33.2.2",
     "@ngrx/signals": "^21.1.0",
     "@tanstack/angular-query-experimental": "^5.100.8",
+    "@usefulsensors/moonshine-js": "0.1.21",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "class-variance-authority": "^0.7.1",

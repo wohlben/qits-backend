@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry1 } from './entry1';
+import { ActionConfigurationDto } from './actionConfigurationDto';
 
 
 export interface Response7 { 
-    entries?: Array<Entry1>;
+    actionConfiguration?: ActionConfigurationDto;
 }
 
