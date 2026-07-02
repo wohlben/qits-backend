@@ -10,7 +10,7 @@
 ## Repository Structure
 
 ```
-docs/
+docs/domain/
 ├── README.md
 └── userflows/
     ├── README.md
@@ -24,9 +24,9 @@ docs/
 
 ## Path Conventions
 
-- `docs/userflows/$domain/` — contains all user flows for a given business domain.
-- `docs/userflows/$domain/README.md` — plain overview of the domain (what it is, why it exists). Must not be a file index.
-- `docs/userflows/$domain/$user-story.md` — a domain-level outcome (not a single CRUD operation). Each file describes a meaningful activity a user performs to achieve a business goal.
+- `docs/domain/userflows/$domain/` — contains all user flows for a given business domain.
+- `docs/domain/userflows/$domain/README.md` — plain overview of the domain (what it is, why it exists). Must not be a file index.
+- `docs/domain/userflows/$domain/$user-story.md` — a domain-level outcome (not a single CRUD operation). Each file describes a meaningful activity a user performs to achieve a business goal.
   1. **User Story** — the narrative describing who, what, and why. Focus on the outcome, not the API call. One story may touch many entities.
   2. **Builds On** *(optional, use sparingly)* — ordered, nested list of prerequisite user flows that must be completed *before* this one in a genuine narrative sequence. Use this only when the prerequisite is a distinct user activity that logically precedes this one (e.g., you cannot create a worktree before a repository exists). Do not list every foreign-key dependency or parent entity; mention those in the narrative instead. References use the form `$domain/$user-story-slug` (matching the filename without `.md`).
   3. **Processes** — bullet list of all kebab-case process IDs involved in enabling this story. It is fine for one story to reference many processes.
