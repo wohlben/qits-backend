@@ -9,6 +9,8 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { MarkdownComponent } from '@/ui/components/markdown/markdown.component';
+
 import { ChatItem, ChatItemKind } from './chat-stream';
 
 /**
@@ -18,7 +20,7 @@ import { ChatItem, ChatItemKind } from './chat-stream';
  */
 @Component({
   selector: 'app-chat-transcript',
-  imports: [],
+  imports: [MarkdownComponent],
   template: `
     <div class="flex items-center justify-end">
       <div class="relative">
@@ -57,13 +59,13 @@ import { ChatItem, ChatItemKind } from './chat-stream';
       @for (item of visible(); track $index) {
         @switch (item.kind) {
           @case ('user') {
-            <div class="self-end max-w-[80%] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground whitespace-pre-wrap">
-              {{ item.text }}
+            <div class="self-end max-w-[80%] rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">
+              <app-markdown [text]="item.text" />
             </div>
           }
           @case ('assistant') {
-            <div class="self-start max-w-[80%] rounded-lg bg-muted px-3 py-2 text-sm whitespace-pre-wrap">
-              {{ item.text }}
+            <div class="self-start max-w-[80%] rounded-lg bg-muted px-3 py-2 text-sm">
+              <app-markdown [text]="item.text" />
             </div>
           }
           @case ('thinking') {
