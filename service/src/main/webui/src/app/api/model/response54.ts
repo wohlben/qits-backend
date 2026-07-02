@@ -10,6 +10,6 @@
 
 
 export interface Response54 { 
-    success?: boolean;
+    output?: string;
 }
 

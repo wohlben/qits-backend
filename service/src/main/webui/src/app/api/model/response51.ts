@@ -10,8 +10,8 @@
 
 
 export interface Response51 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    worktreeId?: string;
+    branch?: string;
+    commandId?: string;
 }
 

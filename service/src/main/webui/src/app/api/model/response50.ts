@@ -10,8 +10,6 @@
 
 
 export interface Response50 { 
-    worktreeId?: string;
-    branch?: string;
-    commandId?: string;
+    output?: string;
 }
 

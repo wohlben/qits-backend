@@ -40,6 +40,9 @@ public abstract class CodingAgent {
   /** The interactive seed prompt, or null. */
   protected String initialContext;
 
+  /** Model override for the launched session, or null for the harness default. */
+  protected String model;
+
   /** Whether to run without permission prompts. */
   protected boolean skipPermissions;
 
@@ -65,6 +68,12 @@ public abstract class CodingAgent {
   /** Seeds an interactive session with a first prompt (only used by {@link #start()}). */
   public CodingAgent initialContext(String context) {
     this.initialContext = context;
+    return this;
+  }
+
+  /** Pins the session to a specific model (a harness-specific id or alias, e.g. "haiku"). */
+  public CodingAgent model(String model) {
+    this.model = model;
     return this;
   }
 

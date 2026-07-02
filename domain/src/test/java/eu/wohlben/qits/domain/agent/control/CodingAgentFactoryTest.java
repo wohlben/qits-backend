@@ -86,6 +86,27 @@ public class CodingAgentFactoryTest {
   }
 
   @Test
+  public void modelFlagRendersOnEveryLaunchVariant() {
+    assertEquals(
+        "claude -p 'hi' --model 'haiku'",
+        CodingAgentFactory.ofType(AgentType.CLAUDE).model("haiku").run("hi").script());
+    assertEquals(
+        "exec claude --model 'haiku'",
+        CodingAgentFactory.ofType(AgentType.CLAUDE).model("haiku").start().script());
+    assertTrue(
+        CodingAgentFactory.ofType(AgentType.CLAUDE)
+            .model("haiku")
+            .chat()
+            .script()
+            .endsWith(" --model 'haiku'"));
+  }
+
+  @Test
+  public void modelFlagIsAbsentWhenUnset() {
+    assertFalse(CodingAgentFactory.ofType(AgentType.CLAUDE).run("hi").script().contains("--model"));
+  }
+
+  @Test
   public void chatRendersTheStreamJsonProtocol() {
     LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE).chat();
 

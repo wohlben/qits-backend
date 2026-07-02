@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.agent.control;
 
+import eu.wohlben.qits.domain.command.control.CommandRegistry;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.error.BadRequestException;
@@ -60,6 +61,8 @@ public class AgentLaunchService {
 
   @Inject CommandService commandService;
 
+  @Inject CommandRegistry commandRegistry;
+
   @Inject RepositoryRepository repositoryRepository;
 
   @ConfigProperty(name = "qits.actions-mcp.url", defaultValue = "http://localhost:8080/mcp/actions")
@@ -94,8 +97,15 @@ public class AgentLaunchService {
             .skipPermissions()
             .chat();
 
-    return commandService.launchChat(
-        repoId, worktreeId, nameFor(scope), spec.script(), spec.environment());
+    CommandDto command =
+        commandService.launchChat(
+            repoId, worktreeId, nameFor(scope), spec.script(), spec.environment());
+    if (initialContext != null && !initialContext.isBlank()) {
+      // Seed the conversation as the first user turn. A stream-json chat only speaks over stdin,
+      // so the seed can't be a CLI argument; the pipe buffers it until claude starts reading.
+      commandRegistry.chatSend(command.id(), initialContext);
+    }
+    return command;
   }
 
   /**

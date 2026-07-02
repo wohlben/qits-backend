@@ -12,6 +12,7 @@ api/featureFlowPhaseActionController.service.ts
 api/featureFlowPhaseController.service.ts
 api/featureFlowPhaseStepController.service.ts
 api/projectController.service.ts
+api/promptRefinementController.service.ts
 api/reactiveEchoController.service.ts
 api/repositoryController.service.ts
 api/worktreeController.service.ts
@@ -68,6 +69,7 @@ model/mergeBranchRequest.ts
 model/mergeWorktreeRequest.ts
 model/models.ts
 model/projectDto.ts
+model/refinePromptRequest.ts
 model/repositoryArchetype.ts
 model/repositoryDto.ts
 model/response.ts
@@ -127,6 +129,7 @@ model/response57.ts
 model/response58.ts
 model/response59.ts
 model/response6.ts
+model/response60.ts
 model/response7.ts
 model/response8.ts
 model/response9.ts
