@@ -64,6 +64,31 @@ describe('buildFileTree', () => {
 
     expect(tree.map((n) => n.label)).toEqual(['kept.ts']);
   });
+
+  it('defaults directories to expanded and attaches no icons', () => {
+    const tree = buildFileTree([file('src/a.ts')]);
+
+    expect(tree[0].expanded).toBe(true);
+    expect(tree[0].icon).toBeUndefined();
+    expect(tree[0].children![0].icon).toBeUndefined();
+  });
+
+  it('collapses directories and attaches folder/file icons when asked', () => {
+    const tree = buildFileTree([{ path: 'src/a.ts' }], { expanded: false, icons: true });
+
+    const dir = tree[0];
+    expect(dir.expanded).toBe(false);
+    expect(dir.icon).toBe('lucideFolder');
+    expect(dir.children![0].icon).toBe('lucideFile');
+  });
+
+  it('works with a plain { path } payload (generic over the item type)', () => {
+    const tree = buildFileTree(['b.ts', 'a/c.ts'].map((path) => ({ path })));
+
+    // directory 'a' sorts before file 'b.ts'; the leaf carries its item as data
+    expect(tree.map((n) => n.label)).toEqual(['a', 'b.ts']);
+    expect(tree[1].data).toEqual({ path: 'b.ts' });
+  });
 });
 
 function leafByPath(nodes: FileTreeNode[], path: string): FileTreeNode | undefined {

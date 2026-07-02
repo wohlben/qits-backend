@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { LayoutImports } from '@/shared/components/layout';
@@ -9,10 +9,12 @@ import { MainNavigationComponent } from '../main-navigation/main-navigation.comp
   imports: [...LayoutImports, RouterOutlet, MainNavigationComponent],
   template: `
     <z-layout>
-      <z-sidebar zCollapsible [zWidth]="240" [zCollapsedWidth]="64">
+      <z-sidebar zCollapsible [zWidth]="240" [zCollapsedWidth]="64" [(zCollapsed)]="collapsed">
         <div class="flex h-full flex-col gap-4 p-4">
           <div class="flex items-center gap-2 px-2 text-lg font-semibold">
-            <span class="truncate">QITS</span>
+            @if (!collapsed()) {
+              <span class="truncate">QITS</span>
+            }
           </div>
 
           <app-main-navigation />
@@ -28,4 +30,6 @@ import { MainNavigationComponent } from '../main-navigation/main-navigation.comp
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MainLayoutComponent {}
+export class MainLayoutComponent {
+  protected readonly collapsed = signal(false);
+}

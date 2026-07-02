@@ -132,6 +132,7 @@ model/response59.ts
 model/response6.ts
 model/response60.ts
 model/response61.ts
+model/response62.ts
 model/response7.ts
 model/response8.ts
 model/response9.ts
@@ -149,6 +150,7 @@ model/updateProjectRequest.ts
 model/worktreeDto.ts
 model/worktreeEventDto.ts
 model/worktreeEventType.ts
+model/worktreeFileContentDto.ts
 model/worktreeHistoryDetailDto.ts
 model/worktreeHistoryDto.ts
 model/worktreeStatus.ts

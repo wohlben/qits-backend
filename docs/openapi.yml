@@ -817,44 +817,44 @@ components:
     Response53:
       type: object
       properties:
+        paths:
+          type: array
+          items:
+            type: string
+    Response54:
+      type: object
+      properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry9"
-    Response54:
+    Response55:
       type: object
       properties:
         output:
           type: string
-    Response55:
+    Response56:
       type: object
       properties:
         success:
           type: boolean
-    Response56:
+    Response57:
       type: object
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeDto"
-    Response57:
+    Response58:
       type: object
       properties:
         files:
           type: array
           items:
             type: string
-    Response58:
+    Response59:
       type: object
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeHistoryDetailDto"
-    Response59:
-      type: object
-      properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry10"
     Response6:
       type: object
       properties:
@@ -863,9 +863,16 @@ components:
     Response60:
       type: object
       properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry10"
+    Response61:
+      type: object
+      properties:
         worktree:
           $ref: "#/components/schemas/WorktreeHistoryDetailDto"
-    Response61:
+    Response62:
       type: object
       properties:
         text:
@@ -1041,6 +1048,15 @@ components:
       - UPDATED_FROM_PARENT
       - INTEGRATED
       - ABANDONED
+    WorktreeFileContentDto:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        binary:
+          type: boolean
     WorktreeHistoryDetailDto:
       type: object
       properties:
@@ -2112,7 +2128,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response59"
+                $ref: "#/components/schemas/Response60"
       summary: List
       tags:
       - Worktree History Controller
@@ -2142,7 +2158,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response58"
+                $ref: "#/components/schemas/Response59"
       summary: Update
       tags:
       - Worktree History Controller
@@ -2165,7 +2181,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response60"
+                $ref: "#/components/schemas/Response61"
       summary: Get
       tags:
       - Worktree History Controller
@@ -2281,7 +2297,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response53"
+                $ref: "#/components/schemas/Response54"
       summary: List
       tags:
       - Worktree Controller
@@ -2304,7 +2320,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response56"
+                $ref: "#/components/schemas/Response57"
         "400":
           description: Bad Request
       summary: Create
@@ -2360,7 +2376,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response57"
+                $ref: "#/components/schemas/Response58"
       summary: Conflicts
       tags:
       - Worktree Controller
@@ -2389,7 +2405,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response55"
+                $ref: "#/components/schemas/Response56"
         "400":
           description: Bad Request
       summary: Discard
@@ -2414,8 +2430,58 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response54"
+                $ref: "#/components/schemas/Response55"
       summary: Fast Forward
+      tags:
+      - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/files:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response53"
+      summary: List Files
+      tags:
+      - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/files/content:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorktreeFileContentDto"
+      summary: File Content
       tags:
       - Worktree Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/incoming-commits:
@@ -2563,7 +2629,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response61"
+                $ref: "#/components/schemas/Response62"
         "400":
           description: Bad Request
       summary: Transcribe

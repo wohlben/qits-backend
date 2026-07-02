@@ -2,9 +2,11 @@ package eu.wohlben.qits.domain.repository.api;
 
 import eu.wohlben.qits.domain.repository.control.CommitService;
 import eu.wohlben.qits.domain.repository.control.ResolveConflictService;
+import eu.wohlben.qits.domain.repository.control.WorktreeFilesService;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.dto.CommitLogDto;
 import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
+import eu.wohlben.qits.domain.repository.dto.WorktreeFileContentDto;
 import eu.wohlben.qits.domain.repository.mapper.WorktreeMapper;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -15,6 +17,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 
@@ -28,6 +31,8 @@ public class WorktreeController {
   @Inject CommitService commitService;
 
   @Inject ResolveConflictService resolveConflictService;
+
+  @Inject WorktreeFilesService worktreeFilesService;
 
   @Inject WorktreeMapper worktreeMapper;
 
@@ -144,5 +149,26 @@ public class WorktreeController {
       @Valid DiscardWorktreeRequest request) {
     worktreeService.discardWorktree(repoId, worktreeId, request == null ? null : request.result());
     return new DiscardWorktreeRequest.Response(true);
+  }
+
+  public static record ListWorktreeFilesRequest() {
+    public record Response(List<String> paths) {}
+  }
+
+  @GET
+  @Path("/{worktreeId}/files")
+  public ListWorktreeFilesRequest.Response listFiles(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    return new ListWorktreeFilesRequest.Response(
+        worktreeFilesService.listFiles(repoId, worktreeId));
+  }
+
+  @GET
+  @Path("/{worktreeId}/files/content")
+  public WorktreeFileContentDto fileContent(
+      @PathParam("repoId") String repoId,
+      @PathParam("worktreeId") String worktreeId,
+      @QueryParam("path") String path) {
+    return worktreeFilesService.readFile(repoId, worktreeId, path);
   }
 }
