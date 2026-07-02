@@ -2,10 +2,21 @@ import { signal } from '@angular/core';
 
 export type RecorderStatus = 'idle' | 'recording';
 
+/** RMS above this counts as speech (autoGainControl keeps real mics in a sane range). */
+const SPEECH_RMS = 0.012;
+/** A pause this long ends the current utterance and ships it for transcription. */
+const SILENCE_CUT_MS = 700;
+/** Force-cut ceiling so uninterrupted speech still streams (and stays in Parakeet's window). */
+const MAX_SEGMENT_MS = 20000;
+/** While nothing has been said yet, keep only this much trailing audio as pre-roll. */
+const PRE_ROLL_CHUNKS = 4;
+
 /**
- * Records the microphone into a 16 kHz mono 16-bit WAV, returned base64-encoded on stop for the
- * server-side transcription endpoint. Plain Web Audio — no speech processing happens in the
- * browser (that's Parakeet's job on the backend).
+ * Records the microphone as 16 kHz mono PCM and streams it out in pause-delimited segments:
+ * a simple energy gate marks speech, and ~700 ms of silence after speech cuts an utterance,
+ * which is WAV-encoded, base64'd and handed to `onSegment` while recording continues. That's
+ * what makes the transcript appear while the user is still talking — each utterance is
+ * transcribed server-side (Parakeet) as soon as it's spoken. `stop()` flushes the tail.
  */
 export class WavRecorder {
   readonly status = signal<RecorderStatus>('idle');
@@ -17,7 +28,14 @@ export class WavRecorder {
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private processor: ScriptProcessorNode | null = null;
+
   private chunks: Float32Array[] = [];
+  private totalSamples = 0;
+  private segmentStartSample = 0;
+  private lastSpeechSample = 0;
+  private hasSpeech = false;
+
+  constructor(private readonly onSegment: (audioBase64: string) => void) {}
 
   async start(): Promise<void> {
     if (this.status() !== 'idle') {
@@ -50,17 +68,13 @@ export class WavRecorder {
         this.audioContext.state,
       );
       this.chunks = [];
+      this.totalSamples = 0;
+      this.segmentStartSample = 0;
+      this.lastSpeechSample = 0;
+      this.hasSpeech = false;
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-      this.processor.onaudioprocess = (event) => {
-        const data = event.inputBuffer.getChannelData(0);
-        this.chunks.push(new Float32Array(data));
-        let peak = 0;
-        for (const v of data) {
-          peak = Math.max(peak, Math.abs(v));
-        }
-        this.level.set(Math.min(1, peak * 2));
-      };
+      this.processor.onaudioprocess = (event) => this.onAudio(event.inputBuffer.getChannelData(0));
       this.source.connect(this.processor);
       // A ScriptProcessorNode only fires when wired into the graph; its output stays silent
       // because we never write the output buffer.
@@ -73,17 +87,55 @@ export class WavRecorder {
     }
   }
 
-  /** Stops recording and returns the captured audio as a base64 WAV, or null if nothing came in. */
-  stop(): string | null {
+  /** Stops recording and flushes whatever utterance is still in the buffer via `onSegment`. */
+  stop(): void {
     if (this.status() !== 'recording') {
-      return null;
+      return;
     }
     this.cleanup();
-    const sampleCount = this.chunks.reduce((n, c) => n + c.length, 0);
-    log('stopped; captured', sampleCount, 'samples');
-    if (sampleCount === 0) {
-      return null;
+    if (this.hasSpeech) {
+      this.emitSegment('stop-flush');
     }
+    this.chunks = [];
+    this.hasSpeech = false;
+  }
+
+  private onAudio(data: Float32Array): void {
+    this.chunks.push(new Float32Array(data));
+    this.totalSamples += data.length;
+
+    let sumSquares = 0;
+    for (const v of data) {
+      sumSquares += v * v;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
+    this.level.set(Math.min(1, rms * 8));
+
+    if (rms > SPEECH_RMS) {
+      this.hasSpeech = true;
+      this.lastSpeechSample = this.totalSamples;
+    }
+
+    const rate = this.audioContext?.sampleRate ?? 16000;
+    if (!this.hasSpeech) {
+      // Nothing said yet — don't hoard silence, keep a short pre-roll only.
+      while (this.chunks.length > PRE_ROLL_CHUNKS) {
+        const dropped = this.chunks.shift();
+        this.segmentStartSample += dropped?.length ?? 0;
+      }
+      return;
+    }
+    const silenceMs = ((this.totalSamples - this.lastSpeechSample) / rate) * 1000;
+    const segmentMs = ((this.totalSamples - this.segmentStartSample) / rate) * 1000;
+    if (silenceMs >= SILENCE_CUT_MS) {
+      this.emitSegment('pause');
+    } else if (segmentMs >= MAX_SEGMENT_MS) {
+      this.emitSegment('max-length');
+    }
+  }
+
+  private emitSegment(reason: string): void {
+    const sampleCount = this.chunks.reduce((n, c) => n + c.length, 0);
     const samples = new Float32Array(sampleCount);
     let offset = 0;
     for (const chunk of this.chunks) {
@@ -91,7 +143,10 @@ export class WavRecorder {
       offset += chunk.length;
     }
     this.chunks = [];
-    return toBase64(encodeWav(samples, this.audioContext?.sampleRate ?? 16000));
+    this.segmentStartSample = this.totalSamples;
+    this.hasSpeech = false;
+    log('segment cut (' + reason + '):', (sampleCount / 16000).toFixed(1) + 's');
+    this.onSegment(toBase64(encodeWav(samples, this.audioContext?.sampleRate ?? 16000)));
   }
 
   private cleanup(): void {
