@@ -72,6 +72,28 @@ Follows the strict pages → pattern → ui layering.
 
 New dependencies: `@codemirror/{state,view,language,language-data,theme-one-dark}`.
 
+### Filtering the tree
+
+Two layers narrow the tree, both driven by a pure util
+(`shared/utils/filter-file-paths.ts`) reused by the tree and the dialog:
+
+- **Top filter input** — fuzzy match on the **filename**; the tree auto-expands to reveal matches
+  (bound via the tree's `[zExpandAll]` — `z-tree` ignores `node.expanded`, so expansion is driven
+  through its service instead).
+- **Advanced filter dialog** (icon left of the input, opened via `ZardDialogService` with an inline
+  `<ng-template>`) — a list of criteria: **exact** (full path ==), **fuzzy** (subsequence over the
+  full path), **includes** (path substring), **excludes** (inverted). The tree is the **union** of
+  the include criteria (or all files if none) **minus** excludes; the dialog shows that "visible
+  files (N)" set live, then the top input does a final filename pass. The filter list is a public,
+  programmatically-settable API on the component (`setFilters`/`addFilter`/`updateFilter`/… — meant
+  to be populated in code later; the dialog just views/edits it).
+- **Smart-case** everywhere: an all-lowercase query matches case-insensitively; any uppercase letter
+  makes it case-sensitive.
+- **Wildcards in fuzzy**: a fuzzy query using `*` (any run) or `?` (one char) is treated as an
+  anchored glob instead of a subsequence — e.g. `.*ignore` finds `.gitignore`/`.dockerignore`,
+  `*.ts` matches `main.ts` but not `main.tsx`. Applies to both the top input and the dialog's fuzzy
+  kind.
+
 ### App sidebar collapse fix
 
 Fixed as part of this work: the left navigation's collapse toggle (the `<` at the bottom) did
@@ -96,8 +118,12 @@ the wordmark hides on the rail. No edit to the CLI-managed ZardUI component.
   400** (regression for the path-traversal fix); missing file → 404.
 - `build-file-tree.spec.ts` — the new `expanded`/`icons` options and the generic `{ path }`
   payload, alongside the existing nesting/sorting cases.
+- `filter-file-paths.spec.ts` — fuzzy subsequence, smart-case, glob wildcards (`.*ignore`, `*.ts`,
+  `?`); `applyPathFilters` union/exact/excludes and the only-excludes case; the full pipeline's
+  final filename pass.
 - `worktree-file-browser.component.spec.ts` — reference add/de-dupe, remove, and that
-  `currentHighlights` reflects only the open file.
+  `currentHighlights` reflects only the open file; the filter API (`add`/`update`/`remove`) and that
+  `filteredPaths`/`dialogVisiblePaths` reflect includes/excludes and the top name query.
 - `code-viewer.component.spec.ts` — binary and empty-content placeholders mount no editor.
 - Verified end-to-end in the running app (headless browser): file tree renders, clicking a file
   shows highlighted content, selecting lines produces a chip + highlight, removing the chip clears

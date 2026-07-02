@@ -7,23 +7,28 @@ import { WorktreeControllerService } from '@/api/api/worktreeController.service'
 import { EDarkModes, ZardDarkMode } from '@/shared/services/dark-mode';
 import { WorktreeFileBrowserComponent } from './worktree-file-browser.component';
 
+const PATHS = ['README.md', 'domain/src/App.java', 'domain/src/AppTest.java', 'service/main.ts'];
+
 describe('WorktreeFileBrowserComponent', () => {
   const worktreeService = {
-    apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet: vi
-      .fn()
-      .mockReturnValue(of({ paths: ['README.md', 'src/app/main.ts'] })),
+    apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet: vi.fn().mockReturnValue(of({ paths: PATHS })),
     apiRepositoriesRepoIdWorktreesWorktreeIdFilesContentGet: vi
       .fn()
       .mockReturnValue(of({ path: 'README.md', content: '# Title\n', binary: false })),
   };
   const darkMode = { themeMode: () => EDarkModes.LIGHT };
+  let queryClient: QueryClient;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    queryClient = new QueryClient();
+    // Seed the file list so `filteredPaths`/`tree` are deterministic without awaiting a fetch.
+    queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], PATHS);
+
     await TestBed.configureTestingModule({
       imports: [WorktreeFileBrowserComponent],
       providers: [
-        provideTanStackQuery(new QueryClient()),
+        provideTanStackQuery(queryClient),
         { provide: WorktreeControllerService, useValue: worktreeService },
         { provide: ZardDarkMode, useValue: darkMode },
       ],
@@ -73,5 +78,44 @@ describe('WorktreeFileBrowserComponent', () => {
     cmp.removeReference(ref);
 
     expect(cmp.references()).toEqual([]);
+  });
+
+  it('exposes a programmatic filter API (add / update / remove / clear)', () => {
+    const cmp = createComponent().componentInstance;
+
+    const id = cmp.addFilter({ kind: 'includes', query: 'domain' });
+    expect(cmp.filters()).toEqual([{ id, kind: 'includes', query: 'domain', enabled: true }]);
+    expect(cmp.hasActiveFilters()).toBe(true);
+
+    cmp.updateFilter(id, { query: 'service', enabled: false });
+    expect(cmp.filters()[0]).toMatchObject({ query: 'service', enabled: false });
+    expect(cmp.hasActiveFilters()).toBe(false); // disabled → not active
+
+    cmp.removeFilter(id);
+    expect(cmp.filters()).toEqual([]);
+  });
+
+  it('narrows the visible paths by the dialog filters (union minus excludes)', () => {
+    const cmp = createComponent().componentInstance;
+
+    cmp.setFilters([{ id: 'a', kind: 'includes', query: 'domain', enabled: true }]);
+    expect(cmp.filteredPaths()).toEqual(['domain/src/App.java', 'domain/src/AppTest.java']);
+
+    cmp.setFilters([
+      { id: 'a', kind: 'includes', query: 'domain', enabled: true },
+      { id: 'b', kind: 'excludes', query: 'Test', enabled: true },
+    ]);
+    expect(cmp.filteredPaths()).toEqual(['domain/src/App.java']);
+  });
+
+  it('applies the top name query as a final filename pass; the dialog list ignores it', () => {
+    const cmp = createComponent().componentInstance;
+    cmp.setFilters([{ id: 'a', kind: 'includes', query: 'domain', enabled: true }]);
+    cmp.nameQuery.set('apptest');
+
+    // final filename pass keeps only AppTest.java
+    expect(cmp.filteredPaths()).toEqual(['domain/src/AppTest.java']);
+    // the dialog's "visible files" preview reflects only the dialog filters
+    expect(cmp.dialogVisiblePaths()).toEqual(['domain/src/App.java', 'domain/src/AppTest.java']);
   });
 });
