@@ -74,7 +74,7 @@ export class SpeechTranscriber {
     } catch (e) {
       this.releaseStream();
       this.status.set('idle');
-      this.error.set(e instanceof Error ? e.message : String(e));
+      this.error.set(describeStartError(e));
     }
   }
 
@@ -89,4 +89,28 @@ export class SpeechTranscriber {
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
   }
+}
+
+/** Turns a getUserMedia/model-load failure into a message the user can act on. */
+function describeStartError(e: unknown): string {
+  if (e instanceof DOMException) {
+    switch (e.name) {
+      case 'NotAllowedError':
+      case 'SecurityError':
+        return (
+          'Microphone access was denied. Allow the microphone for this site in the browser ' +
+          '(padlock icon next to the address bar → Site settings → Microphone), then try again. ' +
+          'On Windows also check Settings → Privacy → Microphone.'
+        );
+      case 'NotFoundError':
+      case 'OverconstrainedError':
+        return 'No microphone was found. Connect one (or check the browser can see it) and try again.';
+      case 'NotReadableError':
+        return 'The microphone is already in use by another application.';
+    }
+  }
+  const message = e instanceof Error ? e.message : String(e);
+  return /fetch|network|load/i.test(message)
+    ? message + ' — the speech model download may have failed; check the network.'
+    : message;
 }
