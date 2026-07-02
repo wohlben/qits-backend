@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorktreeDto } from './worktreeDto';
 
 
 export interface Response56 { 
-    worktree?: WorktreeDto;
+    success?: boolean;
 }
 
