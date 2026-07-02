@@ -17,11 +17,34 @@ All top-level feature routes MUST live under:
 src/app/pages/
 ```
 
-Each feature gets its own directory. Routes are lazy-loaded from `app.routes.ts`.
+Each feature gets its own directory exporting a `*.routes.ts`, lazy-loaded via `loadChildren` from `app.routes.ts`. Everything renders inside `MainLayoutComponent` (the sidebar shell).
+
+## Current Route Map
+
+| Route | Page | Notes |
+|-------|------|-------|
+| `/` | `HomePage` | placeholder dashboard |
+| `/projects` | `ProjectListPage` | standard entity pattern |
+| `/projects/new`, `/projects/:id`, `/projects/:id/edit` | `ProjectFormPage` / `ProjectDetailPage` / `ProjectFormPage` | |
+| `/projects/:projectId/repositories/new` | `ProjectRepositoryNewPage` | child created under parent scope |
+| `/projects/:projectId/feature-flows/new` | `ProjectFeatureFlowNewPage` | child created under parent scope |
+| `/repositories/:repoId` | `RepositoryDetailPage` | drill-down only — no list route |
+| `/repositories/:repoId/branch/:branchName/commits` | `BranchCommitsPage` | |
+| `/repositories/:repoId/branch/:branchName/commits/:commitHash` | `CommitDetailPage` | optional `?parent=` |
+| `/repositories/:repoId/worktrees/:worktreeId` | `WorktreeDetailPage` | file browser |
+| `/repositories/:repoId/worktrees/:worktreeId/wip` | `WorktreeWipPage` | speak-to-prompt |
+| `/repositories/:repoId/history` | `WorktreeHistoryPage` | |
+| `/repositories/:repoId/history/:id` | `WorktreeHistoryDetailPage` | |
+| `/commands` | `CommandListPage` | records, not forms — no `new`/`edit` |
+| `/commands/:commandId` | `CommandTerminalPage` | dispatches on command kind + status |
+| `/action-configurations` (+ `new`, `:id`, `:id/edit`) | standard entity pattern | secondary nav from Feature Flows |
+| `/feature-flows` (+ `:id`, `:id/edit`) | standard entity pattern | create lives under `/projects/:projectId/feature-flows/new` |
+
+Sidebar navigation covers only Home, Projects, Commands, and Feature Flows; everything else is reached by drill-down or secondary nav actions.
 
 ## Standard Entity Route Pattern
 
-For a primary UI entity (e.g., `Project`, `Repository`, `FeatureFlow`), the route structure is:
+For a primary UI entity (e.g., `Project`, `ActionConfiguration`), the route structure is:
 
 | Route | Purpose | Embedded Component |
 |-------|---------|-------------------|
@@ -45,6 +68,15 @@ The detail route (`:id`) displays the entity and **all directly related child en
 
 These related entities are shown as lists or cards. They are **not** routed independently unless they are top-level concerns in their own right. Instead, they are embedded as smart sub-components inside the detail page (see Builder Pattern below).
 
+## Established Deviations from the Standard Pattern
+
+These are deliberate, and new routes in the same situations should follow them:
+
+- **Parent-scoped creation**: an entity that only exists under an aggregate gets its create route under the parent (`/projects/:projectId/repositories/new`), not a top-level `new`.
+- **Drill-down entities**: entities with no standalone "list all" requirement (repositories, worktrees) have no list route; they are reached from their parent's detail page.
+- **Record views**: system-produced records (commands, worktree history) have list + detail routes but no `new`/`edit` — creation happens through domain flows, not forms. Narrative edits (history preamble/result) mutate inline on the detail page.
+- **View dispatch inside one route**: `/commands/:commandId` renders a live chat, a chat replay, a live terminal, or a read-only log depending on the command's kind and status. Route on the entity; let the page pick the representation.
+
 ## Builder Pattern (Nested Sub-Entities)
 
 Some UI concepts span multiple hierarchies and do **not** deserve their own top-level routes. They are managed inline inside a parent detail page.
@@ -60,50 +92,56 @@ Some UI concepts span multiple hierarchies and do **not** deserve their own top-
 Inside the parent detail page, render a list of sub-entity cards. Each card shows read-only data and provides an action row:
 
 - **Add** → opens the same sub-entity form in "create" mode.
-- **Pencil icon** on a card → opens the same sub-entity form in "update" mode, pre-populated with that card's data.
+- **Edit** on a card → switches that card's surface into edit mode.
 - **Remove** → deletes the sub-entity after confirmation.
 
-The sub-entity form component follows the exact same reusability rule as top-level forms: one component handles both create and update via an optional `@Input()`.
+The sub-entity form/edit surface follows the exact same reusability rule as top-level forms: one component handles both create and update via an optional `input()`.
 
 ### Example: Feature Flow Phases inside a Feature Flow
 
 ```
 FeatureFlowDetailPage
-├── FeatureFlowHeader (read-only summary)
-├── FeatureFlowPhaseList
-│   ├── FeatureFlowPhaseCard (read-only)
-│   │   └── [Pencil] → opens FeatureFlowPhaseForm (update mode)
-│   ├── FeatureFlowPhaseCard
-│   └── [Add Phase] → opens FeatureFlowPhaseForm (create mode)
-└── FeatureFlowActions
+└── FeatureFlowPhaseBuilderComponent            (pattern/feature-flow/)
+    ├── FeatureFlowPhaseCardComponent           (read mode ⇄ one edit mode per phase)
+    │   ├── FeatureFlowStepBuilderComponent     (steps editable while phase is in edit mode)
+    │   └── FeatureFlowStepCardComponent
+    └── [Add Phase] → new card directly in edit mode
 ```
 
-`FeatureFlowPhase` has **no** `/feature-flow-phases` route. It is strictly a nested builder inside `/feature-flows/:id`.
+`FeatureFlowPhase` has **no** `/feature-flow-phases` route. It is strictly a nested builder inside `/feature-flows/:id`. Note the UX rule from the domain docs: there is a **single edit mode per phase** — steps and actions inherit editability from the parent phase, never their own toggles.
 
 ## File Structure Example
 
+Pages are thin shells; the smart components they embed live in `pattern/`, presentational pieces in `ui/` (see `CLAUDE.md` for the full layering):
+
 ```
-src/app/pages/
-└── projects/
-    ├── projects.routes.ts          # Lazy-loaded feature routes
-    ├── project-list/
-    │   └── project-list.page.ts    # Smart: fetches list, renders table
-    ├── project-form/
-    │   └── project-form.page.ts    # Smart: handles create + update
-    ├── project-detail/
-    │   └── project-detail.page.ts  # Smart: fetches project + related worktrees
+src/app/
+├── pages/
+│   └── projects/
+│       ├── projects.routes.ts             # Lazy-loaded feature routes
+│       ├── project-list/
+│       │   └── project-list.page.ts       # Thin shell around <app-project-list>
+│       ├── project-form/
+│       │   └── project-form.page.ts       # Thin shell; create + update
+│       └── project-detail/
+│           └── project-detail.page.ts     # Thin shell; composes smart children
+├── pattern/
+│   └── project/
+│       ├── project-list.component.ts      # Smart: fetches list (TanStack Query)
+│       └── project-create-update-form.component.ts  # Smart: POST/PUT
+└── ui/
     └── components/
-        └── worktree-card/
-            └── worktree-card.component.ts   # Dumb presentation (rarely here)
+        └── repository/
+            └── repository-card.component.ts  # Dumb presentation
 ```
 
 ## Architectural Rules
 
-1. **Routes are thin**. A `.page.ts` component should primarily compose smart child components and wire router params/outputs. It should not implement business logic inline.
-2. **Prefer smart components**. If a component needs data, it fetches it. If it needs to mutate, it calls the API. Presentational components (pure `@Input()` / `@Output()`) live in a shared `ui/` or `components/` library, not inside `pages/`.
+1. **Routes are thin**. A `.page.ts` component should primarily compose smart child components and wire router params/outputs. It should not implement business logic inline. Every page wraps `<app-page-layout>` (which also centralizes query pending/error states via its `[request]` input).
+2. **Prefer smart components**. If a component needs data, it fetches it. If it needs to mutate, it calls the API. Smart components live in `pattern/`; presentational components (pure `input()` / `output()`) live in `ui/`, not inside `pages/`.
 3. **Lazy load every feature**. Each folder under `pages/` exports a `Routes` array loaded via `loadChildren` in `app.routes.ts`.
 4. **Standalone only**. Page components are standalone. Do not create `NgModule`s for routing.
-5. **State inside smart components**. Use `@ngrx/signals` (`signalStore` or `signalState`) for local or shared feature state. Do not hoist transient form state into global stores unless cross-route sharing is required.
+5. **State inside smart components**. Use `@ngrx/signals` (`signalStore` or `signalState`) for local or shared feature state; server state goes through TanStack Query keyed by entity arrays. Do not hoist transient form state into global stores unless cross-route sharing is required.
 6. **No globals in templates**. Do not call `new Date()` or similar inside templates. Derive values via `computed()` or pipe them.
 
 ## Component Scope Checklist
@@ -115,3 +153,4 @@ Before adding a new route, ask:
 - [ ] Is my page component under ~150 lines? If not, extract a smart child component.
 - [ ] Are related entities shown inline (builder) or routed independently?
 - [ ] Is the route lazy-loaded and declared under `src/app/pages/`?
+- [ ] Does one of the established deviations above apply (parent-scoped create, drill-down, record view, view dispatch)?
