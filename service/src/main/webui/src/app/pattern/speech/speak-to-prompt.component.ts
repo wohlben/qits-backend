@@ -33,7 +33,9 @@ import { WavRecorder } from './wav-recorder';
             {{ recording() ? 'Stop recording' : 'Record' }}
           </button>
           @if (recording()) {
-            <span class="text-sm text-muted-foreground">Speak, then press Stop</span>
+            <span class="text-sm text-muted-foreground">
+              Speak — text appears after each pause
+            </span>
             <!-- Live input level: if this stays flat while speaking, no audio reaches the page. -->
             <span
               class="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
@@ -44,7 +46,8 @@ import { WavRecorder } from './wav-recorder';
                 [style.width.%]="recorder.level() * 100"
               ></span>
             </span>
-          } @else if (transcribeMutation.isPending()) {
+          }
+          @if (transcribeMutation.isPending()) {
             <span class="text-sm text-muted-foreground">Transcribing…</span>
           }
         </div>
@@ -144,7 +147,10 @@ export class SpeakToPromptComponent {
   /** Null until a refinement (or "as-is") produced something — gates the launch section. */
   readonly refinedPrompt = signal<string | null>(null);
 
-  readonly recorder = new WavRecorder();
+  /** Utterance segments stream in while recording; uploads are serialized to keep text order. */
+  readonly recorder = new WavRecorder((audioBase64) => this.enqueueSegment(audioBase64));
+
+  private uploadQueue: Promise<unknown> = Promise.resolve();
 
   recording() {
     return this.recorder.status() === 'recording';
@@ -152,13 +158,16 @@ export class SpeakToPromptComponent {
 
   toggleRecording() {
     if (this.recording()) {
-      const audioBase64 = this.recorder.stop();
-      if (audioBase64) {
-        this.transcribeMutation.mutate(audioBase64);
-      }
+      this.recorder.stop();
     } else {
       void this.recorder.start();
     }
+  }
+
+  private enqueueSegment(audioBase64: string) {
+    this.uploadQueue = this.uploadQueue.then(() =>
+      this.transcribeMutation.mutateAsync(audioBase64).catch(() => undefined),
+    );
   }
 
   readonly transcribeMutation = injectMutation(() => ({

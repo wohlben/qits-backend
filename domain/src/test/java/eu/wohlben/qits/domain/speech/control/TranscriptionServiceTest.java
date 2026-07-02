@@ -37,10 +37,10 @@ public class TranscriptionServiceTest {
     }
   }
 
-  /** Records executed commands and plays back canned results — no venv or python involved. */
+  /** Records bootstrap commands and plays back canned results — no venv or python involved. */
   static class FakeProcessExecutor extends ProcessExecutor {
     final List<List<String>> commands = new ArrayList<>();
-    Result next = new Result(0, "hello world\n", "", false);
+    Result next = new Result(0, "", "", false);
 
     @Override
     public Result exec(List<String> command, Path cwd, Map<String, String> env, Duration timeout) {
@@ -49,41 +49,71 @@ public class TranscriptionServiceTest {
     }
   }
 
+  /** Records the staged WAV and plays back a canned transcript — no resident worker involved. */
+  static class FakeSpeechWorker extends SpeechWorker {
+    Path lastWav;
+    byte[] lastWavBytes;
+    RuntimeException failWith;
+
+    @Override
+    public synchronized String transcribe(Path wav) {
+      this.lastWav = wav;
+      try {
+        this.lastWavBytes = Files.readAllBytes(wav);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      if (failWith != null) {
+        throw failWith;
+      }
+      return "hello world";
+    }
+
+    @Override
+    public synchronized void ensureProcess() {}
+  }
+
   @Inject TranscriptionService service;
 
   FakeProcessExecutor executor;
+  FakeSpeechWorker worker;
 
   @BeforeEach
   public void setUp() {
     executor = new FakeProcessExecutor();
+    worker = new FakeSpeechWorker();
     QuarkusMock.installMockForType(executor, ProcessExecutor.class);
+    QuarkusMock.installMockForType(worker, SpeechWorker.class);
   }
 
   @Test
-  public void bootstrapsTheVenvAndRunsTheRunnerScript() {
+  public void bootstrapsTheVenvAndStagesTheAudioForTheWorker() {
     String text = service.transcribe(new byte[] {1, 2, 3});
 
     assertEquals("hello world", text);
     // No venv exists in the temp home, so it bootstraps (venv + pip) before transcribing.
-    assertEquals(3, executor.commands.size());
+    assertEquals(2, executor.commands.size());
     assertTrue(
         String.join(" ", executor.commands.get(0)).contains("-m venv"),
         executor.commands.toString());
     assertTrue(
         String.join(" ", executor.commands.get(1)).contains("onnx-asr"),
         executor.commands.toString());
-    List<String> transcribe = executor.commands.get(2);
-    assertTrue(transcribe.get(1).endsWith("transcribe.py"), transcribe.toString());
-    assertTrue(transcribe.get(2).endsWith(".wav"), transcribe.toString());
+    // The worker received the staged bytes; the temp file is cleaned up afterwards.
+    assertEquals(
+        List.of((byte) 1, (byte) 2, (byte) 3),
+        List.of(worker.lastWavBytes[0], worker.lastWavBytes[1], worker.lastWavBytes[2]));
+    assertTrue(worker.lastWav.toString().endsWith(".wav"), worker.lastWav.toString());
+    assertTrue(!Files.exists(worker.lastWav), "staged wav should be deleted");
   }
 
   @Test
-  public void materializesTheRunnerScriptIntoTheSpeechHome() {
+  public void materializesTheWorkerScriptIntoTheSpeechHome() {
     service.transcribe(new byte[] {1});
 
-    // The runner path is whatever the service actually invoked (config fields are proxied away).
-    Path script = Path.of(executor.commands.get(2).get(1));
-    assertTrue(Files.exists(script), "runner script should be written to " + script);
+    // The speech home is where the staged wav went (config fields are proxied away).
+    Path script = worker.lastWav.getParent().getParent().resolve("transcribe_worker.py");
+    assertTrue(Files.exists(script), "worker script should be written to " + script);
   }
 
   @Test
@@ -98,18 +128,11 @@ public class TranscriptionServiceTest {
   }
 
   @Test
-  public void runnerFailureBecomesAServerError() {
-    executor.next = new ProcessExecutor.Result(1, "", "ModuleNotFoundError: onnx_asr", false);
+  public void workerFailurePropagatesAsAServerError() {
+    worker.failWith = new InternalServerErrorException("Transcription worker failed: boom");
 
     InternalServerErrorException e =
         assertThrows(InternalServerErrorException.class, () -> service.transcribe(new byte[] {1}));
-    assertTrue(e.getMessage().contains("onnx_asr"), e.getMessage());
-  }
-
-  @Test
-  public void timeoutBecomesAServerError() {
-    executor.next = new ProcessExecutor.Result(137, "", "", true);
-
-    assertThrows(InternalServerErrorException.class, () -> service.transcribe(new byte[] {1}));
+    assertTrue(e.getMessage().contains("boom"), e.getMessage());
   }
 }

@@ -21,20 +21,24 @@ Related plans:
 ### Speech-to-text (server-side Parakeet)
 
 **`TranscriptionService`** (`domain/.../speech/control/`): transcribes browser-recorded
-WAVs by shelling out (via `ProcessExecutor`) to a small Python runner using
-[onnx-asr](https://github.com/istupakov/onnx-asr) with `nemo-parakeet-tdt-0.6b-v2`
-(int8-quantized ONNX, CPU-only — top-tier English accuracy, ~half Moonshine's word error
-rate). Everything is self-managed under `qits.speech.home` (`~/.qits/speech`):
+WAV segments with [onnx-asr](https://github.com/istupakov/onnx-asr) and
+`nemo-parakeet-tdt-0.6b-v2` (int8-quantized ONNX, CPU-only — top-tier English accuracy,
+~half Moonshine's word error rate). Everything is self-managed under `qits.speech.home`
+(`~/.qits/speech`):
 
 - The **venv bootstraps itself** (`python3 -m venv` + `pip install onnx-asr[cpu,hub]`) on
-  first use; the runner script (`domain/src/main/resources/speech/transcribe.py`) ships as
-  a classpath resource and is re-materialized on every bootstrap check.
-- The ~700 MB model downloads from the Hugging Face hub into its cache on first use; the
-  service **warms this up at startup** in the background (`qits.speech.warmup-on-start`,
-  set only in the service app — the cli never transcribes).
-- Recordings ≤25 s use plain `recognize()`; longer ones are segmented with silero VAD and
-  the segment texts joined (`transcribe.py`).
-- Transcription takes a few seconds on CPU; stdout of the runner is exactly the transcript.
+  first use; the worker script (`domain/src/main/resources/speech/transcribe_worker.py`)
+  ships as a classpath resource and is re-materialized on every bootstrap check.
+- **`SpeechWorker`** keeps one **resident python process** alive with the model loaded
+  (loading costs seconds; per-request spawning killed live-ness). Protocol: one WAV path
+  per stdin line, one JSON line (`{"text"}`/`{"error"}`) back. Requests are serialized; a
+  dead or wedged worker is killed and respawned once per request. Measured: an 11 s clip
+  transcribes in ~0.6 s round-trip (vs ~3.5 s with per-request spawning).
+- The ~700 MB model downloads from the Hugging Face hub into its cache on first worker
+  start; the service **warms this up at startup** in the background
+  (`qits.speech.warmup-on-start`, set only in the service app — the cli never transcribes).
+- Segments ≤25 s use plain `recognize()`; longer ones are segmented with silero VAD and
+  the segment texts joined (`transcribe_worker.py`).
 
 **`SpeechController`**: `POST /api/speech/transcriptions` `{audioBase64}` → `{text}`.
 Base64-in-JSON keeps the OpenAPI→generated-client chain trivial; clips are small (16 kHz
@@ -73,17 +77,22 @@ spawn (the pipe buffers until claude reads stdin).
 ### Frontend
 
 **`WavRecorder`** (`pattern/speech/wav-recorder.ts`): plain Web Audio — 16 kHz mono
-capture via ScriptProcessorNode, 16-bit PCM WAV encoding, base64 out. No ML in the
-browser, no npm deps. Live mic-level signal, gesture-safe AudioContext, chatty `[speech]`
-console logging (speech capture has many silent failure modes), and actionable
+capture via ScriptProcessorNode — that **streams pause-delimited utterance segments**: an
+RMS energy gate marks speech, ~700 ms of silence after speech cuts the utterance (force-cut
+at 20 s so uninterrupted speech still streams), which is WAV-encoded, base64'd and handed
+off while recording continues. The transcript therefore grows *while the user is still
+talking* — each utterance round-trips the resident worker in well under a second. No ML in
+the browser, no npm deps. Live mic-level signal, gesture-safe AudioContext, chatty
+`[speech]` console logging (speech capture has many silent failure modes), and actionable
 `getUserMedia` error messages (denied / no mic / mic busy).
 
 **WIP page** (`pages/repositories/worktree-wip/worktree-wip.page.ts`): shows the worktree
 (branch, parent, preamble as markdown) above `pattern/speech/speak-to-prompt.component.ts`
-— Record → Stop (uploads + "Transcribing…") → editable transcript → **Refine into
-prompt** (or "Use transcript as-is") → editable prompt → **Launch agent with this
-prompt** → navigates to `/commands/:id`. The worktrees query shares the key *and shape*
-of the branch list's (`['worktrees', repoId]` → `WorktreeDto[]`).
+— Record (text pops up at every pause; segment uploads are serialized to keep order;
+Stop flushes the tail) → editable transcript → **Refine into prompt** (or "Use transcript
+as-is") → editable prompt → **Launch agent with this prompt** → navigates to
+`/commands/:id`. The worktrees query shares the key *and shape* of the branch list's
+(`['worktrees', repoId]` → `WorktreeDto[]`).
 
 **Navigation**: `branch-row` gained an `openWip` output ("Work on it", worktree rows
 only), forwarded through `branch-tree` and handled in `branch-list`.
@@ -95,7 +104,10 @@ only), forwarded through `branch-tree` and handled in `branch-list`.
   transcription warmed up").
 - Requires `python3` (≥3.10, with the venv module) on the server host; onnxruntime ships
   wheels up to Python 3.14.
-- Recording is per-clip (record → stop → transcribe), not live streaming.
+- Utterance detection is a client-side energy gate — in loud environments it may cut late
+  (or not at all until the 20 s force-cut). Server-side silero VAD over a WebSocket stream
+  would be the next step if that bites.
+- The resident worker keeps the int8 model in memory (~1 GB RSS) while the service runs.
 - `claude -p` refinement takes ~5–20 s and needs the `claude` CLI logged in on the server.
 - English-focused model (`parakeet-tdt-0.6b-v2`).
 
