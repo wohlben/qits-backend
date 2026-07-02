@@ -49,6 +49,16 @@ import { SpeechTranscriber } from './speech-transcriber';
                   : 'Speak now — text is committed at every pause'
               }}
             </span>
+            <!-- Live input level: if this stays flat while speaking, no audio reaches the page. -->
+            <span
+              class="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
+              title="Microphone input level"
+            >
+              <span
+                class="block h-full rounded-full bg-primary transition-[width] duration-75"
+                [style.width.%]="recorder.level() * 100"
+              ></span>
+            </span>
           }
         </div>
         @if (recorder.error(); as err) {

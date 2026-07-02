@@ -18,10 +18,15 @@ export class SpeechTranscriber {
   readonly status = signal<TranscriberStatus>('idle');
   /** True while the voice-activity detector hears speech (drives a "listening" indicator). */
   readonly speaking = signal(false);
+  /** Microphone input level 0..1, updated while recording — flat at 0 means no audio arrives. */
+  readonly level = signal(0);
   readonly error = signal<string | null>(null);
 
   private transcriber: import('@usefulsensors/moonshine-js').Transcriber | null = null;
   private stream: MediaStream | null = null;
+  private audioContext: AudioContext | null = null;
+  private meterSource: MediaStreamAudioSourceNode | null = null;
+  private meterFrame = 0;
 
   constructor(private readonly onUtterance: (text: string) => void) {}
 
@@ -29,10 +34,22 @@ export class SpeechTranscriber {
     if (this.status() !== 'idle') {
       return;
     }
+    // Create/resume the audio context SYNCHRONOUSLY inside the click gesture. The awaits below
+    // (dynamic import, 60MB model download) outlive Chrome's transient user activation (~5s); a
+    // context created after that starts 'suspended' and the VAD then processes zero frames —
+    // recording looks active but nothing ever transcribes.
+    this.audioContext ??= new AudioContext();
+    if (this.audioContext.state === 'suspended') {
+      void this.audioContext.resume();
+    }
+    log('start: audio context state =', this.audioContext.state);
+
     this.status.set('loading');
     this.error.set(null);
     try {
       const moonshine = await import('@usefulsensors/moonshine-js');
+      log('moonshine-js imported');
+      moonshine.Settings.VERBOSE_LOGGING = true;
       if (!this.transcriber) {
         // The default asset path is the package's @latest CDN URL, which no longer ships the
         // English base model — pin to the last version that does. VAD assets are pinned to the
@@ -44,20 +61,39 @@ export class SpeechTranscriber {
         this.transcriber = new moonshine.Transcriber(
           'model/base',
           {
+            onModelLoadStarted: () => log('model load started (downloads on first use)'),
+            onModelLoaded: () => log('model + VAD loaded'),
+            onTranscribeStarted: () => log('transcription started'),
+            onTranscribeStopped: () => log('transcription stopped'),
+            onTranscriptionUpdated: (text) => log('transcription updated:', text),
             onTranscriptionCommitted: (text) => {
+              log('utterance committed:', text);
               if (text?.trim()) {
                 this.onUtterance(text.trim());
               }
             },
-            onSpeechStart: () => this.speaking.set(true),
-            onSpeechEnd: () => this.speaking.set(false),
+            onSpeechStart: () => {
+              log('VAD: speech started');
+              this.speaking.set(true);
+            },
+            onSpeechEnd: () => {
+              log('VAD: speech ended');
+              this.speaking.set(false);
+            },
             onError: (error) => {
+              log('error callback:', error);
               this.error.set(String(error));
               this.stop();
             },
           },
           true,
         );
+        // Swap the library's own AudioContext (created in its constructor, possibly outside the
+        // user gesture by the time the import resolves) for ours, which is guaranteed running.
+        const internal = this.transcriber as unknown as { audioContext: AudioContext };
+        void internal.audioContext.close();
+        internal.audioContext = this.audioContext;
+        log('transcriber constructed, audio context swapped in');
       }
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -68,10 +104,27 @@ export class SpeechTranscriber {
           sampleRate: 16000,
         },
       });
+      const track = this.stream.getAudioTracks()[0];
+      log('microphone acquired:', track?.label, JSON.stringify(track?.getSettings?.() ?? {}));
       this.transcriber.attachStream(this.stream);
       await this.transcriber.start();
+      if (this.audioContext.state !== 'running') {
+        log('audio context still', this.audioContext.state, '- trying to resume');
+        await this.audioContext.resume();
+      }
+      this.startMeter();
+      log('recording; audio context state =', this.audioContext.state);
+      if (this.audioContext.state !== 'running') {
+        this.stop();
+        this.error.set(
+          'The browser blocked audio processing (no user activation left). Press Record again — ' +
+            'everything is cached now, so the second attempt starts fast enough.',
+        );
+        return;
+      }
       this.status.set('recording');
     } catch (e) {
+      log('start failed:', e);
       this.releaseStream();
       this.status.set('idle');
       this.error.set(describeStartError(e));
@@ -79,16 +132,53 @@ export class SpeechTranscriber {
   }
 
   stop(): void {
+    log('stop');
     this.transcriber?.stop();
+    this.stopMeter();
     this.releaseStream();
     this.speaking.set(false);
     this.status.set('idle');
+  }
+
+  /** Feeds the mic stream into an analyser and mirrors the peak level into {@link level}. */
+  private startMeter(): void {
+    if (!this.audioContext || !this.stream) {
+      return;
+    }
+    const analyser = this.audioContext.createAnalyser();
+    analyser.fftSize = 512;
+    this.meterSource = this.audioContext.createMediaStreamSource(this.stream);
+    this.meterSource.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const tick = () => {
+      analyser.getByteTimeDomainData(data);
+      let peak = 0;
+      for (const v of data) {
+        peak = Math.max(peak, Math.abs(v - 128));
+      }
+      this.level.set(Math.min(1, peak / 64));
+      this.meterFrame = requestAnimationFrame(tick);
+    };
+    this.meterFrame = requestAnimationFrame(tick);
+  }
+
+  private stopMeter(): void {
+    cancelAnimationFrame(this.meterFrame);
+    this.meterSource?.disconnect();
+    this.meterSource = null;
+    this.level.set(0);
   }
 
   private releaseStream(): void {
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
   }
+}
+
+function log(...args: unknown[]): void {
+  // Deliberately chatty: speech capture has many silent failure modes (suspended audio context,
+  // muted mic, VAD never triggering) that only these traces can tell apart.
+  console.log('[speech]', ...args);
 }
 
 /** Turns a getUserMedia/model-load failure into a message the user can act on. */
