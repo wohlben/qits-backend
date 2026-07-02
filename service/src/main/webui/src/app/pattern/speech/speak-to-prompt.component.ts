@@ -7,15 +7,15 @@ import { lastValueFrom } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
+import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { SpeechTranscriber } from './speech-transcriber';
+import { WavRecorder } from './wav-recorder';
 
 /**
- * The speak-to-prompt flow for a worktree: record speech (transcribed locally in the browser by
- * Moonshine — audio never leaves the machine), edit the transcript, have a small Claude model
- * rewrite it into a coherent agent prompt, then launch the worktree's agent with that prompt and
- * jump to its chat.
+ * The speak-to-prompt flow for a worktree: record speech (transcribed server-side by Parakeet),
+ * edit the transcript, have a small Claude model rewrite it into a coherent agent prompt, then
+ * launch the worktree's agent with that prompt and jump to its chat.
  */
 @Component({
   selector: 'app-speak-to-prompt',
@@ -27,28 +27,13 @@ import { SpeechTranscriber } from './speech-transcriber';
           <button
             z-button
             [zType]="recording() ? 'destructive' : 'default'"
-            [zLoading]="recorder.status() === 'loading'"
             (click)="toggleRecording()"
           >
             <ng-icon [name]="recording() ? 'lucideSquare' : 'lucideMic'" class="size-4" />
             {{ recording() ? 'Stop recording' : 'Record' }}
           </button>
-          @if (recorder.status() === 'loading') {
-            <span class="text-sm text-muted-foreground">
-              Loading speech model (downloads ~60 MB on first use)…
-            </span>
-          } @else if (recording()) {
-            <span class="flex items-center gap-2 text-sm text-muted-foreground">
-              <span
-                class="inline-block size-2 rounded-full"
-                [class]="recorder.speaking() ? 'animate-pulse bg-destructive' : 'bg-muted-foreground'"
-              ></span>
-              {{
-                recorder.speaking()
-                  ? 'Listening…'
-                  : 'Speak now — text is committed at every pause'
-              }}
-            </span>
+          @if (recording()) {
+            <span class="text-sm text-muted-foreground">Speak, then press Stop</span>
             <!-- Live input level: if this stays flat while speaking, no audio reaches the page. -->
             <span
               class="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
@@ -59,10 +44,18 @@ import { SpeechTranscriber } from './speech-transcriber';
                 [style.width.%]="recorder.level() * 100"
               ></span>
             </span>
+          } @else if (transcribeMutation.isPending()) {
+            <span class="text-sm text-muted-foreground">Transcribing…</span>
           }
         </div>
         @if (recorder.error(); as err) {
           <div class="text-sm text-destructive">Recording failed: {{ err }}</div>
+        }
+        @if (transcribeMutation.isError()) {
+          <div class="text-sm text-destructive">
+            Transcription failed — the speech runtime may still be downloading its model on the
+            server (first use); check the server logs and try again.
+          </div>
         }
 
         <label class="flex flex-col gap-1 text-sm">
@@ -142,6 +135,7 @@ export class SpeakToPromptComponent {
   readonly repoId = input.required<string>();
   readonly worktreeId = input.required<string>();
 
+  private readonly speechService = inject(SpeechControllerService);
   private readonly refinementService = inject(PromptRefinementControllerService);
   private readonly agentService = inject(AgentControllerService);
   private readonly router = inject(Router);
@@ -150,10 +144,7 @@ export class SpeakToPromptComponent {
   /** Null until a refinement (or "as-is") produced something — gates the launch section. */
   readonly refinedPrompt = signal<string | null>(null);
 
-  /** Utterances append as you pause; commits landing shortly after stop still append. */
-  readonly recorder = new SpeechTranscriber((text) =>
-    this.transcript.update((prev) => (prev ? prev + ' ' + text : text)),
-  );
+  readonly recorder = new WavRecorder();
 
   recording() {
     return this.recorder.status() === 'recording';
@@ -161,11 +152,25 @@ export class SpeakToPromptComponent {
 
   toggleRecording() {
     if (this.recording()) {
-      this.recorder.stop();
+      const audioBase64 = this.recorder.stop();
+      if (audioBase64) {
+        this.transcribeMutation.mutate(audioBase64);
+      }
     } else {
       void this.recorder.start();
     }
   }
+
+  readonly transcribeMutation = injectMutation(() => ({
+    mutationFn: (audioBase64: string) =>
+      lastValueFrom(this.speechService.apiSpeechTranscriptionsPost({ audioBase64 })),
+    onSuccess: (res) => {
+      const text = res.text?.trim();
+      if (text) {
+        this.transcript.update((prev) => (prev ? prev + ' ' + text : text));
+      }
+    },
+  }));
 
   readonly refineMutation = injectMutation(() => ({
     mutationFn: (transcript: string) =>
@@ -199,7 +204,6 @@ export class SpeakToPromptComponent {
   launch() {
     const prompt = this.refinedPrompt()?.trim();
     if (!prompt) return;
-    this.recorder.stop();
     this.launchMutation.mutate(prompt);
   }
 }

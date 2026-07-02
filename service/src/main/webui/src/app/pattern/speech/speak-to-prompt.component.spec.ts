@@ -6,10 +6,14 @@ import { vi } from 'vitest';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
+import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { SpeakToPromptComponent } from './speak-to-prompt.component';
 
 describe('SpeakToPromptComponent', () => {
+  const speechService = {
+    apiSpeechTranscriptionsPost: vi.fn().mockReturnValue(of({ text: 'spoken words' })),
+  };
   const refinementService = {
     apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost: vi
       .fn()
@@ -28,6 +32,7 @@ describe('SpeakToPromptComponent', () => {
       imports: [SpeakToPromptComponent],
       providers: [
         provideTanStackQuery(new QueryClient()),
+        { provide: SpeechControllerService, useValue: speechService },
         { provide: PromptRefinementControllerService, useValue: refinementService },
         { provide: AgentControllerService, useValue: agentService },
         { provide: Router, useValue: router },
@@ -69,15 +74,15 @@ describe('SpeakToPromptComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/commands', 'cmd-1']);
   });
 
-  it('appends utterances committed by the recorder to the transcript', () => {
+  it('uploads the recording and appends the server transcript', async () => {
     const fixture = createComponent();
-    // Drive the callback the component handed to its SpeechTranscriber — the same path a real
-    // VAD-committed utterance takes (no mic/model involved).
-    const onUtterance = (
-      fixture.componentInstance.recorder as unknown as { onUtterance: (text: string) => void }
-    ).onUtterance;
-    onUtterance('first part');
-    onUtterance('second');
-    expect(fixture.componentInstance.transcript()).toBe('first part second');
+    fixture.componentInstance.transcript.set('earlier text');
+    fixture.componentInstance.transcribeMutation.mutate('QkFTRTY0');
+    await fixture.whenStable();
+
+    expect(speechService.apiSpeechTranscriptionsPost).toHaveBeenCalledWith({
+      audioBase64: 'QkFTRTY0',
+    });
+    expect(fixture.componentInstance.transcript()).toBe('earlier text spoken words');
   });
 });

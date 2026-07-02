@@ -865,6 +865,11 @@ components:
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeHistoryDetailDto"
+    Response61:
+      type: object
+      properties:
+        text:
+          type: string
     Response7:
       type: object
       properties:
@@ -912,6 +917,14 @@ components:
           type: string
         source:
           type: string
+    TranscribeRequest:
+      type: object
+      required:
+      - audioBase64
+      properties:
+        audioBase64:
+          type: string
+          pattern: \S
     UpdateActionConfigurationRequest:
       type: object
       properties:
@@ -2536,6 +2549,26 @@ paths:
       summary: Update From Parent
       tags:
       - Worktree Controller
+  /api/speech/transcriptions:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response61"
+        "400":
+          description: Bad Request
+      summary: Transcribe
+      tags:
+      - Speech Controller
 info:
   title: service API
   version: 1.0.0-SNAPSHOT
