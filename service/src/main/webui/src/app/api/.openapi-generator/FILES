@@ -15,6 +15,7 @@ api/projectController.service.ts
 api/promptRefinementController.service.ts
 api/reactiveEchoController.service.ts
 api/repositoryController.service.ts
+api/speechController.service.ts
 api/worktreeController.service.ts
 api/worktreeHistoryController.service.ts
 configuration.ts
@@ -130,12 +131,14 @@ model/response58.ts
 model/response59.ts
 model/response6.ts
 model/response60.ts
+model/response61.ts
 model/response7.ts
 model/response8.ts
 model/response9.ts
 model/setMainBranchRequest.ts
 model/syncStatusDto.ts
 model/traceResponse.ts
+model/transcribeRequest.ts
 model/updateActionConfigurationRequest.ts
 model/updateFeatureFlowConfigurationRequest.ts
 model/updateFeatureFlowPhaseActionRequest.ts
