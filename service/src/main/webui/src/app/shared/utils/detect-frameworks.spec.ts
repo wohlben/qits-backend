@@ -182,6 +182,52 @@ describe('linkedTestsOf / linkedSourcesOf (the shared tab + tree-hiding primitiv
     expect(linkedSourcesOf('src/test/java/com/OrphanTest.java', projects, paths)).toEqual([]);
   });
 
+  it('handles qualified test names (…SpecialCaseTest, …RecordingIT) → the base source', () => {
+    const p = [
+      'pom.xml',
+      'src/main/java/com/TheFile.java',
+      'src/test/java/com/TheFileTest.java',
+      'src/test/java/com/TheFileSpecialCaseTest.java',
+      'src/test/java/com/TheFileRecordingIT.java',
+    ];
+    const proj = detectFrameworks(p);
+    // source → all its qualified tests (Test + IT, any qualifier)
+    expect(linkedTestsOf('src/main/java/com/TheFile.java', proj, p).sort()).toEqual([
+      'src/test/java/com/TheFileRecordingIT.java',
+      'src/test/java/com/TheFileSpecialCaseTest.java',
+      'src/test/java/com/TheFileTest.java',
+    ]);
+    // each qualified test → back to TheFile.java (intermediate prefix, not just full-base/first-word)
+    expect(linkedSourcesOf('src/test/java/com/TheFileSpecialCaseTest.java', proj, p)).toEqual([
+      'src/main/java/com/TheFile.java',
+    ]);
+    expect(linkedSourcesOf('src/test/java/com/TheFileRecordingIT.java', proj, p)).toEqual([
+      'src/main/java/com/TheFile.java',
+    ]);
+  });
+
+  it('attributes a qualified test to the most-specific source when one exists', () => {
+    const p = [
+      'pom.xml',
+      'src/main/java/com/TheFile.java',
+      'src/main/java/com/TheFileSpecialCase.java',
+      'src/test/java/com/TheFileTest.java',
+      'src/test/java/com/TheFileSpecialCaseTest.java',
+    ];
+    const proj = detectFrameworks(p);
+    // TheFileSpecialCaseTest now belongs to TheFileSpecialCase.java, NOT TheFile.java
+    expect(linkedSourcesOf('src/test/java/com/TheFileSpecialCaseTest.java', proj, p)).toEqual([
+      'src/main/java/com/TheFileSpecialCase.java',
+    ]);
+    expect(linkedTestsOf('src/main/java/com/TheFileSpecialCase.java', proj, p)).toEqual([
+      'src/test/java/com/TheFileSpecialCaseTest.java',
+    ]);
+    // …so TheFile.java only owns TheFileTest, not the more-specific test
+    expect(linkedTestsOf('src/main/java/com/TheFile.java', proj, p)).toEqual([
+      'src/test/java/com/TheFileTest.java',
+    ]);
+  });
+
   it('resolveLinkedGroup is exactly these two primitives combined', () => {
     // source path: group is [code, ...linkedTestsOf]
     expect(resolveLinkedGroup('src/main/java/com/App.java', projects, paths)).toEqual([

@@ -84,8 +84,11 @@ kinds expand (a later manual collapse sticks); toggling off never re-expands.
 
 - `resolveLinkedGroup(path, projects, allPaths)` returns the opened file plus its detected
   counterpart(s), each tagged `code`/`test`: it resolves the owning project, runs the descriptor's
-  source→test (or test→source) rules, and keeps only candidates that exist. Best-effort test→source
-  for java strips the `*Test`/`IT` qualifier (`FooSliceTest` → `FooSlice.java`, then `Foo.java`).
+  source→test (or test→source) rules, and keeps only candidates that exist. A java test's owner is
+  the **deepest existing source**: `TheFileSpecialCaseTest`/`…IT` walks the CamelCase prefixes
+  longest-first (`TheFileSpecialCase` → `TheFile` → `The`) and binds to `TheFileSpecialCase.java`
+  when it exists, otherwise `TheFile.java` — and `TheFile.java` correspondingly does *not* claim a
+  test a more-specific source owns.
 - The browser renders a segmented **file-tab strip** above the viewer whenever the group has ≥2
   entries; each tab re-points `selectedPath`. Because the content query is path-keyed, references are
   path-filtered, and the view mode is renderer-keyed, each tab keeps its own content, reference
