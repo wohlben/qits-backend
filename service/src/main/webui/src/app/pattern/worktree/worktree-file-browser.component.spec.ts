@@ -1,9 +1,11 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
 import { EDarkModes, ZardDarkMode } from '@/shared/services/dark-mode';
 import { WorktreeFileBrowserComponent } from './worktree-file-browser.component';
 
@@ -117,5 +119,89 @@ describe('WorktreeFileBrowserComponent', () => {
     expect(cmp.filteredPaths()).toEqual(['domain/src/AppTest.java']);
     // the dialog's "visible files" preview reflects only the dialog filters
     expect(cmp.dialogVisiblePaths()).toEqual(['domain/src/App.java', 'domain/src/AppTest.java']);
+  });
+
+  it('compacts single-child directory chains in the rendered tree', () => {
+    const cmp = createComponent().componentInstance;
+
+    // `domain` → `src` is a pure chain; `service` → `main.ts` compacts into a leaf.
+    expect(cmp.tree().map((n) => n.label)).toEqual(['domain / src', 'service / main.ts', 'README.md']);
+    const serviceLeaf = cmp.tree()[1];
+    expect(serviceLeaf.leaf).toBe(true);
+    expect(serviceLeaf.key).toBe('service/main.ts');
+  });
+
+  it('re-derives compaction from filters: hiding a sibling forms a chain, revealing it splits the chain back', () => {
+    const cmp = createComponent().componentInstance;
+
+    cmp.setFilters([{ id: 'a', kind: 'excludes', query: 'Test', enabled: true }]);
+    // App.java is now domain/src's only descendant — the whole path compacts into one leaf row
+    const compacted = cmp.tree().find((n) => n.key === 'domain/src/App.java');
+    expect(compacted?.label).toBe('domain / src / App.java');
+    expect(compacted?.leaf).toBe(true);
+
+    cmp.clearFilters();
+    // the hidden sibling is visible again → the chain resolves back in the same derivation pass
+    const resolved = cmp.tree().find((n) => n.key === 'domain/src');
+    expect(resolved?.label).toBe('domain / src');
+    expect(resolved?.children?.map((c) => c.label)).toEqual(['App.java', 'AppTest.java']);
+  });
+
+  it('keeps the user "inside the chain" when a filter change splits a compacted node', () => {
+    queryClient.setQueryData(
+      ['worktree-files', 'repo-1', 'wt-1'],
+      ['src/main/java/A.java', 'src/main/java/B.java', 'src/main/resources/app.properties'],
+    );
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+    const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+      .componentInstance.treeService;
+
+    cmp.setFilters([{ id: 'x', kind: 'excludes', query: 'resources', enabled: true }]);
+    fixture.detectChanges();
+    fixture.detectChanges(); // let the expand-all and expansion-sync effects settle
+
+    expect(cmp.tree().map((n) => n.label)).toEqual(['src / main / java']);
+    // filtering auto-expands the compacted node (zExpandAll)…
+    expect(treeService.isExpanded('src/main/java')).toBe(true);
+    // …and the sync effect mirrors that onto the absorbed ancestor dirs
+    expect(treeService.isExpanded('src')).toBe(true);
+    expect(treeService.isExpanded('src/main')).toBe(true);
+
+    cmp.clearFilters();
+    fixture.detectChanges();
+
+    // the chain split at src/main; both it and the java branch are still open
+    expect(cmp.tree()[0].label).toBe('src / main');
+    expect(cmp.tree()[0].children?.map((c) => c.label)).toEqual([
+      'java',
+      'resources / app.properties',
+    ]);
+    expect(treeService.isExpanded('src/main')).toBe(true);
+    expect(treeService.isExpanded('src/main/java')).toBe(true);
+  });
+
+  it('keeps a filtered-to-one-file path visible after the filter clears (leaf chains count as open)', () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+    const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+      .componentInstance.treeService;
+
+    cmp.nameQuery.set('apptest');
+    fixture.detectChanges();
+    fixture.detectChanges(); // let the expansion-sync effect settle
+
+    // the sole match compacts into a leaf row; its absorbed dirs are marked open
+    expect(cmp.tree().map((n) => n.label)).toEqual(['domain / src / AppTest.java']);
+    expect(treeService.isExpanded('domain')).toBe(true);
+    expect(treeService.isExpanded('domain/src')).toBe(true);
+
+    cmp.nameQuery.set('');
+    fixture.detectChanges();
+
+    // chain resolved back into a dir chain whose key is already expanded → the file stays visible
+    const resolved = cmp.tree().find((n) => n.key === 'domain/src');
+    expect(resolved?.children?.map((c) => c.label)).toEqual(['App.java', 'AppTest.java']);
+    expect(treeService.isExpanded('domain/src')).toBe(true);
   });
 });
