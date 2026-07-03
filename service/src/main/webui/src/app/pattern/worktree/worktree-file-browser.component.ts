@@ -268,7 +268,9 @@ function markLazyStubs(
                      the ancestor prefix of a compacted "a / b / c" breadcrumb so the final segment
                      stands out. -->
                 <ng-template #nodeTemplate let-node>
-                  @if (node.icon) {
+                  @if (frameworkIcon(node); as fwIcon) {
+                    <img [src]="fwIcon" class="size-4! shrink-0" alt="" />
+                  } @else if (node.icon) {
                     <ng-icon
                       [name]="node.icon"
                       class="size-4! shrink-0"
@@ -981,6 +983,30 @@ export class WorktreeFileBrowserComponent {
     }
     return options;
   });
+
+  /**
+   * Detection-root directory path → the framework icon URL painted on that folder node. Java roots
+   * show the Quarkus mark or the Java cup depending on the lazy pom peek; angular roots the Angular
+   * shield. The repo root (`''`) has no folder row, so it is skipped.
+   */
+  readonly frameworkRootIcons = computed(() => {
+    const map = new Map<string, string>();
+    for (const { root, descriptor } of this.detectedProjects()) {
+      if (root === '') continue;
+      if (descriptor.id === 'ts-angular') {
+        map.set(root, '/angular.svg');
+      } else if (descriptor.id === 'java-quarkus') {
+        const quarkus = this.refinedKindLabel(descriptor, [root]).includes('Quarkus');
+        map.set(root, quarkus ? '/quarkus.svg' : '/java.svg');
+      }
+    }
+    return map;
+  });
+
+  /** The framework icon URL for a directory node (its key is a detection root), else `null`. */
+  protected frameworkIcon(node: TreeNode<HasPath>): string | null {
+    return node.leaf ? null : (this.frameworkRootIcons().get(node.key) ?? null);
+  }
 
   /** Framework filters not yet selected — the "add dynamic filter" picker offers these. */
   readonly availableFrameworkOptions = computed(() => {
