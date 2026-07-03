@@ -14,11 +14,14 @@ import {
   lucideChevronDown,
   lucideChevronRight,
   lucideChevronUp,
+  lucideCode,
   lucideEye,
   lucideEyeOff,
   lucideFile,
   lucideFileStack,
+  lucideFlaskConical,
   lucideFolder,
+  lucideLayers,
   lucideListFilter,
   lucidePlus,
   lucideX,
@@ -51,6 +54,16 @@ import {
   type PathFilterKind,
   type PathFilterMode,
 } from '@/shared/utils/filter-file-paths';
+import {
+  detectFrameworks,
+  FRAMEWORK_DESCRIPTORS,
+  frameworkToRules,
+  linkedTestsOf,
+  resolveLinkedGroup,
+  type DetectedProject,
+  type FrameworkDescriptor,
+  type LinkedFile,
+} from '@/shared/utils/detect-frameworks';
 import { ignorelistToRules } from '@/shared/utils/ignorelist-rules';
 import type { LineRange } from '@/ui/components/code-viewer/code-viewer.component';
 import {
@@ -67,15 +80,40 @@ export interface CodeReference {
 }
 
 /**
- * A dynamic filter *selection* — a generator, not a rule. Its generated rules are derived from
- * worktree content (for `ignorelist`, `param` is an ignore-file basename like `.gitignore`) and
- * recomputed whenever that content changes, so they live in their own list and are never hand-edited.
+ * A dynamic filter *selection* — a generator, not a rule. Its generated rules are derived from the
+ * worktree's content/structure and recomputed whenever that changes, so they live in their own list
+ * and are never hand-edited. Two kinds:
+ * - `ignorelist`: `param` is an ignore-file basename (`.gitignore`); rules come from that file's
+ *   content.
+ * - `framework`: `param` keys a detected project — `descriptorId` for a whole-descriptor filter
+ *   (docs, spanning every `docs/` dir) or `descriptorId::root` for a per-root one (java/angular);
+ *   rules are the framework's file globs, scoped by root.
  */
 export interface DynamicFilter {
   id: string;
-  type: 'ignorelist';
+  type: 'ignorelist' | 'framework';
   param: string;
   enabled: boolean;
+}
+
+/** Separator in a per-root framework filter's `param` (`descriptorId::root`). */
+const FRAMEWORK_PARAM_SEP = '::';
+
+/** A framework label's short name — the segment after the last ` / ` (`Java / Quarkus` → `Quarkus`). */
+function lastLabelSegment(label: string): string {
+  const i = label.lastIndexOf(' / ');
+  return i === -1 ? label : label.slice(i + 3);
+}
+
+/** An offer-able framework filter — one per detected java/angular root, one aggregate for docs. */
+interface FrameworkOption {
+  /** Stable key stored in the {@link DynamicFilter} selection. */
+  param: string;
+  descriptorId: string;
+  /** The project root(s) this filter's whitelist spans. */
+  roots: string[];
+  /** Human label, e.g. `Java / Quarkus (root)`, `TypeScript / Angular (service/…/webui)`, `Docs`. */
+  label: string;
 }
 
 /** An older or loosely-typed filter accepted by {@link migratePathFilter} / {@link setFilters}. */
@@ -178,6 +216,9 @@ function markLazyStubs(
       lucideChevronDown,
       lucideChevronRight,
       lucideFileStack,
+      lucideLayers,
+      lucideCode,
+      lucideFlaskConical,
     }),
   ],
   template: `
@@ -218,7 +259,7 @@ function markLazyStubs(
               <z-tree
                 class="w-max min-w-full"
                 [zData]="tree()"
-                [zExpandAll]="isFiltering()"
+                [zExpandAll]="expandTreeForFilter()"
                 zSelectable
                 (zNodeClick)="onNodeClick($event)"
               >
@@ -256,6 +297,22 @@ function markLazyStubs(
               not searched — open to include.
             </div>
           }
+          @if (frameworkQuickAccess().length > 0) {
+            <div class="flex flex-wrap items-center gap-1 border-t p-2">
+              <ng-icon name="lucideLayers" class="size-4! shrink-0 text-muted-foreground" />
+              @for (fw of frameworkQuickAccess(); track fw.id) {
+                <button
+                  z-button
+                  [zType]="fw.active ? 'secondary' : 'outline'"
+                  zSize="sm"
+                  [attr.aria-pressed]="fw.active"
+                  (click)="toggleFrameworkKind(fw.id)"
+                >
+                  {{ fw.label }}
+                </button>
+              }
+            </div>
+          }
         </aside>
       </z-resizable-panel>
 
@@ -281,6 +338,29 @@ function markLazyStubs(
                   </button>
                 </z-badge>
               }
+            </div>
+          }
+
+          @if (linkedGroup().length > 1) {
+            <div class="flex shrink-0 items-center">
+              <div class="inline-flex items-center gap-0.5 rounded-md border p-0.5">
+                @for (file of linkedGroup(); track file.path) {
+                  <button
+                    z-button
+                    [zType]="file.path === selectedPath() ? 'secondary' : 'ghost'"
+                    zSize="sm"
+                    [attr.aria-pressed]="file.path === selectedPath()"
+                    [attr.title]="file.path"
+                    (click)="selectedPath.set(file.path)"
+                  >
+                    <ng-icon
+                      [name]="file.role === 'test' ? 'lucideFlaskConical' : 'lucideCode'"
+                      class="mr-1 size-4!"
+                    />
+                    {{ tabLabel(file) }}
+                  </button>
+                }
+              </div>
             </div>
           }
 
@@ -322,7 +402,11 @@ function markLazyStubs(
           resurrect a file a dynamic filter hid. The box above the tree then narrows by filename.
         </p>
 
-        @if (dynamicFilters().length > 0 || ignorelistBasenames().length > 0) {
+        @if (
+          dynamicFilters().length > 0 ||
+          ignorelistBasenames().length > 0 ||
+          frameworkOptions().length > 0
+        ) {
           <div class="flex flex-col gap-2 border-b pb-3">
             <div class="text-xs font-medium text-muted-foreground">Dynamic filters</div>
             @for (dyn of dynamicFilters(); track dyn.id) {
@@ -351,10 +435,8 @@ function markLazyStubs(
                     <ng-icon [name]="dyn.enabled ? 'lucideEye' : 'lucideEyeOff'" class="size-4!" />
                   </button>
                   <span class="flex-1 truncate font-mono text-xs">
-                    {{ dyn.param }}
-                    <span class="text-muted-foreground">
-                      ({{ dynamicRuleGroups().get(dyn.param)?.length ?? 0 }} rules)
-                    </span>
+                    {{ dynamicLabel(dyn) }}
+                    <span class="text-muted-foreground"> ({{ dynamicRules(dyn).length }} rules) </span>
                   </span>
                   <button
                     z-button
@@ -370,7 +452,7 @@ function markLazyStubs(
                   <div
                     class="ml-8 flex max-h-40 flex-col gap-0.5 overflow-auto rounded-md border bg-muted/20 p-2 font-mono text-xs"
                   >
-                    @for (rule of dynamicRuleGroups().get(dyn.param) ?? []; track rule.id) {
+                    @for (rule of dynamicRules(dyn); track rule.id) {
                       <div class="flex items-center gap-2">
                         <span
                           class="rounded px-1 text-[10px] uppercase"
@@ -397,7 +479,9 @@ function markLazyStubs(
                 z-button
                 zType="outline"
                 zSize="sm"
-                [disabled]="availableIgnorelistParams().length === 0"
+                [disabled]="
+                  availableFrameworkOptions().length === 0 && availableIgnorelistParams().length === 0
+                "
                 (click)="showDynamicPicker.set(!showDynamicPicker())"
               >
                 <ng-icon name="lucideFileStack" class="mr-1 size-4!" />
@@ -405,17 +489,31 @@ function markLazyStubs(
               </button>
               @if (showDynamicPicker()) {
                 <div class="mt-1 flex flex-col gap-1 rounded-md border p-1">
+                  @for (option of availableFrameworkOptions(); track option.param) {
+                    <button
+                      type="button"
+                      class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted"
+                      (click)="addDynamicFilter('framework', option.param); showDynamicPicker.set(false)"
+                    >
+                      <ng-icon name="lucideLayers" class="size-4! shrink-0 text-muted-foreground" />
+                      {{ option.label }}
+                    </button>
+                  }
                   @for (param of availableIgnorelistParams(); track param) {
                     <button
                       type="button"
-                      class="cursor-pointer rounded px-2 py-1 text-left font-mono text-xs hover:bg-muted"
-                      (click)="addDynamicFilter(param); showDynamicPicker.set(false)"
+                      class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-left font-mono text-xs hover:bg-muted"
+                      (click)="addDynamicFilter('ignorelist', param); showDynamicPicker.set(false)"
                     >
+                      <ng-icon name="lucideFileStack" class="size-4! shrink-0 text-muted-foreground" />
                       {{ param }}
                     </button>
-                  } @empty {
+                  }
+                  @if (
+                    availableFrameworkOptions().length === 0 && availableIgnorelistParams().length === 0
+                  ) {
                     <div class="px-2 py-1 text-xs text-muted-foreground">
-                      No ignore files available.
+                      No dynamic filters available.
                     </div>
                   }
                 </div>
@@ -606,6 +704,37 @@ export class WorktreeFileBrowserComponent {
         this.openedLazyPaths.update((paths) => [...paths, ...toOpen]);
       }
     });
+
+    // When a quick-access framework kind is toggled ON, open the tree to a framework-aware depth
+    // (java → each root's `src/main`, angular → `src`, docs → the docs dir) rather than leaving it
+    // fully collapsed — but without the expand-everything of a search. Only *newly* activated kinds
+    // expand, so a later manual collapse sticks; toggling a kind off never re-expands.
+    let prevActiveKinds: ReadonlySet<string> = new Set();
+    effect(() => {
+      const active = this.activeFrameworkKinds();
+      const projects = this.detectedProjects();
+      const tree = this.treeCmp();
+      const newly = [...active].filter((id) => !prevActiveKinds.has(id));
+      prevActiveKinds = active;
+      if (!tree || newly.length === 0) return;
+
+      const keys = new Set<string>();
+      for (const { root, descriptor } of projects) {
+        if (!newly.includes(descriptor.id)) continue;
+        const target = descriptor.autoExpandDir?.(root);
+        if (!target) continue;
+        // Open every ancestor directory down to (and including) the target.
+        const parts = target.split('/');
+        for (let i = 1; i <= parts.length; i++) keys.add(parts.slice(0, i).join('/'));
+      }
+      keys.delete('');
+      if (keys.size === 0) return;
+      tree.treeService.expandedKeys.update((set) => {
+        const next = new Set(set);
+        for (const key of keys) next.add(key);
+        return next;
+      });
+    });
   }
 
   readonly filesQuery = injectQuery(() => ({
@@ -671,10 +800,20 @@ export class WorktreeFileBrowserComponent {
     return [...paths];
   });
 
+  /** Every framework/language project detected in the loaded path list — a pure, content-free pass. */
+  readonly detectedProjects = computed<DetectedProject[]>(() =>
+    detectFrameworks(this.allEagerPaths()),
+  );
+
   /** Manual advanced-filter criteria — public and settable in code (this is the programmatic API). */
   readonly filters = signal<PathFilter[]>([]);
   /** Selected dynamic filters (ignorelists). Their rules are generated, not stored here. */
   readonly dynamicFilters = signal<DynamicFilter[]>([]);
+  /**
+   * Framework *kinds* toggled in the quick-access footer (descriptor ids). Each is an aggregate
+   * filter over every detected root of that kind — one "Quarkus" toggle covers all Maven modules.
+   */
+  readonly activeFrameworkKinds = signal<ReadonlySet<string>>(new Set());
   /** The top input's fuzzy-by-filename query. */
   readonly nameQuery = signal('');
 
@@ -761,17 +900,213 @@ export class WorktreeFileBrowserComponent {
     return groups;
   });
 
-  /** Generated dynamic rules first, then manual rules — so a manual whitelist always wins last. */
-  readonly effectiveFilters = computed(() => [...this.generatedDynamicRules(), ...this.filters()]);
+  // --- Framework (dynamic) filters ---
+
+  /**
+   * Marker files (java `pom.xml`) to peek for a label refinement (Maven → Quarkus), deduped. The
+   * always-visible quick-access footer labels its Java toggle from this, so it is fetched whenever a
+   * java project is detected (cheap, cached per path via the shared file-content key).
+   */
+  private readonly frameworkMarkersToFetch = computed<string[]>(() => {
+    const markers = new Set<string>();
+    for (const { root, descriptor } of this.detectedProjects()) {
+      const marker = descriptor.labelPeekMarker?.(root);
+      if (marker) markers.add(marker);
+    }
+    return [...markers];
+  });
+
+  /**
+   * Lazy fetch of each marker file's content, reusing {@link fileQuery}'s key so a `pom.xml` opened
+   * in the viewer is one request. Purely cosmetic (upgrades a label) — never blocks detection.
+   */
+  private readonly frameworkMarkerContents = injectQueries(() => ({
+    queries: this.frameworkMarkersToFetch().map((path) => ({
+      queryKey: ['worktree-file', this.repoId(), this.worktreeId(), path],
+      queryFn: (): Promise<WorktreeFileContentDto> =>
+        lastValueFrom(
+          this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFilesContentGet(
+            this.repoId(),
+            this.worktreeId(),
+            path,
+          ),
+        ),
+    })),
+  }));
+
+  /** Marker path → its fetched content (present only once the lazy peek resolves). */
+  private readonly frameworkMarkerContentByPath = computed(() => {
+    const paths = this.frameworkMarkersToFetch();
+    const results = this.frameworkMarkerContents();
+    const map = new Map<string, string>();
+    for (let i = 0; i < paths.length; i++) {
+      const content = results[i]?.data()?.content;
+      if (content != null) map.set(paths[i], content);
+    }
+    return map;
+  });
+
+  /** A descriptor's label, refined from its marker content when available (else the base label). */
+  private refinedLabel(descriptor: FrameworkDescriptor, root: string): string {
+    const marker = descriptor.labelPeekMarker?.(root);
+    const content = marker ? this.frameworkMarkerContentByPath().get(marker) : undefined;
+    return (content && descriptor.refineLabel?.(content)) || descriptor.label;
+  }
+
+  /**
+   * The offer-able framework filters: one aggregate `Docs` filter spanning every detected `docs/`
+   * dir, plus one per detected java/angular root (labelled with the root, and refined to Quarkus
+   * when the lazy pom peek says so).
+   */
+  readonly frameworkOptions = computed<FrameworkOption[]>(() => {
+    const projects = this.detectedProjects();
+    const options: FrameworkOption[] = [];
+    const docs = projects.filter((p) => p.descriptor.id === 'docs');
+    if (docs.length > 0) {
+      options.push({
+        param: 'docs',
+        descriptorId: 'docs',
+        roots: docs.map((p) => p.root),
+        label: docs[0].descriptor.label,
+      });
+    }
+    for (const { root, descriptor } of projects) {
+      if (descriptor.id === 'docs') continue;
+      options.push({
+        param: `${descriptor.id}${FRAMEWORK_PARAM_SEP}${root}`,
+        descriptorId: descriptor.id,
+        roots: [root],
+        label: `${this.refinedLabel(descriptor, root)} (${root === '' ? 'root' : root})`,
+      });
+    }
+    return options;
+  });
+
+  /** Framework filters not yet selected — the "add dynamic filter" picker offers these. */
+  readonly availableFrameworkOptions = computed(() => {
+    const selected = new Set(
+      this.dynamicFilters().filter((d) => d.type === 'framework').map((d) => d.param),
+    );
+    return this.frameworkOptions().filter((o) => !selected.has(o.param));
+  });
+
+  private readonly descriptorsById = new Map(FRAMEWORK_DESCRIPTORS.map((d) => [d.id, d]));
+
+  /** Selected framework filters → their generated (restrict-whitelist) rules, grouped by param. */
+  readonly frameworkRuleGroups = computed(() => {
+    const options = new Map(this.frameworkOptions().map((o) => [o.param, o]));
+    const groups = new Map<string, PathFilter[]>();
+    for (const dyn of this.dynamicFilters()) {
+      if (dyn.type !== 'framework') continue;
+      const option = options.get(dyn.param);
+      const descriptor = option && this.descriptorsById.get(option.descriptorId);
+      if (option && descriptor) groups.set(dyn.param, frameworkToRules(descriptor, option.roots));
+    }
+    return groups;
+  });
+
+  /** All enabled framework filters' rules, flattened (order within is irrelevant — all restrict). */
+  readonly generatedFrameworkRules = computed<PathFilter[]>(() => {
+    const groups = this.frameworkRuleGroups();
+    const rules: PathFilter[] = [];
+    for (const dyn of this.dynamicFilters()) {
+      if (dyn.type === 'framework' && dyn.enabled) rules.push(...(groups.get(dyn.param) ?? []));
+    }
+    return rules;
+  });
+
+  /** The refined label for a whole kind: `Java / Quarkus` if *any* of its roots' poms say so. */
+  private refinedKindLabel(descriptor: FrameworkDescriptor, roots: readonly string[]): string {
+    for (const root of roots) {
+      const marker = descriptor.labelPeekMarker?.(root);
+      const content = marker ? this.frameworkMarkerContentByPath().get(marker) : undefined;
+      const refined = content ? descriptor.refineLabel?.(content) : null;
+      if (refined) return refined;
+    }
+    return descriptor.label;
+  }
+
+  /**
+   * The quick-access framework toggles rendered as a footer under the tree — one per detected
+   * framework *kind* (aggregate across all its roots), labelled by its short name (`Java / Quarkus`
+   * → `Quarkus`). Toggling one restricts the tree to that kind's files; untoggling shows everything;
+   * several toggled compose as a union.
+   */
+  readonly frameworkQuickAccess = computed(() => {
+    const rootsByKind = new Map<string, { descriptor: FrameworkDescriptor; roots: string[] }>();
+    for (const { root, descriptor } of this.detectedProjects()) {
+      const entry = rootsByKind.get(descriptor.id) ?? { descriptor, roots: [] };
+      entry.roots.push(root);
+      rootsByKind.set(descriptor.id, entry);
+    }
+    const active = this.activeFrameworkKinds();
+    return [...rootsByKind.values()].map(({ descriptor, roots }) => ({
+      id: descriptor.id,
+      label: lastLabelSegment(this.refinedKindLabel(descriptor, roots)),
+      active: active.has(descriptor.id),
+    }));
+  });
+
+  /** Restrict whitelist rules for every toggled quick-access kind (aggregate over all its roots). */
+  readonly generatedQuickFrameworkRules = computed<PathFilter[]>(() => {
+    const active = this.activeFrameworkKinds();
+    if (active.size === 0) return [];
+    const rootsByKind = new Map<string, string[]>();
+    for (const { root, descriptor } of this.detectedProjects()) {
+      if (!active.has(descriptor.id)) continue;
+      const list = rootsByKind.get(descriptor.id);
+      if (list) list.push(root);
+      else rootsByKind.set(descriptor.id, [root]);
+    }
+    const rules: PathFilter[] = [];
+    for (const [id, roots] of rootsByKind) {
+      const descriptor = this.descriptorsById.get(id);
+      if (descriptor) rules.push(...frameworkToRules(descriptor, roots));
+    }
+    return rules;
+  });
+
+  /**
+   * Quick-access framework rules and dialog framework rules first (a restrict-whitelist must lead to
+   * set the default-hidden stance), then ignorelist rules, then manual rules — so a manual whitelist
+   * always wins last.
+   */
+  readonly effectiveFilters = computed(() => [
+    ...this.generatedQuickFrameworkRules(),
+    ...this.generatedFrameworkRules(),
+    ...this.generatedDynamicRules(),
+    ...this.filters(),
+  ]);
 
   readonly hasActiveFilters = computed(() =>
     this.effectiveFilters().some((f) => f.enabled && f.query.trim() !== ''),
   );
 
-  /** Paths after both the dialog filters and the top input — what the tree renders. */
+  /** Paths after both the dialog filters and the top input. */
   readonly filteredPaths = computed(() =>
     filterFilePaths(this.allEagerPaths(), this.effectiveFilters(), this.nameQuery()),
   );
+
+  /**
+   * What the tree actually renders: {@link filteredPaths} minus test files reachable via a visible
+   * source's Test tab (they'd be redundant in the tree). "Reachable" is computed with the exact same
+   * {@link linkedTestsOf} primitive the viewer's tabs use — a test is hidden iff some visible source
+   * would surface it as a tab. Skipped while name-searching, so a test can still be found by name.
+   */
+  readonly treeVisiblePaths = computed(() => {
+    const visible = this.filteredPaths();
+    if (this.nameQuery().trim() !== '') return visible;
+    const projects = this.detectedProjects();
+    const all = this.allEagerPaths();
+    const visibleSet = new Set(visible);
+    const hidden = new Set<string>();
+    for (const source of visible) {
+      for (const test of linkedTestsOf(source, projects, all)) {
+        if (visibleSet.has(test)) hidden.add(test);
+      }
+    }
+    return hidden.size === 0 ? visible : visible.filter((p) => !hidden.has(p));
+  });
 
   /** Paths after only the dialog filters — the dialog's "visible files" preview. */
   readonly dialogVisiblePaths = computed(() =>
@@ -782,9 +1117,26 @@ export class WorktreeFileBrowserComponent {
     this.dialogVisiblePaths().slice(0, VISIBLE_PREVIEW_LIMIT),
   );
 
-  /** True when any filter narrows the tree — drives the tree's expand-all so matches are visible. */
+  /** True when any filter (including the quick-access footer) narrows the tree — drives the hint. */
   protected readonly isFiltering = computed(
     () => this.nameQuery().trim() !== '' || this.hasActiveFilters(),
+  );
+
+  /** Active filters other than the quick-access footer toggles. */
+  private readonly hasNonQuickFilters = computed(() =>
+    [...this.generatedFrameworkRules(), ...this.generatedDynamicRules(), ...this.filters()].some(
+      (f) => f.enabled && f.query.trim() !== '',
+    ),
+  );
+
+  /**
+   * Whether to auto-expand the whole tree to reveal matches. A name query, manual rule, or dialog
+   * dynamic filter is a *search* → expand so deep matches are visible. The quick-access footer
+   * toggles are deliberately excluded: they narrow the tree for *browsing* and must leave it
+   * collapsed (expanding every directory on a framework toggle is jarring).
+   */
+  protected readonly expandTreeForFilter = computed(
+    () => this.nameQuery().trim() !== '' || this.hasNonQuickFilters(),
   );
 
   /**
@@ -813,7 +1165,7 @@ export class WorktreeFileBrowserComponent {
 
     // Unopened (still-stub) lazy dirs get a sentinel leaf so build-file-tree materialises the dir
     // node; a loaded lazy dir is a normal directory (its eager files are already in filteredPaths).
-    const items: HasPath[] = this.filteredPaths().map((path) => ({ path }));
+    const items: HasPath[] = this.treeVisiblePaths().map((path) => ({ path }));
     const stubs: string[] = [];
     for (const dir of counts.keys()) {
       if (!loaded.has(dir)) {
@@ -884,6 +1236,16 @@ export class WorktreeFileBrowserComponent {
       treeService.expand(parts.slice(0, i).join('/'));
     }
   }
+
+  /**
+   * The opened file's linked group — the file plus its detected test/code counterpart(s). ≥2 entries
+   * drive the viewer's tab strip; each tab just re-points {@link selectedPath} (the content query,
+   * reference chips, and view mode are all keyed per path, so they follow for free).
+   */
+  readonly linkedGroup = computed<LinkedFile[]>(() => {
+    const path = this.selectedPath();
+    return path ? resolveLinkedGroup(path, this.detectedProjects(), this.allEagerPaths()) : [];
+  });
 
   readonly references = signal<CodeReference[]>([]);
 
@@ -997,13 +1359,42 @@ export class WorktreeFileBrowserComponent {
 
   // --- Dynamic (ignorelist) filters ---
 
-  /** Select an ignorelist dynamic filter by basename (idempotent — dedupes on param). */
-  addDynamicFilter(param: string): void {
+  /** Select a dynamic filter of the given kind (idempotent — dedupes on type + param). */
+  addDynamicFilter(type: DynamicFilter['type'], param: string): void {
     this.dynamicFilters.update((filters) =>
-      filters.some((d) => d.param === param)
+      filters.some((d) => d.type === type && d.param === param)
         ? filters
-        : [...filters, { id: `d${++this.dynamicSeq}`, type: 'ignorelist', param, enabled: true }],
+        : [...filters, { id: `d${++this.dynamicSeq}`, type, param, enabled: true }],
     );
+  }
+
+  /** The display label for a selected dynamic-filter row (framework label, or ignore-file name). */
+  protected dynamicLabel(dyn: DynamicFilter): string {
+    if (dyn.type === 'framework') {
+      return this.frameworkOptions().find((o) => o.param === dyn.param)?.label ?? dyn.param;
+    }
+    return dyn.param;
+  }
+
+  /** The generated rules for a selected dynamic-filter row — the dialog's read-only view. */
+  protected dynamicRules(dyn: DynamicFilter): PathFilter[] {
+    const groups = dyn.type === 'framework' ? this.frameworkRuleGroups() : this.dynamicRuleGroups();
+    return groups.get(dyn.param) ?? [];
+  }
+
+  /** Toggle a quick-access framework kind on/off (an aggregate filter over all its detected roots). */
+  toggleFrameworkKind(id: string): void {
+    this.activeFrameworkKinds.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** The label for a test↔code tab: its role, capitalised. */
+  protected tabLabel(file: LinkedFile): string {
+    return file.role === 'test' ? 'Test' : 'Code';
   }
 
   removeDynamicFilter(id: string): void {

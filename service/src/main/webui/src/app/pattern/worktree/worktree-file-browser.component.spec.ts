@@ -203,7 +203,7 @@ describe('WorktreeFileBrowserComponent', () => {
       const fixture = createComponent();
       const cmp = fixture.componentInstance;
 
-      cmp.addDynamicFilter('.gitignore');
+      cmp.addDynamicFilter('ignorelist', '.gitignore');
       fixture.detectChanges();
 
       // root: hide *.log but re-include keep.log; src/.gitignore hides only src/**/app.spec.ts
@@ -229,7 +229,7 @@ describe('WorktreeFileBrowserComponent', () => {
       const fixture = createComponent();
       const cmp = fixture.componentInstance;
 
-      cmp.addDynamicFilter('.gitignore');
+      cmp.addDynamicFilter('ignorelist', '.gitignore');
       fixture.detectChanges();
       expect(cmp.filteredPaths()).not.toContain('debug.log');
 
@@ -246,8 +246,8 @@ describe('WorktreeFileBrowserComponent', () => {
       const fixture = createComponent();
       const cmp = fixture.componentInstance;
 
-      cmp.addDynamicFilter('.gitignore');
-      cmp.addDynamicFilter('.gitignore'); // idempotent
+      cmp.addDynamicFilter('ignorelist', '.gitignore');
+      cmp.addDynamicFilter('ignorelist', '.gitignore'); // idempotent
       expect(cmp.dynamicFilters().length).toBe(1);
       fixture.detectChanges();
       expect(cmp.filteredPaths()).not.toContain('debug.log');
@@ -525,5 +525,274 @@ describe('WorktreeFileBrowserComponent', () => {
     fixture.detectChanges();
 
     expect(treeService.isExpanded('domain/src')).toBe(false);
+  });
+
+  describe('framework filters', () => {
+    const FW_PATHS = [
+      'pom.xml',
+      'service/src/main/webui/angular.json',
+      'service/src/main/webui/package.json',
+      'service/src/main/webui/src/app/x.ts',
+      'service/src/main/webui/src/app/x.spec.ts',
+      'src/main/java/com/App.java',
+      'src/test/java/com/AppTest.java',
+      'docs/plan.md',
+      'README.md',
+    ];
+    const paramFor = (cmp: WorktreeFileBrowserComponent, id: string) =>
+      cmp.frameworkOptions().find((o) => o.descriptorId === id)!.param;
+
+    beforeEach(() => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], { paths: FW_PATHS, lazyDirs: [] });
+    });
+
+    it('offers a per-root filter for java/angular and one aggregate Docs filter', () => {
+      const cmp = createComponent().componentInstance;
+      const options = cmp.frameworkOptions();
+      expect(options.map((o) => o.label).sort()).toEqual([
+        'Docs',
+        'Java / Maven (root)',
+        'TypeScript / Angular (service/src/main/webui)',
+      ]);
+      expect(options.find((o) => o.descriptorId === 'docs')?.roots).toEqual(['docs']);
+    });
+
+    it('upgrades the Java label to Quarkus when the pom content mentions quarkus', async () => {
+      queryClient.setQueryData(['worktree-file', 'repo-1', 'wt-1', 'pom.xml'], {
+        path: 'pom.xml',
+        content: '<dependency>io.quarkus</dependency>',
+        binary: false,
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      const label = () => cmp.frameworkOptions().find((o) => o.descriptorId === 'java-quarkus')?.label;
+
+      // the pom is peeked as soon as a java project is detected (the always-visible footer needs it)
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(label()).toBe('Java / Quarkus (root)');
+      });
+    });
+
+    it('enabling the Java filter shows only java/pom and hides the webui TS + docs', () => {
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      cmp.addDynamicFilter('framework', paramFor(cmp, 'java-quarkus'));
+      fixture.detectChanges();
+      expect(cmp.filteredPaths()).toEqual([
+        'pom.xml',
+        'src/main/java/com/App.java',
+        'src/test/java/com/AppTest.java',
+      ]);
+    });
+
+    it('enabling java + angular together shows both stacks (union), still hiding docs/README', () => {
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      cmp.addDynamicFilter('framework', paramFor(cmp, 'java-quarkus'));
+      cmp.addDynamicFilter('framework', paramFor(cmp, 'ts-angular'));
+      fixture.detectChanges();
+      expect([...cmp.filteredPaths()].sort()).toEqual([
+        'pom.xml',
+        'service/src/main/webui/angular.json',
+        'service/src/main/webui/package.json',
+        'service/src/main/webui/src/app/x.spec.ts',
+        'service/src/main/webui/src/app/x.ts',
+        'src/main/java/com/App.java',
+        'src/test/java/com/AppTest.java',
+      ]);
+    });
+
+    it('the Docs filter whitelists the union of every docs dir and hides everything else', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['docs/a.md', 'service/docs/b.md', 'src/main.ts', 'README.md'],
+        lazyDirs: [],
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      cmp.addDynamicFilter('framework', 'docs');
+      fixture.detectChanges();
+      expect(cmp.filteredPaths()).toEqual(['docs/a.md', 'service/docs/b.md']);
+    });
+  });
+
+  describe('framework quick-access footer', () => {
+    const QA_PATHS = [
+      'pom.xml',
+      'domain/pom.xml',
+      'domain/src/main/java/com/D.java',
+      'service/src/main/webui/angular.json',
+      'service/src/main/webui/src/app/x.ts',
+      'src/main/java/com/App.java',
+      'docs/plan.md',
+      'README.md',
+    ];
+
+    beforeEach(() => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], { paths: QA_PATHS, lazyDirs: [] });
+    });
+
+    it('offers one aggregate toggle per framework kind (not per root)', () => {
+      const cmp = createComponent().componentInstance;
+      // two poms (root + domain) collapse into a single Java toggle
+      expect(cmp.frameworkQuickAccess().map((f) => f.label)).toEqual(['Maven', 'Angular', 'Docs']);
+    });
+
+    it('shows the short Quarkus label once any pom mentions quarkus', async () => {
+      queryClient.setQueryData(['worktree-file', 'repo-1', 'wt-1', 'domain/pom.xml'], {
+        path: 'domain/pom.xml',
+        content: 'io.quarkus',
+        binary: false,
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(cmp.frameworkQuickAccess().find((f) => f.id === 'java-quarkus')?.label).toBe('Quarkus');
+      });
+    });
+
+    it('toggling a kind restricts to it (all roots), untoggling restores everything', () => {
+      const cmp = createComponent().componentInstance;
+      cmp.toggleFrameworkKind('java-quarkus');
+      // aggregate over BOTH java roots ('' and 'domain'): all java + poms, nothing else
+      expect(cmp.filteredPaths()).toEqual([
+        'pom.xml',
+        'domain/pom.xml',
+        'domain/src/main/java/com/D.java',
+        'src/main/java/com/App.java',
+      ]);
+      cmp.toggleFrameworkKind('java-quarkus');
+      expect(cmp.filteredPaths()).toEqual(QA_PATHS);
+    });
+
+    it('narrows the tree without triggering expand-all (unlike a name query or manual rule)', () => {
+      const cmp = createComponent().componentInstance;
+      cmp.toggleFrameworkKind('java-quarkus');
+      // a quick-access toggle filters but must NOT auto-expand every directory…
+      expect(cmp['expandTreeForFilter']()).toBe(false);
+      // …while a name query or manual rule still does
+      cmp.nameQuery.set('App');
+      expect(cmp['expandTreeForFilter']()).toBe(true);
+      cmp.nameQuery.set('');
+      cmp.addFilter({ kind: 'includes', query: 'domain', mode: 'whitelist' });
+      expect(cmp['expandTreeForFilter']()).toBe(true);
+    });
+
+    it('opens the tree to a framework-aware depth on toggle (java → src/main), not fully', () => {
+      // `resources` makes `src/main` a real branch node (not absorbed into a chain); two packages
+      // under `com` make it a branch too, so it can stay collapsed below the src/main landing.
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: [
+          'domain/pom.xml',
+          'domain/src/main/java/com/a/A.java',
+          'domain/src/main/java/com/b/B.java',
+          'domain/src/main/resources/app.properties',
+        ],
+        lazyDirs: [],
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+        .componentInstance.treeService;
+
+      cmp.toggleFrameworkKind('java-quarkus');
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      const expanded = treeService.expandedKeys();
+      // opened down to the detected root's src/main…
+      expect(expanded.has('domain')).toBe(true);
+      expect(expanded.has('domain/src/main')).toBe(true);
+      // …but not the deep source packages (framework-aware, not expand-all)
+      expect(expanded.has('domain/src/main/java/com')).toBe(false);
+    });
+
+    it('several toggled kinds compose as a union (docs + angular)', () => {
+      const cmp = createComponent().componentInstance;
+      cmp.toggleFrameworkKind('docs');
+      cmp.toggleFrameworkKind('ts-angular');
+      expect([...cmp.filteredPaths()].sort()).toEqual([
+        'docs/plan.md',
+        'service/src/main/webui/angular.json',
+        'service/src/main/webui/src/app/x.ts',
+      ]);
+    });
+  });
+
+  describe('test↔code tabs', () => {
+    const TAB_PATHS = [
+      'pom.xml',
+      'src/main/java/com/App.java',
+      'src/test/java/com/AppTest.java',
+      'w/angular.json',
+      'w/src/foo.ts',
+      'w/src/foo.spec.ts',
+      'README.md',
+    ];
+
+    beforeEach(() => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], { paths: TAB_PATHS, lazyDirs: [] });
+    });
+
+    it('links a java source to its test symmetrically (code tab first either way)', () => {
+      const cmp = createComponent().componentInstance;
+      cmp.selectedPath.set('src/main/java/com/App.java');
+      expect(cmp.linkedGroup()).toEqual([
+        { role: 'code', path: 'src/main/java/com/App.java' },
+        { role: 'test', path: 'src/test/java/com/AppTest.java' },
+      ]);
+      cmp.selectedPath.set('src/test/java/com/AppTest.java');
+      expect(cmp.linkedGroup()).toEqual([
+        { role: 'code', path: 'src/main/java/com/App.java' },
+        { role: 'test', path: 'src/test/java/com/AppTest.java' },
+      ]);
+    });
+
+    it('hides a linked test from the tree (reachable via its source tab), keeps orphans + name search', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: [...TAB_PATHS, 'src/test/java/com/OrphanTest.java'],
+        lazyDirs: [],
+      });
+      const cmp = createComponent().componentInstance;
+
+      const tree = cmp.treeVisiblePaths();
+      // sources stay, their linked tests are hidden…
+      expect(tree).toContain('src/main/java/com/App.java');
+      expect(tree).not.toContain('src/test/java/com/AppTest.java');
+      expect(tree).not.toContain('w/src/foo.spec.ts');
+      // …an orphan test (no source) stays visible…
+      expect(tree).toContain('src/test/java/com/OrphanTest.java');
+
+      // the hidden test is still reachable as a tab from its source
+      cmp.selectedPath.set('src/main/java/com/App.java');
+      expect(cmp.linkedGroup().map((f) => f.path)).toContain('src/test/java/com/AppTest.java');
+
+      // …and still findable by name search
+      cmp.nameQuery.set('AppTest');
+      expect(cmp.treeVisiblePaths()).toContain('src/test/java/com/AppTest.java');
+    });
+
+    it('links angular foo.ts ↔ foo.spec.ts, and shows no group for a file without a counterpart', () => {
+      const cmp = createComponent().componentInstance;
+      cmp.selectedPath.set('w/src/foo.ts');
+      expect(cmp.linkedGroup().map((f) => f.path)).toEqual(['w/src/foo.ts', 'w/src/foo.spec.ts']);
+      cmp.selectedPath.set('README.md');
+      expect(cmp.linkedGroup()).toEqual([]);
+    });
+
+    it('keeps each file’s reference chips across a tab switch (references are path-keyed)', () => {
+      const cmp = createComponent().componentInstance;
+      cmp.selectedPath.set('src/main/java/com/App.java');
+      cmp.addReference({ startLine: 1, endLine: 3 });
+      expect(cmp.currentHighlights()).toEqual([{ startLine: 1, endLine: 3 }]);
+
+      // switch to the Test tab — the code file's highlight is gone (per-path)…
+      cmp.selectedPath.set('src/test/java/com/AppTest.java');
+      expect(cmp.currentHighlights()).toEqual([]);
+      // …and returns when we switch back
+      cmp.selectedPath.set('src/main/java/com/App.java');
+      expect(cmp.currentHighlights()).toEqual([{ startLine: 1, endLine: 3 }]);
+    });
   });
 });

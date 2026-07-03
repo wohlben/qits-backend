@@ -143,6 +143,17 @@ describe('applyPathFilters — last-match-wins', () => {
     expect(applyPathFilters(TREE, [wl('glob', '**/README.md')])).toEqual(TREE);
   });
 
+  it('a restrict glob whitelist DOES flip the default (framework filter), unlike a plain one', () => {
+    // Same glob, but `restrict:true` sets the stance to default-hidden — only matches survive.
+    const plain = wl('glob', '**/*.ts');
+    const restrict = { ...plain, restrict: true };
+    expect(applyPathFilters(PATHS, [plain])).toEqual(PATHS); // plain glob whitelist: shows all
+    expect(applyPathFilters(PATHS, [restrict])).toEqual([
+      'service/src/main/webui/main.ts',
+      'service/src/test/foo.spec.ts',
+    ]);
+  });
+
   it('glob blacklist then glob whitelist reproduces `*.log` + `!keep.log`', () => {
     const logs = ['a.log', 'keep.log', 'x.txt'];
     const filters = [bl('glob', '**/*.log'), wl('glob', '**/keep.log')];
