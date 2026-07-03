@@ -204,4 +204,28 @@ describe('WorktreeFileBrowserComponent', () => {
     expect(resolved?.children?.map((c) => c.label)).toEqual(['App.java', 'AppTest.java']);
     expect(treeService.isExpanded('domain/src')).toBe(true);
   });
+
+  it('toggles a folder on row click instead of selecting it', () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+    const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+      .componentInstance.treeService;
+    const folder = cmp.tree().find((n) => n.key === 'domain/src')!;
+
+    cmp.selectedPath.set('README.md');
+    treeService.notifyNodeClick(folder); // what a row click sends through the tree
+    fixture.detectChanges();
+    fixture.detectChanges(); // click effect → zNodeClick handler → expansion sync
+
+    expect(treeService.isExpanded('domain/src')).toBe(true);
+    // the open file keeps both the selection state and the highlight
+    expect(cmp.selectedPath()).toBe('README.md');
+    expect(treeService.selectedKeys()).toEqual(new Set(['README.md']));
+
+    treeService.notifyNodeClick(folder);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(treeService.isExpanded('domain/src')).toBe(false);
+  });
 });
