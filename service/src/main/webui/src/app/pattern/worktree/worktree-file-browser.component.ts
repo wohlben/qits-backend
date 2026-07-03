@@ -112,6 +112,9 @@ interface LazyLevel {
  */
 const LAZY_SENTINEL = '__lazy_stub__';
 
+/** How {@link compactFileTree} joins a compacted chain's segments — must match its `separator`. */
+const CHAIN_SEPARATOR = ' / ';
+
 /**
  * Turns the sentinel-bearing directory nodes into lazy stubs in place: marks them {@code lazy},
  * appends the immediate-child count to the label (`node_modules (312)`), and swaps the sentinel
@@ -218,7 +221,31 @@ function markLazyStubs(
                 [zExpandAll]="isFiltering()"
                 zSelectable
                 (zNodeClick)="onNodeClick($event)"
-              />
+              >
+                <!-- Same icon+label as the default node, but de-emphasised parts render dimmed
+                     (without changing layout or click behaviour): a whole lazy directory stub, and
+                     the ancestor prefix of a compacted "a / b / c" breadcrumb so the final segment
+                     stands out. -->
+                <ng-template #nodeTemplate let-node>
+                  @if (node.icon) {
+                    <ng-icon
+                      [name]="node.icon"
+                      class="size-4! shrink-0"
+                      [style.opacity]="node.lazy ? dimOpacity : null"
+                    />
+                  }
+                  @if (node.lazy) {
+                    <span class="truncate" [style.opacity]="dimOpacity">{{ node.label }}</span>
+                  } @else {
+                    <span class="truncate"
+                      ><span [style.opacity]="dimOpacity" [style.fontSize]="breadcrumbPrefixSize">{{
+                        breadcrumbPrefix(node.label)
+                      }}</span
+                      >{{ breadcrumbLeaf(node.label) }}</span
+                    >
+                  }
+                </ng-template>
+              </z-tree>
             }
           </div>
           @if (unsearchedLazyCount() > 0) {
@@ -510,6 +537,19 @@ export class WorktreeFileBrowserComponent {
 
   protected readonly visiblePreviewLimit = VISIBLE_PREVIEW_LIMIT;
 
+  /**
+   * Opacity for de-emphasised label parts: a lazy (not-yet-loaded) directory stub, and the
+   * ancestor prefix of a compacted `a / b / c` breadcrumb (so the final segment stands out). One
+   * knob — tune to taste.
+   */
+  protected readonly dimOpacity = 0.75;
+
+  /** The separator {@link compactFileTree} joins a compacted chain's segments with. */
+  protected readonly chainSeparator = CHAIN_SEPARATOR;
+
+  /** Font size of a breadcrumb's dimmed ancestor prefix (base tree text is 0.875rem / text-sm). */
+  protected readonly breadcrumbPrefixSize = '0.7rem';
+
   private readonly filtersTpl = viewChild<TemplateRef<unknown>>('filtersTpl');
   private readonly treeCmp = viewChild(ZardTreeComponent);
   private filtersDialogRef?: ZardDialogRef<unknown>;
@@ -786,7 +826,7 @@ export class WorktreeFileBrowserComponent {
     markLazyStubs(built, new Set(stubs), counts, opened);
 
     const chains: CompactedChain[] = [];
-    const nodes = compactFileTree(built, { chains });
+    const nodes = compactFileTree(built, { chains, separator: CHAIN_SEPARATOR });
     return { nodes, chains };
   });
 
@@ -992,6 +1032,18 @@ export class WorktreeFileBrowserComponent {
   /** Coerce a z-input model value (string | number | null | undefined) to a string. */
   protected str(value: unknown): string {
     return value == null ? '' : String(value);
+  }
+
+  /** The ancestor prefix of a compacted breadcrumb label (`a / b / ` for `a / b / c`), else ''. */
+  protected breadcrumbPrefix(label: string): string {
+    const i = label.lastIndexOf(this.chainSeparator);
+    return i === -1 ? '' : label.slice(0, i + this.chainSeparator.length);
+  }
+
+  /** The final segment of a compacted breadcrumb label (`c` for `a / b / c`), else the whole label. */
+  protected breadcrumbLeaf(label: string): string {
+    const i = label.lastIndexOf(this.chainSeparator);
+    return i === -1 ? label : label.slice(i + this.chainSeparator.length);
   }
 
   addReference(range: LineRange): void {
