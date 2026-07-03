@@ -26,3 +26,7 @@ allure-results/
 
 # Misc
 .claude/
+
+# Starter migration scratch file — written to the repo root by `cli generate-migration`
+# as a reminder/template; turn it into a hand-written db/migration/V#__name.sql, then delete it.
+PENDING_MIGRATION.sql
