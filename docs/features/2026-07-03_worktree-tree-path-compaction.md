@@ -111,6 +111,9 @@ export function compactFileTree<T>(
   so the browsers' path-based selection logic is unchanged.
 - **Accessibility**: the joined label is announced as one string; the separator is ` / ` (with
   spaces) so screen readers don't merge segments into one pseudo-word.
+- **Long labels**: compacted labels are wider than plain names, so both trees render at natural
+  width (`w-max min-w-full`) inside their scrollable pane instead of truncating, and the
+  tree/viewer split is user-draggable (`z-resizable`, ZardUI) — full names are always reachable.
 
 ## Decisions (formerly open questions)
 
