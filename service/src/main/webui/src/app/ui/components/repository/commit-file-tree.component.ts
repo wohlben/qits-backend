@@ -14,7 +14,15 @@ import { FileTreeNode } from '@/shared/utils/build-file-tree';
   selector: 'app-commit-file-tree',
   imports: [ZardTreeImports],
   template: `
-    <z-tree [zData]="nodes()" zExpandAll zSelectable (zNodeClick)="onNodeClick($event)">
+    <!-- w-max lets rows take their natural width so long (compacted) labels are reachable via
+         the parent's horizontal scroll instead of being truncated -->
+    <z-tree
+      class="w-max min-w-full"
+      [zData]="nodes()"
+      zExpandAll
+      zSelectable
+      (zNodeClick)="onNodeClick($event)"
+    >
       <ng-template #nodeTemplate let-node>
         <div class="flex flex-1 items-center gap-2">
           @if (node.leaf && node.data) {

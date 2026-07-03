@@ -11,6 +11,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { CommitFileChangeDto } from '@/api/model/commitFileChangeDto';
+import { ZardResizableImports } from '@/shared/components/resizable/resizable.imports';
 import { buildFileTree } from '@/shared/utils/build-file-tree';
 import { compactFileTree } from '@/shared/utils/compact-file-tree';
 import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.component';
@@ -25,7 +26,12 @@ import { FileDiffViewComponent } from '@/ui/components/repository/file-diff-view
  */
 @Component({
   selector: 'app-commit-diff',
-  imports: [EmptyStateComponent, CommitFileTreeComponent, FileDiffViewComponent],
+  imports: [
+    ...ZardResizableImports,
+    EmptyStateComponent,
+    CommitFileTreeComponent,
+    FileDiffViewComponent,
+  ],
   template: `
     @if (changesQuery.isPending()) {
       <div class="text-sm text-muted-foreground">Loading changes…</div>
@@ -37,27 +43,34 @@ import { FileDiffViewComponent } from '@/ui/components/repository/file-diff-view
         <span description>This commit does not change any files against its base</span>
       </app-empty-state>
     } @else {
-      <div class="grid h-[72vh] grid-cols-[20rem_1fr] gap-4">
-        <div class="overflow-auto rounded-md border border-border p-2">
-          <app-commit-file-tree [nodes]="treeNodes()" (fileClick)="onFileClick($event)" />
-        </div>
-        <div class="overflow-auto rounded-md border border-border">
-          @if (selectedPath()) {
-            @if (fileDiffQuery.isPending()) {
-              <div class="text-sm text-muted-foreground">Loading diff…</div>
-            } @else if (fileDiffQuery.isError()) {
-              <div class="text-sm text-destructive">Failed to load file diff</div>
+      <z-resizable class="h-[72vh]">
+        <z-resizable-panel zDefaultSize="25" zMin="200px" zMax="70">
+          <div class="h-full overflow-auto rounded-md border border-border p-2">
+            <app-commit-file-tree [nodes]="treeNodes()" (fileClick)="onFileClick($event)" />
+          </div>
+        </z-resizable-panel>
+
+        <z-resizable-handle zWithHandle class="mx-1" />
+
+        <z-resizable-panel zDefaultSize="75">
+          <div class="h-full overflow-auto rounded-md border border-border">
+            @if (selectedPath()) {
+              @if (fileDiffQuery.isPending()) {
+                <div class="text-sm text-muted-foreground">Loading diff…</div>
+              } @else if (fileDiffQuery.isError()) {
+                <div class="text-sm text-destructive">Failed to load file diff</div>
+              } @else {
+                <app-file-diff-view
+                  [diff]="fileDiffQuery.data()?.diff ?? ''"
+                  [path]="selectedPath() ?? ''"
+                />
+              }
             } @else {
-              <app-file-diff-view
-                [diff]="fileDiffQuery.data()?.diff ?? ''"
-                [path]="selectedPath() ?? ''"
-              />
+              <div class="text-sm text-muted-foreground">Select a file to view its diff</div>
             }
-          } @else {
-            <div class="text-sm text-muted-foreground">Select a file to view its diff</div>
-          }
-        </div>
-      </div>
+          </div>
+        </z-resizable-panel>
+      </z-resizable>
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

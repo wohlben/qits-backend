@@ -27,6 +27,7 @@ import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 import { ZardInputDirective } from '@/shared/components/input';
+import { ZardResizableImports } from '@/shared/components/resizable/resizable.imports';
 import { ZardSelectImports } from '@/shared/components/select';
 import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
@@ -40,7 +41,10 @@ import {
   type PathFilter,
   type PathFilterKind,
 } from '@/shared/utils/filter-file-paths';
-import { CodeViewerComponent, type LineRange } from '@/ui/components/code-viewer/code-viewer.component';
+import {
+  CodeViewerComponent,
+  type LineRange,
+} from '@/ui/components/code-viewer/code-viewer.component';
 
 /** A collected reference to a range of a file, staged to later become part of a Claude prompt. */
 export interface CodeReference {
@@ -69,6 +73,7 @@ const VISIBLE_PREVIEW_LIMIT = 500;
   imports: [
     ...ZardTreeImports,
     ...ZardSelectImports,
+    ...ZardResizableImports,
     CodeViewerComponent,
     ZardBadgeComponent,
     ZardButtonComponent,
@@ -87,92 +92,102 @@ const VISIBLE_PREVIEW_LIMIT = 500;
     }),
   ],
   template: `
-    <div class="flex h-[calc(100vh-11rem)] min-h-0 gap-4">
-      <aside class="flex w-72 shrink-0 flex-col rounded-md border">
-        <div class="flex items-center gap-2 border-b p-2">
-          <button
-            z-button
-            zType="ghost"
-            zSize="icon"
-            aria-label="Advanced filters"
-            [class]="hasActiveFilters() ? 'text-primary' : ''"
-            (click)="openFilters()"
-          >
-            <ng-icon name="lucideListFilter" class="size-4!" />
-          </button>
-          <input
-            z-input
-            zSize="sm"
-            class="flex-1"
-            placeholder="Filter files… (fuzzy, or *.ts)"
-            [value]="nameQuery()"
-            (valueChange)="nameQuery.set(str($event))"
-          />
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-auto p-2">
-          @if (filesQuery.isPending()) {
-            <div class="p-2 text-sm text-muted-foreground">Loading files…</div>
-          } @else if (filesQuery.isError()) {
-            <div class="p-2 text-sm text-destructive">Failed to load files</div>
-          } @else if (tree().length === 0) {
-            <div class="p-2 text-sm text-muted-foreground">No files match.</div>
-          } @else {
-            <z-tree
-              [zData]="tree()"
-              [zExpandAll]="isFiltering()"
-              zSelectable
-              (zNodeClick)="onNodeClick($event)"
+    <z-resizable class="h-[calc(100vh-11rem)] min-h-0">
+      <z-resizable-panel zDefaultSize="20" zMin="200px" zMax="70">
+        <aside class="flex h-full flex-col rounded-md border">
+          <div class="flex items-center gap-2 border-b p-2">
+            <button
+              z-button
+              zType="ghost"
+              zSize="icon"
+              aria-label="Advanced filters"
+              [class]="hasActiveFilters() ? 'text-primary' : ''"
+              (click)="openFilters()"
+            >
+              <ng-icon name="lucideListFilter" class="size-4!" />
+            </button>
+            <input
+              z-input
+              zSize="sm"
+              class="flex-1"
+              placeholder="Filter files… (fuzzy, or *.ts)"
+              [value]="nameQuery()"
+              (valueChange)="nameQuery.set(str($event))"
             />
-          }
-        </div>
-      </aside>
-
-      <section class="flex min-w-0 flex-1 flex-col gap-2">
-        @if (references().length > 0) {
-          <div class="flex flex-wrap items-center gap-1.5">
-            @for (ref of references(); track trackRef(ref)) {
-              <z-badge zType="secondary" class="gap-1 font-mono text-xs">
-                {{ ref.path }}:{{ ref.startLine }}@if (ref.endLine !== ref.startLine) {
-                  -{{ ref.endLine }}
-                }
-                <button
-                  type="button"
-                  class="ml-0.5 inline-flex cursor-pointer opacity-70 hover:opacity-100"
-                  [attr.aria-label]="'Remove reference ' + trackRef(ref)"
-                  (click)="removeReference(ref)"
-                >
-                  <ng-icon name="lucideX" class="size-3!" />
-                </button>
-              </z-badge>
-            }
           </div>
-        }
 
-        <div class="min-h-0 flex-1">
-          @if (selectedPath(); as path) {
-            @if (fileQuery.isPending()) {
-              <div class="text-sm text-muted-foreground">Loading {{ path }}…</div>
-            } @else if (fileQuery.isError()) {
-              <div class="text-sm text-destructive">Failed to load {{ path }}</div>
-            } @else if (fileQuery.data(); as file) {
-              <app-code-viewer
-                [path]="path"
-                [content]="file.content ?? null"
-                [binary]="file.binary ?? false"
-                [isDark]="isDark()"
-                [highlights]="currentHighlights()"
-                (selectRange)="addReference($event)"
+          <div class="min-h-0 flex-1 overflow-auto p-2">
+            @if (filesQuery.isPending()) {
+              <div class="p-2 text-sm text-muted-foreground">Loading files…</div>
+            } @else if (filesQuery.isError()) {
+              <div class="p-2 text-sm text-destructive">Failed to load files</div>
+            } @else if (tree().length === 0) {
+              <div class="p-2 text-sm text-muted-foreground">No files match.</div>
+            } @else {
+              <!-- w-max lets rows take their natural width so long (compacted) labels are
+                 reachable via the container's horizontal scroll instead of being truncated -->
+              <z-tree
+                class="w-max min-w-full"
+                [zData]="tree()"
+                [zExpandAll]="isFiltering()"
+                zSelectable
+                (zNodeClick)="onNodeClick($event)"
               />
             }
-          } @else {
-            <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Select a file to view its contents.
+          </div>
+        </aside>
+      </z-resizable-panel>
+
+      <z-resizable-handle zWithHandle class="mx-1" />
+
+      <z-resizable-panel zDefaultSize="80">
+        <section class="flex h-full min-w-0 flex-col gap-2">
+          @if (references().length > 0) {
+            <div class="flex flex-wrap items-center gap-1.5">
+              @for (ref of references(); track trackRef(ref)) {
+                <z-badge zType="secondary" class="gap-1 font-mono text-xs">
+                  {{ ref.path }}:{{ ref.startLine }}
+                  @if (ref.endLine !== ref.startLine) {
+                    -{{ ref.endLine }}
+                  }
+                  <button
+                    type="button"
+                    class="ml-0.5 inline-flex cursor-pointer opacity-70 hover:opacity-100"
+                    [attr.aria-label]="'Remove reference ' + trackRef(ref)"
+                    (click)="removeReference(ref)"
+                  >
+                    <ng-icon name="lucideX" class="size-3!" />
+                  </button>
+                </z-badge>
+              }
             </div>
           }
-        </div>
-      </section>
-    </div>
+
+          <div class="min-h-0 flex-1">
+            @if (selectedPath(); as path) {
+              @if (fileQuery.isPending()) {
+                <div class="text-sm text-muted-foreground">Loading {{ path }}…</div>
+              } @else if (fileQuery.isError()) {
+                <div class="text-sm text-destructive">Failed to load {{ path }}</div>
+              } @else if (fileQuery.data(); as file) {
+                <app-code-viewer
+                  [path]="path"
+                  [content]="file.content ?? null"
+                  [binary]="file.binary ?? false"
+                  [isDark]="isDark()"
+                  [highlights]="currentHighlights()"
+                  (selectRange)="addReference($event)"
+                />
+              }
+            } @else {
+              <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Select a file to view its contents.
+              </div>
+            }
+          </div>
+        </section>
+      </z-resizable-panel>
+    </z-resizable>
 
     <ng-template #filtersTpl>
       <div class="flex flex-col gap-3">
@@ -183,11 +198,7 @@ const VISIBLE_PREVIEW_LIMIT = 500;
 
         @for (row of filters(); track row.id) {
           <div class="flex items-center gap-2">
-            <z-select
-              class="w-32"
-              [zValue]="row.kind"
-              (zSelectionChange)="setKind(row.id, $event)"
-            >
+            <z-select class="w-32" [zValue]="row.kind" (zSelectionChange)="setKind(row.id, $event)">
               <z-select-item zValue="exact">Exact</z-select-item>
               <z-select-item zValue="fuzzy">Fuzzy</z-select-item>
               <z-select-item zValue="includes">Includes</z-select-item>
@@ -433,9 +444,7 @@ export class WorktreeFileBrowserComponent {
   }
 
   updateFilter(id: string, patch: Partial<Omit<PathFilter, 'id'>>): void {
-    this.filters.update((filters) =>
-      filters.map((f) => (f.id === id ? { ...f, ...patch } : f)),
-    );
+    this.filters.update((filters) => filters.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   }
 
   removeFilter(id: string): void {
