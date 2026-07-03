@@ -616,6 +616,49 @@ describe('WorktreeFileBrowserComponent', () => {
     });
   });
 
+  describe('framework root icons', () => {
+    const seedPom = (path: string, content: string) =>
+      queryClient.setQueryData(['worktree-file', 'repo-1', 'wt-1', path], { path, content, binary: false });
+
+    it('maps a quarkus root to the quarkus mark and an angular root to the shield; skips repo root', async () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: [
+          'pom.xml',
+          'domain/pom.xml',
+          'domain/src/main/java/com/D.java',
+          'service/src/main/webui/angular.json',
+        ],
+        lazyDirs: [],
+      });
+      seedPom('domain/pom.xml', 'io.quarkus'); // up-front so the peek is deterministic (no mock race)
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(cmp.frameworkRootIcons().get('domain')).toBe('/quarkus.svg');
+      });
+      expect(cmp.frameworkRootIcons().get('service/src/main/webui')).toBe('/angular.svg');
+      // the repo-root java project has no folder row → no icon
+      expect(cmp.frameworkRootIcons().has('')).toBe(false);
+    });
+
+    it('shows the Java cup for a plain (non-quarkus) maven root', async () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['domain/pom.xml', 'domain/src/main/java/com/D.java'],
+        lazyDirs: [],
+      });
+      seedPom('domain/pom.xml', '<project>plain maven</project>');
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(cmp.frameworkRootIcons().get('domain')).toBe('/java.svg');
+      });
+    });
+  });
+
   describe('framework quick-access footer', () => {
     const QA_PATHS = [
       'pom.xml',
