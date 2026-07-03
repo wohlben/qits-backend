@@ -459,20 +459,32 @@ export class WorktreeControllerService extends BaseService {
      * @endpoint get /api/repositories/{repoId}/worktrees/{worktreeId}/files
      * @param repoId 
      * @param worktreeId 
+     * @param path 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response53>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response53>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response53>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, path?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response53>;
+    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, path?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response53>>;
+    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, path?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response53>>;
+    public apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(repoId: string, worktreeId: string, path?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet.');
         }
         if (worktreeId === null || worktreeId === undefined) {
             throw new Error('Required parameter worktreeId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet.');
         }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'path',
+            <any>path,
+            QueryParamStyle.Form,
+            true,
+        );
+
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -504,6 +516,7 @@ export class WorktreeControllerService extends BaseService {
         return this.httpClient.request<Response53>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

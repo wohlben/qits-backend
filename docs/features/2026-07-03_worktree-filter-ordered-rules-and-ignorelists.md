@@ -15,13 +15,14 @@ Related/dependent plans:
   [worktree-file-browser](2026-07-02_worktree-file-browser.md)
   (`shared/utils/filter-file-paths.ts`, the advanced dialog in
   `pattern/worktree/worktree-file-browser.component.ts`).
-- **Part 3 of the original idea is deferred** — see
-  [../feature-ideas/worktree-filter-ignorelists.md](../feature-ideas/worktree-filter-ignorelists.md):
-  the `/files` endpoint still runs `git ls-files … --exclude-standard`, so gitignored files stay
-  out of the payload for now. Because git still hides them, there is no default-on `.gitignore`
-  filter — dynamic filters are entirely user-added. The `.gitignore` dynamic filter still does
-  real work on gitignore patterns that match *tracked* files git surfaces via `--cached` (and on
-  non-git ignore files like `.dockerignore`/`.eslintignore`).
+- **Part 3 of the original idea (exposing gitignored files from the backend) was folded into a
+  better approach** — see
+  [2026-07-03_lazy-directory-exploration.md](2026-07-03_lazy-directory-exploration.md), which makes
+  gitignored *directories* openable lazy stubs rather than dropping `--exclude-standard`. In this
+  ordered-rules/ignorelists feature there is therefore no default-on `.gitignore` filter — dynamic
+  filters are entirely user-added. The `.gitignore` dynamic filter still does real work on gitignore
+  patterns that match *tracked* files git surfaces via `--cached` (and on non-git ignore files like
+  `.dockerignore`/`.eslintignore`).
 
 ## What was built
 

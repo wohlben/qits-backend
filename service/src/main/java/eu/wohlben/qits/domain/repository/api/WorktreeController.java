@@ -5,6 +5,7 @@ import eu.wohlben.qits.domain.repository.control.ResolveConflictService;
 import eu.wohlben.qits.domain.repository.control.WorktreeFilesService;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.dto.CommitLogDto;
+import eu.wohlben.qits.domain.repository.dto.LazyDirDto;
 import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
 import eu.wohlben.qits.domain.repository.dto.WorktreeFileContentDto;
 import eu.wohlben.qits.domain.repository.mapper.WorktreeMapper;
@@ -19,6 +20,8 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Path("/repositories/{repoId}/worktrees")
@@ -152,15 +155,36 @@ public class WorktreeController {
   }
 
   public static record ListWorktreeFilesRequest() {
-    public record Response(List<String> paths) {}
+    public record Response(List<String> paths, List<LazyDirDto> lazyDirs) {}
   }
 
   @GET
   @Path("/{worktreeId}/files")
   public ListWorktreeFilesRequest.Response listFiles(
-      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
-    return new ListWorktreeFilesRequest.Response(
-        worktreeFilesService.listFiles(repoId, worktreeId));
+      @PathParam("repoId") String repoId,
+      @PathParam("worktreeId") String worktreeId,
+      @QueryParam("path") String path) {
+    WorktreeFilesService.Listing listing = worktreeFilesService.listFiles(repoId, worktreeId, path);
+    List<LazyDirDto> lazyDirs =
+        listing.lazyDirs().stream()
+            .map(
+                dir ->
+                    new LazyDirDto(
+                        dir.path(), dir.childCount(), lazyDirHref(repoId, worktreeId, dir.path())))
+            .toList();
+    return new ListWorktreeFilesRequest.Response(listing.paths(), lazyDirs);
+  }
+
+  /**
+   * The self-referential {@code /files?path=…} link the client follows to open a lazy directory.
+   */
+  private static String lazyDirHref(String repoId, String worktreeId, String dirPath) {
+    return "/api/repositories/"
+        + repoId
+        + "/worktrees/"
+        + worktreeId
+        + "/files?path="
+        + URLEncoder.encode(dirPath, StandardCharsets.UTF_8);
   }
 
   @GET

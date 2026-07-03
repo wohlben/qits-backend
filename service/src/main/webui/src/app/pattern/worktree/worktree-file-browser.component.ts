@@ -28,6 +28,7 @@ import { injectQueries } from '@tanstack/angular-query-experimental/inject-queri
 import { lastValueFrom } from 'rxjs';
 
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import type { LazyDirDto } from '@/api/model/lazyDirDto';
 import type { WorktreeFileContentDto } from '@/api/model/worktreeFileContentDto';
 import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -97,6 +98,44 @@ export function migratePathFilter(filter: LegacyPathFilter): PathFilter {
 
 /** How many paths to render in the dialog's "visible files" preview before truncating. */
 const VISIBLE_PREVIEW_LIMIT = 500;
+
+/** One level of a worktree's file tree: eager files plus lazily-resolvable directory stubs. */
+interface LazyLevel {
+  paths: string[];
+  lazyDirs: LazyDirDto[];
+}
+
+/**
+ * A synthetic leaf appended under an unopened lazy directory so {@link buildFileTree} materialises
+ * the directory node and the tree renders an expansion chevron for it. It is replaced by the real
+ * listing once the directory is opened and its fetch resolves.
+ */
+const LAZY_SENTINEL = '__lazy_stub__';
+
+/**
+ * Turns the sentinel-bearing directory nodes into lazy stubs in place: marks them {@code lazy},
+ * appends the immediate-child count to the label (`node_modules (312)`), and swaps the sentinel
+ * leaf for a single placeholder child (shown as `Loading…` only while the dir is open and its fetch
+ * is in flight). Recurses into non-stub directories.
+ */
+function markLazyStubs(
+  nodes: TreeNode<HasPath>[],
+  stubs: ReadonlySet<string>,
+  counts: ReadonlyMap<string, number>,
+  opened: ReadonlySet<string>,
+): void {
+  for (const node of nodes) {
+    if (stubs.has(node.key)) {
+      node.lazy = true;
+      node.label = `${node.label} (${counts.get(node.key) ?? 0})`;
+      node.children = [
+        { key: `${node.key}/${LAZY_SENTINEL}`, label: opened.has(node.key) ? 'Loading…' : '', leaf: true },
+      ];
+    } else if (node.children?.length) {
+      markLazyStubs(node.children, stubs, counts, opened);
+    }
+  }
+}
 
 /**
  * Smart component: browses a worktree's files. A folder tree on the left (built from the git file
@@ -182,6 +221,14 @@ const VISIBLE_PREVIEW_LIMIT = 500;
               />
             }
           </div>
+          @if (unsearchedLazyCount() > 0) {
+            <div class="border-t px-2 py-1 text-xs text-muted-foreground">
+              {{ unsearchedLazyCount() }} collapsed director{{
+                unsearchedLazyCount() === 1 ? 'y' : 'ies'
+              }}
+              not searched — open to include.
+            </div>
+          }
         </aside>
       </z-resizable-panel>
 
@@ -501,18 +548,88 @@ export class WorktreeFileBrowserComponent {
         return next;
       });
     });
+
+    // Fetch a lazy directory's contents the moment it is expanded — whether by chevron or row
+    // click, both of which update `expandedKeys` (the tree only emits zNodeExpand for the keyboard).
+    // Adding to `openedLazyPaths` is idempotent, so an already-opened dir re-uses its cache.
+    effect(() => {
+      const tree = this.treeCmp();
+      if (!tree) return;
+      const expanded = tree.treeService.expandedKeys();
+      const lazy = this.allLazyDirs();
+      const opened = new Set(this.openedLazyPaths());
+      const toOpen: string[] = [];
+      for (const key of expanded) {
+        if (lazy.has(key) && !opened.has(key)) toOpen.push(key);
+      }
+      if (toOpen.length) {
+        this.openedLazyPaths.update((paths) => [...paths, ...toOpen]);
+      }
+    });
   }
 
   readonly filesQuery = injectQuery(() => ({
     queryKey: ['worktree-files', this.repoId(), this.worktreeId()],
-    queryFn: () =>
+    queryFn: (): Promise<LazyLevel> =>
       lastValueFrom(
         this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(
           this.repoId(),
           this.worktreeId(),
         ),
-      ).then((r) => r.paths ?? []),
+      ).then((r) => ({ paths: r.paths ?? [], lazyDirs: r.lazyDirs ?? [] })),
   }));
+
+  /** Lazy directories the user has expanded — each triggers a one-level fetch, cached per path. */
+  readonly openedLazyPaths = signal<string[]>([]);
+
+  /**
+   * One-level listings of every opened lazy directory, fetched reactively (dynamic count). Keyed
+   * {@code ['worktree-files', repoId, worktreeId, dir]} — a distinct cache entry per directory, so
+   * re-expanding a previously-opened dir is instant.
+   */
+  private readonly lazyListingsQuery = injectQueries(() => ({
+    queries: this.openedLazyPaths().map((dir) => ({
+      queryKey: ['worktree-files', this.repoId(), this.worktreeId(), dir],
+      queryFn: (): Promise<LazyLevel & { dir: string }> =>
+        lastValueFrom(
+          this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet(
+            this.repoId(),
+            this.worktreeId(),
+            dir,
+          ),
+        ).then((r) => ({ dir, paths: r.paths ?? [], lazyDirs: r.lazyDirs ?? [] })),
+    })),
+  }));
+
+  /** Opened lazy dirs whose listing has arrived, keyed by directory path. */
+  private readonly loadedLazyListings = computed(() => {
+    const map = new Map<string, LazyLevel>();
+    for (const result of this.lazyListingsQuery()) {
+      const data = result?.data();
+      if (data) map.set(data.dir, { paths: data.paths, lazyDirs: data.lazyDirs });
+    }
+    return map;
+  });
+
+  /** Every known lazy directory (root + nested from loaded listings) → its immediate-child count. */
+  private readonly allLazyDirs = computed(() => {
+    const counts = new Map<string, number>();
+    const add = (dirs: LazyDirDto[]) => {
+      for (const dir of dirs) if (dir.path) counts.set(dir.path, dir.childCount ?? 0);
+    };
+    add(this.filesQuery.data()?.lazyDirs ?? []);
+    for (const level of this.loadedLazyListings().values()) add(level.lazyDirs);
+    return counts;
+  });
+
+  /** Every eager file path currently loaded — the root plus every opened lazy directory's files. */
+  readonly allEagerPaths = computed(() => {
+    const paths = new Set<string>(this.filesQuery.data()?.paths ?? []);
+    for (const level of this.loadedLazyListings().values()) {
+      for (const p of level.paths) paths.add(p);
+    }
+    return [...paths];
+  });
 
   /** Manual advanced-filter criteria — public and settable in code (this is the programmatic API). */
   readonly filters = signal<PathFilter[]>([]);
@@ -524,7 +641,7 @@ export class WorktreeFileBrowserComponent {
   /** Distinct ignore-file basenames (`.gitignore`, `.dockerignore`, …) present in the worktree. */
   readonly ignorelistBasenames = computed(() => {
     const names = new Set<string>();
-    for (const path of this.filesQuery.data() ?? []) {
+    for (const path of this.allEagerPaths()) {
       const name = basename(path);
       if (fuzzyMatch('.*ignore', name)) names.add(name);
     }
@@ -545,7 +662,7 @@ export class WorktreeFileBrowserComponent {
   private readonly ignorePathsToFetch = computed(() => {
     const params = new Set(this.dynamicFilters().filter((d) => d.enabled).map((d) => d.param));
     if (params.size === 0) return [];
-    return (this.filesQuery.data() ?? [])
+    return this.allEagerPaths()
       .filter((path) => params.has(basename(path)))
       .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
   });
@@ -613,12 +730,12 @@ export class WorktreeFileBrowserComponent {
 
   /** Paths after both the dialog filters and the top input — what the tree renders. */
   readonly filteredPaths = computed(() =>
-    filterFilePaths(this.filesQuery.data() ?? [], this.effectiveFilters(), this.nameQuery()),
+    filterFilePaths(this.allEagerPaths(), this.effectiveFilters(), this.nameQuery()),
   );
 
   /** Paths after only the dialog filters — the dialog's "visible files" preview. */
   readonly dialogVisiblePaths = computed(() =>
-    applyPathFilters(this.filesQuery.data() ?? [], this.effectiveFilters()),
+    applyPathFilters(this.allEagerPaths(), this.effectiveFilters()),
   );
 
   readonly dialogVisiblePreview = computed(() =>
@@ -631,19 +748,45 @@ export class WorktreeFileBrowserComponent {
   );
 
   /**
-   * The rendered forest with single-child chains compacted (`src / main / java`), plus the
-   * chain map needed to keep expansion state coherent when a chain forms or resolves. Derived,
-   * so a filter change that reveals a hidden sibling splits the chain in the same pass.
+   * Unopened lazy directories the active filter therefore can't see inside — surfaced as a hint so
+   * "no match" never silently hides files the user simply hasn't loaded yet.
+   */
+  readonly unsearchedLazyCount = computed(() => {
+    if (!this.isFiltering()) return 0;
+    const loaded = this.loadedLazyListings();
+    let count = 0;
+    for (const dir of this.allLazyDirs().keys()) if (!loaded.has(dir)) count++;
+    return count;
+  });
+
+  /**
+   * The rendered forest: the filtered eager files built into a tree, with a lazy stub injected for
+   * every unopened lazy directory (present as a collapsed, openable folder with a child count),
+   * then single-child chains compacted (`src / main / java`). Lazy stubs are compaction boundaries,
+   * so they never fold into a chain. Derived, so a filter change or a freshly-loaded lazy level
+   * re-splices in the same pass.
    */
   private readonly compaction = computed(() => {
+    const loaded = this.loadedLazyListings();
+    const counts = this.allLazyDirs();
+    const opened = new Set(this.openedLazyPaths());
+
+    // Unopened (still-stub) lazy dirs get a sentinel leaf so build-file-tree materialises the dir
+    // node; a loaded lazy dir is a normal directory (its eager files are already in filteredPaths).
+    const items: HasPath[] = this.filteredPaths().map((path) => ({ path }));
+    const stubs: string[] = [];
+    for (const dir of counts.keys()) {
+      if (!loaded.has(dir)) {
+        stubs.push(dir);
+        items.push({ path: `${dir}/${LAZY_SENTINEL}` });
+      }
+    }
+
+    const built = buildFileTree(items, { expanded: false, icons: true });
+    markLazyStubs(built, new Set(stubs), counts, opened);
+
     const chains: CompactedChain[] = [];
-    const nodes = compactFileTree(
-      buildFileTree(
-        this.filteredPaths().map((path) => ({ path })),
-        { expanded: false, icons: true },
-      ),
-      { chains },
-    );
+    const nodes = compactFileTree(built, { chains });
     return { nodes, chains };
   });
 
@@ -685,7 +828,7 @@ export class WorktreeFileBrowserComponent {
 
   /** A rendered relative link resolved to a repo path: open it in the browser. */
   openLinkedPath(target: string): void {
-    if (!this.filesQuery.data()?.includes(target)) {
+    if (!this.allEagerPaths().includes(target)) {
       return; // dead link (missing file or a directory) — silent no-op
     }
     this.selectedPath.set(target);
@@ -715,6 +858,10 @@ export class WorktreeFileBrowserComponent {
   protected readonly isDark = computed(() => this.darkMode.themeMode() === EDarkModes.DARK);
 
   protected onNodeClick(node: TreeNode<HasPath>): void {
+    // The placeholder under a loading lazy stub is not a real file — ignore clicks on it.
+    if (node.key.endsWith(`/${LAZY_SENTINEL}`)) {
+      return;
+    }
     // Leaves are files; their key is the full path.
     if (node.leaf) {
       this.selectedPath.set(node.key);
