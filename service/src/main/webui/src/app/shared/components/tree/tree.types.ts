@@ -11,6 +11,12 @@ export interface TreeNode<T> {
   checked?: boolean;
   disabled?: boolean;
   leaf?: boolean;
+  /**
+   * A lazily-resolvable directory stub whose contents are fetched on demand. Compaction treats it
+   * as a boundary (never folds it into a chain), and its lone placeholder child exists only to give
+   * it an expansion chevron until its real children arrive.
+   */
+  lazy?: boolean;
 }
 
 export interface TreeNodeTemplateContext<T = unknown> {

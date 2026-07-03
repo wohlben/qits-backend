@@ -7,13 +7,18 @@ import eu.wohlben.qits.domain.repository.dto.WorktreeFileContentDto;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -34,17 +39,45 @@ public class WorktreeFilesService {
 
   @Inject GitExecutor git;
 
+  @Inject @Any Instance<LazyDirectoryStrategy> lazyStrategies;
+
   @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
   String dataDir;
 
+  @ConfigProperty(name = "qits.repositories.file-tree.laziness", defaultValue = "gitignore")
+  String lazinessStrategyId;
+
   /**
-   * Lists the worktree's files as paths relative to its root, sorted. Uses {@code git ls-files
-   * --cached --others --exclude-standard} so the result is tracked files plus new untracked ones,
-   * while honouring {@code .gitignore} — keeping {@code .git}, {@code node_modules} and build
-   * output out of the tree.
+   * A lazily-resolvable directory the active {@link LazyDirectoryStrategy} marked as a boundary:
+   * shown in the tree as a collapsed stub, its contents fetched on demand. {@code childCount} is
+   * the cheap immediate-child count, not total descendants.
    */
-  public List<String> listFiles(String repoId, String worktreeId) {
+  public record LazyDir(String path, int childCount) {}
+
+  /**
+   * One level of a worktree's file tree: eager {@code paths} (files rendered immediately) plus
+   * {@code lazyDirs} (collapsed stubs). Returned for both the root and a single lazy directory.
+   */
+  public record Listing(List<String> paths, List<LazyDir> lazyDirs) {}
+
+  /**
+   * Lists a worktree level as a {@link Listing}. With no {@code path} this is the root: eager files
+   * from {@code git ls-files --cached --others --exclude-standard} (tracked + new untracked,
+   * gitignore honoured) plus the directories the active laziness strategy marked as lazy stubs.
+   * With a {@code path} it is that one directory's immediate listing, read straight from the
+   * filesystem (a lazy directory git refuses to walk), so arbitrarily deep lazy nesting resolves
+   * through the same endpoint.
+   */
+  public Listing listFiles(String repoId, String worktreeId, String path) {
     Path worktreePath = worktreePath(repoId, worktreeId);
+    if (path == null || path.isBlank()) {
+      return listRoot(worktreePath);
+    }
+    return listDirectory(worktreePath, path);
+  }
+
+  /** The eager (non-lazy) tree from the worktree root, with the strategy's lazy dirs alongside. */
+  private Listing listRoot(Path worktreePath) {
     String output;
     try {
       output =
@@ -58,7 +91,77 @@ public class WorktreeFilesService {
     } catch (Exception e) {
       throw new InternalServerErrorException("Failed to list worktree files: " + e.getMessage());
     }
-    return output.lines().filter(line -> !line.isBlank()).distinct().sorted().toList();
+    List<String> paths =
+        output.lines().filter(line -> !line.isBlank()).distinct().sorted().toList();
+
+    Path root = canonicalRoot(worktreePath);
+    List<LazyDir> lazyDirs =
+        strategy().lazyDirectories(root, git).stream()
+            .map(dir -> new LazyDir(dir, immediateChildCount(root.resolve(dir))))
+            .toList();
+    return new Listing(paths, lazyDirs);
+  }
+
+  /**
+   * Lists one directory a single level deep, read directly from the filesystem (git offers nothing
+   * inside an ignored directory). Immediate regular files become {@code paths}; immediate
+   * subdirectories become lazy stubs again (the same laziness applies recursively). Symlinks are
+   * skipped rather than followed — a symlink committed inside an untrusted worktree must not be
+   * walked through (see {@link #resolveWithinWorktree}). {@code path} is user-supplied, so it is
+   * guarded exactly like a file read.
+   */
+  private Listing listDirectory(Path worktreePath, String path) {
+    if (path.equals(".git") || path.startsWith(".git/")) {
+      throw new BadRequestException("Cannot list the .git directory");
+    }
+    Path root = canonicalRoot(worktreePath);
+    Path real = resolveWithinWorktree(root, path);
+    if (!Files.isDirectory(real, LinkOption.NOFOLLOW_LINKS)) {
+      throw new BadRequestException("Not a directory: " + path);
+    }
+
+    List<String> files = new ArrayList<>();
+    List<LazyDir> dirs = new ArrayList<>();
+    try (Stream<Path> children = Files.list(real)) {
+      for (Path child : (Iterable<Path>) children::iterator) {
+        String rel = root.relativize(child).toString().replace('\\', '/');
+        if (Files.isSymbolicLink(child)) {
+          continue; // not followed — a symlink could redirect the listing outside the worktree
+        }
+        if (Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
+          dirs.add(new LazyDir(rel, immediateChildCount(child)));
+        } else if (Files.isRegularFile(child, LinkOption.NOFOLLOW_LINKS)) {
+          files.add(rel);
+        }
+      }
+    } catch (IOException e) {
+      throw new InternalServerErrorException("Failed to list directory: " + e.getMessage());
+    }
+    files.sort(Comparator.naturalOrder());
+    dirs.sort(Comparator.comparing(LazyDir::path));
+    return new Listing(files, dirs);
+  }
+
+  /**
+   * Immediate-child count of a directory — one cheap listing, never a recursive descendant walk.
+   */
+  private int immediateChildCount(Path dir) {
+    try (Stream<Path> children = Files.list(dir)) {
+      return (int) children.count();
+    } catch (IOException e) {
+      return 0;
+    }
+  }
+
+  /** The active laziness strategy, selected by {@code qits.repositories.file-tree.laziness}. */
+  private LazyDirectoryStrategy strategy() {
+    return lazyStrategies.stream()
+        .filter(s -> s.id().equals(lazinessStrategyId))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new InternalServerErrorException(
+                    "Unknown file-tree laziness strategy: " + lazinessStrategyId));
   }
 
   /**
@@ -72,32 +175,8 @@ public class WorktreeFilesService {
     if (path == null || path.isBlank()) {
       throw new BadRequestException("File path is required");
     }
-    Path worktreePath = worktreePath(repoId, worktreeId);
-    Path root;
-    try {
-      // Canonicalize the root itself (it may live under a symlinked data dir).
-      root = worktreePath.toRealPath();
-    } catch (IOException e) {
-      throw new NotFoundException("Worktree not found on disk");
-    }
-
-    // Lexical guard first: reject `..`/absolute escapes before touching the filesystem.
-    Path resolved = root.resolve(path).normalize();
-    if (!resolved.startsWith(root)) {
-      throw new BadRequestException("Invalid file path: " + path);
-    }
-
-    // Resolve any symlinks along the path and re-check containment, so a symlink inside the
-    // worktree can't redirect the read to a target outside it (path traversal via symlink).
-    Path real;
-    try {
-      real = resolved.toRealPath();
-    } catch (IOException e) {
-      throw new NotFoundException("File not found: " + path);
-    }
-    if (!real.startsWith(root)) {
-      throw new BadRequestException("Invalid file path: " + path);
-    }
+    Path root = canonicalRoot(worktreePath(repoId, worktreeId));
+    Path real = resolveWithinWorktree(root, path);
     if (!Files.isRegularFile(real, LinkOption.NOFOLLOW_LINKS)) {
       throw new NotFoundException("File not found: " + path);
     }
@@ -136,6 +215,39 @@ public class WorktreeFilesService {
       throw new NotFoundException("Worktree not found on disk");
     }
     return worktreePath;
+  }
+
+  /** Canonicalizes the worktree root (it may live under a symlinked data dir). */
+  private Path canonicalRoot(Path worktreePath) {
+    try {
+      return worktreePath.toRealPath();
+    } catch (IOException e) {
+      throw new NotFoundException("Worktree not found on disk");
+    }
+  }
+
+  /**
+   * Resolves a user-supplied {@code path} against the canonical worktree {@code root} and proves it
+   * stays inside — shared by file reads and directory listings, since {@code path} is untrusted in
+   * both. First a lexical guard rejects {@code ..}/absolute escapes; then symlinks along the path
+   * are resolved and containment re-checked, so a symlink committed inside the (untrusted) worktree
+   * can't redirect the operation to a target outside it. Returns the real, contained path.
+   */
+  private Path resolveWithinWorktree(Path root, String path) {
+    Path resolved = root.resolve(path).normalize();
+    if (!resolved.startsWith(root)) {
+      throw new BadRequestException("Invalid file path: " + path);
+    }
+    Path real;
+    try {
+      real = resolved.toRealPath();
+    } catch (IOException e) {
+      throw new NotFoundException("File not found: " + path);
+    }
+    if (!real.startsWith(root)) {
+      throw new BadRequestException("Invalid file path: " + path);
+    }
+    return real;
   }
 
   /** A file is treated as binary when any NUL byte appears in it — the usual git heuristic. */

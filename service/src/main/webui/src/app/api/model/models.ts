@@ -41,6 +41,7 @@ export * from './featureFlowPhaseDto';
 export * from './featureFlowPhaseStepDto';
 export * from './launchAgentRequest';
 export * from './launchCommandRequest';
+export * from './lazyDirDto';
 export * from './logChannel';
 export * from './mergeBranchRequest';
 export * from './mergeWorktreeRequest';

@@ -65,6 +65,7 @@ model/featureFlowPhaseDto.ts
 model/featureFlowPhaseStepDto.ts
 model/launchAgentRequest.ts
 model/launchCommandRequest.ts
+model/lazyDirDto.ts
 model/logChannel.ts
 model/mergeBranchRequest.ts
 model/mergeWorktreeRequest.ts

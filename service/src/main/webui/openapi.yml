@@ -474,6 +474,16 @@ components:
         actionId:
           type: string
           pattern: \S
+    LazyDirDto:
+      type: object
+      properties:
+        path:
+          type: string
+        childCount:
+          type: integer
+          format: int32
+        href:
+          type: string
     LogChannel:
       type: string
       enum:
@@ -821,6 +831,10 @@ components:
           type: array
           items:
             type: string
+        lazyDirs:
+          type: array
+          items:
+            $ref: "#/components/schemas/LazyDirDto"
     Response54:
       type: object
       properties:
@@ -2445,6 +2459,10 @@ paths:
       - name: worktreeId
         in: path
         required: true
+        schema:
+          type: string
+      - name: path
+        in: query
         schema:
           type: string
       responses:

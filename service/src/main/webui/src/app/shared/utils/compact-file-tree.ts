@@ -53,12 +53,15 @@ function compactNode<T>(
   separator: string,
   chains?: CompactedChain[],
 ): TreeNode<T> {
-  if (node.leaf || !node.children?.length) return node;
+  // A lazy stub is a compaction boundary: its placeholder child must never be folded into its
+  // label, and it stays a standalone openable node.
+  if (node.leaf || node.lazy || !node.children?.length) return node;
 
   const labels = [node.label];
   const absorbedKeys: string[] = [];
   let deepest = node;
-  while (!deepest.leaf && deepest.children?.length === 1) {
+  // Stop before absorbing a lazy child — it must remain a separate node the user can open.
+  while (!deepest.leaf && deepest.children?.length === 1 && !deepest.children[0].lazy) {
     absorbedKeys.push(deepest.key);
     deepest = deepest.children[0];
     labels.push(deepest.label);

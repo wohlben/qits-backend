@@ -73,6 +73,9 @@ export class ZardTreeService<T = any> {
     const allKeys = new Set<string>();
     const collect = (nodes: TreeNode<T>[]) => {
       for (const node of nodes) {
+        // Never auto-open a lazy directory stub — opening it triggers a fetch, so it must stay a
+        // deliberate user action even when "expand all" fires (e.g. while filtering).
+        if (node.lazy) continue;
         if (!node.leaf && node.children?.length) {
           allKeys.add(node.key);
           collect(node.children);

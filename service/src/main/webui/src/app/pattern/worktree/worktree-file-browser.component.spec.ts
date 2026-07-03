@@ -1,8 +1,21 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { vi } from 'vitest';
+
+import type { TreeNode } from '@/shared/components/tree/tree.types';
+import type { HasPath } from '@/shared/utils/build-file-tree';
+
+/** Recursively find a tree node by key (lazy children may be nested arbitrarily deep). */
+function findNode(nodes: TreeNode<HasPath>[], key: string): TreeNode<HasPath> | undefined {
+  for (const node of nodes) {
+    if (node.key === key) return node;
+    const found = node.children && findNode(node.children, key);
+    if (found) return found;
+  }
+  return undefined;
+}
 
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
@@ -29,7 +42,7 @@ describe('WorktreeFileBrowserComponent', () => {
       defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false } },
     });
     // Seed the file list so `filteredPaths`/`tree` are deterministic without awaiting a fetch.
-    queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], PATHS);
+    queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], { paths: PATHS, lazyDirs: [] });
 
     await TestBed.configureTestingModule({
       imports: [WorktreeFileBrowserComponent],
@@ -166,7 +179,7 @@ describe('WorktreeFileBrowserComponent', () => {
     }
 
     beforeEach(() => {
-      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], DYN_PATHS);
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], { paths: DYN_PATHS, lazyDirs: [] });
     });
 
     it('offers ignore-file basenames de-duplicated, and only when present', () => {
@@ -176,7 +189,10 @@ describe('WorktreeFileBrowserComponent', () => {
       expect(cmp.availableIgnorelistParams()).toEqual(['.gitignore']);
 
       // a worktree with no ignore files offers nothing
-      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], ['a.ts', 'b.ts']);
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['a.ts', 'b.ts'],
+        lazyDirs: [],
+      });
       const bare = createComponent().componentInstance;
       expect(bare.ignorelistBasenames()).toEqual([]);
     });
@@ -242,6 +258,108 @@ describe('WorktreeFileBrowserComponent', () => {
     });
   });
 
+  describe('lazy directory exploration', () => {
+    it('renders an unopened lazy directory as a stub with a child-count label', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md'],
+        lazyDirs: [{ path: 'node_modules', childCount: 312, href: '/x' }],
+      });
+      const cmp = createComponent().componentInstance;
+
+      const stub = cmp.tree().find((n) => n.key === 'node_modules');
+      expect(stub?.lazy).toBe(true);
+      expect(stub?.label).toBe('node_modules (312)');
+      expect(stub?.leaf).toBeFalsy();
+      expect(stub?.children?.length).toBe(1); // a placeholder child so the chevron shows
+    });
+
+    it('fetches and splices a lazy directory’s children when it is expanded', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md'],
+        lazyDirs: [{ path: 'node_modules', childCount: 2, href: '/x' }],
+      });
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1', 'node_modules'], {
+        dir: 'node_modules',
+        paths: ['node_modules/index.js', 'node_modules/util.js'],
+        lazyDirs: [],
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+        .componentInstance.treeService;
+
+      // expanding (chevron or row) updates expandedKeys → the effect opens+loads the dir
+      treeService.expand('node_modules');
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(cmp.openedLazyPaths()).toContain('node_modules');
+      const nm = cmp.tree().find((n) => n.key === 'node_modules');
+      expect(nm?.lazy).toBeFalsy(); // now a real directory
+      expect(nm?.children?.map((c) => c.label)).toEqual(['index.js', 'util.js']);
+    });
+
+    it('shows a Loading… placeholder while an opened lazy directory is still fetching', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md'],
+        lazyDirs: [{ path: 'node_modules', childCount: 5, href: '/x' }],
+      });
+      // the per-directory fetch never resolves → the dir stays in a loading state
+      worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFilesGet.mockImplementation(
+        (_repo: string, _wt: string, path?: string) =>
+          path === 'node_modules' ? NEVER : of({ paths: ['README.md'], lazyDirs: [] }),
+      );
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.openedLazyPaths.set(['node_modules']);
+      fixture.detectChanges();
+
+      const stub = cmp.tree().find((n) => n.key === 'node_modules');
+      expect(stub?.lazy).toBe(true); // still a stub — its listing hasn't arrived
+      expect(stub?.children?.[0].label).toBe('Loading…');
+    });
+
+    it('keeps a nested ignored subdirectory lazy after its parent is opened', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md'],
+        lazyDirs: [{ path: 'node_modules', childCount: 1, href: '/x' }],
+      });
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1', 'node_modules'], {
+        dir: 'node_modules',
+        paths: [],
+        lazyDirs: [{ path: 'node_modules/pkg', childCount: 3, href: '/y' }],
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.openedLazyPaths.set(['node_modules']);
+      fixture.detectChanges();
+
+      // node_modules resolved to a real dir; its child pkg is still a lazy stub
+      const pkg = findNode(cmp.tree(), 'node_modules/pkg');
+      expect(pkg?.lazy).toBe(true);
+      expect(pkg?.label).toBe('pkg (3)');
+    });
+
+    it('never auto-opens lazy dirs while filtering, and hints they were not searched', () => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md', 'src/app.ts'],
+        lazyDirs: [{ path: 'node_modules', childCount: 9, href: '/x' }],
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.nameQuery.set('app'); // triggers expand-all, which must skip the lazy stub
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(cmp.openedLazyPaths()).toEqual([]); // no fetch was triggered
+      expect(cmp.tree().find((n) => n.key === 'node_modules')?.lazy).toBe(true);
+      expect(cmp.unsearchedLazyCount()).toBe(1);
+    });
+  });
+
   it('compacts single-child directory chains in the rendered tree', () => {
     const cmp = createComponent().componentInstance;
 
@@ -273,10 +391,10 @@ describe('WorktreeFileBrowserComponent', () => {
   });
 
   it('keeps the user "inside the chain" when a filter change splits a compacted node', () => {
-    queryClient.setQueryData(
-      ['worktree-files', 'repo-1', 'wt-1'],
-      ['src/main/java/A.java', 'src/main/java/B.java', 'src/main/resources/app.properties'],
-    );
+    queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], {
+      paths: ['src/main/java/A.java', 'src/main/java/B.java', 'src/main/resources/app.properties'],
+      lazyDirs: [],
+    });
     const fixture = createComponent();
     const cmp = fixture.componentInstance;
     const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
