@@ -105,12 +105,10 @@ export const FRAMEWORK_DESCRIPTORS: readonly FrameworkDescriptor[] = [
       const m = JAVA_TEST.exec(relTest);
       if (!m) return [];
       const pkg = m[1] ?? '';
-      const base = m[2]; // e.g. 'FooSlice' (from FooSliceTest) or 'Foo' (from FooTest)
-      const names = new Set<string>([base]);
-      // The `*` qualifier makes the inverse ambiguous — also try the leading CamelCase word.
-      const first = /^[A-Z][a-z0-9]*/.exec(base)?.[0];
-      if (first) names.add(first);
-      return [...names].map((n) => `src/main/java/${pkg}${n}.java`);
+      // The `*Test`/`*IT` qualifier makes the inverse ambiguous, so try every CamelCase prefix of
+      // the base **longest-first** (`TheFileSpecialCase` → `TheFileSpecialCase`, `TheFileSpecial`,
+      // `TheFile`, `The`); the caller picks the first that exists — the deepest class that owns it.
+      return camelPrefixes(m[2]).map((n) => `src/main/java/${pkg}${n}.java`);
     },
     labelPeekMarker: (root) => (root === '' ? 'pom.xml' : `${root}/pom.xml`),
     refineLabel: (content) => (/quarkus/i.test(content) ? 'Java / Quarkus' : null),
@@ -203,23 +201,49 @@ function byClosest(a: string, b: string): number {
   return basename(a).length - basename(b).length || a.localeCompare(b);
 }
 
-/** Existing paths matching any of `globs` (root-scoped), excluding `self`, closest first. */
-function matchCandidates(
+/**
+ * The CamelCase prefixes of a class base name, **longest first**: `TheFileCase` →
+ * `[TheFileCase, TheFile, The]`. A run of capitals stays together (`HTTPServer` → `[HTTPServer,
+ * HTTP]`). Used to resolve a qualified test (`TheFileCaseTest`) to the deepest source class.
+ */
+function camelPrefixes(base: string): string[] {
+  const words = base.match(/[A-Z][a-z0-9]*|[A-Z]+(?![a-z])/g) ?? [base];
+  const prefixes: string[] = [];
+  let acc = '';
+  for (const word of words) {
+    acc += word;
+    prefixes.push(acc);
+  }
+  return prefixes.reverse();
+}
+
+/**
+ * The single source that owns a test — the **first of its `sourceCandidates` that exists**. Because
+ * java yields CamelCase prefixes longest-first, `FooBarTest` resolves to `FooBar.java` when it
+ * exists and otherwise to `Foo.java`: the deepest class that actually owns it. `null` if `path` is
+ * not a test or has no existing source.
+ */
+function ownerSource(
+  path: string,
+  descriptor: FrameworkDescriptor,
   root: string,
-  globs: string[],
-  self: string,
-  allPaths: readonly string[],
-): string[] {
-  if (globs.length === 0) return [];
-  const res = globs.map((g) => gitignoreGlobToRegExp(root === '' ? g : `${root}/${g}`, true));
-  return allPaths.filter((p) => p !== self && res.some((re) => re.test(p))).sort(byClosest);
+  existing: ReadonlySet<string>,
+): string | null {
+  const rel = root === '' ? path : path.slice(root.length + 1);
+  if (!descriptor.isTestPath?.(rel)) return null;
+  for (const candidate of descriptor.sourceCandidates?.(rel) ?? []) {
+    const full = root === '' ? candidate : `${root}/${candidate}`;
+    if (full !== path && existing.has(full)) return full;
+  }
+  return null;
 }
 
 /**
  * The existing **test** files of a source `path` (source→test detection). This is the single
  * primitive behind both the viewer's test tabs and the tree's redundant-test hiding, so the two can
- * never disagree. Returns `[]` when `path` is itself a test, isn't owned by a project, or has no
- * detected tests.
+ * never disagree. A candidate test is kept only when `path` is its **most-specific** owner, so
+ * `Foo.java` does not also claim `FooBarTest` once `FooBar.java` exists. Returns `[]` when `path` is
+ * itself a test, isn't owned by a project, or has no detected tests.
  */
 export function linkedTestsOf(
   path: string,
@@ -231,10 +255,17 @@ export function linkedTestsOf(
   const { descriptor, root } = proj;
   const rel = root === '' ? path : path.slice(root.length + 1);
   if (descriptor.isTestPath?.(rel)) return [];
-  return matchCandidates(root, descriptor.testCandidates?.(rel) ?? [], path, allPaths);
+  const globs = descriptor.testCandidates?.(rel) ?? [];
+  if (globs.length === 0) return [];
+  const res = globs.map((g) => gitignoreGlobToRegExp(root === '' ? g : `${root}/${g}`, true));
+  const existing = new Set(allPaths);
+  return allPaths
+    .filter((p) => p !== path && res.some((re) => re.test(p)))
+    .filter((test) => ownerSource(test, descriptor, root, existing) === path)
+    .sort(byClosest);
 }
 
-/** The existing **source** files of a test `path` (test→source detection); `[]` if `path` isn't a test. */
+/** The existing **source** file of a test `path` (test→source), or `[]` if `path` isn't a test. */
 export function linkedSourcesOf(
   path: string,
   projects: readonly DetectedProject[],
@@ -242,10 +273,8 @@ export function linkedSourcesOf(
 ): string[] {
   const proj = owningProject(path, projects);
   if (!proj) return [];
-  const { descriptor, root } = proj;
-  const rel = root === '' ? path : path.slice(root.length + 1);
-  if (!descriptor.isTestPath?.(rel)) return [];
-  return matchCandidates(root, descriptor.sourceCandidates?.(rel) ?? [], path, allPaths);
+  const source = ownerSource(path, proj.descriptor, proj.root, new Set(allPaths));
+  return source ? [source] : [];
 }
 
 /**
