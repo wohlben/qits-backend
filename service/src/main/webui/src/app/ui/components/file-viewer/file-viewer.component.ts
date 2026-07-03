@@ -60,6 +60,7 @@ export type FileViewMode = 'rendered' | 'source';
           <app-markdown-file-renderer
             [content]="content()!"
             [path]="path()"
+            [isDark]="isDark()"
             (openLink)="openPath.emit($event)"
           />
         </div>
