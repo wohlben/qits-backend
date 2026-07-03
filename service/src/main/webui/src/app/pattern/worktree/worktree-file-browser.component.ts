@@ -400,10 +400,18 @@ export class WorktreeFileBrowserComponent {
   protected readonly isDark = computed(() => this.darkMode.themeMode() === EDarkModes.DARK);
 
   protected onNodeClick(node: TreeNode<HasPath>): void {
-    // Leaves are files; their key is the full path. Directories are ignored.
+    // Leaves are files; their key is the full path.
     if (node.leaf) {
       this.selectedPath.set(node.key);
+      return;
     }
+    // Clicking a folder row toggles it, like its chevron — and must not steal the selection
+    // highlight from the open file (the tree already selected the folder before this fires).
+    const treeService = this.treeCmp()?.treeService;
+    if (!treeService) return;
+    treeService.toggle(node.key);
+    const selected = this.selectedPath();
+    treeService.selectedKeys.set(new Set(selected ? [selected] : []));
   }
 
   // --- Advanced-filter dialog + programmatic API ---

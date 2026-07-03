@@ -1,14 +1,15 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, viewChild } from '@angular/core';
 
 import { CommitFileChangeDto } from '@/api/model/commitFileChangeDto';
+import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import { FileTreeNode } from '@/shared/utils/build-file-tree';
 
 /**
  * Renders the changed-file forest with zard's `z-tree` (it owns nesting, indentation,
  * expand/collapse and a11y). Each file leaf shows a one-letter change badge (A/M/D/R/…);
- * clicking a file bubbles its {@link CommitFileChangeDto} to the smart parent. Directory
- * nodes only toggle and emit nothing.
+ * clicking a file bubbles its {@link CommitFileChangeDto} to the smart parent. Clicking a
+ * directory row toggles it (like its chevron) and emits nothing.
  */
 @Component({
   selector: 'app-commit-file-tree',
@@ -47,10 +48,22 @@ export class CommitFileTreeComponent {
   readonly nodes = input.required<FileTreeNode[]>();
   readonly fileClick = output<CommitFileChangeDto>();
 
+  private readonly tree = viewChild(ZardTreeComponent);
+  /** Last clicked file, so a later folder click can hand the selection highlight back to it. */
+  private lastFileKey: string | null = null;
+
   onNodeClick(node: FileTreeNode) {
     if (node.leaf && node.data) {
+      this.lastFileKey = node.key;
       this.fileClick.emit(node.data);
+      return;
     }
+    // Clicking a directory row toggles it, like its chevron — and must not steal the selection
+    // highlight from the open file (the tree already selected the folder before this fires).
+    const treeService = this.tree()?.treeService;
+    if (!treeService) return;
+    treeService.toggle(node.key);
+    treeService.selectedKeys.set(new Set(this.lastFileKey ? [this.lastFileKey] : []));
   }
 
   statusLetter(changeType?: string): string {
