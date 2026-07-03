@@ -1,8 +1,22 @@
-import { applyPathFilters, filterFilePaths, fuzzyMatch, type PathFilter } from './filter-file-paths';
+import {
+  applyPathFilters,
+  filterFilePaths,
+  fuzzyMatch,
+  gitignoreGlobToRegExp,
+  type PathFilter,
+} from './filter-file-paths';
 
-function filter(kind: PathFilter['kind'], query: string, enabled = true): PathFilter {
-  return { id: `${kind}:${query}`, kind, query, enabled };
+function rule(
+  kind: PathFilter['kind'],
+  query: string,
+  mode: PathFilter['mode'] = 'whitelist',
+  enabled = true,
+): PathFilter {
+  return { id: `${kind}:${mode}:${query}`, kind, mode, query, enabled };
 }
+
+const wl = (kind: PathFilter['kind'], query: string) => rule(kind, query, 'whitelist');
+const bl = (kind: PathFilter['kind'], query: string) => rule(kind, query, 'blacklist');
 
 const PATHS = [
   'README.md',
@@ -23,95 +37,125 @@ describe('fuzzyMatch', () => {
     expect(fuzzyMatch('xyz', 'app')).toBe(false);
   });
 
-  it('is smart-case: a lowercase query is case-insensitive', () => {
+  it('is smart-case', () => {
     expect(fuzzyMatch('readme', 'README.md')).toBe(true);
-  });
-
-  it('is smart-case: an uppercase letter makes the query case-sensitive', () => {
     expect(fuzzyMatch('README', 'README.md')).toBe(true);
     expect(fuzzyMatch('README', 'readme.md')).toBe(false);
   });
 
   it('treats a query with * / ? as an anchored glob wildcard', () => {
-    // the motivating example: one pattern finds every *ignore file
     expect(fuzzyMatch('.*ignore', '.gitignore')).toBe(true);
     expect(fuzzyMatch('.*ignore', '.dockerignore')).toBe(true);
-    // anchored: *.ts matches .ts but not .tsx
     expect(fuzzyMatch('*.ts', 'main.ts')).toBe(true);
     expect(fuzzyMatch('*.ts', 'main.tsx')).toBe(false);
-    // ? is exactly one character
     expect(fuzzyMatch('main.??', 'main.ts')).toBe(true);
     expect(fuzzyMatch('main.??', 'main.tsx')).toBe(false);
   });
+});
 
-  it('applies smart-case to wildcard queries too', () => {
-    expect(fuzzyMatch('*IGNORE', '.gitignore')).toBe(false); // uppercase → case-sensitive
-    expect(fuzzyMatch('*ignore', '.GITIGNORE')).toBe(true); // lowercase → case-insensitive
+describe('gitignoreGlobToRegExp', () => {
+  it('single * stays within one path segment', () => {
+    const re = gitignoreGlobToRegExp('src/*.ts', true);
+    expect(re.test('src/a.ts')).toBe(true);
+    expect(re.test('src/nested/a.ts')).toBe(false);
+  });
+
+  it('** crosses directory separators', () => {
+    const re = gitignoreGlobToRegExp('src/**/*.ts', true);
+    expect(re.test('src/a.ts')).toBe(true);
+    expect(re.test('src/nested/deep/a.ts')).toBe(true);
+    expect(re.test('other/a.ts')).toBe(false);
+  });
+
+  it('**/name matches the basename at any depth (including zero)', () => {
+    const re = gitignoreGlobToRegExp('**/foo', true);
+    expect(re.test('foo')).toBe(true);
+    expect(re.test('a/b/foo')).toBe(true);
+    expect(re.test('foobar')).toBe(false);
+  });
+
+  it('? matches exactly one non-separator character', () => {
+    const re = gitignoreGlobToRegExp('a?c', true);
+    expect(re.test('abc')).toBe(true);
+    expect(re.test('a/c')).toBe(false);
+    expect(re.test('ac')).toBe(false);
+  });
+
+  it('supports character classes and negated classes', () => {
+    expect(gitignoreGlobToRegExp('[a-z]file', true).test('afile')).toBe(true);
+    expect(gitignoreGlobToRegExp('[a-z]file', true).test('1file')).toBe(false);
+    expect(gitignoreGlobToRegExp('[!a]x', true).test('bx')).toBe(true);
+    expect(gitignoreGlobToRegExp('[!a]x', true).test('ax')).toBe(false);
+  });
+
+  it('is anchored and case-sensitive when asked', () => {
+    expect(gitignoreGlobToRegExp('README', true).test('README')).toBe(true);
+    expect(gitignoreGlobToRegExp('README', true).test('readme')).toBe(false);
+    expect(gitignoreGlobToRegExp('README', false).test('readme')).toBe(true);
   });
 });
 
-describe('applyPathFilters', () => {
+describe('applyPathFilters — last-match-wins', () => {
+  const TREE = ['dist/app.js', 'dist/config.json', 'src/main.ts', 'README.md'];
+
   it('returns everything when there are no active filters', () => {
     expect(applyPathFilters(PATHS, [])).toEqual(PATHS);
-    // disabled or blank filters are no-ops
-    expect(applyPathFilters(PATHS, [filter('includes', 'domain', false)])).toEqual(PATHS);
-    expect(applyPathFilters(PATHS, [filter('includes', '   ')])).toEqual(PATHS);
+    expect(applyPathFilters(PATHS, [wl('includes', 'domain')].map((f) => ({ ...f, enabled: false })))).toEqual(
+      PATHS,
+    );
+    expect(applyPathFilters(PATHS, [wl('includes', '   ')])).toEqual(PATHS);
   });
 
-  it('includes: keeps only paths containing the substring', () => {
-    expect(applyPathFilters(PATHS, [filter('includes', 'domain')])).toEqual([
-      'domain/src/main/java/App.java',
-      'domain/src/test/java/AppTest.java',
-    ]);
-  });
-
-  it('unions multiple whitelist filters', () => {
-    const result = applyPathFilters(PATHS, [
-      filter('includes', 'domain'),
-      filter('includes', 'webui'),
-    ]);
-    expect(result).toEqual([
-      'domain/src/main/java/App.java',
-      'domain/src/test/java/AppTest.java',
-      'service/src/main/webui/main.ts',
-    ]);
-  });
-
-  it('exact: matches the full path only', () => {
-    expect(applyPathFilters(PATHS, [filter('exact', 'README.md')])).toEqual(['README.md']);
-    expect(applyPathFilters(PATHS, [filter('exact', 'README')])).toEqual([]);
-  });
-
-  it('excludes: removes matches from the whitelist (or from all when no includes)', () => {
-    // only an exclude → everything minus matches
-    expect(applyPathFilters(PATHS, [filter('excludes', 'test')])).toEqual([
+  it('default is visible when there is only a blacklist (excludes behaviour)', () => {
+    expect(applyPathFilters(PATHS, [bl('includes', 'test')])).toEqual([
       'README.md',
       'domain/src/main/java/App.java',
       'service/src/main/webui/main.ts',
     ]);
-    // include union then subtract excludes
-    expect(
-      applyPathFilters(PATHS, [filter('includes', 'domain'), filter('excludes', 'test')]),
-    ).toEqual(['domain/src/main/java/App.java']);
   });
 
-  it('fuzzy: supports glob wildcards over the full path', () => {
-    expect(applyPathFilters(PATHS, [filter('fuzzy', '*.java')])).toEqual([
+  it('default flips to hidden once a manual whitelist rule exists (union-of-includes)', () => {
+    expect(applyPathFilters(PATHS, [wl('includes', 'domain')])).toEqual([
       'domain/src/main/java/App.java',
       'domain/src/test/java/AppTest.java',
     ]);
-    expect(applyPathFilters(PATHS, [filter('fuzzy', '*/test/*')])).toEqual([
+    expect(applyPathFilters(PATHS, [wl('includes', 'domain'), wl('includes', 'webui')])).toEqual([
+      'domain/src/main/java/App.java',
       'domain/src/test/java/AppTest.java',
-      'service/src/test/foo.spec.ts',
+      'service/src/main/webui/main.ts',
     ]);
+  });
+
+  it('a whitelist rule after a blacklist resurrects a hidden path', () => {
+    // hide dist/, then whitelist one file back in — only works because it comes later
+    const filters = [bl('includes', 'dist/'), wl('exact', 'dist/config.json')];
+    expect(applyPathFilters(TREE, filters)).toEqual(['dist/config.json', 'src/main.ts', 'README.md']);
+  });
+
+  it('order matters: the same two rules reversed hide the file again', () => {
+    // whitelist first (flips default to hidden), then blacklist dist/ catches config.json last
+    const filters = [wl('exact', 'dist/config.json'), bl('includes', 'dist/')];
+    expect(applyPathFilters(TREE, filters)).toEqual([]);
+  });
+
+  it('a glob whitelist does NOT flip the default (gitignore-negation semantics)', () => {
+    // generated negations are whitelist globs; a lone one must not hide everything else
+    expect(applyPathFilters(TREE, [wl('glob', '**/README.md')])).toEqual(TREE);
+  });
+
+  it('glob blacklist then glob whitelist reproduces `*.log` + `!keep.log`', () => {
+    const logs = ['a.log', 'keep.log', 'x.txt'];
+    const filters = [bl('glob', '**/*.log'), wl('glob', '**/keep.log')];
+    expect(applyPathFilters(logs, filters)).toEqual(['keep.log', 'x.txt']);
+  });
+
+  it('exact matches the full path only', () => {
+    expect(applyPathFilters(PATHS, [wl('exact', 'README.md')])).toEqual(['README.md']);
+    expect(applyPathFilters(PATHS, [wl('exact', 'README')])).toEqual([]);
   });
 
   it('applies smart-case to includes', () => {
-    expect(applyPathFilters(PATHS, [filter('includes', 'app')])).toEqual([
-      'domain/src/main/java/App.java',
-      'domain/src/test/java/AppTest.java',
-    ]);
-    expect(applyPathFilters(PATHS, [filter('includes', 'App')])).toEqual([
+    expect(applyPathFilters(PATHS, [wl('includes', 'App')])).toEqual([
       'domain/src/main/java/App.java',
       'domain/src/test/java/AppTest.java',
     ]);
@@ -119,18 +163,12 @@ describe('applyPathFilters', () => {
 });
 
 describe('filterFilePaths', () => {
-  it('applies dialog filters, then a final fuzzy pass over the filename only', () => {
-    // includes 'src' would keep 4 paths; the name query 'app' then keeps only those whose
-    // basename fuzzy-matches — App.java / AppTest.java (not main.ts / foo.spec.ts).
-    const result = filterFilePaths(PATHS, [filter('includes', 'src')], 'app');
-    expect(result).toEqual([
-      'domain/src/main/java/App.java',
-      'domain/src/test/java/AppTest.java',
-    ]);
+  it('applies the rule list, then a final fuzzy pass over the filename only', () => {
+    const result = filterFilePaths(PATHS, [wl('includes', 'src')], 'app');
+    expect(result).toEqual(['domain/src/main/java/App.java', 'domain/src/test/java/AppTest.java']);
   });
 
   it('the name query supports glob wildcards on the filename', () => {
-    // '.*ignore'-style suffix search, but here for .ts files by extension
     expect(filterFilePaths(PATHS, [], '*.java')).toEqual([
       'domain/src/main/java/App.java',
       'domain/src/test/java/AppTest.java',
@@ -138,7 +176,6 @@ describe('filterFilePaths', () => {
   });
 
   it('name query matches the basename, not the directory', () => {
-    // 'domain' appears in directories but no basename fuzzy-matches it
     expect(filterFilePaths(PATHS, [], 'domain')).toEqual([]);
   });
 

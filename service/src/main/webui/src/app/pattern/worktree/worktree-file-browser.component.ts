@@ -11,18 +11,24 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  lucideChevronDown,
+  lucideChevronRight,
+  lucideChevronUp,
   lucideEye,
   lucideEyeOff,
   lucideFile,
+  lucideFileStack,
   lucideFolder,
   lucideListFilter,
   lucidePlus,
   lucideX,
 } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
+import { injectQueries } from '@tanstack/angular-query-experimental/inject-queries-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import type { WorktreeFileContentDto } from '@/api/model/worktreeFileContentDto';
 import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
@@ -37,10 +43,14 @@ import { buildFileTree, type HasPath } from '@/shared/utils/build-file-tree';
 import { compactFileTree, type CompactedChain } from '@/shared/utils/compact-file-tree';
 import {
   applyPathFilters,
+  basename,
   filterFilePaths,
+  fuzzyMatch,
   type PathFilter,
   type PathFilterKind,
+  type PathFilterMode,
 } from '@/shared/utils/filter-file-paths';
+import { ignorelistToRules } from '@/shared/utils/ignorelist-rules';
 import type { LineRange } from '@/ui/components/code-viewer/code-viewer.component';
 import {
   FileViewerComponent,
@@ -55,6 +65,36 @@ export interface CodeReference {
   endLine: number;
 }
 
+/**
+ * A dynamic filter *selection* — a generator, not a rule. Its generated rules are derived from
+ * worktree content (for `ignorelist`, `param` is an ignore-file basename like `.gitignore`) and
+ * recomputed whenever that content changes, so they live in their own list and are never hand-edited.
+ */
+export interface DynamicFilter {
+  id: string;
+  type: 'ignorelist';
+  param: string;
+  enabled: boolean;
+}
+
+/** An older or loosely-typed filter accepted by {@link migratePathFilter} / {@link setFilters}. */
+export type LegacyPathFilter = Omit<PathFilter, 'kind' | 'mode'> & {
+  kind: string;
+  mode?: PathFilterMode;
+};
+
+/**
+ * Brings a filter up to the current model: the old `excludes` kind becomes an `includes`
+ * blacklist, and any filter missing a `mode` defaults to `whitelist`. Applied at the programmatic
+ * `setFilters` boundary so older callers keep working.
+ */
+export function migratePathFilter(filter: LegacyPathFilter): PathFilter {
+  if (filter.kind === 'excludes') {
+    return { ...filter, kind: 'includes', mode: 'blacklist' };
+  }
+  return { ...filter, kind: filter.kind as PathFilterKind, mode: filter.mode ?? 'whitelist' };
+}
+
 /** How many paths to render in the dialog's "visible files" preview before truncating. */
 const VISIBLE_PREVIEW_LIMIT = 500;
 
@@ -65,10 +105,11 @@ const VISIBLE_PREVIEW_LIMIT = 500;
  * as a persistent highlight.
  *
  * The tree can be narrowed two ways: a top **filter input** (fuzzy over the filename) and an
- * **advanced filter dialog** whose criteria (exact/fuzzy/includes/excludes) form a whitelist union
- * minus excludes. The dialog's filter list is a public, programmatically-settable API (see
- * {@link setFilters}/{@link addFilter}/etc.) — it's meant to be populated in code later; the dialog
- * just lets the user view and tweak it.
+ * **advanced filter dialog** holding an ordered rule list evaluated gitignore-style
+ * (last-match-wins; each rule is whitelist/blacklist). On top of manual rules sit **dynamic
+ * filters** — ignorelists (`.gitignore`, `.dockerignore`, …) whose rules are generated from the
+ * ignore files' contents and recomputed whenever those change. The manual filter list is a public,
+ * programmatically-settable API (see {@link setFilters}/{@link addFilter}/etc.).
  */
 @Component({
   selector: 'app-worktree-file-browser',
@@ -91,6 +132,10 @@ const VISIBLE_PREVIEW_LIMIT = 500;
       lucideEye,
       lucideEyeOff,
       lucidePlus,
+      lucideChevronUp,
+      lucideChevronDown,
+      lucideChevronRight,
+      lucideFileStack,
     }),
   ],
   template: `
@@ -197,17 +242,120 @@ const VISIBLE_PREVIEW_LIMIT = 500;
     <ng-template #filtersTpl>
       <div class="flex flex-col gap-3">
         <p class="text-sm text-muted-foreground">
-          Shows the union of the include criteria below (or all files if there are none), minus any
-          excludes. The filter box above the tree then narrows by filename.
+          Rules are evaluated top-to-bottom, <strong>last match wins</strong> (like
+          <code>.gitignore</code>): the last rule matching a file decides whether it's shown or
+          hidden. Dynamic filters apply first, then your rules — so a whitelist rule can always
+          resurrect a file a dynamic filter hid. The box above the tree then narrows by filename.
         </p>
 
+        @if (dynamicFilters().length > 0 || ignorelistBasenames().length > 0) {
+          <div class="flex flex-col gap-2 border-b pb-3">
+            <div class="text-xs font-medium text-muted-foreground">Dynamic filters</div>
+            @for (dyn of dynamicFilters(); track dyn.id) {
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1.5">
+                  <button
+                    z-button
+                    zType="ghost"
+                    zSize="icon"
+                    [attr.aria-label]="isDynamicExpanded(dyn.id) ? 'Collapse rules' : 'Show rules'"
+                    (click)="toggleDynamicExpanded(dyn.id)"
+                  >
+                    <ng-icon
+                      [name]="isDynamicExpanded(dyn.id) ? 'lucideChevronDown' : 'lucideChevronRight'"
+                      class="size-4!"
+                    />
+                  </button>
+                  <button
+                    z-button
+                    zType="ghost"
+                    zSize="icon"
+                    [class]="dyn.enabled ? '' : 'opacity-40'"
+                    [attr.aria-label]="dyn.enabled ? 'Disable dynamic filter' : 'Enable dynamic filter'"
+                    (click)="toggleDynamicFilter(dyn.id)"
+                  >
+                    <ng-icon [name]="dyn.enabled ? 'lucideEye' : 'lucideEyeOff'" class="size-4!" />
+                  </button>
+                  <span class="flex-1 truncate font-mono text-xs">
+                    {{ dyn.param }}
+                    <span class="text-muted-foreground">
+                      ({{ dynamicRuleGroups().get(dyn.param)?.length ?? 0 }} rules)
+                    </span>
+                  </span>
+                  <button
+                    z-button
+                    zType="ghost"
+                    zSize="icon"
+                    aria-label="Remove dynamic filter"
+                    (click)="removeDynamicFilter(dyn.id)"
+                  >
+                    <ng-icon name="lucideX" class="size-4!" />
+                  </button>
+                </div>
+                @if (isDynamicExpanded(dyn.id)) {
+                  <div
+                    class="ml-8 flex max-h-40 flex-col gap-0.5 overflow-auto rounded-md border bg-muted/20 p-2 font-mono text-xs"
+                  >
+                    @for (rule of dynamicRuleGroups().get(dyn.param) ?? []; track rule.id) {
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="rounded px-1 text-[10px] uppercase"
+                          [class]="
+                            rule.mode === 'whitelist'
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-destructive/15 text-destructive'
+                          "
+                        >
+                          {{ rule.mode === 'whitelist' ? 'show' : 'hide' }}
+                        </span>
+                        <span class="truncate">{{ rule.query }}</span>
+                      </div>
+                    } @empty {
+                      <div class="text-muted-foreground">No rules (loading or empty).</div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <div>
+              <button
+                z-button
+                zType="outline"
+                zSize="sm"
+                [disabled]="availableIgnorelistParams().length === 0"
+                (click)="showDynamicPicker.set(!showDynamicPicker())"
+              >
+                <ng-icon name="lucideFileStack" class="mr-1 size-4!" />
+                Add dynamic filter
+              </button>
+              @if (showDynamicPicker()) {
+                <div class="mt-1 flex flex-col gap-1 rounded-md border p-1">
+                  @for (param of availableIgnorelistParams(); track param) {
+                    <button
+                      type="button"
+                      class="cursor-pointer rounded px-2 py-1 text-left font-mono text-xs hover:bg-muted"
+                      (click)="addDynamicFilter(param); showDynamicPicker.set(false)"
+                    >
+                      {{ param }}
+                    </button>
+                  } @empty {
+                    <div class="px-2 py-1 text-xs text-muted-foreground">
+                      No ignore files available.
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
         @for (row of filters(); track row.id) {
-          <div class="flex items-center gap-2">
-            <z-select class="w-32" [zValue]="row.kind" (zSelectionChange)="setKind(row.id, $event)">
+          <div class="flex items-center gap-1.5">
+            <z-select class="w-28" [zValue]="row.kind" (zSelectionChange)="setKind(row.id, $event)">
               <z-select-item zValue="exact">Exact</z-select-item>
               <z-select-item zValue="fuzzy">Fuzzy</z-select-item>
               <z-select-item zValue="includes">Includes</z-select-item>
-              <z-select-item zValue="excludes">Excludes</z-select-item>
             </z-select>
             <input
               z-input
@@ -217,6 +365,36 @@ const VISIBLE_PREVIEW_LIMIT = 500;
               [value]="row.query"
               (valueChange)="updateFilter(row.id, { query: str($event) })"
             />
+            <button
+              z-button
+              zType="outline"
+              zSize="sm"
+              class="w-16"
+              [attr.aria-label]="
+                row.mode === 'whitelist' ? 'Whitelist (matches shown)' : 'Blacklist (matches hidden)'
+              "
+              (click)="setMode(row.id, row.mode === 'whitelist' ? 'blacklist' : 'whitelist')"
+            >
+              {{ row.mode === 'whitelist' ? 'Show' : 'Hide' }}
+            </button>
+            <button
+              z-button
+              zType="ghost"
+              zSize="icon"
+              aria-label="Move filter up"
+              (click)="moveFilterUp(row.id)"
+            >
+              <ng-icon name="lucideChevronUp" class="size-4!" />
+            </button>
+            <button
+              z-button
+              zType="ghost"
+              zSize="icon"
+              aria-label="Move filter down"
+              (click)="moveFilterDown(row.id)"
+            >
+              <ng-icon name="lucideChevronDown" class="size-4!" />
+            </button>
             <button
               z-button
               zType="ghost"
@@ -289,6 +467,12 @@ export class WorktreeFileBrowserComponent {
   private readonly treeCmp = viewChild(ZardTreeComponent);
   private filtersDialogRef?: ZardDialogRef<unknown>;
   private filterSeq = 0;
+  private dynamicSeq = 0;
+
+  /** Which dynamic-filter rows are expanded to show their generated rules read-only. */
+  private readonly expandedDynamic = signal<ReadonlySet<string>>(new Set());
+  /** Whether the "add dynamic filter" picker is open in the dialog. */
+  protected readonly showDynamicPicker = signal(false);
 
   constructor() {
     // Mirror a compacted node's open/closed state onto the dirs absorbed into its label. When a
@@ -330,23 +514,111 @@ export class WorktreeFileBrowserComponent {
       ).then((r) => r.paths ?? []),
   }));
 
-  /** Advanced-filter criteria — public and settable in code (this is the programmatic API). */
+  /** Manual advanced-filter criteria — public and settable in code (this is the programmatic API). */
   readonly filters = signal<PathFilter[]>([]);
+  /** Selected dynamic filters (ignorelists). Their rules are generated, not stored here. */
+  readonly dynamicFilters = signal<DynamicFilter[]>([]);
   /** The top input's fuzzy-by-filename query. */
   readonly nameQuery = signal('');
 
+  /** Distinct ignore-file basenames (`.gitignore`, `.dockerignore`, …) present in the worktree. */
+  readonly ignorelistBasenames = computed(() => {
+    const names = new Set<string>();
+    for (const path of this.filesQuery.data() ?? []) {
+      const name = basename(path);
+      if (fuzzyMatch('.*ignore', name)) names.add(name);
+    }
+    return [...names].sort();
+  });
+
+  /** Ignore-file basenames not yet selected — the "add dynamic filter" picker offers these. */
+  readonly availableIgnorelistParams = computed(() => {
+    const selected = new Set(this.dynamicFilters().map((d) => d.param));
+    return this.ignorelistBasenames().filter((name) => !selected.has(name));
+  });
+
+  /**
+   * Every path whose basename is a selected+enabled dynamic-filter param — the ignore files whose
+   * contents we must read. Sorted shallow→deep (then lexically) so generated rules apply in git's
+   * precedence order and so the fetched contents align positionally with {@link ignoreContents}.
+   */
+  private readonly ignorePathsToFetch = computed(() => {
+    const params = new Set(this.dynamicFilters().filter((d) => d.enabled).map((d) => d.param));
+    if (params.size === 0) return [];
+    return (this.filesQuery.data() ?? [])
+      .filter((path) => params.has(basename(path)))
+      .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
+  });
+
+  /**
+   * Reactive, dynamic-count fetch of every ignore file's content. The query key is byte-identical
+   * to {@link fileQuery}'s, so an ignore file opened in the viewer and used as a filter is one
+   * request. Results align by index with {@link ignorePathsToFetch}.
+   */
+  private readonly ignoreContents = injectQueries(() => ({
+    queries: this.ignorePathsToFetch().map((path) => ({
+      queryKey: ['worktree-file', this.repoId(), this.worktreeId(), path],
+      queryFn: (): Promise<WorktreeFileContentDto> =>
+        lastValueFrom(
+          this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFilesContentGet(
+            this.repoId(),
+            this.worktreeId(),
+            path,
+          ),
+        ),
+    })),
+  }));
+
+  /** Ignore-file content translated into locality-scoped generated rules (recomputed on change). */
+  readonly generatedDynamicRules = computed<PathFilter[]>(() => {
+    const paths = this.ignorePathsToFetch();
+    const results = this.ignoreContents();
+    const rules: PathFilter[] = [];
+    for (let i = 0; i < paths.length; i++) {
+      const content = results[i]?.data()?.content;
+      if (content == null) continue; // still loading, binary, or empty — skip
+      const path = paths[i];
+      const slash = path.lastIndexOf('/');
+      const dir = slash === -1 ? '' : path.slice(0, slash);
+      rules.push(...ignorelistToRules(dir, content));
+    }
+    return rules;
+  });
+
+  /** Generated rules grouped by their source ignore-file basename — the dialog's read-only view. */
+  readonly dynamicRuleGroups = computed(() => {
+    const paths = this.ignorePathsToFetch();
+    const results = this.ignoreContents();
+    const groups = new Map<string, PathFilter[]>();
+    for (let i = 0; i < paths.length; i++) {
+      const content = results[i]?.data()?.content;
+      if (content == null) continue;
+      const path = paths[i];
+      const slash = path.lastIndexOf('/');
+      const dir = slash === -1 ? '' : path.slice(0, slash);
+      const name = basename(path);
+      const list = groups.get(name) ?? [];
+      list.push(...ignorelistToRules(dir, content));
+      groups.set(name, list);
+    }
+    return groups;
+  });
+
+  /** Generated dynamic rules first, then manual rules — so a manual whitelist always wins last. */
+  readonly effectiveFilters = computed(() => [...this.generatedDynamicRules(), ...this.filters()]);
+
   readonly hasActiveFilters = computed(() =>
-    this.filters().some((f) => f.enabled && f.query.trim() !== ''),
+    this.effectiveFilters().some((f) => f.enabled && f.query.trim() !== ''),
   );
 
   /** Paths after both the dialog filters and the top input — what the tree renders. */
   readonly filteredPaths = computed(() =>
-    filterFilePaths(this.filesQuery.data() ?? [], this.filters(), this.nameQuery()),
+    filterFilePaths(this.filesQuery.data() ?? [], this.effectiveFilters(), this.nameQuery()),
   );
 
   /** Paths after only the dialog filters — the dialog's "visible files" preview. */
   readonly dialogVisiblePaths = computed(() =>
-    applyPathFilters(this.filesQuery.data() ?? [], this.filters()),
+    applyPathFilters(this.filesQuery.data() ?? [], this.effectiveFilters()),
   );
 
   readonly dialogVisiblePreview = computed(() =>
@@ -476,17 +748,18 @@ export class WorktreeFileBrowserComponent {
     this.filtersDialogRef = undefined;
   }
 
-  /** Replace the whole filter list (programmatic entry point). */
-  setFilters(filters: PathFilter[]): void {
-    this.filters.set(filters);
+  /** Replace the whole filter list (programmatic entry point). Older filter shapes are migrated. */
+  setFilters(filters: LegacyPathFilter[]): void {
+    this.filters.set(filters.map(migratePathFilter));
   }
 
-  /** Append a filter, returning its generated id. Defaults to an enabled, empty "includes". */
+  /** Append a filter, returning its generated id. Defaults to an enabled, empty "includes" whitelist. */
   addFilter(partial: Partial<Omit<PathFilter, 'id'>> = {}): string {
     const id = `f${++this.filterSeq}`;
     const filter: PathFilter = {
       id,
       kind: partial.kind ?? 'includes',
+      mode: partial.mode ?? 'whitelist',
       query: partial.query ?? '',
       enabled: partial.enabled ?? true,
     };
@@ -509,6 +782,64 @@ export class WorktreeFileBrowserComponent {
   protected setKind(id: string, value: string | string[]): void {
     const kind = (Array.isArray(value) ? value[0] : value) as PathFilterKind;
     this.updateFilter(id, { kind });
+  }
+
+  /** Toggle a manual rule between whitelist (show matches) and blacklist (hide matches). */
+  setMode(id: string, mode: PathFilterMode): void {
+    this.updateFilter(id, { mode });
+  }
+
+  /** Move a manual rule one position earlier (a rule's position is its evaluation order). */
+  moveFilterUp(id: string): void {
+    this.filters.update((filters) => this.swapByIndex(filters, id, -1));
+  }
+
+  /** Move a manual rule one position later. */
+  moveFilterDown(id: string): void {
+    this.filters.update((filters) => this.swapByIndex(filters, id, +1));
+  }
+
+  private swapByIndex(filters: PathFilter[], id: string, delta: number): PathFilter[] {
+    const i = filters.findIndex((f) => f.id === id);
+    const j = i + delta;
+    if (i === -1 || j < 0 || j >= filters.length) return filters;
+    const next = [...filters];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  }
+
+  // --- Dynamic (ignorelist) filters ---
+
+  /** Select an ignorelist dynamic filter by basename (idempotent — dedupes on param). */
+  addDynamicFilter(param: string): void {
+    this.dynamicFilters.update((filters) =>
+      filters.some((d) => d.param === param)
+        ? filters
+        : [...filters, { id: `d${++this.dynamicSeq}`, type: 'ignorelist', param, enabled: true }],
+    );
+  }
+
+  removeDynamicFilter(id: string): void {
+    this.dynamicFilters.update((filters) => filters.filter((d) => d.id !== id));
+  }
+
+  toggleDynamicFilter(id: string): void {
+    this.dynamicFilters.update((filters) =>
+      filters.map((d) => (d.id === id ? { ...d, enabled: !d.enabled } : d)),
+    );
+  }
+
+  protected toggleDynamicExpanded(id: string): void {
+    this.expandedDynamic.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  protected isDynamicExpanded(id: string): boolean {
+    return this.expandedDynamic().has(id);
   }
 
   /** Coerce a z-input model value (string | number | null | undefined) to a string. */

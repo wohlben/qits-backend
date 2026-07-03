@@ -23,7 +23,11 @@ describe('WorktreeFileBrowserComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    queryClient = new QueryClient();
+    // Seeded data is the source of truth in these tests — never let it go stale and refetch from
+    // the blanket mocks (which would clobber per-test file lists / ignore-file contents).
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false } },
+    });
     // Seed the file list so `filteredPaths`/`tree` are deterministic without awaiting a fetch.
     queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], PATHS);
 
@@ -86,7 +90,9 @@ describe('WorktreeFileBrowserComponent', () => {
     const cmp = createComponent().componentInstance;
 
     const id = cmp.addFilter({ kind: 'includes', query: 'domain' });
-    expect(cmp.filters()).toEqual([{ id, kind: 'includes', query: 'domain', enabled: true }]);
+    expect(cmp.filters()).toEqual([
+      { id, kind: 'includes', mode: 'whitelist', query: 'domain', enabled: true },
+    ]);
     expect(cmp.hasActiveFilters()).toBe(true);
 
     cmp.updateFilter(id, { query: 'service', enabled: false });
@@ -97,17 +103,40 @@ describe('WorktreeFileBrowserComponent', () => {
     expect(cmp.filters()).toEqual([]);
   });
 
-  it('narrows the visible paths by the dialog filters (union minus excludes)', () => {
+  it('narrows visible paths by the ordered rule list, migrating the legacy `excludes` kind', () => {
     const cmp = createComponent().componentInstance;
 
+    // a lone whitelist restricts to matches (leads with a manual whitelist → default hidden)
     cmp.setFilters([{ id: 'a', kind: 'includes', query: 'domain', enabled: true }]);
     expect(cmp.filteredPaths()).toEqual(['domain/src/App.java', 'domain/src/AppTest.java']);
 
+    // legacy `excludes` migrates to an `includes` blacklist; whitelist-then-blacklist subtracts
     cmp.setFilters([
       { id: 'a', kind: 'includes', query: 'domain', enabled: true },
       { id: 'b', kind: 'excludes', query: 'Test', enabled: true },
     ]);
+    expect(cmp.filters()[1]).toMatchObject({ kind: 'includes', mode: 'blacklist' });
     expect(cmp.filteredPaths()).toEqual(['domain/src/App.java']);
+  });
+
+  it('reorders rules and toggles mode (last-match-wins depends on both)', () => {
+    const cmp = createComponent().componentInstance;
+
+    // lead with a blacklist so the default stays visible, then whitelist one file back in
+    const bl = cmp.addFilter({ kind: 'includes', query: 'domain', mode: 'blacklist' });
+    const wl = cmp.addFilter({ kind: 'exact', query: 'domain/src/App.java', mode: 'whitelist' });
+    // blacklist hides both domain files, the trailing whitelist resurrects App.java; others stay
+    expect(cmp.filteredPaths()).toEqual(['README.md', 'domain/src/App.java', 'service/main.ts']);
+
+    // move the whitelist above the blacklist → the list now leads with a whitelist (stance flips to
+    // "show only"), and the trailing blacklist gets the last word on App.java → nothing survives
+    cmp.moveFilterUp(wl);
+    expect(cmp.filters().map((f) => f.id)).toEqual([wl, bl]);
+    expect(cmp.filteredPaths()).toEqual([]);
+
+    // flip the (now-trailing) rule to whitelist too → a whitelist-led list restricts to domain
+    cmp.setMode(bl, 'whitelist');
+    expect(cmp.filteredPaths()).toEqual(['domain/src/App.java', 'domain/src/AppTest.java']);
   });
 
   it('applies the top name query as a final filename pass; the dialog list ignores it', () => {
@@ -119,6 +148,98 @@ describe('WorktreeFileBrowserComponent', () => {
     expect(cmp.filteredPaths()).toEqual(['domain/src/AppTest.java']);
     // the dialog's "visible files" preview reflects only the dialog filters
     expect(cmp.dialogVisiblePaths()).toEqual(['domain/src/App.java', 'domain/src/AppTest.java']);
+  });
+
+  describe('dynamic ignorelist filters', () => {
+    const DYN_PATHS = [
+      '.gitignore',
+      'src/.gitignore',
+      'src/app.ts',
+      'src/app.spec.ts',
+      'dist/bundle.js',
+      'keep.log',
+      'debug.log',
+    ];
+
+    function seedContent(path: string, content: string) {
+      queryClient.setQueryData(['worktree-file', 'repo-1', 'wt-1', path], { path, content, binary: false });
+    }
+
+    beforeEach(() => {
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], DYN_PATHS);
+    });
+
+    it('offers ignore-file basenames de-duplicated, and only when present', () => {
+      const cmp = createComponent().componentInstance;
+      // two `.gitignore` files (root + src) collapse to a single picker entry
+      expect(cmp.ignorelistBasenames()).toEqual(['.gitignore']);
+      expect(cmp.availableIgnorelistParams()).toEqual(['.gitignore']);
+
+      // a worktree with no ignore files offers nothing
+      queryClient.setQueryData(['worktree-files', 'repo-1', 'wt-1'], ['a.ts', 'b.ts']);
+      const bare = createComponent().componentInstance;
+      expect(bare.ignorelistBasenames()).toEqual([]);
+    });
+
+    it('generates locality-scoped rules from ignore-file contents and regenerates on change', async () => {
+      seedContent('.gitignore', '*.log\n!keep.log\n');
+      seedContent('src/.gitignore', 'app.spec.ts\n');
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.addDynamicFilter('.gitignore');
+      fixture.detectChanges();
+
+      // root: hide *.log but re-include keep.log; src/.gitignore hides only src/**/app.spec.ts
+      expect(cmp.filteredPaths()).toEqual([
+        '.gitignore',
+        'src/.gitignore',
+        'src/app.ts',
+        'dist/bundle.js',
+        'keep.log',
+      ]);
+
+      // editing the mocked content re-derives the rules: app.spec.ts comes back. The cache update
+      // reaches the query observer on a microtask, so poll rather than assert synchronously.
+      seedContent('src/.gitignore', '');
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(cmp.filteredPaths()).toContain('src/app.spec.ts');
+      });
+    });
+
+    it('lets a manual whitelist resurrect a file a dynamic filter hid (dynamic rules apply first)', () => {
+      seedContent('.gitignore', '*.log\n');
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.addDynamicFilter('.gitignore');
+      fixture.detectChanges();
+      expect(cmp.filteredPaths()).not.toContain('debug.log');
+
+      cmp.addFilter({ kind: 'exact', query: 'debug.log', mode: 'whitelist' });
+      // the manual whitelist (applied after the generated rules) brings debug.log back…
+      expect(cmp.filteredPaths()).toContain('debug.log');
+      // …without hiding the rest, and keep.log stays hidden (still caught by *.log)
+      expect(cmp.filteredPaths()).toContain('src/app.ts');
+      expect(cmp.filteredPaths()).not.toContain('keep.log');
+    });
+
+    it('de-dupes a dynamic filter and disabling it restores every path', () => {
+      seedContent('.gitignore', '*.log\n');
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.addDynamicFilter('.gitignore');
+      cmp.addDynamicFilter('.gitignore'); // idempotent
+      expect(cmp.dynamicFilters().length).toBe(1);
+      fixture.detectChanges();
+      expect(cmp.filteredPaths()).not.toContain('debug.log');
+
+      cmp.toggleDynamicFilter(cmp.dynamicFilters()[0].id);
+      fixture.detectChanges();
+      expect(cmp.filteredPaths()).toEqual(DYN_PATHS);
+    });
   });
 
   it('compacts single-child directory chains in the rendered tree', () => {
