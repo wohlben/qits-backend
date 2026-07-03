@@ -87,7 +87,11 @@ function buildHighlights(state: EditorState, ranges: LineRange[]): DecorationSet
         No content.
       </div>
     } @else {
-      <div #host class="h-full min-h-0 overflow-hidden rounded-md border text-sm"></div>
+      <div
+        #host
+        class="min-h-0 overflow-hidden rounded-md border text-sm"
+        [class.h-full]="!fit()"
+      ></div>
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -98,6 +102,11 @@ export class CodeViewerComponent {
   readonly binary = input(false);
   readonly isDark = input(false);
   readonly highlights = input<LineRange[]>([]);
+  /**
+   * When true the editor grows to fit its content instead of filling its parent — use it for short
+   * embedded snippets (e.g. a file's frontmatter) that should be only as tall as the text.
+   */
+  readonly fit = input(false);
 
   readonly selectRange = output<LineRange>();
 
@@ -115,8 +124,9 @@ export class CodeViewerComponent {
       const content = this.content();
       const dark = this.isDark();
       const path = this.path();
-      // Track binary too, so toggling to/from a binary file re-evaluates.
+      // Track binary and fit too, so toggling either re-evaluates.
       this.binary();
+      this.fit();
 
       untracked(() => this.rebuild(host, path, content, dark));
     });
@@ -160,7 +170,9 @@ export class CodeViewerComponent {
       this.languageCompartment.of([]),
       EditorView.updateListener.of((u) => this.onUpdate(u)),
       EditorView.theme({
-        '&': { height: '100%' },
+        // Fill the parent by default; in fit mode grow to content instead so the viewer is only as
+        // tall as its text (capped, so an unexpectedly huge snippet still scrolls rather than sprawls).
+        '&': this.fit() ? { maxHeight: '20rem' } : { height: '100%' },
         '.cm-scroller': { overflow: 'auto' },
         '.cm-refHighlight': { backgroundColor: 'rgba(250, 204, 21, 0.18)' },
       }),

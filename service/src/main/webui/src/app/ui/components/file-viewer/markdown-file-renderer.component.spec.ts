@@ -98,6 +98,30 @@ describe('MarkdownFileRendererComponent', () => {
     expect(emitted).toEqual([]);
   });
 
+  it('shows leading YAML frontmatter in an editor and keeps it out of the rendered body', () => {
+    const fixture = TestBed.createComponent(MarkdownFileRendererComponent);
+    fixture.componentRef.setInput(
+      'content',
+      ['---', 'title: Hello', 'draft: true', '---', '', '# Real heading', 'body text'].join('\n'),
+    );
+    fixture.componentRef.setInput('path', 'docs/post.md');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    // The frontmatter is mounted in the read-only code editor, not rendered as markdown.
+    expect(host.querySelector('app-code-viewer')).not.toBeNull();
+    expect(host.querySelector('.cm-editor')?.textContent ?? '').toContain('title: Hello');
+    // The body renders normally; the YAML keys never leak into it.
+    const rendered = host.querySelector('.qits-md');
+    expect(rendered?.querySelector('h1')?.textContent).toBe('Real heading');
+    expect(rendered?.textContent ?? '').not.toContain('draft: true');
+  });
+
+  it('renders no frontmatter editor when the file has none', () => {
+    const fixture = createComponent();
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-code-viewer')).toBeNull();
+  });
+
   it('ignores clicks that are not on a link', () => {
     const fixture = createComponent();
     const emitted: string[] = [];
