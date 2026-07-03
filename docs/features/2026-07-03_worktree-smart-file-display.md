@@ -2,27 +2,33 @@
 
 ## Introduction
 
-The worktree file browser currently shows every file the same way: a read-only CodeMirror
-source view with syntax highlighting. This idea adds **smart display** — files whose type has a
-richer natural presentation get a *rendered* view, starting with **`*.md` rendered as HTML**.
-The source view never goes away: rendered and source are two modes of the same viewer pane,
-with a toggle (GitHub's Preview/Code pattern), because the source view carries behaviour the
-rendered view can't (line-range reference selection).
+The worktree file browser used to show every file the same way: a read-only CodeMirror
+source view with syntax highlighting. This feature adds **smart display** — files whose type
+has a richer natural presentation get a *rendered* view, starting with **`*.md` rendered as
+HTML**. The source view never goes away: rendered and source are two modes of the same viewer
+pane, with a toggle (GitHub's Preview/Code pattern), because the source view carries behaviour
+the rendered view can't (line-range reference selection).
+
+Implemented 2026-07-03: renderer registry + viewer host in `ui/components/file-viewer/`
+(`renderers.ts`, `file-viewer.component.ts`, `markdown-file-renderer.component.ts`,
+`resolve-relative-link.ts`), wired into the file browser. Deferred: heading anchors (marked
+v18 emits no heading ids; `#…` links are swallowed instead of navigating away) and the
+raw-bytes endpoint / image renderer listed under "future renderers".
 
 Related/dependent plans:
 
 - Extends the viewer pane of the
-  [worktree-file-browser](../features/2026-07-02_worktree-file-browser.md)
+  [worktree-file-browser](./2026-07-02_worktree-file-browser.md)
   (`pattern/worktree/worktree-file-browser.component.ts`,
   `ui/components/code-viewer/code-viewer.component.ts`).
 - Reuses the presentational `MarkdownComponent` built for
-  [chat markdown rendering](../features/2026-07-02_chat-markdown-rendering.md) (`marked`,
+  [chat markdown rendering](./2026-07-02_chat-markdown-rendering.md) (`marked`,
   GFM, sanitized through Angular's `[innerHTML]` binding) — same component, new consumer.
 - Independent of the filtering ideas
-  ([worktree-filter-ignorelists](worktree-filter-ignorelists.md),
-  [worktree-tree-path-compaction](worktree-tree-path-compaction.md)) but shares the file-
-  content query; a raw-bytes endpoint mentioned under "future renderers" would also unlock
-  showing images that are currently a `binary` placeholder.
+  ([worktree-filter-ignorelists](../feature-ideas/worktree-filter-ignorelists.md),
+  [worktree-tree-path-compaction](./2026-07-03_worktree-tree-path-compaction.md)) but shares
+  the file-content query; a raw-bytes endpoint mentioned under "future renderers" would also
+  unlock showing images that are currently a `binary` placeholder.
 
 ## Behaviour
 

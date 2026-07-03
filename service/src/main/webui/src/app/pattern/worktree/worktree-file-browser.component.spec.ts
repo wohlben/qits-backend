@@ -125,7 +125,11 @@ describe('WorktreeFileBrowserComponent', () => {
     const cmp = createComponent().componentInstance;
 
     // `domain` → `src` is a pure chain; `service` → `main.ts` compacts into a leaf.
-    expect(cmp.tree().map((n) => n.label)).toEqual(['domain / src', 'service / main.ts', 'README.md']);
+    expect(cmp.tree().map((n) => n.label)).toEqual([
+      'domain / src',
+      'service / main.ts',
+      'README.md',
+    ]);
     const serviceLeaf = cmp.tree()[1];
     expect(serviceLeaf.leaf).toBe(true);
     expect(serviceLeaf.key).toBe('service/main.ts');
@@ -203,6 +207,61 @@ describe('WorktreeFileBrowserComponent', () => {
     const resolved = cmp.tree().find((n) => n.key === 'domain/src');
     expect(resolved?.children?.map((c) => c.label)).toEqual(['App.java', 'AppTest.java']);
     expect(treeService.isExpanded('domain/src')).toBe(true);
+  });
+
+  it('defaults markdown to the rendered view and everything else to source', () => {
+    const cmp = createComponent().componentInstance;
+
+    cmp.selectedPath.set('README.md');
+    expect(cmp.viewerMode()).toBe('rendered');
+
+    cmp.selectedPath.set('service/main.ts');
+    expect(cmp.viewerMode()).toBe('source');
+  });
+
+  it('remembers the chosen mode per file type for the session', () => {
+    const cmp = createComponent().componentInstance;
+
+    cmp.selectedPath.set('README.md');
+    cmp.setViewerMode('source');
+    expect(cmp.viewerMode()).toBe('source');
+
+    // another markdown file inherits the choice (per type, not per file)
+    cmp.selectedPath.set('docs/notes.md');
+    expect(cmp.viewerMode()).toBe('source');
+
+    // a file without a renderer is unaffected, and setting a mode there is a no-op
+    cmp.selectedPath.set('service/main.ts');
+    cmp.setViewerMode('rendered');
+    expect(cmp.viewerMode()).toBe('source');
+    cmp.selectedPath.set('docs/notes.md');
+    expect(cmp.viewerMode()).toBe('source');
+  });
+
+  it('opens a resolved relative link: selects the file and expands its ancestors in the tree', () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+    const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+      .componentInstance.treeService;
+
+    cmp.selectedPath.set('README.md');
+    cmp.openLinkedPath('domain/src/App.java');
+    fixture.detectChanges();
+
+    expect(cmp.selectedPath()).toBe('domain/src/App.java');
+    expect(treeService.selectedKeys()).toEqual(new Set(['domain/src/App.java']));
+    expect(treeService.isExpanded('domain')).toBe(true);
+    expect(treeService.isExpanded('domain/src')).toBe(true);
+  });
+
+  it('ignores links to paths that are not files in the worktree', () => {
+    const cmp = createComponent().componentInstance;
+
+    cmp.selectedPath.set('README.md');
+    cmp.openLinkedPath('missing.md');
+    cmp.openLinkedPath('domain/src'); // a directory, not a file
+
+    expect(cmp.selectedPath()).toBe('README.md');
   });
 
   it('toggles a folder on row click instead of selecting it', () => {

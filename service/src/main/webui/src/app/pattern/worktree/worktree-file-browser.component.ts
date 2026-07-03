@@ -41,10 +41,12 @@ import {
   type PathFilter,
   type PathFilterKind,
 } from '@/shared/utils/filter-file-paths';
+import type { LineRange } from '@/ui/components/code-viewer/code-viewer.component';
 import {
-  CodeViewerComponent,
-  type LineRange,
-} from '@/ui/components/code-viewer/code-viewer.component';
+  FileViewerComponent,
+  type FileViewMode,
+} from '@/ui/components/file-viewer/file-viewer.component';
+import { findRenderer } from '@/ui/components/file-viewer/renderers';
 
 /** A collected reference to a range of a file, staged to later become part of a Claude prompt. */
 export interface CodeReference {
@@ -74,7 +76,7 @@ const VISIBLE_PREVIEW_LIMIT = 500;
     ...ZardTreeImports,
     ...ZardSelectImports,
     ...ZardResizableImports,
-    CodeViewerComponent,
+    FileViewerComponent,
     ZardBadgeComponent,
     ZardButtonComponent,
     ZardInputDirective,
@@ -170,13 +172,16 @@ const VISIBLE_PREVIEW_LIMIT = 500;
               } @else if (fileQuery.isError()) {
                 <div class="text-sm text-destructive">Failed to load {{ path }}</div>
               } @else if (fileQuery.data(); as file) {
-                <app-code-viewer
+                <app-file-viewer
                   [path]="path"
                   [content]="file.content ?? null"
                   [binary]="file.binary ?? false"
                   [isDark]="isDark()"
                   [highlights]="currentHighlights()"
+                  [mode]="viewerMode()"
+                  (modeChange)="setViewerMode($event)"
                   (selectRange)="addReference($event)"
+                  (openPath)="openLinkedPath($event)"
                 />
               }
             } @else {
@@ -386,6 +391,44 @@ export class WorktreeFileBrowserComponent {
         ),
       ),
   }));
+
+  /** Session-only memory of the rendered/source choice, keyed by smart-renderer id. */
+  private readonly rendererModes = signal<ReadonlyMap<string, FileViewMode>>(new Map());
+
+  /** The viewer mode for the open file: rendered by default when a smart renderer matches. */
+  readonly viewerMode = computed<FileViewMode>(() => {
+    const path = this.selectedPath();
+    const renderer = path ? findRenderer(path) : undefined;
+    return renderer ? (this.rendererModes().get(renderer.id) ?? 'rendered') : 'source';
+  });
+
+  setViewerMode(mode: FileViewMode): void {
+    const path = this.selectedPath();
+    const renderer = path ? findRenderer(path) : undefined;
+    if (!renderer) {
+      return;
+    }
+    this.rendererModes.update((modes) => new Map(modes).set(renderer.id, mode));
+  }
+
+  /** A rendered relative link resolved to a repo path: open it in the browser. */
+  openLinkedPath(target: string): void {
+    if (!this.filesQuery.data()?.includes(target)) {
+      return; // dead link (missing file or a directory) — silent no-op
+    }
+    this.selectedPath.set(target);
+    const treeService = this.treeCmp()?.treeService;
+    if (!treeService) {
+      return;
+    }
+    treeService.selectedKeys.set(new Set([target]));
+    // Expand every ancestor prefix so the node is visible. Safe with chain compaction: the
+    // mirroring effect in the constructor reconciles absorbed keys and only writes on a delta.
+    const parts = target.split('/');
+    for (let i = 1; i < parts.length; i++) {
+      treeService.expand(parts.slice(0, i).join('/'));
+    }
+  }
 
   readonly references = signal<CodeReference[]>([]);
 
