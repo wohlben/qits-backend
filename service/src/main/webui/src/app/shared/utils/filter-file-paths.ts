@@ -20,6 +20,13 @@ export interface PathFilter {
   mode: PathFilterMode;
   query: string;
   enabled: boolean;
+  /**
+   * Generated glob whitelists normally do **not** set the list's stance (so an ignore file opening
+   * with `!negation` can't flip the whole tree to hidden). A `restrict` glob whitelist is the
+   * opposite: a leading one *does* set the stance to default-hidden, so the list shows only its
+   * matches. Used by framework filters; ignored for manual/non-glob rules.
+   */
+  restrict?: boolean;
 }
 
 /**
@@ -173,15 +180,18 @@ function compileMatcher(filter: PathFilter): (path: string) => boolean {
  *   gitignore's `foo` + `!foo/keep` semantics, and the resurrection flow for dynamic filters.
  *
  * A generated `glob` whitelist never sets the stance (an ignore file that opens with a `!negation`
- * must not flip the whole tree to hidden), so it is treated as if the default were visible.
+ * must not flip the whole tree to hidden), so it is treated as if the default were visible — unless
+ * it is flagged `restrict` (a framework filter), which *does* lead with default-hidden.
  */
 export function applyPathFilters(paths: string[], filters: PathFilter[]): string[] {
   const active = filters.filter((f) => f.enabled && f.query.trim() !== '');
   if (active.length === 0) return paths;
 
   const rules = active.map((f) => ({ whitelist: f.mode === 'whitelist', matches: compileMatcher(f) }));
-  const leadsWithManualWhitelist = active[0].mode === 'whitelist' && active[0].kind !== 'glob';
-  const initial = !leadsWithManualWhitelist;
+  const first = active[0];
+  const leadsRestrictive =
+    first.mode === 'whitelist' && (first.kind !== 'glob' || first.restrict === true);
+  const initial = !leadsRestrictive;
 
   return paths.filter((path) => {
     let visible = initial;
