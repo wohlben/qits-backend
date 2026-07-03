@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -27,10 +28,12 @@ import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 import { ZardInputDirective } from '@/shared/components/input';
 import { ZardSelectImports } from '@/shared/components/select';
+import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import type { TreeNode } from '@/shared/components/tree/tree.types';
 import { EDarkModes, ZardDarkMode } from '@/shared/services/dark-mode';
 import { buildFileTree, type HasPath } from '@/shared/utils/build-file-tree';
+import { compactFileTree, type CompactedChain } from '@/shared/utils/compact-file-tree';
 import {
   applyPathFilters,
   filterFilePaths,
@@ -267,8 +270,38 @@ export class WorktreeFileBrowserComponent {
   protected readonly visiblePreviewLimit = VISIBLE_PREVIEW_LIMIT;
 
   private readonly filtersTpl = viewChild<TemplateRef<unknown>>('filtersTpl');
+  private readonly treeCmp = viewChild(ZardTreeComponent);
   private filtersDialogRef?: ZardDialogRef<unknown>;
   private filterSeq = 0;
+
+  constructor() {
+    // Mirror a compacted node's open/closed state onto the dirs absorbed into its label. When a
+    // filter change later splits the chain, the newly separate ancestors are then already open —
+    // the user was "inside" the chain, so re-opening there is the right UX. A leaf-ending chain
+    // counts as open: its file is visible, which in an uncompacted tree implies every ancestor
+    // is expanded. Only writes on an actual delta, so the effect settles after one pass.
+    effect(() => {
+      const tree = this.treeCmp();
+      if (!tree) return;
+      const { chains } = this.compaction();
+      const expanded = tree.treeService.expandedKeys();
+      const add: string[] = [];
+      const remove: string[] = [];
+      for (const { key: deepestKey, absorbedKeys, leaf } of chains) {
+        const open = leaf || expanded.has(deepestKey);
+        for (const key of absorbedKeys) {
+          if (open !== expanded.has(key)) (open ? add : remove).push(key);
+        }
+      }
+      if (add.length === 0 && remove.length === 0) return;
+      tree.treeService.expandedKeys.update((keys) => {
+        const next = new Set(keys);
+        for (const key of add) next.add(key);
+        for (const key of remove) next.delete(key);
+        return next;
+      });
+    });
+  }
 
   readonly filesQuery = injectQuery(() => ({
     queryKey: ['worktree-files', this.repoId(), this.worktreeId()],
@@ -309,12 +342,24 @@ export class WorktreeFileBrowserComponent {
     () => this.nameQuery().trim() !== '' || this.hasActiveFilters(),
   );
 
-  readonly tree = computed<TreeNode<HasPath>[]>(() =>
-    buildFileTree(
-      this.filteredPaths().map((path) => ({ path })),
-      { expanded: false, icons: true },
-    ),
-  );
+  /**
+   * The rendered forest with single-child chains compacted (`src / main / java`), plus the
+   * chain map needed to keep expansion state coherent when a chain forms or resolves. Derived,
+   * so a filter change that reveals a hidden sibling splits the chain in the same pass.
+   */
+  private readonly compaction = computed(() => {
+    const chains: CompactedChain[] = [];
+    const nodes = compactFileTree(
+      buildFileTree(
+        this.filteredPaths().map((path) => ({ path })),
+        { expanded: false, icons: true },
+      ),
+      { chains },
+    );
+    return { nodes, chains };
+  });
+
+  readonly tree = computed<TreeNode<HasPath>[]>(() => this.compaction().nodes);
 
   readonly selectedPath = signal<string | null>(null);
 

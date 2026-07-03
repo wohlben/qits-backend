@@ -12,6 +12,7 @@ import { lastValueFrom } from 'rxjs';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
 import { CommitFileChangeDto } from '@/api/model/commitFileChangeDto';
 import { buildFileTree } from '@/shared/utils/build-file-tree';
+import { compactFileTree } from '@/shared/utils/compact-file-tree';
 import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.component';
 import { CommitFileTreeComponent } from '@/ui/components/repository/commit-file-tree.component';
 import { FileDiffViewComponent } from '@/ui/components/repository/file-diff-view.component';
@@ -82,7 +83,9 @@ export class CommitDiffComponent {
   }));
 
   readonly files = computed<CommitFileChangeDto[]>(() => this.changesQuery.data()?.files ?? []);
-  readonly treeNodes = computed(() => buildFileTree(this.files()));
+  // Changed files are sparse, so single-child dir chains are long — compact them. The tree
+  // renders fully expanded (zExpandAll), so no expansion state needs syncing here.
+  readonly treeNodes = computed(() => compactFileTree(buildFileTree(this.files())));
 
   /**
    * The file shown on the right. Re-derived from the change set: keeps the current pick when it
