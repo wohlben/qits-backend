@@ -6,8 +6,7 @@ import { lastValueFrom } from 'rxjs';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
-import { SpeakToPromptComponent } from '@/pattern/speech/speak-to-prompt.component';
-import { MarkdownComponent } from '@/ui/components/markdown/markdown.component';
+import { WorktreePromptPanelComponent } from '@/pattern/speech/worktree-prompt-panel.component';
 
 /**
  * The "work in progress" page of a worktree: decide what to do in it by speaking. Speech is
@@ -16,7 +15,7 @@ import { MarkdownComponent } from '@/ui/components/markdown/markdown.component';
  */
 @Component({
   selector: 'app-worktree-wip-page',
-  imports: [PageLayoutComponent, SpeakToPromptComponent, MarkdownComponent],
+  imports: [PageLayoutComponent, WorktreePromptPanelComponent],
   template: `
     <app-page-layout
       [request]="worktreesQuery"
@@ -37,16 +36,11 @@ import { MarkdownComponent } from '@/ui/components/markdown/markdown.component';
         </div>
       </ng-template>
 
-      <div class="flex flex-col gap-6">
-        @if (worktree()?.preamble; as preamble) {
-          <section class="rounded-lg border bg-muted/30 p-4">
-            <h2 class="mb-2 text-sm font-medium text-muted-foreground">Goal of this worktree</h2>
-            <app-markdown [text]="preamble" />
-          </section>
-        }
-
-        <app-speak-to-prompt [repoId]="repoId" [worktreeId]="worktreeId" />
-      </div>
+      <app-worktree-prompt-panel
+        [repoId]="repoId"
+        [worktreeId]="worktreeId"
+        [preamble]="worktree()?.preamble ?? null"
+      />
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

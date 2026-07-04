@@ -248,7 +248,7 @@ interface NodeSummary {
             [canCleanup]="cleanupable().has(node.label)"
             [claudeConfigurable]="claudeConfigurable()"
             (viewCommits)="viewCommits.emit(node.label)"
-            (openWip)="openWip.emit(node.data!)"
+            (openWorktree)="openWorktree.emit(node.data!)"
             (run)="run.emit(node.label)"
             (configureWithClaude)="configureWithClaude.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
@@ -274,8 +274,8 @@ export class BranchTreeComponent {
   /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no worktree. */
   readonly branchSummaries = input<Record<string, BranchSummary>>({});
   readonly viewCommits = output<string>();
-  /** Open a worktree's "work in progress" page (carries the worktree). */
-  readonly openWip = output<WorktreeDto>();
+  /** Open a worktree's detail page (carries the worktree). */
+  readonly openWorktree = output<WorktreeDto>();
   /** Open the "Run…" dialog for a worktree-backed branch (carries the branch name). */
   readonly run = output<string>();
   /** Launch the repository-MCP Claude action in a subtree's terminal (carries the branch name). */

@@ -75,7 +75,7 @@ interface CreateWorktreeForm {
             [branchSummaries]="branchSummaries()"
             [claudeConfigurable]="true"
             (viewCommits)="viewCommits($event)"
-            (openWip)="openWip($event)"
+            (openWorktree)="openWorktree($event)"
             (run)="openRun($event)"
             (configureWithClaude)="configureWithClaude($event)"
             (resolveConflict)="openResolveConflict($event)"
@@ -715,16 +715,10 @@ export class BranchListComponent {
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'commits']);
   }
 
-  /** Open the worktree's "work in progress" page (speak → prompt → agent). */
-  openWip(worktree: WorktreeDto) {
+  /** Open the worktree's detail page (file browser + chat dialog). */
+  openWorktree(worktree: WorktreeDto) {
     if (!worktree.worktreeId) return;
-    this.router.navigate([
-      '/repositories',
-      this.repoId(),
-      'worktrees',
-      worktree.worktreeId,
-      'wip',
-    ]);
+    this.router.navigate(['/repositories', this.repoId(), 'worktrees', worktree.worktreeId]);
   }
 
   /** Open the Run… dialog for a branch; the action list comes from actionConfigsQuery. */

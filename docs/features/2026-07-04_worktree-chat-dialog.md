@@ -12,21 +12,24 @@ evolution (split pane, references feeding the prompt) is noted but out of scope.
 
 Related/dependent plans:
 
-- Lives on the [worktree-file-browser](../features/2026-07-02_worktree-file-browser.md) route;
+- Lives on the [worktree-file-browser](./2026-07-02_worktree-file-browser.md) route;
   that doc's reference cache ("collects, doesn't submit") was built to eventually feed this
   chat — this feature creates the surface where that hand-off will land, without wiring it yet.
-- Encapsulates the [speak-to-prompt](../features/2026-07-02_speak-to-prompt.md) flow
+- Encapsulates the [speak-to-prompt](./2026-07-02_speak-to-prompt.md) flow
   (`SpeakToPromptComponent`) — the WIP route stays as-is for now and shares the components.
-- The chat itself is the [stream-json chat](../features/2026-07-01_stream-json-chat.md): a
+- The chat itself is the [stream-json chat](./2026-07-01_stream-json-chat.md): a
   registry-tracked, **re-attachable** `Command` of kind `CHAT`
   (`command-chat.component.ts`, WebSocket ring-replay + live). Persistence across dialog
   open/close is exactly the re-attach mechanism that already exists — no new backend.
 
 ## Behaviour
 
-- A **"Chat"** button in the worktree detail header (next to the existing "Speak a prompt"
-  link, which it will eventually replace) opens a near-fullscreen dialog
-  (`ZardDialogService`, ~`90vw`/`90vh`, single instance).
+- A **"Chat"** button in the worktree detail header (it replaced the "Speak a prompt" link;
+  the WIP route stays reachable by URL only, kept for prototyping) opens a near-fullscreen
+  dialog (`ZardDialogService`, ~`90vw`/`90vh`, single instance, backdrop click disabled so an
+  unsent transcript isn't lost).
+- The repository detail page's per-worktree **"Work on it"** button now opens the worktree
+  detail route (previously the WIP route).
 - **No session yet** → the dialog shows the WIP content: the worktree goal (preamble) and
   `<app-speak-to-prompt>`; launching creates the chat and the dialog switches to the
   transcript. A plain typed prompt (skip the mic) should also be possible — speak-to-prompt
@@ -38,8 +41,9 @@ Related/dependent plans:
 - **Closing the dialog does not end the chat.** The agent keeps working server-side (it's a
   registry command); the dialog is just a viewport. A small indicator on the Chat button
   (e.g. a dot when a session is running) tells the user there's a live conversation behind it.
-- **Terminating** stays available inside the dialog (the chat component's existing terminate),
-  after which reopening starts fresh with speak-to-prompt again.
+- **Terminating** stays available inside the dialog (a Terminate button in the dialog's own
+  header — the chat component itself has no terminate), after which the dialog falls back to
+  speak-to-prompt.
 
 ## Session discovery & state
 
@@ -85,11 +89,10 @@ reload — so it can't live in the dialog component:
 - Launching with worktree context (open file, current filters) folded into the seed prompt.
 - Multiple named sessions per worktree.
 
-## Open questions
+## Open questions (settled)
 
-- Should the "Speak a prompt" header link be removed immediately (dialog replaces it) or kept
-  until the dialog has proven itself? Lean: keep both for one iteration, then retire the link
-  and eventually the WIP route.
+- Should the "Speak a prompt" header link be removed immediately? **Removed** — the dialog
+  replaces it; the WIP route itself stays reachable by URL for future prototyping.
 - Does opening the dialog while an agent is mid-turn need any guard? No — ring replay +
   line-oriented events mean attaching mid-turn renders correctly by construction (same as the
   Commands page re-attach today).

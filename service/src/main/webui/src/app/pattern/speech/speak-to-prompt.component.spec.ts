@@ -74,6 +74,31 @@ describe('SpeakToPromptComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/commands', 'cmd-1']);
   });
 
+  it('emits the launched command id alongside navigating by default', async () => {
+    const fixture = createComponent();
+    let launchedId: string | undefined;
+    fixture.componentInstance.launched.subscribe((id) => (launchedId = id));
+    fixture.componentInstance.refinedPrompt.set('do the thing');
+    fixture.componentInstance.launch();
+    await fixture.whenStable();
+
+    expect(launchedId).toBe('cmd-1');
+    expect(router.navigate).toHaveBeenCalledWith(['/commands', 'cmd-1']);
+  });
+
+  it('only emits, without navigating, when navigateOnLaunch is off', async () => {
+    const fixture = createComponent();
+    fixture.componentRef.setInput('navigateOnLaunch', false);
+    let launchedId: string | undefined;
+    fixture.componentInstance.launched.subscribe((id) => (launchedId = id));
+    fixture.componentInstance.refinedPrompt.set('do the thing');
+    fixture.componentInstance.launch();
+    await fixture.whenStable();
+
+    expect(launchedId).toBe('cmd-1');
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
   it('uploads the recording and appends the server transcript', async () => {
     const fixture = createComponent();
     fixture.componentInstance.transcript.set('earlier text');

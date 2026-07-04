@@ -26,8 +26,9 @@ type Status = 'connecting' | 'open' | 'closed';
   selector: 'app-command-chat',
   imports: [ChatTranscriptComponent, ZardButtonComponent, ZardInputDirective],
   template: `
-    <div class="flex h-[70vh] flex-col gap-3 rounded-lg border p-4">
-      <app-chat-transcript [items]="items()" [waiting]="thinking()" />
+    <div class="flex flex-col gap-3 rounded-lg border p-4" [class]="heightClass()">
+      <!-- The host must grow for the transcript's inner scroller to work and the form to pin. -->
+      <app-chat-transcript class="flex min-h-0 flex-1 flex-col" [items]="items()" [waiting]="thinking()" />
 
       <form class="flex items-center gap-2" (submit)="onSubmit($event)">
         <input
@@ -47,6 +48,8 @@ type Status = 'connecting' | 'open' | 'closed';
 })
 export class CommandChatComponent implements OnInit, OnDestroy {
   readonly commandId = input.required<string>();
+  /** Container height; the chat dialog overrides this to fill its full-size body. */
+  readonly heightClass = input('h-[70vh]');
 
   private readonly lines = signal<string[]>([]);
   readonly items = computed(() => linesToItems(this.lines()));
