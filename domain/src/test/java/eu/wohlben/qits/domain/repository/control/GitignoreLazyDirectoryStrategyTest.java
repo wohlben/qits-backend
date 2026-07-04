@@ -54,6 +54,11 @@ class GitignoreLazyDirectoryStrategyTest {
         }
 
         @Override
+        public boolean resolvesInsideRoot(String repoId, String worktreeId, String path) {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
         public byte[] read(String repoId, String worktreeId, String path) {
           throw new UnsupportedOperationException();
         }

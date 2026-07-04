@@ -61,6 +61,17 @@ public interface WorktreeFileAccess {
   int childCount(String repoId, String worktreeId, String dir);
 
   /**
+   * Whether {@code path} resolves — following <em>every</em> intermediate and final symlink — to a
+   * location still inside the worktree root. This is the containment guard the lexical {@code ..}
+   * check cannot provide: a committed symlink at any path segment (e.g. a {@code linkdir/} symlink
+   * to an absolute path) that points outside the worktree is rejected. A missing path, or a broken
+   * or looping symlink, resolves to {@code false}. Cloned repositories are untrusted and git checks
+   * out symlinks, so this must run before any {@code find}/{@code cat} that would otherwise
+   * dereference an intermediate link.
+   */
+  boolean resolvesInsideRoot(String repoId, String worktreeId, String path);
+
+  /**
    * The raw bytes of a regular file, streamed exactly (no TTY, no charset round-trip) so binary
    * content and line endings survive. The caller enforces the size limit (via {@link #stat}) before
    * reading and does binary sniffing on the returned bytes.

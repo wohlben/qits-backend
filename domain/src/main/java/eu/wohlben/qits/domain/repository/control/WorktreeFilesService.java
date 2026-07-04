@@ -108,6 +108,12 @@ public class WorktreeFilesService {
         // fall through to the listing below
       }
     }
+    // The lstat above only vets the final segment; an intermediate symlinked directory (e.g.
+    // linkdir/ -> /etc) is transparently followed during path resolution, so confirm the whole path
+    // still resolves inside the worktree before find walks it.
+    if (!access.resolvesInsideRoot(repoId, worktreeId, path)) {
+      throw new BadRequestException("Invalid directory path: " + path);
+    }
 
     List<String> files = new ArrayList<>();
     List<LazyDir> dirs = new ArrayList<>();
@@ -158,6 +164,12 @@ public class WorktreeFilesService {
       case FILE -> {
         // fall through to the read below
       }
+    }
+    // The lstat above only vets the final segment; an intermediate symlinked directory (e.g.
+    // linkdir/ -> /etc in `linkdir/passwd`) is transparently followed during path resolution, so
+    // confirm the whole path still resolves inside the worktree before cat reads it.
+    if (!access.resolvesInsideRoot(repoId, worktreeId, path)) {
+      throw new BadRequestException("Invalid file path: " + path);
     }
     if (stat.size() > MAX_CONTENT_BYTES) {
       return new WorktreeFileContentDto(path, null, true);
