@@ -47,7 +47,7 @@ public class AgentLaunchServiceTest {
     seedRepository(projectId, repoId);
 
     List<AgentLaunchService.ScopedMcp> servers =
-        agentLaunchService.serversFor(repoId, AgentMcpScope.ACTIONS);
+        agentLaunchService.serversFor(repoId, "work", AgentMcpScope.ACTIONS);
 
     assertEquals(2, servers.size(), "configure sessions get the actions AND repository servers");
     AgentLaunchService.ScopedMcp actions = servers.get(0);
@@ -65,7 +65,12 @@ public class AgentLaunchServiceTest {
     assertTrue(
         repository
             .url()
-            .contains("/mcp/repository?projectId=" + projectId + "&repositoryId=" + repoId),
+            .contains(
+                "/mcp/repository?projectId="
+                    + projectId
+                    + "&repositoryId="
+                    + repoId
+                    + "&worktreeId=work"),
         repository.url());
   }
 
@@ -76,11 +81,18 @@ public class AgentLaunchServiceTest {
     seedRepository(projectId, repoId);
 
     AgentLaunchService.ScopedMcp server =
-        agentLaunchService.serversFor(repoId, AgentMcpScope.REPOSITORY).getFirst();
+        agentLaunchService.serversFor(repoId, "work", AgentMcpScope.REPOSITORY).getFirst();
 
     assertEquals("repository", server.key());
     assertTrue(
-        server.url().contains("/mcp/repository?projectId=" + projectId + "&repositoryId=" + repoId),
+        server
+            .url()
+            .contains(
+                "/mcp/repository?projectId="
+                    + projectId
+                    + "&repositoryId="
+                    + repoId
+                    + "&worktreeId=work"),
         server.url());
     assertTrue(server.allowedTools().contains("mcp__repository__listBranches"));
     assertFalse(server.allowedTools().contains("mcp__repository__runAction"));
@@ -93,7 +105,7 @@ public class AgentLaunchServiceTest {
     seedRepository(projectId, repoId);
 
     AgentLaunchService.ScopedMcp server =
-        agentLaunchService.serversFor(repoId, AgentMcpScope.PROJECT).getFirst();
+        agentLaunchService.serversFor(repoId, "work", AgentMcpScope.PROJECT).getFirst();
 
     assertTrue(server.url().contains("/mcp/repository?projectId=" + projectId), server.url());
     assertFalse(server.url().contains("repositoryId="), server.url());
@@ -104,7 +116,7 @@ public class AgentLaunchServiceTest {
     // A repo id that isn't a UUID must be rejected before it can be embedded in the launch command.
     assertThrows(
         BadRequestException.class,
-        () -> agentLaunchService.serversFor("bad'; touch pwned; '", AgentMcpScope.ACTIONS));
+        () -> agentLaunchService.serversFor("bad'; touch pwned; '", "work", AgentMcpScope.ACTIONS));
   }
 
   @Test
@@ -115,7 +127,7 @@ public class AgentLaunchServiceTest {
     String repoId = "77777777-7777-7777-7777-777777777777";
     seedRepository(projectId, repoId);
 
-    LaunchSpec spec = agentLaunchService.renderChat(repoId, AgentMcpScope.ACTIONS);
+    LaunchSpec spec = agentLaunchService.renderChat(repoId, "work", AgentMcpScope.ACTIONS);
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
     // Still the stream-json chat, unchanged.

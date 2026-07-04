@@ -68,6 +68,8 @@ public class CommandService {
 
   @Inject ContainerRuntime containers;
 
+  @Inject OtelEnvironment otelEnvironment;
+
   /** The outcome of a non-interactive run: combined output and exit code. */
   public record RunOutcome(String actionId, String actionName, int exitCode, String output) {}
 
@@ -85,7 +87,8 @@ public class CommandService {
 
   /**
    * What a launch needs regardless of where it came from: an action or a coding agent. {@code
-   * actionId} is null for agent launches (they aren't backed by an action).
+   * actionId} is null for agent launches (they aren't backed by an action). {@code otel} injects
+   * the OTLP exporter environment (daemons with the toggle set; see {@link OtelEnvironment}).
    */
   private record LaunchDescriptor(
       String actionId,
@@ -93,7 +96,8 @@ public class CommandService {
       String script,
       boolean interactive,
       Map<String, String> environment,
-      CommandKind kind) {
+      CommandKind kind,
+      boolean otel) {
 
     static LaunchDescriptor of(ResolvedAction action) {
       return new LaunchDescriptor(
@@ -102,7 +106,8 @@ public class CommandService {
           action.executeScript(),
           action.interactive(),
           action.environment(),
-          CommandKind.TERMINAL);
+          CommandKind.TERMINAL,
+          false);
     }
   }
 
@@ -133,7 +138,7 @@ public class CommandService {
             repoId,
             worktreeId,
             new LaunchDescriptor(
-                null, name, script, interactive, environment, CommandKind.TERMINAL));
+                null, name, script, interactive, environment, CommandKind.TERMINAL, false));
     registry.spawn(
         p.dto().id(), p.container(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
@@ -154,7 +159,7 @@ public class CommandService {
         prepare(
             repoId,
             worktreeId,
-            new LaunchDescriptor(null, name, script, false, environment, CommandKind.CHAT));
+            new LaunchDescriptor(null, name, script, false, environment, CommandKind.CHAT, false));
     registry.spawnChat(
         p.dto().id(),
         p.container(),
@@ -182,6 +187,7 @@ public class CommandService {
       String name,
       String script,
       Map<String, String> environment,
+      boolean otel,
       CommandExitListener exitListener,
       CommandLogWriter logWriterTap,
       CommandOutputSink... observerSinks) {
@@ -189,7 +195,7 @@ public class CommandService {
         prepare(
             repoId,
             worktreeId,
-            new LaunchDescriptor(null, name, script, true, environment, CommandKind.DAEMON));
+            new LaunchDescriptor(null, name, script, true, environment, CommandKind.DAEMON, otel));
     CommandExitListener composite =
         (commandId, exitCode, terminatedManually) -> {
           onExit(commandId, exitCode, terminatedManually);
@@ -292,6 +298,11 @@ public class CommandService {
     // environment (and its credentials) is deliberately never inherited into a workspace container.
     Map<String, String> env = new HashMap<>();
     env.put("TERM", "xterm-256color");
+    if (descriptor.otel()) {
+      // The command id exists here (createRunning above) — each (re)launch exports with its own
+      // qits.command.id. The definition overlay stays last so an explicit user OTEL_* var wins.
+      env.putAll(otelEnvironment.forLaunch(repoId, worktreeId, dto.id(), descriptor.name()));
+    }
     env.putAll(descriptor.environment());
 
     return new Prepared(dto, container, descriptor.script(), env);

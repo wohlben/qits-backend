@@ -159,6 +159,74 @@ public class CommandServiceTest {
     assertEquals(70000, event.get("text").asText().length(), "stored event must be intact JSON");
   }
 
+  @Test
+  public void daemonLaunchWithOtelInjectsExporterEnvAndUserOverridesWin() throws Exception {
+    String repoId = repoWithWorktree();
+
+    // The daemon's own environment overrides one injected var — the definition overlay must win.
+    CommandDto command =
+        commandService.launchDaemon(
+            repoId,
+            "work",
+            "otel daemon",
+            "env",
+            Map.of("OTEL_SERVICE_NAME", "user-override"),
+            true,
+            (commandId, exitCode, terminatedManually) -> {},
+            null);
+
+    List<CommandLogLineDto> lines = awaitStableLog(command.id());
+    String env = lines.stream().map(CommandLogLineDto::content).reduce("", (a, b) -> a + "\n" + b);
+    assertTrue(
+        env.contains("OTEL_EXPORTER_OTLP_ENDPOINT=http://"), "endpoint must be injected: " + env);
+    assertTrue(env.contains("/api/otel"), "endpoint must point at the receiver: " + env);
+    assertTrue(env.contains("OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf"), env);
+    assertTrue(
+        env.contains("qits.command.id=" + command.id()),
+        "resource attributes must carry the persisted command id: " + env);
+    assertTrue(
+        env.contains("qits.worktree.id=work,qits.repository.id=" + repoId),
+        "resource attributes must carry worktree + repository: " + env);
+    assertTrue(
+        env.contains("OTEL_SERVICE_NAME=user-override"),
+        "an explicit user OTEL_* var must beat the injected one: " + env);
+  }
+
+  @Test
+  public void daemonLaunchWithoutOtelInjectsNothing() throws Exception {
+    String repoId = repoWithWorktree();
+
+    CommandDto command =
+        commandService.launchDaemon(
+            repoId,
+            "work",
+            "plain daemon",
+            "env",
+            Map.of(),
+            false,
+            (commandId, exitCode, terminatedManually) -> {},
+            null);
+
+    List<CommandLogLineDto> lines = awaitStableLog(command.id());
+    assertTrue(
+        lines.stream().noneMatch(l -> l.content().contains("OTEL_EXPORTER_OTLP_ENDPOINT")),
+        "no OTEL env without the toggle: " + lines);
+  }
+
+  /** Awaits the async log until its size is stable across two polls (the `env` dump is large). */
+  private List<CommandLogLineDto> awaitStableLog(String commandId) throws InterruptedException {
+    List<CommandLogLineDto> previous = awaitLog(commandId);
+    for (int i = 0; i < 40; i++) {
+      Thread.sleep(100);
+      List<CommandLogLineDto> current = commandService.log(commandId, null);
+      if (!current.isEmpty() && current.size() == previous.size()) {
+        return current;
+      }
+      previous = current;
+    }
+    return previous;
+  }
+
   private List<CommandLogLineDto> awaitLog(String commandId) throws InterruptedException {
     for (int i = 0; i < 40; i++) {
       List<CommandLogLineDto> lines = commandService.log(commandId, null);

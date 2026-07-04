@@ -41,7 +41,7 @@ Related/dependent plans:
   (message a running one). The picker is an *input source* for prompts, not a new agent channel.
 - Complements the [worktree chat dialog](../features/2026-07-04_worktree-chat-dialog.md):
   "pick this element" and "ask the agent about it" want to sit next to each other.
-- Orthogonal to [observability](observability.md), but the same shape of idea — qits obtaining a
+- Orthogonal to [observability](../features/2026-07-04_observability.md), but the same shape of idea — qits obtaining a
   view into a running app the source alone can't give. Neither requires the other.
 - Parked follow-up:
   [daemon-proxy-cross-origin-mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md) extends

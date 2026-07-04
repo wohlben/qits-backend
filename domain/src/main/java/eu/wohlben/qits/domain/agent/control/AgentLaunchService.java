@@ -61,7 +61,12 @@ public class AgentLaunchService {
           "mcp__repository__listCommits",
           "mcp__repository__listCommitChanges",
           "mcp__repository__getCommitFileDiff",
-          "mcp__repository__listActions");
+          "mcp__repository__listActions",
+          "mcp__repository__telemetryErrors",
+          "mcp__repository__telemetryTrace",
+          "mcp__repository__telemetrySlowSpans",
+          "mcp__repository__telemetrySearchLogs",
+          "mcp__repository__telemetryMetrics");
 
   @Inject CommandService commandService;
 
@@ -126,7 +131,7 @@ public class AgentLaunchService {
       return launchLogin(repoId, worktreeId);
     }
 
-    LaunchSpec spec = renderChat(repoId, scope);
+    LaunchSpec spec = renderChat(repoId, worktreeId, scope);
 
     CommandDto command =
         commandService.launchChat(
@@ -185,9 +190,9 @@ public class AgentLaunchService {
    * HOME} pointed at the shared credential volume. Package-visible so the credential overlay is
    * assertable without spawning a container.
    */
-  LaunchSpec renderChat(String repoId, AgentMcpScope scope) {
+  LaunchSpec renderChat(String repoId, String worktreeId, AgentMcpScope scope) {
     CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
-    for (ScopedMcp server : serversFor(repoId, scope)) {
+    for (ScopedMcp server : serversFor(repoId, worktreeId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
     return withAgentHome(agent).skipPermissions().chat();
@@ -219,15 +224,22 @@ public class AgentLaunchService {
    * The scoped MCP servers for {@code scope}, with their read-only allowlists. Package-visible for
    * tests.
    */
-  List<ScopedMcp> serversFor(String repoId, AgentMcpScope scope) {
+  List<ScopedMcp> serversFor(String repoId, String worktreeId, AgentMcpScope scope) {
     String repo = requireUuid(repoId, "repository id");
     String projectId = projectIdFor(repo);
     // Project-scoped, then narrowed to this one repository so a per-subtree session only sees its
-    // own repo, not its siblings in the project.
+    // own repo, not its siblings in the project. The worktree narrowing is the third dimension:
+    // it unlocks (and fences) the telemetry tools, which answer only for the session's worktree.
     ScopedMcp narrowedRepositoryServer =
         new ScopedMcp(
             "repository",
-            repositoryMcpUrl + "?projectId=" + projectId + "&repositoryId=" + repo,
+            repositoryMcpUrl
+                + "?projectId="
+                + projectId
+                + "&repositoryId="
+                + repo
+                + "&worktreeId="
+                + worktreeId,
             READ_ONLY_REPOSITORY_TOOLS);
     return switch (scope) {
       case ACTIONS ->

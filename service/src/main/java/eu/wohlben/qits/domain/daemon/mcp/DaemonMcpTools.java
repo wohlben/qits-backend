@@ -123,6 +123,12 @@ public class DaemonMcpTools {
           String restartPolicy,
       @ToolArg(required = false, description = "relaunch attempts before settling CRASHED")
           Integer maxRestarts,
+      @ToolArg(
+              required = false,
+              description =
+                  "inject OTEL_EXPORTER_* env vars at launch so the process exports telemetry to"
+                      + " qits (default false)")
+          Boolean otel,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment,
       @ToolArg(required = false, description = "log observers watching the daemon's output")
@@ -140,6 +146,7 @@ public class DaemonMcpTools {
             stopSignal,
             parseRestartPolicy(restartPolicy),
             maxRestarts,
+            otel,
             environment,
             ObserverArg.toEntities(observers),
             SourceArg.toEntities(sources));
@@ -166,6 +173,11 @@ public class DaemonMcpTools {
       @ToolArg(required = false, description = "new restart policy (NEVER/ON_FAILURE/ALWAYS)")
           String restartPolicy,
       @ToolArg(required = false, description = "new relaunch budget") Integer maxRestarts,
+      @ToolArg(
+              required = false,
+              description =
+                  "toggle OTEL_EXPORTER_* env injection (telemetry export to qits) at launch")
+          Boolean otel,
       @ToolArg(required = false, description = "replacement environment, as key/value pairs")
           Map<String, String> environment,
       @ToolArg(required = false, description = "replacement log observers")
@@ -184,6 +196,7 @@ public class DaemonMcpTools {
             stopSignal,
             parseRestartPolicy(restartPolicy),
             maxRestarts,
+            otel,
             environment,
             ObserverArg.toEntities(observers),
             SourceArg.toEntities(sources));
