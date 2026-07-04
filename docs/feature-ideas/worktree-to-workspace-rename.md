@@ -2,10 +2,12 @@
 
 ## Introduction
 
-Parked follow-up to [disposable workspace containers](../features/2026-07-04_disposable-workspace-containers.md)
-(§G of the original idea), which deliberately shipped the lifecycle behaviour (§A–§F) *without* this
-rename so the mechanical change stays out of the same diff as behaviour changes. This is a change to
-already-implemented code: a pure, green rename pass, no behaviour change.
+Planned near-term follow-up to
+[disposable workspace containers](../features/2026-07-04_disposable-workspace-containers.md) (§G of the
+original idea), which deliberately shipped the lifecycle behaviour (§A–§F) *without* this rename so the
+mechanical change stays out of the same diff as behaviour changes. This **will** be done — soon, just
+not right now — as a pure, green rename pass over the already-implemented code, with no behaviour
+change.
 
 Related:
 
@@ -16,12 +18,12 @@ Related:
   (the `qits.workspace.*` config, `/workspace` mount and `qits/workspace` image already use the
   target name — the entity is the last thing that doesn't).
 
-## Trigger
+## When
 
-Pick this up when the disposable-container work has settled and there is an appetite for a broad,
-reviewable, behaviour-free rename — ideally before building further features on top of the worktree
-entity, so new code is written against `Workspace` from the start rather than adding to the rename
-surface. Not urgent; purely a naming-clarity investment.
+Do this soon — once the disposable-container work has settled, and ideally **before** building further
+features on top of the worktree entity, so new code is written against `Workspace` from the start
+rather than adding to the rename surface. Deferred only to keep the mechanical rename out of the
+behaviour diff; it is not optional.
 
 ## Why
 
