@@ -2,7 +2,6 @@ package eu.wohlben.qits.domain.repository.control;
 
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -26,13 +25,13 @@ public class GitignoreLazyDirectoryStrategy implements LazyDirectoryStrategy {
   }
 
   @Override
-  public List<String> lazyDirectories(Path worktreeRoot, GitExecutor git) {
+  public List<String> lazyDirectories(String repoId, String worktreeId, WorktreeFileAccess access) {
     String output;
     try {
       output =
-          git.exec(
-              worktreeRoot.toFile(),
-              "git",
+          access.git(
+              repoId,
+              worktreeId,
               "ls-files",
               "--others",
               "--ignored",
