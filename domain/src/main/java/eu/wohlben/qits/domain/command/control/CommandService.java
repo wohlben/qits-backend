@@ -154,7 +154,13 @@ public class CommandService {
             worktreeId,
             new LaunchDescriptor(null, name, script, false, environment, CommandKind.CHAT));
     registry.spawnChat(
-        p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
+        p.dto().id(),
+        p.worktreePath(),
+        p.script(),
+        p.env(),
+        this::onExit,
+        commandLogService,
+        commandLogService);
     return p.dto();
   }
 

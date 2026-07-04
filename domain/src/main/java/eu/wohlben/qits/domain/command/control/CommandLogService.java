@@ -27,7 +27,7 @@ import org.jboss.logging.Logger;
  * last unflushed batch.
  */
 @ApplicationScoped
-public class CommandLogService implements CommandLogWriter {
+public class CommandLogService implements CommandLogWriter, CommandLogReader {
 
   private static final Logger LOG = Logger.getLogger(CommandLogService.class);
 
@@ -94,6 +94,17 @@ public class CommandLogService implements CommandLogWriter {
         LOG.error("Failed to persist a command-log batch; dropping it", e);
       }
     }
+  }
+
+  /** The already-flushed head of a command's log, for full-transcript restore on re-attach. */
+  @Override
+  @Transactional
+  public List<String> linesBefore(String commandId, long sequenceExclusive) {
+    return commandLogLineRepository
+        .findByCommandAndSeqLessThanOrderBySeq(commandId, sequenceExclusive)
+        .stream()
+        .map(line -> line.content)
+        .toList();
   }
 
   /** A command's full captured log, in order. */

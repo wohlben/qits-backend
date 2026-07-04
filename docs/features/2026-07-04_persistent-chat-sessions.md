@@ -12,16 +12,16 @@ not a lossy approximation.
 
 Related/dependent plans:
 
-- Builds directly on the [stream-json chat](../features/2026-07-01_stream-json-chat.md): the
+- Builds directly on the [stream-json chat](./2026-07-01_stream-json-chat.md): the
   unified line stream (Claude stdout events + synthetic user echoes) that is ringed, broadcast,
   and persisted per line is exactly what gets restored here — the invariant "live and replay
   render identically" is preserved and strengthened.
-- Persistence rides the [command audit logs](../features/2026-06-30_command-audit-logs.md)
+- Persistence rides the [command audit logs](./2026-06-30_command-audit-logs.md)
   pipeline (`CommandLogWriter` → batched `command_log_line` inserts, CLOB content); this idea
   removes the chat-side truncation that undermines it.
-- The [worktree chat dialog](../features/2026-07-04_worktree-chat-dialog.md) depends on re-attach being lossless:
+- The [worktree chat dialog](./2026-07-04_worktree-chat-dialog.md) depends on re-attach being lossless:
   its close/reopen cycle is a reconnect, so it inherits full restore for free once this lands.
-- Complements [command restore navigation](../features/2026-06-30_command-restore-navigation.md)
+- Complements [command restore navigation](./2026-06-30_command-restore-navigation.md)
   (finding your way back to a session) — this covers what you *see* once you're back.
 
 ## Current state (what already works, what doesn't)

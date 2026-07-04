@@ -76,6 +76,7 @@ public class CommandRegistry {
       Map<String, String> environment,
       CommandExitListener exitListener,
       CommandLogWriter logWriter,
+      CommandLogReader logReader,
       CommandOutputSink... initialSinks) {
     Process process;
     try {
@@ -89,7 +90,8 @@ public class CommandRegistry {
       throw new InternalServerErrorException("Failed to start chat: " + e.getMessage());
     }
     ChatSession session =
-        new ChatSession(commandId, process, exitListener, () -> chats.remove(commandId), logWriter);
+        new ChatSession(
+            commandId, process, exitListener, () -> chats.remove(commandId), logWriter, logReader);
     for (CommandOutputSink sink : initialSinks) {
       session.addInitialSink(sink);
     }
