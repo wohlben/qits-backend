@@ -36,15 +36,16 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div pageActions class="flex items-center gap-2">
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'daemons']">Daemons</a>
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
-        <!-- Launches Claude Code in the main worktree with the actions MCP scoped to this repo, so
-             repository-specific actions can be created from inside Claude. -->
+        <!-- Launches Claude Code in the main worktree with the actions MCP scoped to this repo plus
+             the repository MCP narrowed to it, so both actions and repository-owned configuration
+             (daemons) can be managed from inside Claude. -->
         <button
           z-button
           zType="secondary"
           (click)="configureWithClaude()"
           [zDisabled]="!canConfigureWithClaude()"
         >
-          Configure actions with Claude
+          Configure with Claude
         </button>
         <button
           z-button
@@ -126,7 +127,7 @@ export class RepositoryDetailPage {
     },
   }));
 
-  /** Open Claude Code in the main worktree's terminal, scoped to this repo's actions MCP. */
+  /** Open Claude Code in the main worktree, with the actions + repository MCP scoped to this repo. */
   configureWithClaude() {
     const branch = this.mainBranch();
     if (!branch) return;

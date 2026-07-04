@@ -78,7 +78,7 @@ public class AgentLaunchService {
 
   /**
    * Launches Claude Code as a stream-json <strong>chat</strong> command in {@code worktreeId} of
-   * {@code repoId}, with the MCP server for {@code scope} attached. The session is rendered as a
+   * {@code repoId}, with the MCP server(s) for {@code scope} attached. The session is rendered as a
    * conversation and tracked in the command registry (re-attachable, logged). Tools run
    * auto-approved ({@code --dangerously-skip-permissions}): the CLI does not expose the stream-json
    * permission-prompt protocol, so in-UI approval isn't currently possible; a networked deployment
@@ -93,12 +93,11 @@ public class AgentLaunchService {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
 
-    ScopedMcp server = serverFor(repoId, scope);
-    LaunchSpec spec =
-        CodingAgentFactory.ofType(AgentType.CLAUDE)
-            .mcpServer(server.key(), McpServers.httpMcp(server.url()))
-            .skipPermissions()
-            .chat();
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    for (ScopedMcp server : serversFor(repoId, scope)) {
+      agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
+    }
+    LaunchSpec spec = agent.skipPermissions().chat();
 
     CommandDto command =
         commandService.launchChat(
@@ -134,34 +133,43 @@ public class AgentLaunchService {
   public record ScopedMcp(String key, String url, List<String> allowedTools) {}
 
   /**
-   * The scoped MCP server for {@code scope}, with its read-only allowlist. Package-visible for
+   * The scoped MCP servers for {@code scope}, with their read-only allowlists. Package-visible for
    * tests.
    */
-  ScopedMcp serverFor(String repoId, AgentMcpScope scope) {
+  List<ScopedMcp> serversFor(String repoId, AgentMcpScope scope) {
     String repo = requireUuid(repoId, "repository id");
+    String projectId = projectIdFor(repo);
+    // Project-scoped, then narrowed to this one repository so a per-subtree session only sees its
+    // own repo, not its siblings in the project.
+    ScopedMcp narrowedRepositoryServer =
+        new ScopedMcp(
+            "repository",
+            repositoryMcpUrl + "?projectId=" + projectId + "&repositoryId=" + repo,
+            READ_ONLY_REPOSITORY_TOOLS);
     return switch (scope) {
       case ACTIONS ->
-          new ScopedMcp("actions", actionsMcpUrl + "?repositoryId=" + repo, READ_ONLY_ACTION_TOOLS);
-      case REPOSITORY ->
-          // Project-scoped, then narrowed to this one repository so a per-subtree session only sees
-          // its own repo, not its siblings in the project.
-          new ScopedMcp(
-              "repository",
-              repositoryMcpUrl + "?projectId=" + projectIdFor(repo) + "&repositoryId=" + repo,
-              READ_ONLY_REPOSITORY_TOOLS);
+          // The "configure this repository" session: the actions server for the action library,
+          // plus the (narrowed) repository server — repository-owned configuration such as daemons
+          // is managed there, and the session needs both to configure the repository fully.
+          List.of(
+              new ScopedMcp(
+                  "actions", actionsMcpUrl + "?repositoryId=" + repo, READ_ONLY_ACTION_TOOLS),
+              narrowedRepositoryServer);
+      case REPOSITORY -> List.of(narrowedRepositoryServer);
       case PROJECT ->
           // Project scope only, no repository narrowing — the session sees every repository in the
           // project. It still runs in some repository's worktree (the terminal needs a checkout).
-          new ScopedMcp(
-              "repository",
-              repositoryMcpUrl + "?projectId=" + projectIdFor(repo),
-              READ_ONLY_REPOSITORY_TOOLS);
+          List.of(
+              new ScopedMcp(
+                  "repository",
+                  repositoryMcpUrl + "?projectId=" + projectId,
+                  READ_ONLY_REPOSITORY_TOOLS));
     };
   }
 
   private String nameFor(AgentMcpScope scope) {
     return switch (scope) {
-      case ACTIONS -> "Claude Code (actions MCP)";
+      case ACTIONS -> "Claude Code (actions + repository MCP)";
       case REPOSITORY -> "Claude Code (repository MCP)";
       case PROJECT -> "Claude Code (project MCP)";
     };

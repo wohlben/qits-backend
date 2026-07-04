@@ -53,7 +53,9 @@ public class ContextServerRegistry {
             "repository",
             "Branches, commits and diffs of a project's repositories, plus the actions on them:"
                 + " branch off a worktree, clean up a branch, integrate a branch, and merge a"
-                + " parent (e.g. master) into a worktree.",
+                + " parent (e.g. master) into a worktree. Also owns the repositories' daemons —"
+                + " long-running processes such as a dev server: define/edit them and start/stop"
+                + " them in a worktree.",
             repositoryPath,
             repositoryPath + "/sse",
             ProjectScope.PROJECT_HEADER,
