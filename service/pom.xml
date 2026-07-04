@@ -40,6 +40,22 @@
             <artifactId>quarkus-websockets-next</artifactId>
         </dependency>
         <dependency>
+            <!-- Servlet container for the in-process JGit smart-HTTP server (QitsGitServlet at
+                 /git/*). The codebase's first servlet; in the platform BOM, so no version. -->
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-undertow</artifactId>
+        </dependency>
+        <dependency>
+            <!-- JGit's smart-HTTP server: serves the existing bare origins over the git wire
+                 protocol so workspace containers can clone/push. JGit speaks the protocol ONLY —
+                 the git CLI (GitExecutor) remains the sole mutator of repositories. Not in the
+                 platform BOM, so the version is pinned; 7.x uses the jakarta.servlet namespace that
+                 quarkus-undertow provides. Pulls org.eclipse.jgit (core) transitively. -->
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit.http.server</artifactId>
+            <version>7.3.0.202506031305-r</version>
+        </dependency>
+        <dependency>
             <groupId>io.quarkiverse.quinoa</groupId>
             <artifactId>quarkus-quinoa</artifactId>
             <version>2.8.1</version>

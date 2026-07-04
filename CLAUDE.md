@@ -42,6 +42,14 @@ All Maven commands use the wrapper.
 # Native build + integration tests (failsafe; ITs are skipped by default via skipITs=true)
 ./mvnw -pl service package -Dnative
 
+# Extended suite: heavier, environment-dependent integration tests (JUnit `*IT`, @Tag("extended")),
+# e.g. the real-docker WorkspaceContainerIT. Skipped by every default build; opt in with -Pextended.
+# ITs self-skip when their backend (docker + the qits/workspace image) is absent, so this is safe to
+# run anywhere. Build the image first: `docker build -t qits/workspace docker/workspace`.
+./mvnw verify -Pextended                       # full spectrum: unit tests + extended ITs
+./mvnw -pl service verify -Pextended \
+  -Dtest=__none__ -Dsurefire.failIfNoSpecifiedTests=false   # extended ITs only (skip unit tests)
+
 # Seed demo data (project + branch tree incl. fast-forwardable/diverged worktrees) into the shared
 # H2 file. One-step command-mode run, no web server (the cli pom binds quarkus:run's program args
 # to the cli.args property). Idempotent.
@@ -92,7 +100,18 @@ It applies the committed migrations to a throwaway in-memory H2, diffs the entit
 
 ### Git operations
 
-`repository.control.GitExecutor` shells out to the `git` CLI via `ProcessBuilder` (no JGit). Repository/worktree operations are real git commands against on-disk paths.
+`repository.control.GitExecutor` shells out to the `git` CLI via `ProcessBuilder` — the only thing that mutates repositories. It runs against the on-disk **bare origins** (`<data-dir>/<repoId>/origin`, a `--mirror` clone) and throwaway host worktrees for integration; there is no longer a persistent host checkout per worktree. The one JGit use is a wire-protocol *server* only (below).
+
+### Workspace containers (execution model)
+
+Every worktree executes inside a **per-worktree Docker container** — the sole execution environment for action scripts, dev servers, daemons, and the coding agent (no host-execution fallback). See `docs/features/2026-07-04_workspace-containers.md`.
+
+- `repository.control.ContainerRuntime` (impl `DockerExecutor`) is the sibling of `GitExecutor`: it shells the `docker` CLI (`docker run`/`exec`/`rm`, configurable via `qits.workspace.container-runtime`). A worktree is a branch ref in the bare origin **plus** a container that `git clone`s that branch into `/workspace` from qits' in-process git server.
+- The in-process git server is JGit's `GitServlet` at `/git/*` (`service` module, `eu.wohlben.qits.githost`) — JGit speaks the smart-HTTP protocol only; `GitExecutor` stays the only mutator. Containers reach it via `http://host.docker.internal:<port>/git/<repoId>`.
+- `Worktree.branch` is a **stored column** (no host checkout to read it from). Worktree-local git verbs (`status`, `fetch`+`merge`) run as `docker exec` in the container; `CommandRegistry`'s two spawn seams prepend a `docker exec` prefix; termination reads a pid file and `kill`s the in-container process group.
+- **Build the fat default image locally** before running the app end-to-end: `docker build -t qits/workspace docker/workspace` (config `qits.workspace.image`). The container runs as your host uid.
+- **Tests** don't need docker: `FakeContainerRuntime` (a Quarkus `@Mock` in each module's `src/test`) emulates a container as a host clone at the old worktree path. Because it runs real host processes, process-group termination works end-to-end. Tests that create branch divergence must **push** (origin-side ahead/behind/conflict probes only see pushed commits).
+- **Caveat**: the `cli` `seed` command now creates containers + clones from the git server, so seeding requires the `service` running (reachable git host/port) and docker available.
 
 ### Frontend
 

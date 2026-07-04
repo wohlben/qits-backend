@@ -3,11 +3,16 @@ package eu.wohlben.qits.domain.command.control;
 import com.pty4j.PtyProcess;
 import com.pty4j.PtyProcessBuilder;
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * The live registry of running command processes, keyed by durable command id. Owns each {@link
@@ -30,17 +35,22 @@ public class CommandRegistry {
    */
   private final Map<String, ChatSession> chats = new ConcurrentHashMap<>();
 
+  @Inject ContainerRuntime containers;
+
+  /** Grace period before a graceful stop escalates to SIGKILL then a container restart. */
+  @ConfigProperty(name = "qits.workspace.term-grace-ms", defaultValue = "5000")
+  long graceMillis;
+
   /** Spawn a process for {@code commandId} with optional sinks attached before output starts. */
   public void spawn(
       String commandId,
-      Path worktreePath,
+      String container,
       String script,
       Map<String, String> environment,
       CommandExitListener exitListener,
       CommandLogWriter logWriter,
       CommandOutputSink... initialSinks) {
-    startSession(
-        commandId, worktreePath, script, environment, exitListener, logWriter, initialSinks);
+    startSession(commandId, container, script, environment, exitListener, logWriter, initialSinks);
   }
 
   /**
@@ -51,7 +61,7 @@ public class CommandRegistry {
    */
   public int spawnAndAwait(
       String commandId,
-      Path worktreePath,
+      String container,
       String script,
       Map<String, String> environment,
       CommandExitListener exitListener,
@@ -60,7 +70,7 @@ public class CommandRegistry {
       CommandOutputSink... initialSinks) {
     CommandSession session =
         startSession(
-            commandId, worktreePath, script, environment, exitListener, logWriter, initialSinks);
+            commandId, container, script, environment, exitListener, logWriter, initialSinks);
     return session.awaitExit(timeoutMillis);
   }
 
@@ -71,7 +81,7 @@ public class CommandRegistry {
    */
   public void spawnChat(
       String commandId,
-      Path worktreePath,
+      String container,
       String script,
       Map<String, String> environment,
       CommandExitListener exitListener,
@@ -80,9 +90,12 @@ public class CommandRegistry {
       CommandOutputSink... initialSinks) {
     Process process;
     try {
-      ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-lc", script);
-      pb.directory(worktreePath.toFile());
-      pb.environment().putAll(environment);
+      // Plain pipe into the container (no -t): a TTY would echo input and corrupt the
+      // line-delimited
+      // JSON. The client process runs on the host and inherits its env so the docker binary is on
+      // PATH; the container-side env travels as -e flags inside the exec argv.
+      ProcessBuilder pb =
+          new ProcessBuilder(dockerExec(container, false, environment, commandId, script));
       // Keep stderr off the JSON stdout stream (it would corrupt parsing); route it to the log.
       pb.redirectError(ProcessBuilder.Redirect.INHERIT);
       process = pb.start();
@@ -91,7 +104,15 @@ public class CommandRegistry {
     }
     ChatSession session =
         new ChatSession(
-            commandId, process, exitListener, () -> chats.remove(commandId), logWriter, logReader);
+            commandId,
+            process,
+            container,
+            containers,
+            graceMillis,
+            exitListener,
+            () -> chats.remove(commandId),
+            logWriter,
+            logReader);
     for (CommandOutputSink sink : initialSinks) {
       session.addInitialSink(sink);
     }
@@ -111,7 +132,7 @@ public class CommandRegistry {
 
   private CommandSession startSession(
       String commandId,
-      Path worktreePath,
+      String container,
       String script,
       Map<String, String> environment,
       CommandExitListener exitListener,
@@ -119,13 +140,16 @@ public class CommandRegistry {
       CommandOutputSink... initialSinks) {
     PtyProcess process;
     try {
-      // executeScript is a shell line, so run it through a login shell. Seeded interactive actions
-      // `exec` their target so a single PTY-leader process remains for terminate()'s SIGKILL.
+      // The PtyProcess is the host-side `docker exec -it` client; pty4j's outer PTY drives the
+      // inner container TTY (resize, colors, full-screen apps). The client inherits the host env so
+      // the docker binary is on PATH; the container-side env travels as -e flags in the argv.
+      Map<String, String> clientEnv = new HashMap<>(System.getenv());
+      clientEnv.put("TERM", "xterm-256color");
       process =
           new PtyProcessBuilder()
-              .setCommand(new String[] {"/bin/bash", "-lc", script})
-              .setDirectory(worktreePath.toString())
-              .setEnvironment(environment)
+              .setCommand(dockerExec(container, true, environment, commandId, script))
+              .setDirectory(System.getProperty("user.home"))
+              .setEnvironment(clientEnv)
               .setInitialColumns(80)
               .setInitialRows(24)
               .start();
@@ -135,13 +159,56 @@ public class CommandRegistry {
 
     CommandSession session =
         new CommandSession(
-            commandId, process, exitListener, () -> sessions.remove(commandId), logWriter);
+            commandId,
+            process,
+            container,
+            containers,
+            graceMillis,
+            exitListener,
+            () -> sessions.remove(commandId),
+            logWriter);
     for (CommandOutputSink sink : initialSinks) {
       session.addInitialSink(sink);
     }
     sessions.put(commandId, session);
     session.startReader();
     return session;
+  }
+
+  /**
+   * The full {@code docker exec} argv that runs {@code script} inside {@code container}: the
+   * runtime exec prefix (with the container-side {@code -e} env and {@code -w /workspace}) plus a
+   * wrapper that records the launched shell's process-group id to a pid file before running the
+   * script. {@code terminate()}/{@code signal()} read that pid file to kill the whole group inside
+   * the container — killing the host-side exec client alone would orphan the process.
+   *
+   * <p>The TTY path ({@code -it}) needs no {@code setsid}: {@code docker exec -it} already makes
+   * the shell a session leader owning the inner TTY, so {@code $$} is its process-group id (and
+   * {@code setsid -c} would fail with EPERM re-stealing the controlling terminal). The no-TTY pipe
+   * path ({@code -i}, chats) prepends {@code setsid} so the shell still becomes a group leader
+   * {@code kill -- -pgid} can address.
+   *
+   * <p>The script runs as the shell body, not {@code exec}'d: {@code $$} (the login shell) is the
+   * group leader that {@code kill -- -pgid} reaches along with its children. It is deliberately not
+   * {@code exec}'d — a compound script ({@code while …; do …; done}) is not a simple command {@code
+   * exec} can take — but a script that wants a single leader process can still {@code exec} its own
+   * target (the shell keeps the same pid, so the recorded pgid stays valid).
+   */
+  private String[] dockerExec(
+      String container,
+      boolean tty,
+      Map<String, String> environment,
+      String commandId,
+      String script) {
+    List<String> cmd =
+        new ArrayList<>(containers.execArgv(container, tty, "/workspace", environment));
+    if (!tty) {
+      cmd.add("setsid");
+    }
+    cmd.add("bash");
+    cmd.add("-lc");
+    cmd.add("echo $$ > /tmp/qits-cmd-" + commandId + ".pid; " + script);
+    return cmd.toArray(new String[0]);
   }
 
   /** Attach a live client to a running command (terminal or chat); false if none is running. */

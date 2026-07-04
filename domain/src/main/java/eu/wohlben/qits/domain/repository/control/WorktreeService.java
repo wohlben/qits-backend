@@ -35,8 +35,109 @@ public class WorktreeService {
 
   @Inject GitExecutor git;
 
+  @Inject ContainerRuntime containers;
+
   @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
   String dataDir;
+
+  @ConfigProperty(name = "qits.workspace.git-host", defaultValue = "host.docker.internal")
+  String gitHost;
+
+  @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
+  String qitsPort;
+
+  /** The URL a worktree container clones/pushes its branch over (the in-process JGit host). */
+  private String cloneUrl(String repoId) {
+    return "http://" + gitHost + ":" + qitsPort + "/git/" + repoId;
+  }
+
+  /**
+   * Runs a git command inside a worktree's container under {@code /workspace}, throwing on a
+   * non-zero exit. The container-side counterpart of {@code git.exec(worktreePath, …)} now that the
+   * checkout lives in the container rather than on the host.
+   */
+  private String containerGit(String repoId, String worktreeId, String... gitArgs) {
+    String container = containers.containerName(worktreeId, repoId);
+    String[] argv = new String[gitArgs.length + 1];
+    argv[0] = "git";
+    System.arraycopy(gitArgs, 0, argv, 1, gitArgs.length);
+    ContainerRuntime.ExecResult result =
+        containers.exec(container, "/workspace", java.util.Map.of(), argv);
+    if (result.exitCode() != 0) {
+      throw new InternalServerErrorException(
+          "Container git failed ["
+              + result.exitCode()
+              + "]: "
+              + String.join(" ", argv)
+              + "\n"
+              + result.output());
+    }
+    return result.output();
+  }
+
+  /**
+   * Materializes a worktree as a branch + container: optionally creates {@code branch} in the bare
+   * origin (from {@code parentBranch}), runs the container, then clones {@code branch} into its
+   * {@code /workspace} and sets the {@code qits@local} commit identity. Rolls back a freshly
+   * created branch ref and the container if a later step fails, so a retry with the same id can
+   * succeed.
+   */
+  private void createContainerWorktree(
+      String repoId,
+      String worktreeId,
+      String branch,
+      String parentBranch,
+      Path originPath,
+      boolean createBranchRef) {
+    if (createBranchRef) {
+      try {
+        git.exec(originPath.toFile(), "git", "branch", "--end-of-options", branch, parentBranch);
+      } catch (Exception e) {
+        throw new InternalServerErrorException("Failed to create branch: " + e.getMessage());
+      }
+    }
+
+    String container;
+    try {
+      container = containers.run(repoId, worktreeId, branch, parentBranch);
+    } catch (RuntimeException e) {
+      rollbackBranch(createBranchRef, originPath, branch);
+      throw e;
+    }
+
+    ContainerRuntime.ExecResult clone =
+        containers.exec(
+            container,
+            null,
+            java.util.Map.of(),
+            "git",
+            "clone",
+            "--branch",
+            branch,
+            cloneUrl(repoId),
+            "/workspace");
+    if (clone.exitCode() != 0) {
+      containers.rm(container);
+      rollbackBranch(createBranchRef, originPath, branch);
+      throw new InternalServerErrorException("Clone into container failed: " + clone.output());
+    }
+    // Commit identity matches the one mergeIntoTarget/updateWorktreeFromParent use host-side.
+    containers.exec(
+        container, "/workspace", java.util.Map.of(), "git", "config", "user.email", "qits@local");
+    containers.exec(
+        container, "/workspace", java.util.Map.of(), "git", "config", "user.name", "qits");
+  }
+
+  private void rollbackBranch(boolean created, Path originPath, String branch) {
+    if (!created) {
+      return;
+    }
+    try {
+      git.exec(originPath.toFile(), "git", "branch", "-D", "--", branch);
+    } catch (Exception ignored) {
+      // best effort — the branch may not have been created
+    }
+  }
 
   /** Appends a history event to a worktree's timeline. */
   private void recordEvent(
@@ -63,7 +164,7 @@ public class WorktreeService {
     return worktreeRepository.findActiveByRepositoryId(repoId).stream()
         .map(
             wt -> {
-              String branch = currentBranchOrNull(repoId, wt.worktreeId);
+              String branch = wt.branch;
               AheadBehind ab = aheadBehind(originPath, wt.parent, branch);
               // Only diverged branches (both ahead and behind) can't fast-forward and so risk a
               // conflict; everything else integrates cleanly, so skip the extra merge-tree probe.
@@ -115,12 +216,41 @@ public class WorktreeService {
       return false;
     }
     if (wt != null) {
-      Path worktreePath = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
-      if (!Files.exists(worktreePath) || !isWorktreeClean(worktreePath)) {
+      // The working tree lives in the container; a dirty tree or unpushed commits (which the
+      // origin-side ahead/behind above cannot see) both mean cleanup could destroy work.
+      if (!isWorktreeClean(repoId, wt) || !isFullyPushed(repoId, originPath, wt)) {
         return false;
       }
     }
     return !hasChildren(repoId, branch);
+  }
+
+  /**
+   * Whether the container's HEAD equals the branch's ref in the origin — i.e. every commit made
+   * inside the container has been pushed. The origin-side ahead/behind can't see container-local
+   * commits, so without this a "safe" cleanup could delete unpushed work. A missing container means
+   * nothing is left to lose, so treat it as pushed.
+   */
+  private boolean isFullyPushed(String repoId, Path originPath, Worktree wt) {
+    String container = containers.containerName(wt.worktreeId, repoId);
+    if (!containers.exists(container)) {
+      return true;
+    }
+    if (wt.branch == null || wt.branch.isBlank()) {
+      return true;
+    }
+    ContainerRuntime.ExecResult head =
+        containers.exec(container, "/workspace", java.util.Map.of(), "git", "rev-parse", "HEAD");
+    if (head.exitCode() != 0) {
+      return false; // unknown container state — never delete blindly
+    }
+    try {
+      String originSha =
+          git.exec(originPath.toFile(), "git", "rev-parse", "refs/heads/" + wt.branch).trim();
+      return head.output().trim().equals(originSha);
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   /** The parent a branch is compared against and how far it is ahead/behind it. */
@@ -147,14 +277,16 @@ public class WorktreeService {
     return new BranchSummary(parent, ab.ahead(), ab.behind());
   }
 
-  /** True when the worktree's working tree has no staged or unstaged changes. */
-  private boolean isWorktreeClean(Path worktreePath) {
-    try {
-      String status = git.exec(worktreePath.toFile(), "git", "status", "--porcelain");
-      return status == null || status.isBlank();
-    } catch (Exception e) {
-      return false; // unknown state — treat as not clean so we never delete blindly
+  /** True when the worktree container's working tree has no staged or unstaged changes. */
+  private boolean isWorktreeClean(String repoId, Worktree wt) {
+    String container = containers.containerName(wt.worktreeId, repoId);
+    if (!containers.exists(container)) {
+      return false; // no container — treat as not clean so we never delete blindly
     }
+    ContainerRuntime.ExecResult status =
+        containers.exec(
+            container, "/workspace", java.util.Map.of(), "git", "status", "--porcelain");
+    return status.exitCode() == 0 && status.output().isBlank();
   }
 
   /** True when another worktree forks from {@code branch} (i.e. lists it as its parent). */
@@ -168,47 +300,26 @@ public class WorktreeService {
   }
 
   /**
-   * The on-disk path of the worktree currently checked out on {@code branch}, if any. Used by the
-   * sync code so a pull of the main branch fast-forwards its worktree rather than trying to update
-   * a ref that is checked out (which git refuses).
+   * The on-disk path of a host worktree checked out on {@code branch}, if any. With workspace
+   * containers there are no host checkouts (each branch lives in its container), so this is always
+   * empty — the sync code then updates the bare origin ref directly rather than a checked-out
+   * worktree. Kept as the seam so pull stays branch-aware if host worktrees ever return.
    */
   public Optional<Path> worktreePathForBranch(String repoId, String branch) {
-    Worktree wt = findWorktreeByBranch(repoId, branch);
-    return wt == null
-        ? Optional.empty()
-        : Optional.of(Path.of(dataDir, repoId, "worktrees", wt.worktreeId));
+    return Optional.empty();
   }
 
-  /** The worktree whose checked-out branch is {@code branch}, or null when none matches. */
+  /** The worktree that owns {@code branch}, or null when none matches. */
   private Worktree findWorktreeByBranch(String repoId, String branch) {
     if (branch == null) {
       return null;
     }
     for (Worktree wt : worktreeRepository.findActiveByRepositoryId(repoId)) {
-      Path p = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
-      if (Files.exists(p)) {
-        try {
-          if (branch.equals(git.getCurrentBranch(p))) {
-            return wt;
-          }
-        } catch (Exception ignored) {
-          // unreadable checkout — skip
-        }
+      if (branch.equals(wt.branch)) {
+        return wt;
       }
     }
     return null;
-  }
-
-  private String currentBranchOrNull(String repoId, String worktreeId) {
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
-    if (!Files.exists(worktreePath)) {
-      return null;
-    }
-    try {
-      return git.getCurrentBranch(worktreePath);
-    } catch (Exception e) {
-      return null;
-    }
   }
 
   /**
@@ -315,30 +426,18 @@ public class WorktreeService {
     if (parentBranch.startsWith("-") || newBranch.startsWith("-")) {
       throw new BadRequestException("Invalid branch name");
     }
-    // Absolute path: `git worktree add` runs with cwd=origin, so a relative path
-    // would be created nested under origin instead of the repo's worktrees dir.
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
 
-    try {
-      Files.createDirectories(worktreePath.getParent());
-      git.exec(
-          originPath.toFile(),
-          "git",
-          "worktree",
-          "add",
-          "-b",
-          newBranch,
-          "--end-of-options",
-          worktreePath.toString(),
-          parentBranch);
-    } catch (Exception e) {
-      throw new InternalServerErrorException("Git worktree add failed: " + e.getMessage());
-    }
+    // 1. Create the branch ref host-side in the bare origin so ahead/behind and the merge-tree
+    //    conflict probe (both run against origin refs) work from the first second.
+    // 2. Run the worktree's container.
+    // 3. Clone the new branch into the container's /workspace and set its commit identity.
+    createContainerWorktree(repoId, worktreeId, newBranch, parentBranch, originPath, true);
 
     Worktree worktree = new Worktree();
     worktree.worktreeId = worktreeId;
     worktree.repository = repo;
     worktree.parent = parentBranch;
+    worktree.branch = newBranch;
     worktree.status = WorktreeStatus.ACTIVE;
     worktree.preamble = preamble;
     worktreeRepository.persist(worktree);
@@ -381,26 +480,14 @@ public class WorktreeService {
           .orElseThrow();
     }
 
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
-    try {
-      Files.createDirectories(worktreePath.getParent());
-      // No `-b`: check out the existing main branch rather than fork a new one off it.
-      git.exec(
-          originPath.toFile(),
-          "git",
-          "worktree",
-          "add",
-          "--end-of-options",
-          worktreePath.toString(),
-          branch);
-    } catch (Exception e) {
-      throw new InternalServerErrorException("Git worktree add failed: " + e.getMessage());
-    }
+    // No branch-create: check out the existing main branch rather than fork a new one off it.
+    createContainerWorktree(repoId, worktreeId, branch, null, originPath, false);
 
     Worktree worktree = new Worktree();
     worktree.worktreeId = worktreeId;
     worktree.repository = repo;
     worktree.parent = null; // the main branch is the tree root — it has no fork point
+    worktree.branch = branch;
     worktree.status = WorktreeStatus.ACTIVE;
     worktreeRepository.persist(worktree);
     recordEvent(worktree, WorktreeEventType.CREATED, branch, null, null);
@@ -438,24 +525,19 @@ public class WorktreeService {
             .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
-    if (!Files.exists(worktreePath)) {
-      throw new NotFoundException("Worktree not found on disk");
-    }
-
     String resolvedTarget = (target == null || target.isBlank()) ? "master" : target;
 
-    // Resolve target to a branch name
+    // Resolve a target given as a worktree id to the branch that worktree owns.
     Worktree targetWorktree =
         worktreeRepository.findActiveByRepositoryAndWorktreeId(repoId, resolvedTarget).orElse(null);
-    if (targetWorktree != null) {
-      Path targetWorktreePath = Path.of(dataDir, repoId, "worktrees", targetWorktree.worktreeId);
-      if (Files.exists(targetWorktreePath)) {
-        resolvedTarget = git.getCurrentBranch(targetWorktreePath);
-      }
+    if (targetWorktree != null && targetWorktree.branch != null) {
+      resolvedTarget = targetWorktree.branch;
     }
 
-    String currentBranch = git.getCurrentBranch(worktreePath);
+    String currentBranch = worktree.branch;
+    // Integration merges origin refs (in a temp host worktree); the container may hold unpushed
+    // commits, so push the source branch first or the merge would miss them.
+    containerGit(repoId, worktreeId, "push", "origin", currentBranch);
     MergeResult result = mergeIntoTarget(repoId, currentBranch, resolvedTarget);
     if (!result.hasConflicts()) {
       recordEvent(
@@ -578,6 +660,9 @@ public class WorktreeService {
           Path.of(dataDir, repoId, "worktrees", ".tmp-merge-" + System.currentTimeMillis())
               .toAbsolutePath();
       try {
+        // The worktrees dir no longer holds host checkouts (they are containers now); ensure it
+        // exists so the throwaway merge worktree can be created under it.
+        Files.createDirectories(mergeCwd.getParent());
         git.exec(
             originPath.toFile(), "git", "worktree", "add", mergeCwd.toString(), resolvedTarget);
       } catch (Exception e) {
@@ -631,19 +716,29 @@ public class WorktreeService {
             .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
-    if (!Files.exists(worktreePath)) {
-      throw new NotFoundException("Worktree not found on disk");
-    }
-
     String parent = worktree.parent;
     if (parent == null || parent.isBlank()) {
       throw new BadRequestException(
           "Worktree '" + worktreeId + "' has no parent to fast-forward to");
     }
+    if (parent.startsWith("-")) {
+      throw new BadRequestException("Invalid parent branch");
+    }
 
+    // Inside the container: fetch, first fast-forward the container's own branch to origin's ref
+    // (it may have advanced out-of-band, e.g. a host-side integration into it), then fast-forward
+    // onto the parent and push. --ff-only refuses (400) on divergence or a dirty tree — so a branch
+    // that diverged from its parent is correctly rejected even though the container was stale.
+    String container = containers.containerName(worktreeId, repoId);
+    if (!containers.exists(container)) {
+      throw new NotFoundException("Worktree container not found");
+    }
     try {
-      return git.exec(worktreePath.toFile(), "git", "merge", "--ff-only", parent);
+      containerGit(repoId, worktreeId, "fetch", "origin");
+      containerGit(repoId, worktreeId, "merge", "--ff-only", "origin/" + worktree.branch);
+      String output = containerGit(repoId, worktreeId, "merge", "--ff-only", "origin/" + parent);
+      containerGit(repoId, worktreeId, "push", "origin", worktree.branch);
+      return output;
     } catch (Exception e) {
       throw new BadRequestException(
           "Cannot fast-forward worktree '"
@@ -674,11 +769,6 @@ public class WorktreeService {
             .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
             .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
 
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId);
-    if (!Files.exists(worktreePath)) {
-      throw new NotFoundException("Worktree not found on disk");
-    }
-
     String parent = worktree.parent;
     if (parent == null || parent.isBlank()) {
       throw new BadRequestException("Worktree '" + worktreeId + "' has no parent to update from");
@@ -687,36 +777,42 @@ public class WorktreeService {
       throw new BadRequestException("Invalid parent branch");
     }
 
-    GitExecutor.ExecResult result;
-    try {
-      // Identity is supplied inline so the merge commit can be created even on a clone with no
-      // configured user.
-      result =
-          git.execAllowNonZero(
-              worktreePath.toFile(),
-              "git",
-              "-c",
-              "user.email=qits@local",
-              "-c",
-              "user.name=qits",
-              "merge",
-              "--no-edit",
-              parent);
-    } catch (Exception e) {
-      throw new InternalServerErrorException(
-          "Failed to merge '" + parent + "' into '" + worktreeId + "': " + e.getMessage());
+    String container = containers.containerName(worktreeId, repoId);
+    if (!containers.exists(container)) {
+      throw new NotFoundException("Worktree container not found");
     }
 
+    // Inside the container: fetch, sync the container's own branch to origin's ref (it may have
+    // advanced out-of-band), then merge the parent in (a merge commit — works where ff-only can't).
+    // Identity is supplied inline. On conflict, abort so the worktree stays usable and return a
+    // 400. On success, push so the origin reflects the merge.
+    try {
+      containerGit(repoId, worktreeId, "fetch", "origin");
+      containerGit(repoId, worktreeId, "merge", "--ff-only", "origin/" + worktree.branch);
+    } catch (Exception e) {
+      throw new InternalServerErrorException(
+          "Failed to fetch '" + parent + "' into '" + worktreeId + "': " + e.getMessage());
+    }
+    ContainerRuntime.ExecResult result =
+        containers.exec(
+            container,
+            "/workspace",
+            java.util.Map.of(),
+            "git",
+            "-c",
+            "user.email=qits@local",
+            "-c",
+            "user.name=qits",
+            "merge",
+            "--no-edit",
+            "origin/" + parent);
+
     if (result.exitCode() != 0) {
-      // Conflicts (or any other failure): undo the half-applied merge so the worktree stays usable.
-      try {
-        git.exec(worktreePath.toFile(), "git", "merge", "--abort");
-      } catch (Exception ignored) {
-        // best effort — nothing more we can safely do here
-      }
+      containers.exec(container, "/workspace", java.util.Map.of(), "git", "merge", "--abort");
       throw new BadRequestException(
           "Cannot merge '" + parent + "' into '" + worktreeId + "' without conflicts");
     }
+    containerGit(repoId, worktreeId, "push", "origin", worktree.branch);
     recordEvent(worktree, WorktreeEventType.UPDATED_FROM_PARENT, null, parent, null);
     return result.output();
   }
@@ -748,20 +844,20 @@ public class WorktreeService {
    */
   private void doDiscard(
       String repoId, Worktree worktree, WorktreeStatus resolution, String result) {
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktree.worktreeId);
     Path originPath = Path.of(dataDir, repoId, "origin");
 
     try {
-      String branch = git.getCurrentBranch(worktreePath);
+      String branch = worktree.branch;
 
-      if (Files.exists(worktreePath)) {
-        git.exec(originPath.toFile(), "git", "worktree", "remove", "-f", worktreePath.toString());
-      }
+      // Remove the worktree's container (its clone dies with it — a clone is cheap to redo).
+      containers.rm(containers.containerName(worktree.worktreeId, repoId));
 
-      try {
-        git.exec(originPath.toFile(), "git", "branch", "-D", branch);
-      } catch (Exception ignored) {
-        // branch may already be gone
+      if (branch != null && !branch.isBlank()) {
+        try {
+          git.exec(originPath.toFile(), "git", "branch", "-D", "--", branch);
+        } catch (Exception ignored) {
+          // branch may already be gone
+        }
       }
 
       worktree.status = resolution;
@@ -786,18 +882,10 @@ public class WorktreeService {
   }
 
   private Path findWorktreePathForBranch(String repoId, String branch) {
-    for (Worktree wt : worktreeRepository.findActiveByRepositoryId(repoId)) {
-      Path p = Path.of(dataDir, repoId, "worktrees", wt.worktreeId);
-      if (Files.exists(p)) {
-        try {
-          String b = git.getCurrentBranch(p);
-          if (b.equals(branch)) {
-            return p;
-          }
-        } catch (Exception ignored) {
-        }
-      }
-    }
+    // With workspace containers no branch has a host checkout the merge can run in, so integration
+    // always spins up a throwaway host worktree in the bare origin ({@link #mergeIntoTarget}).
+    // (Returning null unconditionally — rather than scanning the worktrees dir — also avoids
+    // matching an unrelated on-disk checkout that shares the path.)
     return null;
   }
 

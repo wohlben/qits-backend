@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The security payoff of [workspace containers](workspace-containers.md) only fully lands when
+The security payoff of [workspace containers](../features/2026-07-04_workspace-containers.md) only fully lands when
 the **coding agent** — the single biggest executor of arbitrary commands in qits — runs inside
 the sandbox. Phase 1's exec routing already carries chat commands mechanically; this phase is
 about what the agent specifically needs: the CLI in the image, a credential hand-off that
@@ -10,7 +10,7 @@ doesn't defeat the sandbox, a git identity, and the harness contract surviving u
 
 Related/dependent plans:
 
-- **Phase 1 — [workspace-containers](workspace-containers.md)** (hard dependency). Independent
+- **Phase 1 — [workspace-containers](../features/2026-07-04_workspace-containers.md)** (hard dependency). Independent
   of Phase 2 ([container-file-access](container-file-access.md)).
 - The [coding-agent harness](../features/2026-07-01_coding-agent-harness.md) launch flow and
   the [stream-json chat](../features/2026-07-01_stream-json-chat.md) protocol are the things

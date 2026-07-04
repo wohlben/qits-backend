@@ -89,8 +89,18 @@ public class ChatSessionTest {
   }
 
   private ChatSession newSession(FakeLog log) {
+    // container/runtime/grace are unused here — these tests drive lines synchronously via sendUser
+    // and never terminate, so no container signalling occurs.
     return new ChatSession(
-        "cmd-1", new FakeProcess(), (commandId, exitCode, manual) -> {}, () -> {}, log, log);
+        "cmd-1",
+        new FakeProcess(),
+        null,
+        null,
+        0L,
+        (commandId, exitCode, manual) -> {},
+        () -> {},
+        log,
+        log);
   }
 
   @Test

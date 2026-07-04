@@ -2,7 +2,7 @@
 
 ## Introduction
 
-With [workspace containers](workspace-containers.md) (Phase 1), a worktree's files live inside
+With [workspace containers](../features/2026-07-04_workspace-containers.md) (Phase 1), a worktree's files live inside
 its container — and the entire file-browser feature train reads worktree files from host paths
 via `WorktreeFilesService`. This phase reroutes those reads through `docker exec` so the
 browser shows the **actual live state** of the container's working tree, uncommitted changes
@@ -15,7 +15,7 @@ now; mitigations are listed as deferred.
 
 Related/dependent plans:
 
-- **Phase 1 — [workspace-containers](workspace-containers.md)** (hard dependency): the
+- **Phase 1 — [workspace-containers](../features/2026-07-04_workspace-containers.md)** (hard dependency): the
   container, `DockerExecutor`, and exec mechanics all come from there. Phase 3
   ([container-agent-sessions](container-agent-sessions.md)) is independent of this phase.
 - Reroutes the read path under the

@@ -252,7 +252,7 @@ it lives there (see Explicitly deferred), not in the primary path.
   [backlog-ideas/daemon-proxy-cross-origin-mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md).
 - **Port collisions** — inherited limitation from the daemons feature; `httpPort` is hardcoded
   in the definition, so parallel worktrees running the same daemon collide. Planned resolution:
-  [workspace containers](workspace-containers.md) — per-container network namespaces make the
+  [workspace containers](../features/2026-07-04_workspace-containers.md) — per-container network namespaces make the
   hardcoded port correct for every worktree, and the proxy's origin resolver (which already
   resolves through the registry precisely so this lands without touching it) targets the
   container's address instead of `127.0.0.1`.
