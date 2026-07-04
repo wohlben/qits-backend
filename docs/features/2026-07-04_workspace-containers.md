@@ -18,8 +18,9 @@ execution through `docker exec`). Related/dependent plans:
   this, now implemented): the worktree file browser reads files via `docker exec` instead of host
   paths. Phase 1 leaves the file browser reading host paths; in tests the container is a host-clone at
   the old worktree path so the browser keeps working unchanged.
-- **Phase 3 — [container-agent-sessions](../feature-ideas/container-agent-sessions.md)** (depends
-  on this): the coding agent works inside the container; credential hand-off.
+- **Phase 3 — [container-agent-sessions](2026-07-04_container-agent-sessions.md)** (depends
+  on this, now implemented): the coding agent works inside the container; credential hand-off via a
+  shared `~/.claude` volume.
 - Moves [daemons](2026-07-04_daemons.md) into the container along with all other registry
   execution — dissolving the port-collision limitation: every worktree's daemon binds its
   canonical port inside its own container network namespace.

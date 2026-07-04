@@ -1,7 +1,5 @@
 package eu.wohlben.qits.domain.featureflow.control;
 
-import eu.wohlben.qits.domain.agent.control.AgentType;
-import eu.wohlben.qits.domain.agent.control.CodingAgentFactory;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -36,13 +34,11 @@ public class ActionConfigurationSeeder {
   @Transactional
   public void seedDefaults() {
     ensure("Bash", "Interactive login shell in the worktree", "exec bash", Map.of());
-    // The bare "launch Claude" script is rendered by the coding-agent builder (no MCP servers), so
-    // every Claude invocation in the codebase goes through the same harness.
-    ensure(
-        "Claude Code",
-        "Launch Claude Code directly in the worktree",
-        CodingAgentFactory.ofType(AgentType.CLAUDE).start().script(),
-        Map.of());
+    // The coding agent (Claude Code) is launched through the dedicated agent path (the
+    // "Configure … with Claude" chat buttons / AgentLaunchService), which points HOME at the shared
+    // credential volume so the in-container claude can authenticate — a bare seeded action would
+    // run
+    // without that overlay, so it is intentionally not seeded here.
   }
 
   private void ensure(
@@ -50,7 +46,7 @@ public class ActionConfigurationSeeder {
     if (actionConfigurationRepository.findByName(name).isPresent()) {
       return;
     }
-    // The seeded defaults are interactive terminal processes (a shell, Claude Code).
+    // The seeded defaults are interactive terminal processes (a shell).
     actionConfigurationService.create(name, description, executeScript, null, true, environment);
     LOG.infof("Seeded default run action '%s'.", name);
   }
