@@ -379,6 +379,7 @@ function markLazyStubs(
                   [binary]="file.binary ?? false"
                   [isDark]="isDark()"
                   [highlights]="currentHighlights()"
+                  [scrollToLine]="anchorScrollLine()"
                   [mode]="viewerMode()"
                   (modeChange)="setViewerMode($event)"
                   (selectRange)="addReference($event)"
@@ -1212,6 +1213,29 @@ export class WorktreeFileBrowserComponent {
 
   readonly selectedPath = signal<string | null>(null);
 
+  /**
+   * A daemon event's "open in source" target: the file plus the anchored line range, painted as a
+   * highlight and scrolled into view. Independent of the git-aware tree — log files are usually
+   * gitignored and invisible there, but the content endpoint reads any file in the worktree.
+   */
+  readonly anchor = signal<{ path: string; startLine: number; endLine: number } | null>(null);
+
+  /** Opens {@code path} in the viewer with {@code startLine}–{@code endLine} anchored. */
+  openAtLine(path: string, startLine: number, endLine: number): void {
+    this.anchor.set({ path, startLine, endLine });
+    this.selectedPath.set(path);
+    const treeService = this.treeCmp()?.treeService;
+    if (!treeService) {
+      return;
+    }
+    // Best-effort tree reveal — a gitignored log file won't be in the tree, and that's fine.
+    treeService.selectedKeys.set(new Set([path]));
+    const parts = path.split('/');
+    for (let i = 1; i < parts.length; i++) {
+      treeService.expand(parts.slice(0, i).join('/'));
+    }
+  }
+
   readonly fileQuery = injectQuery(() => ({
     queryKey: ['worktree-file', this.repoId(), this.worktreeId(), this.selectedPath()],
     enabled: this.selectedPath() !== null,
@@ -1278,9 +1302,20 @@ export class WorktreeFileBrowserComponent {
   /** Ranges collected for the currently open file, painted as highlights in the viewer. */
   readonly currentHighlights = computed<LineRange[]>(() => {
     const path = this.selectedPath();
-    return this.references()
+    const ranges = this.references()
       .filter((r) => r.path === path)
       .map((r) => ({ startLine: r.startLine, endLine: r.endLine }));
+    const anchor = this.anchor();
+    if (anchor && anchor.path === path) {
+      ranges.push({ startLine: anchor.startLine, endLine: anchor.endLine });
+    }
+    return ranges;
+  });
+
+  /** The anchored line to scroll to, when the anchored file is the one open. */
+  readonly anchorScrollLine = computed<number | null>(() => {
+    const anchor = this.anchor();
+    return anchor && anchor.path === this.selectedPath() ? anchor.startLine : null;
   });
 
   protected readonly isDark = computed(() => this.darkMode.themeMode() === EDarkModes.DARK);

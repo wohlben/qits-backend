@@ -1,7 +1,9 @@
 package eu.wohlben.qits.domain.command.control;
 
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
+import eu.wohlben.qits.domain.command.entity.CommandLogLine;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
+import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import eu.wohlben.qits.domain.command.mapper.CommandLogLineMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandLogLineRepository;
 import io.quarkus.runtime.ShutdownEvent;
@@ -107,11 +109,13 @@ public class CommandLogService implements CommandLogWriter, CommandLogReader {
         .toList();
   }
 
-  /** A command's full captured log, in order. */
+  /** A command's captured log in order; a non-null {@code severity} narrows to those lines. */
   @Transactional
-  public List<CommandLogLineDto> log(String commandId) {
-    return commandLogLineRepository.findByCommandOrderBySeq(commandId).stream()
-        .map(commandLogLineMapper::toDto)
-        .toList();
+  public List<CommandLogLineDto> log(String commandId, LogSeverity severity) {
+    List<CommandLogLine> lines =
+        severity == null
+            ? commandLogLineRepository.findByCommandOrderBySeq(commandId)
+            : commandLogLineRepository.findByCommandAndSeverityOrderBySeq(commandId, severity);
+    return lines.stream().map(commandLogLineMapper::toDto).toList();
   }
 }

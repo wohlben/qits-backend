@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.entity.DaemonConfiguration;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
+import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.daemon.persistence.DaemonConfigurationRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
@@ -30,7 +31,8 @@ public class DaemonConfigurationService {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<LogObserver> observers) {
+      List<LogObserver> observers,
+      List<LogSource> sources) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
     }
@@ -39,6 +41,7 @@ public class DaemonConfigurationService {
     }
     DaemonDefinitionValidator.requireValidRegex(readyPattern, "readyPattern");
     DaemonDefinitionValidator.requireValidObservers(observers);
+    DaemonDefinitionValidator.requireValidSources(sources);
 
     DaemonConfiguration config = new DaemonConfiguration();
     config.name = name;
@@ -50,6 +53,7 @@ public class DaemonConfigurationService {
     config.maxRestarts = maxRestarts != null ? maxRestarts : 3;
     config.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     config.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
+    config.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
     daemonConfigurationRepository.persist(config);
 
     return config;
@@ -76,7 +80,8 @@ public class DaemonConfigurationService {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<LogObserver> observers) {
+      List<LogObserver> observers,
+      List<LogSource> sources) {
     DaemonConfiguration config = get(id);
 
     if (name != null && !name.isBlank()) {
@@ -108,6 +113,10 @@ public class DaemonConfigurationService {
     if (observers != null) {
       DaemonDefinitionValidator.requireValidObservers(observers);
       config.observers = new ArrayList<>(observers);
+    }
+    if (sources != null) {
+      DaemonDefinitionValidator.requireValidSources(sources);
+      config.sources = new ArrayList<>(sources);
     }
 
     return config;

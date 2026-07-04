@@ -23,6 +23,10 @@ export interface DaemonEventDto {
     summary?: string;
     logExcerpt?: string;
     commandId?: string;
+    source?: string;
+    anchorFrom?: number;
+    anchorTo?: number;
+    sourceEpoch?: string;
     timestamp?: string;
 }
 export namespace DaemonEventDto {

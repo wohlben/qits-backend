@@ -71,6 +71,7 @@ export type FileViewMode = 'rendered' | 'source';
           [binary]="binary()"
           [isDark]="isDark()"
           [highlights]="highlights()"
+          [scrollToLine]="scrollToLine()"
           (selectRange)="selectRange.emit($event)"
         />
       }
@@ -84,6 +85,8 @@ export class FileViewerComponent {
   readonly binary = input(false);
   readonly isDark = input(false);
   readonly highlights = input<LineRange[]>([]);
+  /** Passed through to the source view: scroll this 1-based line into view. */
+  readonly scrollToLine = input<number | null>(null);
   /** Controlled by the parent — this host never stores the mode itself. */
   readonly mode = input<FileViewMode>('rendered');
 

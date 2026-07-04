@@ -5,6 +5,7 @@ import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.Command;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
@@ -169,7 +170,10 @@ public class CommandService {
    * an interactive action, so the existing terminal socket gives log tailing and re-attach. The
    * caller (the daemon supervisor) owns the lifecycle around it: {@code exitListener} is invoked
    * <em>after</em> the persisted status update, and {@code observerSinks} are attached before the
-   * first output byte so ready/error observers never miss early lines.
+   * first output byte so ready/error observers never miss early lines. An optional {@code
+   * logWriterTap} is teed onto the session's log writer, receiving every captured line with the
+   * same sequence the audit log persists — the seam that lets observer findings anchor to {@code
+   * command_log_line} rows.
    */
   public CommandDto launchDaemon(
       String repoId,
@@ -178,6 +182,7 @@ public class CommandService {
       String script,
       Map<String, String> environment,
       CommandExitListener exitListener,
+      CommandLogWriter logWriterTap,
       CommandOutputSink... observerSinks) {
     Prepared p =
         prepare(
@@ -189,14 +194,19 @@ public class CommandService {
           onExit(commandId, exitCode, terminatedManually);
           exitListener.onExit(commandId, exitCode, terminatedManually);
         };
+    CommandLogWriter logWriter =
+        logWriterTap == null
+            ? commandLogService
+            : (commandId, sequence, channel, content, timestamp) -> {
+              commandLogService.append(commandId, sequence, channel, content, timestamp);
+              try {
+                logWriterTap.append(commandId, sequence, channel, content, timestamp);
+              } catch (RuntimeException e) {
+                LOG.debugf(e, "Daemon log tap failed for command %s", commandId);
+              }
+            };
     registry.spawn(
-        p.dto().id(),
-        p.worktreePath(),
-        p.script(),
-        p.env(),
-        composite,
-        commandLogService,
-        observerSinks);
+        p.dto().id(), p.worktreePath(), p.script(), p.env(), composite, logWriter, observerSinks);
     return p.dto();
   }
 
@@ -289,10 +299,10 @@ public class CommandService {
     return commandMapper.toDto(command);
   }
 
-  /** A command's captured per-line log (the audit history). */
-  public List<CommandLogLineDto> log(String commandId) {
+  /** A command's captured per-line log (the audit history), optionally severity-filtered. */
+  public List<CommandLogLineDto> log(String commandId, LogSeverity severity) {
     get(commandId); // validates existence (404 if unknown)
-    return commandLogService.log(commandId);
+    return commandLogService.log(commandId, severity);
   }
 
   @Transactional

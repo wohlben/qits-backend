@@ -52,8 +52,12 @@ import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-b
       </ng-template>
 
       <div class="flex flex-col gap-6">
-        <app-worktree-daemons [repoId]="repoId" [worktreeId]="worktreeId" />
-        <app-worktree-file-browser [repoId]="repoId" [worktreeId]="worktreeId" />
+        <app-worktree-daemons
+          [repoId]="repoId"
+          [worktreeId]="worktreeId"
+          (openFile)="fileBrowser.openAtLine($event.path, $event.startLine, $event.endLine)"
+        />
+        <app-worktree-file-browser #fileBrowser [repoId]="repoId" [worktreeId]="worktreeId" />
       </div>
     </app-page-layout>
   `,

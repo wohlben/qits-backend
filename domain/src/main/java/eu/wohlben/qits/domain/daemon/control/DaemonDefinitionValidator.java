@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
+import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -56,6 +57,34 @@ final class DaemonDefinitionValidator {
         throw new BadRequestException("PATTERN observers require a pattern");
       }
       requireValidRegex(observer.pattern, "observer pattern");
+    }
+  }
+
+  /**
+   * FILE source paths are worktree-relative and untrusted, so traversal is rejected lexically at
+   * definition time (the tail re-checks containment at runtime against the resolved worktree root,
+   * mirroring the file browser's guard).
+   */
+  static void requireValidSources(List<LogSource> sources) {
+    if (sources == null) {
+      return;
+    }
+    for (LogSource source : sources) {
+      if (source.path == null || source.path.isBlank()) {
+        throw new BadRequestException("Log sources require a path");
+      }
+      String path = source.path;
+      if (path.startsWith("/") || path.contains("\\")) {
+        throw new BadRequestException("Log source path must be worktree-relative: " + path);
+      }
+      for (String segment : path.split("/")) {
+        if (segment.isEmpty() || segment.equals("..")) {
+          throw new BadRequestException("Invalid log source path: " + path);
+        }
+      }
+      if (path.equals(".git") || path.startsWith(".git/")) {
+        throw new BadRequestException("Log source path may not point into .git: " + path);
+      }
     }
   }
 }

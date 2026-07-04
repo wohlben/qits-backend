@@ -21,6 +21,8 @@ import { CommandStatus } from '../model/commandStatus';
 // @ts-ignore
 import { LaunchCommandRequest } from '../model/launchCommandRequest';
 // @ts-ignore
+import { LogSeverity } from '../model/logSeverity';
+// @ts-ignore
 import { Response2 } from '../model/response2';
 // @ts-ignore
 import { Response3 } from '../model/response3';
@@ -107,17 +109,29 @@ export class CommandControllerService extends BaseService {
      * Log
      * @endpoint get /api/commands/{commandId}/log
      * @param commandId 
+     * @param severity 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response3>;
-    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response3>>;
-    public apiCommandsCommandIdLogGet(commandId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response3>>;
-    public apiCommandsCommandIdLogGet(commandId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiCommandsCommandIdLogGet(commandId: string, severity?: LogSeverity, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response3>;
+    public apiCommandsCommandIdLogGet(commandId: string, severity?: LogSeverity, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response3>>;
+    public apiCommandsCommandIdLogGet(commandId: string, severity?: LogSeverity, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response3>>;
+    public apiCommandsCommandIdLogGet(commandId: string, severity?: LogSeverity, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (commandId === null || commandId === undefined) {
             throw new Error('Required parameter commandId was null or undefined when calling apiCommandsCommandIdLogGet.');
         }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'severity',
+            <any>severity,
+            QueryParamStyle.Form,
+            true,
+        );
+
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -149,6 +163,7 @@ export class CommandControllerService extends BaseService {
         return this.httpClient.request<Response3>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

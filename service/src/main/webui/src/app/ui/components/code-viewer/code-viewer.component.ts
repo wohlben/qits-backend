@@ -102,6 +102,8 @@ export class CodeViewerComponent {
   readonly binary = input(false);
   readonly isDark = input(false);
   readonly highlights = input<LineRange[]>([]);
+  /** When set, the viewer scrolls this 1-based line into view (e.g. a daemon event's anchor). */
+  readonly scrollToLine = input<number | null>(null);
   /**
    * When true the editor grows to fit its content instead of filling its parent — use it for short
    * embedded snippets (e.g. a file's frontmatter) that should be only as tall as the text.
@@ -138,6 +140,14 @@ export class CodeViewerComponent {
         this.view.dispatch({ effects: setHighlights.of(ranges) });
       }
     });
+
+    // Scroll to a newly requested anchor line without rebuilding (rebuild also applies it).
+    effect(() => {
+      this.scrollToLine();
+      if (this.view) {
+        this.applyScrollToLine();
+      }
+    });
   }
 
   private rebuild(
@@ -157,7 +167,22 @@ export class CodeViewerComponent {
     });
     this.view = new EditorView({ state, parent: host });
     this.view.dispatch({ effects: setHighlights.of(this.highlights()) });
+    this.applyScrollToLine();
     void this.loadLanguage(path);
+  }
+
+  private applyScrollToLine(): void {
+    const line = this.scrollToLine();
+    if (!this.view || line === null) {
+      return;
+    }
+    const doc = this.view.state.doc;
+    if (line < 1 || line > doc.lines) {
+      return;
+    }
+    this.view.dispatch({
+      effects: EditorView.scrollIntoView(doc.line(line).from, { y: 'center' }),
+    });
   }
 
   private extensions(dark: boolean): Extension[] {

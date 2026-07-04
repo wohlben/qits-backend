@@ -67,6 +67,10 @@ export class DaemonConfigurationCreateUpdateFormComponent {
             pattern: o.pattern ?? '',
             severity: o.severity ?? 'ERROR',
           })),
+          sources: (d.sources ?? []).map((s) => ({
+            path: s.path ?? '',
+            label: s.label ?? '',
+          })),
         }
       : undefined;
   });
@@ -101,6 +105,9 @@ export class DaemonConfigurationCreateUpdateFormComponent {
       maxRestarts: this.parseMaxRestarts(data.maxRestarts),
       environment: this.toEnvMap(data.environment),
       observers: data.observers.map((row) => this.toObserver(row)),
+      sources: data.sources
+        .filter((row) => row.path.trim().length > 0)
+        .map((row) => ({ path: row.path.trim(), label: row.label.trim() || undefined })),
     };
     if (this.daemon()) {
       this.updateMutation.mutate(request);

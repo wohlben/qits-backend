@@ -6,16 +6,19 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.jboss.logging.Logger;
 
 /**
- * The LOG_LEVEL observer: buffers output lines and, after a debounce (idle gap or size cap),
+ * The LOG_LEVEL observer: buffers observed lines and, after a debounce (idle gap or size cap),
  * classifies the batch locally via {@link LogClassifier} — one finding per burst instead of one per
- * line, with the excerpt starting at the reported offset. Throttled like the PATTERN observer so a
- * crash-looping daemon can't flood the feed or the agent's chat. Classification runs on the
- * supervisor's scheduler, never on the session's reader thread.
+ * line, with the excerpt starting at the reported offset. The finding anchors to its source: the
+ * position range from the classified line to the batch's last line. One instance per (observer,
+ * source), so a batch is always a contiguous range of a single source. Throttled like the PATTERN
+ * observer so a crash-looping daemon can't flood the feed or the agent's chat. Classification runs
+ * on the supervisor's scheduler, never on the producer's thread.
  */
-final class LogLevelObserver extends LineFramingSink {
+final class LogLevelObserver implements ObservedLineListener {
 
   private static final Logger LOG = Logger.getLogger(LogLevelObserver.class);
 
@@ -32,7 +35,7 @@ final class LogLevelObserver extends LineFramingSink {
   private final ScheduledExecutorService scheduler;
   private final Consumer<ObserverFinding> onFinding;
 
-  private final List<String> pending = new ArrayList<>();
+  private final List<ObservedLine> pending = new ArrayList<>();
   private int pendingChars;
   private ScheduledFuture<?> flushTask;
   private volatile long lastEmitMillis;
@@ -47,14 +50,14 @@ final class LogLevelObserver extends LineFramingSink {
   }
 
   @Override
-  protected synchronized void onLine(String line) {
+  public synchronized void onLine(ObservedLine line) {
     pending.add(line);
-    pendingChars += line.length();
+    pendingChars += line.content().length();
     if (flushTask != null) {
       flushTask.cancel(false);
     }
     if (pendingChars >= MAX_BATCH_CHARS) {
-      List<String> batch = takeBatch();
+      List<ObservedLine> batch = takeBatch();
       scheduler.execute(() -> classify(batch));
     } else {
       flushTask = scheduler.schedule(this::flush, DEBOUNCE_MILLIS, TimeUnit.MILLISECONDS);
@@ -62,15 +65,15 @@ final class LogLevelObserver extends LineFramingSink {
   }
 
   private void flush() {
-    List<String> batch;
+    List<ObservedLine> batch;
     synchronized (this) {
       batch = takeBatch();
     }
     classify(batch);
   }
 
-  private synchronized List<String> takeBatch() {
-    List<String> batch = List.copyOf(pending);
+  private synchronized List<ObservedLine> takeBatch() {
+    List<ObservedLine> batch = List.copyOf(pending);
     pending.clear();
     pendingChars = 0;
     flushTask = null;
@@ -78,9 +81,10 @@ final class LogLevelObserver extends LineFramingSink {
   }
 
   /**
-   * Runs on the scheduler, off the reader thread; a failed classification is logged and dropped.
+   * Runs on the scheduler, off the producer's thread; a failed classification is logged and
+   * dropped.
    */
-  private void classify(List<String> batch) {
+  private void classify(List<ObservedLine> batch) {
     if (batch.isEmpty()) {
       return;
     }
@@ -89,14 +93,17 @@ final class LogLevelObserver extends LineFramingSink {
       return;
     }
     try {
+      String joined = batch.stream().map(ObservedLine::content).collect(Collectors.joining("\n"));
       classifier
-          .classify(String.join("\n", batch))
+          .classify(joined)
           .ifPresent(
               classification -> {
                 lastEmitMillis = now;
                 int offset =
                     Math.clamp(classification.firstLineOffset(), 0, Math.max(0, batch.size() - 1));
-                String excerpt = String.join("\n", batch.subList(offset, batch.size()));
+                List<ObservedLine> anchored = batch.subList(offset, batch.size());
+                String excerpt =
+                    anchored.stream().map(ObservedLine::content).collect(Collectors.joining("\n"));
                 if (excerpt.length() > 2000) {
                   excerpt = excerpt.substring(0, 2000);
                 }
@@ -105,7 +112,11 @@ final class LogLevelObserver extends LineFramingSink {
                         classification.severity(),
                         classification.errorType(),
                         classification.summary(),
-                        excerpt));
+                        excerpt,
+                        batch.getFirst().source(),
+                        anchored.getFirst().position(),
+                        anchored.getLast().position(),
+                        batch.getFirst().sourceEpoch()));
               });
     } catch (RuntimeException e) {
       LOG.warnf(e, "Log classification failed; dropping batch of %d lines", batch.size());

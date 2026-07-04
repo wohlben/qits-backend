@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
+import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
@@ -35,7 +36,8 @@ public class RepositoryDaemonService {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<LogObserver> observers) {
+      List<LogObserver> observers,
+      List<LogSource> sources) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
     }
@@ -44,6 +46,7 @@ public class RepositoryDaemonService {
     }
     DaemonDefinitionValidator.requireValidRegex(readyPattern, "readyPattern");
     DaemonDefinitionValidator.requireValidObservers(observers);
+    DaemonDefinitionValidator.requireValidSources(sources);
 
     Repository repository =
         repositoryRepository
@@ -61,6 +64,7 @@ public class RepositoryDaemonService {
     daemon.maxRestarts = maxRestarts != null ? maxRestarts : 3;
     daemon.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
+    daemon.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
     repositoryDaemonRepository.persist(daemon);
 
     return daemon;
@@ -94,7 +98,8 @@ public class RepositoryDaemonService {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<LogObserver> observers) {
+      List<LogObserver> observers,
+      List<LogSource> sources) {
     RepositoryDaemon daemon = get(repositoryId, daemonId);
 
     if (name != null && !name.isBlank()) {
@@ -125,6 +130,10 @@ public class RepositoryDaemonService {
     if (observers != null) {
       DaemonDefinitionValidator.requireValidObservers(observers);
       daemon.observers = new ArrayList<>(observers);
+    }
+    if (sources != null) {
+      DaemonDefinitionValidator.requireValidSources(sources);
+      daemon.sources = new ArrayList<>(sources);
     }
 
     return daemon;

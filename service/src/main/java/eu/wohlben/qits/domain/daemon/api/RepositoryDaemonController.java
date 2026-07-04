@@ -39,7 +39,8 @@ public class RepositoryDaemonController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<@Valid LogObserverInput> observers) {
+      List<@Valid LogObserverInput> observers,
+      List<@Valid LogSourceInput> sources) {
     public record Response(DaemonConfigurationDto daemon) {}
   }
 
@@ -58,7 +59,8 @@ public class RepositoryDaemonController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.environment(),
-            LogObserverInput.toEntities(request.observers()));
+            LogObserverInput.toEntities(request.observers()),
+            LogSourceInput.toEntities(request.sources()));
     return new CreateRepositoryDaemonRequest.Response(repositoryDaemonMapper.toDto(daemon));
   }
 
@@ -102,7 +104,8 @@ public class RepositoryDaemonController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<@Valid LogObserverInput> observers) {
+      List<@Valid LogObserverInput> observers,
+      List<@Valid LogSourceInput> sources) {
     public record Response(DaemonConfigurationDto daemon) {}
   }
 
@@ -124,7 +127,8 @@ public class RepositoryDaemonController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.environment(),
-            LogObserverInput.toEntities(request.observers()));
+            LogObserverInput.toEntities(request.observers()),
+            LogSourceInput.toEntities(request.sources()));
     return new UpdateRepositoryDaemonRequest.Response(repositoryDaemonMapper.toDto(daemon));
   }
 

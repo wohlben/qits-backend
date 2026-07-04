@@ -161,13 +161,13 @@ public class CommandServiceTest {
 
   private List<CommandLogLineDto> awaitLog(String commandId) throws InterruptedException {
     for (int i = 0; i < 40; i++) {
-      List<CommandLogLineDto> lines = commandService.log(commandId);
+      List<CommandLogLineDto> lines = commandService.log(commandId, null);
       if (!lines.isEmpty()) {
         return lines;
       }
       Thread.sleep(100);
     }
-    return commandService.log(commandId);
+    return commandService.log(commandId, null);
   }
 
   @Test

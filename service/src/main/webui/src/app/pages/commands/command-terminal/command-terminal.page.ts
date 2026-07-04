@@ -60,7 +60,11 @@ import { ZardButtonComponent } from '@/shared/components/button';
         } @else if (command.status === CommandStatus.Running) {
           <app-web-terminal [commandId]="commandId" />
         } @else {
-          <app-command-log [commandId]="commandId" />
+          <app-command-log
+            [commandId]="commandId"
+            [highlightFrom]="highlightFrom"
+            [highlightTo]="highlightTo"
+          />
         }
       } @else if (commandQuery.isError()) {
         <div class="text-sm text-destructive">Failed to load command</div>
@@ -79,6 +83,16 @@ export class CommandTerminalPage {
   protected readonly CommandKind = CommandKind;
 
   readonly commandId = this.route.snapshot.paramMap.get('commandId')!;
+
+  /** Optional ?seq=&seqTo= from a daemon event's "open in source" link. */
+  readonly highlightFrom = this.queryParamNumber('seq');
+  readonly highlightTo = this.queryParamNumber('seqTo');
+
+  private queryParamNumber(name: string): number | null {
+    const raw = this.route.snapshot.queryParamMap.get(name);
+    const parsed = raw === null ? Number.NaN : Number.parseInt(raw, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
 
   readonly commandQuery = injectQuery(() => ({
     queryKey: ['command', this.commandId],

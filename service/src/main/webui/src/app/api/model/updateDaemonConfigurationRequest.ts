@@ -9,6 +9,7 @@
  */
 import { RestartPolicy } from './restartPolicy';
 import { LogObserverInput } from './logObserverInput';
+import { LogSourceInput } from './logSourceInput';
 
 
 export interface UpdateDaemonConfigurationRequest { 
@@ -21,6 +22,7 @@ export interface UpdateDaemonConfigurationRequest {
     maxRestarts?: number;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverInput>;
+    sources?: Array<LogSourceInput>;
 }
 export namespace UpdateDaemonConfigurationRequest {
 }
