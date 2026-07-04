@@ -34,6 +34,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </ng-template>
 
       <div pageActions class="flex items-center gap-2">
+        <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'daemons']">Daemons</a>
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
         <!-- Launches Claude Code in the main worktree with the actions MCP scoped to this repo, so
              repository-specific actions can be created from inside Claude. -->

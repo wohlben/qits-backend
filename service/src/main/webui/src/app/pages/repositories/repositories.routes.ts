@@ -7,6 +7,25 @@ export const repositoriesRoutes: Routes = [
       import('./repository-detail/repository-detail.page').then((m) => m.RepositoryDetailPage),
   },
   {
+    path: ':repoId/daemons',
+    loadComponent: () =>
+      import('./repository-daemons/repository-daemons.page').then((m) => m.RepositoryDaemonsPage),
+  },
+  {
+    path: ':repoId/daemons/new',
+    loadComponent: () =>
+      import('./repository-daemon-form/repository-daemon-form.page').then(
+        (m) => m.RepositoryDaemonFormPage,
+      ),
+  },
+  {
+    path: ':repoId/daemons/:daemonId/edit',
+    loadComponent: () =>
+      import('./repository-daemon-form/repository-daemon-form.page').then(
+        (m) => m.RepositoryDaemonFormPage,
+      ),
+  },
+  {
     path: ':repoId/branch/:branchName/commits',
     loadComponent: () =>
       import('./branch-commits/branch-commits.page').then((m) => m.BranchCommitsPage),
