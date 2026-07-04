@@ -33,6 +33,21 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && corepack prepare pnpm@latest --activate \
     && rm -rf /var/lib/apt/lists/*
 
+# The coding agent (Claude Code) runs inside this container — the single biggest executor of
+# arbitrary commands in the sandbox. Bake the CLI in at a pinned version (bump CLAUDE_CODE_VERSION
+# to any published release; the build fails loudly if it doesn't exist). npm-global installs it to
+# /usr/bin/claude, on PATH for the arbitrary runtime uid the container runs as — the now-preferred
+# native installer (claude.ai/install.sh) installs per-user under ~/.local/bin, which doesn't fit a
+# uid-agnostic image, so npm-global is the right trade here.
+ARG CLAUDE_CODE_VERSION=2.1.89
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+
+# Mount point for the shared credential volume (qits.workspace.claude-volume, default
+# qits_shared_dot_claude). Agent launches set HOME here so `claude` reads the operator's one-time
+# OAuth login (~/.claude) off the volume — see docker/workspace/agent-login.sh. World-writable so
+# the empty named volume initializes writable and the arbitrary-uid container can write to it.
+RUN mkdir -p /claude-home && chmod 0777 /claude-home
+
 # Cloned repositories live here; DockerExecutor execs commands with -w /workspace. The container
 # runs as an arbitrary host uid (--user $(id -u)) with no matching passwd entry, so make /workspace
 # world-writable (the clone happens as that uid) and point HOME at it so git/tools have somewhere to

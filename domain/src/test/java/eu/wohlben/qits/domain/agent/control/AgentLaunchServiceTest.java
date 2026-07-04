@@ -106,4 +106,27 @@ public class AgentLaunchServiceTest {
         BadRequestException.class,
         () -> agentLaunchService.serversFor("bad'; touch pwned; '", AgentMcpScope.ACTIONS));
   }
+
+  @Test
+  public void chatLaunchPointsHomeAtTheSharedCredentialVolume() {
+    // The agent authenticates from the shared ~/.claude volume mounted in the container, so its
+    // launch must set HOME to the mount (default /claude-home) — the one credential hand-off.
+    String projectId = "66666666-6666-6666-6666-666666666666";
+    String repoId = "77777777-7777-7777-7777-777777777777";
+    seedRepository(projectId, repoId);
+
+    LaunchSpec spec = agentLaunchService.renderChat(repoId, AgentMcpScope.ACTIONS);
+
+    assertEquals("/claude-home", spec.environment().get("HOME"));
+    // Still the stream-json chat, unchanged.
+    assertTrue(spec.script().contains("--input-format stream-json"), spec.script());
+  }
+
+  @Test
+  public void autonomousLaunchPointsHomeAtTheSharedCredentialVolume() {
+    LaunchSpec spec = agentLaunchService.renderAutonomous("resolve the conflict");
+
+    assertEquals("/claude-home", spec.environment().get("HOME"));
+    assertTrue(spec.script().startsWith("claude -p 'resolve the conflict'"), spec.script());
+  }
 }

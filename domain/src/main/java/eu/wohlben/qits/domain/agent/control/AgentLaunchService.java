@@ -77,6 +77,16 @@ public class AgentLaunchService {
   String repositoryMcpUrl;
 
   /**
+   * Where the shared agent-credential volume mounts in the container (mirrors {@code
+   * qits.workspace.claude-mount}). Agent launches point {@code HOME} here so the in-container
+   * {@code claude} reads the one-time OAuth login off the volume instead of a per-session secret —
+   * the one credential that crosses into the sandbox. Blank leaves {@code HOME} at the image
+   * default.
+   */
+  @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
+  String claudeMount;
+
+  /**
    * Launches Claude Code as a stream-json <strong>chat</strong> command in {@code worktreeId} of
    * {@code repoId}, with the MCP server(s) for {@code scope} attached. The session is rendered as a
    * conversation and tracked in the command registry (re-attachable, logged). Tools run
@@ -93,11 +103,7 @@ public class AgentLaunchService {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
 
-    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
-    for (ScopedMcp server : serversFor(repoId, scope)) {
-      agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
-    }
-    LaunchSpec spec = agent.skipPermissions().chat();
+    LaunchSpec spec = renderChat(repoId, scope);
 
     CommandDto command =
         commandService.launchChat(
@@ -122,9 +128,39 @@ public class AgentLaunchService {
    * Used by composed flows such as conflict resolution. Returns the spawned command.
    */
   public CommandDto launchAutonomous(String repoId, String worktreeId, String name, String prompt) {
-    LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE).skipPermissions().run(prompt);
+    LaunchSpec spec = renderAutonomous(prompt);
     return commandService.launchAgent(
         repoId, worktreeId, name, spec.script(), true, spec.environment());
+  }
+
+  /**
+   * Renders the stream-json chat launch for {@code scope} with its MCP servers attached and {@code
+   * HOME} pointed at the shared credential volume. Package-visible so the credential overlay is
+   * assertable without spawning a container.
+   */
+  LaunchSpec renderChat(String repoId, AgentMcpScope scope) {
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    for (ScopedMcp server : serversFor(repoId, scope)) {
+      agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
+    }
+    return withAgentHome(agent).skipPermissions().chat();
+  }
+
+  /** Renders the one-shot autonomous run over {@code prompt}, with the same credential overlay. */
+  LaunchSpec renderAutonomous(String prompt) {
+    return withAgentHome(CodingAgentFactory.ofType(AgentType.CLAUDE).skipPermissions()).run(prompt);
+  }
+
+  /**
+   * Points the agent's {@code HOME} at the shared credential volume so the in-container {@code
+   * claude} reads the operator's one-time OAuth login. CWD stays {@code /workspace}, so project
+   * detection (the repo's own {@code .claude/}, {@code CLAUDE.md}) is unaffected.
+   */
+  private CodingAgent withAgentHome(CodingAgent agent) {
+    if (claudeMount != null && !claudeMount.isBlank()) {
+      agent.environment("HOME", claudeMount);
+    }
+    return agent;
   }
 
   /**
