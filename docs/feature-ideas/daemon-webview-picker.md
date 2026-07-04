@@ -39,8 +39,8 @@ Related/dependent plans:
   [stream-json chat](../features/2026-07-01_stream-json-chat.md) already use: the
   `speak-to-prompt` flow's `initialContext` (launch a new agent) and the command-chat `draft`
   (message a running one). The picker is an *input source* for prompts, not a new agent channel.
-- Complements the [worktree chat dialog](worktree-chat-dialog.md): "pick this element" and "ask
-  the agent about it" want to sit next to each other.
+- Complements the [worktree chat dialog](../features/2026-07-04_worktree-chat-dialog.md):
+  "pick this element" and "ask the agent about it" want to sit next to each other.
 - Orthogonal to [observability](observability.md), but the same shape of idea — qits obtaining a
   view into a running app the source alone can't give. Neither requires the other.
 - Parked follow-up:
@@ -250,9 +250,12 @@ it lives there (see Explicitly deferred), not in the primary path.
   cross-origin frame and the retired injection/postMessage machinery. Written up as a change to
   this feature's implemented code in
   [backlog-ideas/daemon-proxy-cross-origin-mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md).
-- **Port auto-allocation** — inherited limitation from daemons.md; `httpPort` is hardcoded in the
-  definition, so parallel worktrees running the same daemon collide. The proxy resolves through
-  the registry precisely so this lands later without touching it.
+- **Port collisions** — inherited limitation from the daemons feature; `httpPort` is hardcoded
+  in the definition, so parallel worktrees running the same daemon collide. Planned resolution:
+  [workspace containers](workspace-containers.md) — per-container network namespaces make the
+  hardcoded port correct for every worktree, and the proxy's origin resolver (which already
+  resolves through the registry precisely so this lands without touching it) targets the
+  container's address instead of `127.0.0.1`.
 - **In-page screenshots** attached to a pick — a CDP-side screenshot is the right later shape.
 - **Backend snippet channel / MCP feed** — picks could reach the agent's MCP tools directly;
   the in-browser prompt-context store is enough for iteration one.
