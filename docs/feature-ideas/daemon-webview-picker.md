@@ -1,4 +1,4 @@
-# Daemon web-view picker: frame a daemon's app, pick DOM into the prompt
+# Daemon web-view picker: proxy a daemon's app, pick DOM into the prompt
 
 ## Introduction
 
@@ -10,19 +10,30 @@ daemon-served app**, plus a **DOM picker** — hover an element, click it, and i
 misaligned" stops being a description and becomes the actual `<button class="…">` handed to the
 agent.
 
-The key realisation that keeps this small: **we own both sides.** The daemon app is one of the
-user's own projects, launched by qits. So rather than intercepting a stranger's app, we let a tiny
-**cooperating script** loaded by the app do the DOM work and `postMessage` picks back to qits. No
-reverse proxy, no HTML rewriting, no header surgery — the app is served untouched by its own dev
-server, so its assets and hot-reload keep working exactly as they do today. (A zero-touch reverse
-proxy is still possible for apps we *don't* control; it's demoted to an optional mode at the end.)
+Two decisions shape this revision of the idea:
+
+1. **The reverse proxy is a requirement, not a fallback.** Daemon ports are never individually
+   exposed; the browser reaches every daemon **through the qits origin** via an in-process Vert.x
+   proxy mounted on the Quarkus router. One port (qits' own) serves everything — no per-daemon
+   firewall/forwarding, and remote access to qits transparently includes its daemons.
+2. **No source edits, no injection.** The previous draft had the app load a cooperating picker
+   script (manual `<script>` tag, postMessage back to qits). That entire apparatus is deleted by a
+   side effect of decision 1: a path-prefix proxy makes the framed app **same-origin** with the
+   qits UI, so the qits frontend can read `iframe.contentDocument` directly. The picker becomes
+   plain Angular code in qits — nothing is injected anywhere, and the proxy never rewrites a byte.
+
+The "we own both sides" realisation from the first draft survives, but applied at the right layer:
+instead of adding our script to the user's app, qits injects a **base-path environment variable**
+at daemon launch and the app's start script passes it to its dev server — so the app natively
+serves itself under the proxied prefix and the proxy stays a dumb passthrough.
 
 Related/dependent plans:
 
 - Hard dependency on [daemons](daemons.md): the thing being framed is a daemon instance (a
   `CommandKind.DAEMON` registry command). This idea adds one field to the daemon definition
-  (`httpPort`) so the UI knows the app's URL, and reads the registry to confirm the instance is
-  running.
+  (`httpPort`), uses the daemon environment-injection slot (the same one observability uses for
+  `OTEL_EXPORTER_OTLP_*`) for `QITS_PUBLIC_BASE`, and leans on the singleton-per-(worktree,
+  daemon) rule — the proxy route key requires that pair to be unambiguous.
 - The captured HTML feeds the agent through the same door the
   [coding-agent harness](../features/2026-07-01_coding-agent-harness.md) and
   [stream-json chat](../features/2026-07-01_stream-json-chat.md) already use: the
@@ -33,77 +44,128 @@ Related/dependent plans:
 - Orthogonal to [observability](observability.md), but the same shape of idea — qits obtaining a
   view into a running app the source alone can't give. Neither requires the other.
 
-## Plausibility: the one wall, and why it isn't in our way
+## Architecture overview
 
-There is exactly one browser constraint here, and it's narrower than it first looks. The daemon app
-runs on a **different loopback port** from the qits UI, so it's a **different origin**. The
-same-origin policy therefore blocks the qits parent window from reading `iframe.contentDocument`.
-That's the whole wall. Critically, it does **not** block `postMessage`:
+```
+browser ── qits:8080 /daemon/{worktreeId}/{daemonId}/*  (same origin as the qits UI)
+              │  Vert.x HttpProxy (in-process, verbatim passthrough, WS included)
+              ▼
+          127.0.0.1:{httpPort}   dev server, launched with QITS_PUBLIC_BASE=/daemon/{…}/
+                                 → emits every asset URL and its HMR websocket under the prefix
+```
 
-- A script running **inside** the daemon app reads *its own* DOM freely (home origin to itself) and
-  calls `window.parent.postMessage(pick, qitsOrigin)` — cross-origin `postMessage` **out** is
-  allowed.
-- The qits parent calls `iframe.contentWindow.postMessage({type:'enter'}, daemonOrigin)` to toggle
-  pick mode — calling `postMessage` on a cross-origin `contentWindow` is *also* allowed (you just
-  can't read its properties).
+- The **proxy** forwards paths verbatim — no prefix stripping, no HTML rewriting, no header
+  surgery. It can do that because the dev server itself serves under the prefix (base-path
+  contract below).
+- The **iframe** in the qits UI points at the *relative* path `/daemon/{…}/` — same origin, so the
+  qits parent has full DOM access to the framed document.
+- The **picker** is an Angular service/directive in qits operating directly on
+  `iframe.contentDocument`. No script in the app, no postMessage protocol.
 
-So the only thing we actually need is **our code running inside the app's page**. Since we own the
-app, we simply load it there — no proxy required to inject it. Framing works too: qits sets no
-framing headers, and our own dev servers don't set `X-Frame-Options`/`frame-ancestors`, so the
-iframe renders.
+## Proxy routing shape: path-prefix + base-aligned passthrough
 
-For contrast, the approaches that would be needed *if we didn't control the app* (all now
-unnecessary for the primary case, retained as fallbacks in §"Zero-touch mode"):
+**Chosen: path-prefix `/daemon/{worktreeId}/{daemonDefinitionId}/*` on the qits origin.** The
+same-origin property is what deletes the injection machinery, and a single origin/port works
+unchanged for remote access (LAN, tunnel) — no DNS tricks.
 
-1. **Cooperative injection + postMessage** — the above. **Chosen.** Zero proxy, perfect asset/HMR
-   fidelity because the app is served untouched.
-2. **Reverse proxy + injected script** — rewrite every HTML response to inject the picker and strip
-   framing/CSP headers. The only way in for an app we can't touch; carries asset-URL rewriting and
-   an SSRF-shaped proxy surface. **Demoted to optional zero-touch mode.**
-3. **CDP / Playwright** driving a qits-owned browser — powerful and origin-agnostic, but qits would
-   own a Chromium process. The escape hatch if injection ever proves impossible.
+Path-prefix proxying has one classic problem: dev servers emit root-absolute URLs (`/main.js`,
+`/@vite/client`) that escape the prefix. The fix is the **base-path env contract** — the correct
+application of "we control both sides":
 
-## Architecture
+- At launch, the daemon supervisor injects **`QITS_PUBLIC_BASE=/daemon/{worktreeId}/{daemonId}/`**
+  into the process environment (same injection slot daemons.md plans for OTLP vars).
+- The project's `startScript` opts in — a documented convention per stack, not per-framework magic
+  in qits:
+  - **Vite:** `vite --base "$QITS_PUBLIC_BASE"`. Verified: `base` applies in dev, and the HMR
+    websocket path is derived from it (Vite's `clientInjections.ts` injects `hmrBase = devBase`),
+    so assets *and* HMR stay inside the prefix.
+  - **Angular:** `ng serve --serve-path "$QITS_PUBLIC_BASE" --base-href "$QITS_PUBLIC_BASE"`.
+    Both flags: `--serve-path` alone doesn't set `<base href>` (angular-cli #7782); note the
+    19.1.x regression where HMR requests ignored `--serve-path` (angular-cli #29395).
+  - **webpack:** `devServer` / `output.publicPath` from the env var.
+- The dev server then mounts everything — assets, SPA routes, HMR websocket — under the prefix,
+  and the proxy forwards bytes untouched (compression and chunked transfer pass through dumb).
 
-### Getting the picker into the app (cooperative injection)
+Alternatives considered:
 
-`__qits_picker.js` is a small, framework-free, self-contained file that qits **serves as a static
-asset** (e.g. `service/src/main/webui/public/qits-picker.js`, served by Quinoa at the qits origin).
-A cross-origin `<script src>` load is not CORS-restricted, so the app can load it directly. Three
-delivery flavors, increasingly automatic:
+- **Strip-prefix + HTML rewriting** (proxy strips `/daemon/{key}`, app thinks it's at `/`, proxy
+  rewrites responses): rejected. Root-absolute and JS-constructed URLs escape the prefix *in the
+  browser* — no proxy-side rewriting fixes what the browser requests — and the un-based HMR client
+  opens its websocket at the qits root. Additionally, vertx-http-proxy 4.5.x interceptors don't
+  run on WebSocket upgrades at all, so even the handshake path couldn't be rewritten.
+- **Wildcard subdomain per daemon** (`{key}.qits.localhost:8080`): perfect fidelity with zero app
+  config, but the frame becomes cross-origin again (the injected-script + postMessage picker
+  returns), `*.localhost` only resolves on the local machine, and remote access needs wildcard
+  DNS. Kept as the **deferred fallback** for apps that cannot serve under a base path.
 
-- **Manual script tag (documented v1 default).** Add one dev-only line to the app's `index.html`:
-  `<script src="http://localhost:8080/qits-picker.js" data-qits-origin="http://localhost:8080"></script>`.
-  Ten seconds per project, works today, nothing clever. The `data-qits-origin` attribute tells the
-  picker which parent origin to trust and post to.
-- **qits-assisted launch wrapper (refinement).** The daemon's `startScript` is qits-controlled, so
-  for known stacks qits can inject without a source edit — e.g. launch Vite with a merged config
-  that adds an `transformIndexHtml` plugin emitting the tag, or wrap webpack-dev-server similarly.
-  Per-framework work; deferred behind the manual path.
-- **Reverse proxy (zero-touch, apps you don't control).** See §"Zero-touch mode".
+## Proxy mechanics (verified against Quarkus 3 / Vert.x 4.5.x)
 
-### The picker script (`__qits_picker.js`)
+- **Dependency:** `io.vertx:vertx-http-proxy` — managed by the Quarkus platform BOM (4.5.26 under
+  quarkus-bom 3.34.6), added version-less to `service/pom.xml`.
+- **Mount:** the documented Quarkus pattern `void init(@Observes Router router)` (Vert.x reference
+  guide); `router.route("/daemon/*").handler(rc -> proxy.handle(rc.request()))`, with the shared
+  `HttpClient` created from the managed `Vertx`. Deliberately *not* under `/api` — it isn't REST.
+  Add `/daemon` to `quarkus.quinoa.ignored-path-prefixes` (currently `/api,/mcp`).
+- **Target resolution:** `HttpProxy.origin(OriginRequestProvider)` resolves the target per
+  request: parse `{worktreeId}/{daemonId}` from the path → look up the running instance in the
+  registry → `127.0.0.1:{httpPort}`. Unknown key → 404 without connecting anywhere; known but not
+  running/`READY` → qits-branded 502.
+- **WebSockets (HMR):** vertx-http-proxy forwards WebSocket upgrades **by default** ("The proxy
+  supports WebSocket by default"); the inbound `Host` is replaced with the origin's on the
+  handshake. Note `SameOriginUpgradeCheck` guards only websockets-next endpoints — this raw router
+  route bypasses it (good: HMR upgrades aren't blocked; see Security for the flip side).
+- **Host header:** rewrite the outbound authority to `127.0.0.1:{port}` on the HTTP leg too, so
+  Vite's post-CVE-2025-24010 host checking never sees a foreign hostname even when qits itself is
+  accessed remotely.
+- **Niceties:** 302 from `/daemon/{worktreeId}/{daemonId}` to the trailing-slash form so relative
+  URLs resolve correctly inside the frame.
 
-Vanilla JS, no framework, runs in the daemon app's origin:
+## Route key and lifecycle
 
-- **Mode toggle:** listens for `message`, validates `event.origin` against `data-qits-origin`, and
-  on `{type:'qits-pick:enter'|'exit'}` toggles a **capture-phase** `mousemove`/`click` listener.
-- **Hover overlay:** one absolutely-positioned `div` (high z-index, `pointer-events:none`, outline)
-  repositioned to `target.getBoundingClientRect()` on `mousemove`. No per-element mutation, cheap.
+The route key is **`(worktreeId, daemonDefinitionId)` — not commandId.** The supervisor's restart
+loop creates a *new `Command` row per relaunch* (daemons.md), so a commandId-keyed base path would
+change on every crash-restart — invalidating the `QITS_PUBLIC_BASE` baked into the dev server's
+emitted URLs at launch and breaking any open iframe. The (worktree, daemon) pair is stable across
+restarts, known *before* launch (required — the base must be in the environment at spawn time),
+and is exactly the pair daemons.md already leans toward making a singleton. The proxy strengthens
+that lean: it needs the pair to be unambiguous.
+
+The **port mapping lives in registry/supervisor runtime state**, next to the
+`CommandSession`/`DaemonStatus` — consistent with the "registry is the only stateful singleton"
+rule. The `OriginRequestProvider` resolves through the registry, never the definition directly, so
+the deferred port-auto-allocation feature later changes only the supervisor, never the proxy.
+
+## The picker: parent-side, no injection
+
+Because the frame is same-origin, the picker is ordinary qits frontend code with full DOM access
+to the framed document:
+
+- **Mode toggle:** when pick mode is on, attach **capture-phase** `mousemove`/`click` listeners on
+  `iframe.contentDocument`.
+- **Hover overlay:** one absolutely-positioned `div` (high z-index, `pointer-events:none`,
+  outline) repositioned via `target.getBoundingClientRect()` — placed inside the framed document
+  or in the parent with the iframe's offset added. No per-element mutation, cheap.
 - **Click capture:** capture-phase `click` → `preventDefault()` + `stopPropagation()` so the app
-  doesn't react, then post back
-  `{type:'qits-pick:result', payload:{outerHTML, selector, url, tag, textPreview}}` to
-  `qitsOrigin`, where `selector` is an nth-child chain up to the nearest `id`/`data-testid` and
-  `url` is `location.href` (the framed route). When `element.shadowRoot` exists, also include
-  `shadowRoot.innerHTML`.
-- **Persistence:** the tag lives in the app's own `index.html`, so it survives SPA navigation and
-  HMR (same document, and re-served on a full reload) with no re-injection machinery.
+  doesn't react, then build the pick: `{outerHTML, selector, url, tag, textPreview}`, where
+  `selector` is an nth-child chain up to the nearest `id`/`data-testid` and `url` is the framed
+  document's `location.href`. When `element.shadowRoot` exists (open roots), include
+  `shadowRoot.innerHTML` alongside the shallow `outerHTML`.
+- **Lifecycle (the crux):** SPA navigations inside the frame keep the same `document`, so
+  listeners survive. Full reloads (F5 in the frame, Vite full-reload HMR, `location` navigations)
+  replace the document — the parent listens to the **iframe `load` event and re-attaches**. That
+  single re-attach hook is the entire robustness story.
+- **Failure mode:** if the frame navigates to a foreign origin (external link),
+  `contentDocument` access throws — catch it and show "picker unavailable on external pages".
+- **No `sandbox` attribute, by explicit decision:** without `allow-same-origin` the frame gets an
+  opaque origin, killing both `contentDocument` (the picker) and the app's own storage; with
+  `allow-same-origin` + `allow-scripts` on same-origin content the sandbox is neutralized anyway.
 
-The data path is **postMessage only** — no backend round-trip. (Shipping picks through qits' REST
-API instead would make the cross-origin `POST` a preflighted request needing loopback CORS
-(`quarkus.http.cors=true`); postMessage avoids that entirely and keeps everything client-side.)
+Retired from the first draft: `__qits_picker.js`, the `data-qits-origin` trust handshake, and the
+whole postMessage protocol — all made redundant by same-origin access. Proxy-side `<head>` script
+injection was also considered and is only ever needed for the *cross-origin* subdomain fallback;
+it lives there (see Explicitly deferred), not in the primary path.
 
-### Frontend (`service/src/main/webui/src/app/…`)
+## Frontend (`service/src/main/webui/src/app/…`)
 
 - **Floaty button** in `layout/main-layout/main-layout.component.ts` — the only always-mounted
   chrome — fixed bottom-right, `@ng-icons/lucide` (e.g. `lucideScan`). Rendered only when a
@@ -111,10 +173,10 @@ API instead would make the cross-origin `POST` a preflighted request needing loo
 - **Full-screen dialog** via `ZardDialogService`. The ZardUI dialog is CDK-overlay based and
   centered by default (`dialog.variants.ts` hard-codes `left-[50%] top-[50%] translate-*`). Add a
   `fullscreen` size to the variant (`inset-0 h-full w-full max-w-none rounded-none` overriding the
-  centering) through the ZardUI variant mechanism — not an ad-hoc component edit. The body hosts an
-  `<iframe [src]="daemonUrl()">` pointing **straight at the real daemon origin**
-  (`http://localhost:{httpPort}`), a pick-mode toggle that posts into the iframe, a `message`
-  listener (origin-validated) that receives picks, and a thin snippet tray.
+  centering) through the ZardUI variant mechanism — not an ad-hoc component edit. The body hosts
+  an `<iframe [src]="daemonBasePath()">` pointing at the **relative** `/daemon/{…}/` path — no
+  daemon origin composition, no `httpPort` in the frontend at all — plus the pick-mode toggle, the
+  picker attach/re-attach logic, and a thin snippet tray.
 - **Prompt-context store** — new root `signalStore` at `shared/state/prompt-context.store.ts` (the
   repo's first `signalStore`; today only `signalState` is used in `branch-list`). Holds
   `PickedSnippet[]` (`{id, html, selector, url, tag, textPreview, capturedAt}`) with
@@ -125,92 +187,103 @@ API instead would make the cross-origin `POST` a preflighted request needing loo
   - `pattern/command/command-chat.component.ts` — insert snippet HTML into the `draft` signal to
     message a running agent.
 
-### Backend / daemon coupling (small)
+## Backend / daemon coupling
 
-Extend `AbstractDaemonDefinition` (mirrors
-`domain/…/featureflow/entity/AbstractActionDefinition.java` — public Panache fields) with a
-nullable **`Integer httpPort`** (+ optional `httpPath`). Nullable cleanly means "web-viewable": the
-floaty button only lights up when it's set. Surface it on the daemon/command DTO so the UI can
-compose `http://localhost:{httpPort}{httpPath}` for the iframe `src`, gated on the registry showing
-a running (`READY`) `CommandKind.DAEMON` instance. That's the entire backend surface — **no new
-Vert.x route, no proxy, no `vertx-http-proxy` dependency** in the primary design.
+- Extend `AbstractDaemonDefinition` (mirrors
+  `domain/…/featureflow/entity/AbstractActionDefinition.java` — public Panache fields) with a
+  nullable **`Integer httpPort`** (+ optional `httpPath` later). Nullable cleanly means
+  "web-viewable": the floaty button only lights up when it's set.
+- The daemon supervisor injects **`QITS_PUBLIC_BASE`** into the environment at spawn and records
+  `httpPort` in its runtime state for the proxy's origin resolver.
+- The daemon/command DTO exposes a web-viewable flag and the **proxied base path**
+  (`/daemon/{worktreeId}/{daemonId}/`), gated on the registry showing a running (`READY`)
+  `CommandKind.DAEMON` instance — not a composed localhost URL.
 
-## Zero-touch mode (optional: apps we don't control)
+## Security
 
-If a daemon app can't be given the script tag (not our source, no launch hook), fall back to a
-reverse proxy that injects the picker on the fly — the iframe then points at a qits proxy URL
-instead of the daemon directly. This resurrects the machinery the cooperative path avoids and is
-worth building *only* if that need appears:
-
-- Add `io.vertx:vertx-http-proxy` (BOM-managed) to `service/pom.xml`; mount `HttpProxy` on the
-  Vert.x `Router` at a top-level `/daemon-view/:commandId/*` (not under `/api`), added to
-  `quarkus.quinoa.ignored-path-prefixes`.
-- A `ProxyInterceptor` injects the picker `<script>` into `text/html` and strips
-  `x-frame-options`/CSP (headers **and** `<meta http-equiv>`), stripping `accept-encoding` upstream
-  and dropping `content-length`/`content-encoding` after mutation.
-- The unavoidable costs that make this the fallback, not the default: root-absolute and
-  JS-constructed asset URLs can't be reliably rewritten (Vite/modern-Angular assets and HMR
-  degrade); a `*.localhost` subdomain-per-daemon proxy fixes fidelity but adds routing; and the
-  proxy is an **SSRF-shaped primitive** (qits fetching `127.0.0.1:{port}`) that must be locked to a
-  running daemon's registered loopback port, never a client-supplied URL.
-
-## Explicitly deferred
-
-- **qits-assisted launch-wrapper injection** for known frameworks — the manual tag ships first.
-- **Zero-touch reverse-proxy mode** (above) — built only if an app we can't edit needs framing.
-- **In-page screenshots** attached to a pick — `html-to-image` inside the framed doc is heavy and
-  tainted-canvas-prone on cross-origin subresources. A CDP-side screenshot is the right later shape.
-- **Backend snippet channel / MCP feed** — picks could POST to qits and reach the agent's MCP tools
-  directly (needs loopback CORS); postMessage-into-the-prompt is enough for iteration one.
-- **Port auto-allocation** — inherited limitation from daemons.md; `httpPort` is hardcoded in the
-  definition, so parallel worktrees running the same daemon collide.
+1. **Same-origin means the daemon app's JS runs on the qits origin.** It can read qits
+   `localStorage`/cookies and call `/api` with ambient credentials. Honest framing: qits already
+   *executes these apps as processes with the user's full privileges* — browser-side origin
+   sharing adds no new trust boundary for the user's own code. But it forecloses "frame an app you
+   don't trust" forever on this path; an untrusted app would need the subdomain fallback.
+2. **`sandbox` can't help here** (see the picker section) — omitted by explicit decision.
+3. **SSRF shape.** The proxy is "qits fetches loopback URLs on behalf of the browser". Constrain
+   it structurally: the origin resolver maps only registered, running daemon instances; the port
+   comes from the registry, never from any request component; targets are hard-pinned to
+   `127.0.0.1`; unknown keys 404 without connecting.
+4. **Exposure surface.** Every daemon app becomes reachable to anyone who can reach qits:8080 —
+   the same trust boundary as qits itself, but it now includes dev servers with their own dev
+   endpoints (Vite's `/@fs/` can serve files outside the project when `server.fs` is
+   misconfigured; CVE-2025-30208-class issues). One more reason the proxy routes only to *known*
+   daemons. Also: `/daemon/*` bypasses `SameOriginUpgradeCheck` — if qits is ever networked with
+   auth, this route needs the same guard as the rest.
 
 ## Risks and failure modes
 
 1. **Web components / shadow DOM (highest).** `outerHTML` of a custom element is a shallow tag —
-   useless for exactly the component-heavy apps this targets (Lit/Stencil). Mitigation:
-   `shadowRoot.innerHTML` when present, and frame the feature as *"point the agent at this
-   element,"* not *"clone this UI."* (Angular's default light DOM is fine.)
-2. **Per-project injection (the trade we accepted).** Each daemon app needs the script tag; this
-   is not automatic across arbitrary apps. Fine for the handful of repos you own; the qits-assisted
-   wrapper and the zero-touch proxy are the answers if that friction bites.
-3. **The app's own dev CSP** could block the external `<script>` or the framing. Dev servers almost
-   never set one, and we own the app so we can relax it — but note it for stacks with a strict dev
-   CSP.
-4. **`outerHTML` fidelity.** Captured HTML carries dev-time hydration attributes and no scoped
+   useless for exactly the component-heavy apps this targets (Lit/Stencil). Mitigation: include
+   `shadowRoot.innerHTML` for open roots (closed roots stay closed — true for every approach), and
+   frame the feature as *"point the agent at this element,"* not *"clone this UI."*
+2. **Hand-written root-absolute runtime URLs.** `base`/`serve-path` covers build-tool-emitted
+   URLs, not app code doing `fetch('/api/users')` — that escapes the prefix and hits *qits'* own
+   `/api`. Apps need relative URLs or a dev-proxy config; otherwise they're a case for the
+   subdomain fallback.
+3. **Base-incapable apps.** A dev server that can't serve under a sub-path (or a stack with a
+   `--serve-path`-class bug like angular-cli #29395) breaks the base-aligned scheme → subdomain
+   fallback.
+4. **Foreign-origin navigation inside the frame** kills `contentDocument` access — degrade
+   gracefully, don't crash the dialog.
+5. **`outerHTML` fidelity.** Captured HTML carries dev-time hydration attributes and no scoped
    CSS/computed styles — it's a *structural pointer* for the agent, not a reproduction. A UI-copy
    framing to set, not a bug to fix.
-5. **Selector brittleness.** nth-child chains drift across HMR re-renders; a `data-testid`-first
+6. **Selector brittleness.** nth-child chains drift across HMR re-renders; a `data-testid`-first
    path plus a text preview softens this, but a pick is a moment-in-time capture.
-6. **No auth.** The picker script trusts `data-qits-origin` and qits trusts the iframe's origin;
-   both are local-loopback assumptions. Acceptable for a local prototype; revisit if qits is ever
-   networked.
+
+## Explicitly deferred
+
+- **Wildcard-subdomain proxy mode** (`{key}.qits.localhost`) for apps that can't serve under a
+  base path — full asset fidelity with zero app config, at the cost of a cross-origin frame. Only
+  this mode needs the retired machinery: proxy-side `<script>` injection into `<head>` (HTML
+  buffering, content-length/encoding fixups) and the postMessage picker protocol.
+- **Port auto-allocation** — inherited limitation from daemons.md; `httpPort` is hardcoded in the
+  definition, so parallel worktrees running the same daemon collide. The proxy resolves through
+  the registry precisely so this lands later without touching it.
+- **In-page screenshots** attached to a pick — a CDP-side screenshot is the right later shape.
+- **Backend snippet channel / MCP feed** — picks could reach the agent's MCP tools directly;
+  the in-browser prompt-context store is enough for iteration one.
 
 ## Open questions
 
-- **Injection default** — ship the manual tag and add the qits-assisted wrapper later, or invest in
-  the Vite/webpack wrapper up front so setup is zero-step for the common stacks? Lean: manual first.
-- **Scope of the cache** — global (pick from any daemon, use anywhere) vs per-worktree? Lean:
-  global root store, since a snippet is just text once captured.
-- **Selector strategy** — is `data-testid`-first enough, or should a pick also carry a coarse
-  text/role fingerprint to survive re-renders?
-- **`httpPath` vs port only** — do any of our dev servers serve the app under a sub-path? Lean:
-  port-only first, add `httpPath` when a case appears.
+- **Key encoding** — raw UUIDs in the path (`/daemon/{worktreeId}/{daemonId}/`) are ugly but
+  unambiguous; a short slug needs a uniqueness story. Lean: raw IDs first.
+- **`STARTING` behavior** — proxy 502s until `READY`, or serve a qits-branded loading splash that
+  auto-refreshes? Lean: splash — dev servers take seconds to boot and a blank 502 in the iframe
+  is a bad first impression.
+- **Vite host checking under remote access** — is rewriting the outbound authority to
+  `127.0.0.1:{port}` sufficient everywhere, or should qits also inject an allowed-hosts env var
+  (`--allowed-hosts "$QITS_ALLOWED_HOSTS"`) as part of the contract?
+- **`httpPath` vs port only** — do any of our dev servers serve the app under their own sub-path
+  on top of the base? Lean: port-only first, add `httpPath` when a case appears.
 
 ## Testing sketch
 
-- **Picker script (frontend, or via the `playwright`/`chrome-devtools` MCP):** serve a fixture page
-  that loads `qits-picker.js` with a `data-qits-origin`; from a parent frame `postMessage` `enter`,
-  click an element → assert a `qits-pick:result` arrives with the right `outerHTML`/`selector`;
-  assert a message from a foreign origin is ignored, and that a pick posts only to the trusted
-  origin. Shadow-DOM case: a custom element yields `shadowRoot.innerHTML` alongside the shallow
-  `outerHTML`.
+- **Proxy (`@QuarkusTest`):** spin up a trivial local HTTP server on a loopback port, register a
+  fake running daemon instance for a (worktree, daemon) pair → requests to
+  `/daemon/{w}/{d}/whatever` reach it verbatim (path unstripped) and stream back; unknown key →
+  404 with no outbound connection; known-but-not-READY → 502; the target is never derivable from
+  client input; a WebSocket echo through the proxy round-trips (HMR path).
+- **Picker (frontend, or via the `playwright`/`chrome-devtools` MCP):** a fixture page in an
+  iframe served same-origin; enter pick mode → hover shows the overlay, click yields the right
+  `outerHTML`/`selector` and doesn't trigger the app's own handlers; full-reload the frame →
+  picker re-attaches via the `load` event and still works; shadow-DOM fixture yields
+  `shadowRoot.innerHTML`.
 - **Store:** `add`/`remove`/`clear`; a snippet flows into `speak-to-prompt`'s `initialContext` and
   into `command-chat`'s `draft`.
-- **Backend (`@QuarkusTest`):** a daemon definition with `httpPort` set surfaces a web-viewable flag
-  + composed URL on its DTO; without it, not web-viewable; the flag also requires a running `READY`
-  `DAEMON` command in the registry.
-- **Manual:** seed a repo with a web-viewable daemon (`httpPort` set) running `ng serve`, drop the
-  script tag into its `index.html`; floaty button → dialog → iframe renders the live app with
-  working HMR → toggle pick → click a component → snippet in the tray → insert into a prompt →
-  launch the agent and confirm `initialContext` carries the HTML.
+- **Backend (`@QuarkusTest`):** a daemon definition with `httpPort` set surfaces the web-viewable
+  flag + proxied base path on its DTO; without it, not web-viewable; the flag also requires a
+  running `READY` `DAEMON` command in the registry; the spawned environment contains
+  `QITS_PUBLIC_BASE` with the stable key.
+- **Manual:** seed a repo with a web-viewable daemon running Vite via
+  `vite --base "$QITS_PUBLIC_BASE"`; floaty button → dialog → iframe renders the live app through
+  the proxy with working HMR → toggle pick → click a component → snippet in the tray → insert into
+  a prompt → launch the agent and confirm `initialContext` carries the HTML.
