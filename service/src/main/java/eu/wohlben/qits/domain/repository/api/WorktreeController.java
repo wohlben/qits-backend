@@ -68,6 +68,33 @@ public class WorktreeController {
     return new CreateWorktreeRequest.Response(worktreeMapper.toDto(wt));
   }
 
+  /**
+   * Start (or recreate) the worktree's container on demand — the container is a recreatable cache
+   * of the durable branch. Idempotent (a running container is left as-is). 404 if the branch itself
+   * is gone (the worktree is then abandoned); the error surfaces to the client rather than a silent
+   * no-op. Returns the refreshed worktree with its live runtime status.
+   */
+  @POST
+  @Path("/{worktreeId}/ensure-container")
+  public WorktreeDto ensureContainer(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    worktreeService.ensureContainer(repoId, worktreeId);
+    return worktreeService.getWorktree(repoId, worktreeId);
+  }
+
+  /**
+   * Gracefully stop the worktree's container: its branch is pushed to origin first (so committed
+   * work survives), then the container is removed and the worktree is left ACTIVE/STOPPED for lazy
+   * recreate. Returns the refreshed worktree.
+   */
+  @POST
+  @Path("/{worktreeId}/stop-container")
+  public WorktreeDto stopContainer(
+      @PathParam("repoId") String repoId, @PathParam("worktreeId") String worktreeId) {
+    worktreeService.stopContainer(repoId, worktreeId);
+    return worktreeService.getWorktree(repoId, worktreeId);
+  }
+
   public static record MergeWorktreeRequest(String target) {
     public record Response(String commitHash, boolean hasConflicts, String output) {}
   }

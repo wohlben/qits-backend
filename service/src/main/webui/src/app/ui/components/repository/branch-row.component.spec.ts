@@ -110,6 +110,69 @@ describe('BranchRowComponent', () => {
     expect(plainButtons.some((b) => b.textContent?.includes('Work on it'))).toBe(false);
   });
 
+  it('shows a STOPPED container and recreates it on Start', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('worktree', {
+      worktreeId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'STOPPED',
+    });
+    fixture.detectChanges();
+
+    let started = false;
+    fixture.componentInstance.ensureContainer.subscribe(() => (started = true));
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('z-badge')?.textContent).toContain('STOPPED');
+    const buttons = Array.from(el.querySelectorAll('button'));
+    // A stopped container offers Start (recreate), not Stop.
+    expect(buttons.some((b) => b.textContent?.trim() === 'Stop')).toBe(false);
+    buttons.find((b) => b.textContent?.includes('Start'))!.click();
+    expect(started).toBe(true);
+  });
+
+  it('shows a RUNNING container and stops it on Stop', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('worktree', {
+      worktreeId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+    });
+    fixture.detectChanges();
+
+    let stopped = false;
+    fixture.componentInstance.stopContainer.subscribe(() => (stopped = true));
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('z-badge')?.textContent).toContain('RUNNING');
+    const buttons = Array.from(el.querySelectorAll('button'));
+    expect(buttons.some((b) => b.textContent?.includes('Start'))).toBe(false);
+    buttons.find((b) => b.textContent?.trim() === 'Stop')!.click();
+    expect(stopped).toBe(true);
+  });
+
+  it('labels the control Recreate and shows the reason when provisioning FAILED', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('worktree', {
+      worktreeId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'FAILED',
+      runtimeError: 'git-host unreachable',
+    });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('z-badge')?.getAttribute('title')).toContain('git-host unreachable');
+    const buttons = Array.from(el.querySelectorAll('button'));
+    expect(buttons.some((b) => b.textContent?.includes('Recreate'))).toBe(true);
+  });
+
   it('replaces integrate/abandon with cleanup when the worktree can be cleaned up', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/done');

@@ -248,6 +248,8 @@ interface NodeSummary {
             [canCleanup]="cleanupable().has(node.label)"
             [claudeConfigurable]="claudeConfigurable()"
             (viewCommits)="viewCommits.emit(node.label)"
+            (ensureContainer)="ensureContainer.emit(node.data!)"
+            (stopContainer)="stopContainer.emit(node.data!)"
             (openWorktree)="openWorktree.emit(node.data!)"
             (run)="run.emit(node.label)"
             (configureWithClaude)="configureWithClaude.emit(node.label)"
@@ -274,6 +276,10 @@ export class BranchTreeComponent {
   /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no worktree. */
   readonly branchSummaries = input<Record<string, BranchSummary>>({});
   readonly viewCommits = output<string>();
+  /** Start/recreate a worktree's container (carries the worktree). */
+  readonly ensureContainer = output<WorktreeDto>();
+  /** Gracefully stop a worktree's container (carries the worktree). */
+  readonly stopContainer = output<WorktreeDto>();
   /** Open a worktree's detail page (carries the worktree). */
   readonly openWorktree = output<WorktreeDto>();
   /** Open the "Run…" dialog for a worktree-backed branch (carries the branch name). */

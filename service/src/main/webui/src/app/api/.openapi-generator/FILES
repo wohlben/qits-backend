@@ -1,5 +1,4 @@
 .gitignore
-.openapi-generator-ignore
 README.md
 api.base.service.ts
 api.module.ts
@@ -184,6 +183,7 @@ model/worktreeEventType.ts
 model/worktreeFileContentDto.ts
 model/worktreeHistoryDetailDto.ts
 model/worktreeHistoryDto.ts
+model/worktreeRuntimeStatus.ts
 model/worktreeStatus.ts
 param.ts
 provide-api.ts

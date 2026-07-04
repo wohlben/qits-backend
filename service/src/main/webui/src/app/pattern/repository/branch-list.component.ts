@@ -75,6 +75,8 @@ interface CreateWorktreeForm {
             [branchSummaries]="branchSummaries()"
             [claudeConfigurable]="true"
             (viewCommits)="viewCommits($event)"
+            (ensureContainer)="onEnsureContainer($event)"
+            (stopContainer)="onStopContainer($event)"
             (openWorktree)="openWorktree($event)"
             (run)="openRun($event)"
             (configureWithClaude)="configureWithClaude($event)"
@@ -97,6 +99,14 @@ interface CreateWorktreeForm {
           }
           @if (cleanupMutation.isError()) {
             <div class="text-sm text-destructive">Failed to clean up branch</div>
+          }
+          @if (ensureContainerMutation.isError()) {
+            <div class="text-sm text-destructive">
+              Failed to start the container: {{ errorMessage(ensureContainerMutation.error()) }}
+            </div>
+          }
+          @if (stopContainerMutation.isError()) {
+            <div class="text-sm text-destructive">Failed to stop the container</div>
           }
         }
       }
@@ -636,6 +646,31 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
+  // Start/recreate a worktree's container on demand (it is a recreatable cache of the branch). The
+  // error is surfaced (below) rather than swallowed, so a failed provision — e.g. the branch is gone
+  // or the git-host is unreachable — tells the user why.
+  readonly ensureContainerMutation = injectMutation(() => ({
+    mutationFn: (worktreeId: string) =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdEnsureContainerPost(
+          this.repoId(),
+          worktreeId,
+        ),
+      ),
+    onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+  }));
+
+  readonly stopContainerMutation = injectMutation(() => ({
+    mutationFn: (worktreeId: string) =>
+      lastValueFrom(
+        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdStopContainerPost(
+          this.repoId(),
+          worktreeId,
+        ),
+      ),
+    onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+  }));
+
   readonly resolveMutation = injectMutation(() => ({
     mutationFn: (worktreeId: string) =>
       lastValueFrom(
@@ -850,6 +885,30 @@ export class BranchListComponent {
   onFastForward(worktree: WorktreeDto) {
     if (worktree.worktreeId) {
       this.fastForwardMutation.mutate(worktree.worktreeId);
+    }
+  }
+
+  onEnsureContainer(worktree: WorktreeDto) {
+    if (worktree.worktreeId) {
+      this.ensureContainerMutation.mutate(worktree.worktreeId);
+    }
+  }
+
+  /** The backend error message from a failed mutation ({@code {message}} body), for display. */
+  errorMessage(error: unknown): string {
+    const httpError = error as { error?: unknown; message?: string } | null;
+    const body = httpError?.error;
+    if (typeof body === 'string' && body.trim()) return body;
+    if (body && typeof body === 'object') {
+      const message = (body as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return httpError?.message ?? 'unknown error';
+  }
+
+  onStopContainer(worktree: WorktreeDto) {
+    if (worktree.worktreeId) {
+      this.stopContainerMutation.mutate(worktree.worktreeId);
     }
   }
 

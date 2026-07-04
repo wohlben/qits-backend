@@ -3,6 +3,8 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideBot, lucideFolderOpen } from '@ng-icons/lucide';
 
 import { WorktreeDto } from '@/api/model/worktreeDto';
+import { WorktreeRuntimeStatus } from '@/api/model/worktreeRuntimeStatus';
+import { ZardBadgeComponent, ZardBadgeTypeVariants } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
 
 /**
@@ -15,24 +17,52 @@ import { ZardButtonComponent } from '@/shared/components/button';
  */
 @Component({
   selector: 'app-branch-row',
-  imports: [ZardButtonComponent, NgIcon],
+  imports: [ZardButtonComponent, ZardBadgeComponent, NgIcon],
   template: `
     <div class="flex w-full flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
       <div class="flex min-w-0 flex-col gap-1">
         <span class="font-medium">{{ branch() }}</span>
         @if (worktree(); as wt) {
-          <span class="text-sm text-muted-foreground">
-            worktree: {{ wt.worktreeId }}
-            @if (wt.parent) {
-              <span> · forked from {{ wt.parent }}</span>
-            }
+          <span class="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              worktree: {{ wt.worktreeId }}
+              @if (wt.parent) {
+                <span> · forked from {{ wt.parent }}</span>
+              }
+            </span>
+            <!-- The container is a recreatable cache of the branch; this badge shows its live state
+                 (RUNNING/STOPPED/PROVISIONING/FAILED), with the failure reason on hover. -->
+            <z-badge
+              [zType]="runtimeBadgeType(wt.runtimeStatus)"
+              [attr.title]="wt.runtimeStatus === 'FAILED' ? (wt.runtimeError ?? 'Provision failed') : null"
+            >
+              {{ wt.runtimeStatus ?? 'STOPPED' }}
+            </z-badge>
           </span>
         }
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button z-button zType="ghost" (click)="viewCommits.emit()">View commits</button>
-        @if (worktree()) {
+        @if (worktree(); as wt) {
+          <!-- Container lifecycle: bring a stopped/failed container back (recreated from the branch)
+               or gracefully stop a running one (pushes first, so committed work survives). -->
+          @if (wt.runtimeStatus === 'PROVISIONING') {
+            <button z-button zType="ghost" [zLoading]="true" [zDisabled]="true">Starting…</button>
+          } @else if (wt.runtimeStatus === 'RUNNING') {
+            <button z-button zType="ghost" title="Stop this container" (click)="stopContainer.emit()">
+              Stop
+            </button>
+          } @else {
+            <button
+              z-button
+              zType="secondary"
+              title="Start this worktree's container (recreated from its branch)"
+              (click)="ensureContainer.emit()"
+            >
+              {{ wt.runtimeStatus === 'FAILED' ? 'Recreate' : 'Start' }}
+            </button>
+          }
           <!-- Opens the worktree's detail page: browse its files and chat with its agent. -->
           <button z-button zType="ghost" title="Open this worktree" (click)="openWorktree.emit()">
             <ng-icon name="lucideFolderOpen" class="size-4" />
@@ -89,6 +119,10 @@ export class BranchRowComponent {
    */
   readonly canCleanup = input(false);
   readonly viewCommits = output<void>();
+  /** Start or recreate this worktree's container (re-materialized from its branch on demand). */
+  readonly ensureContainer = output<void>();
+  /** Gracefully stop this worktree's container (pushes its branch first, then removes it). */
+  readonly stopContainer = output<void>();
   /** Open this worktree's detail page (file browser + chat dialog). */
   readonly openWorktree = output<void>();
   /** Open the "Run…" dialog to pick a preconfigured action to run in this worktree. */
@@ -99,4 +133,16 @@ export class BranchRowComponent {
   readonly abandon = output<void>();
   readonly delete = output<void>();
   readonly cleanup = output<void>();
+
+  /** Badge colour for a container runtime state: neutral when running/stopped, red on failure. */
+  runtimeBadgeType(status: WorktreeRuntimeStatus | undefined): ZardBadgeTypeVariants {
+    switch (status) {
+      case WorktreeRuntimeStatus.Running:
+        return 'secondary';
+      case WorktreeRuntimeStatus.Failed:
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  }
 }

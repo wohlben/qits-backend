@@ -155,4 +155,5 @@ export * from './worktreeEventType';
 export * from './worktreeFileContentDto';
 export * from './worktreeHistoryDetailDto';
 export * from './worktreeHistoryDto';
+export * from './worktreeRuntimeStatus';
 export * from './worktreeStatus';
