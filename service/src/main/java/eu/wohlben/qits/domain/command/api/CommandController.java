@@ -4,6 +4,7 @@ import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -72,8 +73,9 @@ public class CommandController {
 
   @GET
   @Path("/{commandId}/log")
-  public GetCommandLogRequest.Response log(@PathParam("commandId") String commandId) {
-    return new GetCommandLogRequest.Response(commandService.log(commandId));
+  public GetCommandLogRequest.Response log(
+      @PathParam("commandId") String commandId, @QueryParam("severity") LogSeverity severity) {
+    return new GetCommandLogRequest.Response(commandService.log(commandId, severity));
   }
 
   public static record TerminateCommandRequest() {

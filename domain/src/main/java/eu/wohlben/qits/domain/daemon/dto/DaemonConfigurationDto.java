@@ -21,4 +21,5 @@ public record DaemonConfigurationDto(
     DaemonScope scope,
     String repositoryId,
     Map<String, String> environment,
-    List<LogObserverDto> observers) {}
+    List<LogObserverDto> observers,
+    List<LogSourceDto> sources) {}

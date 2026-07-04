@@ -39,7 +39,8 @@ public class DaemonConfigurationController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<@Valid LogObserverInput> observers) {
+      List<@Valid LogObserverInput> observers,
+      List<@Valid LogSourceInput> sources) {
     public record Response(DaemonConfigurationDto daemonConfiguration) {}
   }
 
@@ -56,7 +57,8 @@ public class DaemonConfigurationController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.environment(),
-            LogObserverInput.toEntities(request.observers()));
+            LogObserverInput.toEntities(request.observers()),
+            LogSourceInput.toEntities(request.sources()));
     return new CreateDaemonConfigurationRequest.Response(daemonConfigurationMapper.toDto(config));
   }
 
@@ -98,7 +100,8 @@ public class DaemonConfigurationController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Map<String, String> environment,
-      List<@Valid LogObserverInput> observers) {
+      List<@Valid LogObserverInput> observers,
+      List<@Valid LogSourceInput> sources) {
     public record Response(DaemonConfigurationDto daemonConfiguration) {}
   }
 
@@ -117,7 +120,8 @@ public class DaemonConfigurationController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.environment(),
-            LogObserverInput.toEntities(request.observers()));
+            LogObserverInput.toEntities(request.observers()),
+            LogSourceInput.toEntities(request.sources()));
     return new UpdateDaemonConfigurationRequest.Response(daemonConfigurationMapper.toDto(config));
   }
 

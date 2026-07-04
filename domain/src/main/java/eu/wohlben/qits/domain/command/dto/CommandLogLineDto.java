@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.command.dto;
 
 import eu.wohlben.qits.domain.command.entity.LogChannel;
+import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import java.time.Instant;
 
 /**
@@ -9,7 +10,8 @@ import java.time.Instant;
  * @param sequence the monotonic per-command ordinal (stable sort key)
  * @param channel which stream the line came from (STDIN vs merged OUTPUT)
  * @param content the raw line text (may contain ANSI escapes)
+ * @param severity classified severity (DAEMON output lines only); null on routine output
  * @param timestamp when the line completed
  */
 public record CommandLogLineDto(
-    long sequence, LogChannel channel, String content, Instant timestamp) {}
+    long sequence, LogChannel channel, String content, LogSeverity severity, Instant timestamp) {}

@@ -116,6 +116,8 @@ components:
           $ref: "#/components/schemas/LogChannel"
         content:
           type: string
+        severity:
+          $ref: "#/components/schemas/LogSeverity"
         timestamp:
           $ref: "#/components/schemas/Instant"
     CommandStatus:
@@ -237,6 +239,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogObserverInput"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogSourceInput"
     CreateFeatureFlowPhaseActionRequest:
       type: object
       required:
@@ -353,6 +359,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogObserverInput"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogSourceInput"
     CreateWorktreeRequest:
       type: object
       required:
@@ -399,6 +409,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogObserverDto"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogSourceDto"
     DaemonEventDto:
       type: object
       properties:
@@ -422,6 +436,16 @@ components:
           type: string
         commandId:
           type: string
+        source:
+          type: string
+        anchorFrom:
+          type: integer
+          format: int64
+        anchorTo:
+          type: integer
+          format: int64
+        sourceEpoch:
+          $ref: "#/components/schemas/Instant"
         timestamp:
           $ref: "#/components/schemas/Instant"
     DaemonEventKind:
@@ -687,6 +711,29 @@ components:
       enum:
       - PATTERN
       - LOG_LEVEL
+    LogSeverity:
+      type: string
+      enum:
+      - INFO
+      - WARNING
+      - ERROR
+    LogSourceDto:
+      type: object
+      properties:
+        path:
+          type: string
+        label:
+          type: string
+    LogSourceInput:
+      type: object
+      required:
+      - path
+      properties:
+        path:
+          type: string
+          pattern: \S
+        label:
+          type: string
     MergeBranchRequest:
       type: object
       required:
@@ -763,35 +810,37 @@ components:
     Response12:
       type: object
       properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/DaemonEventDto"
+    Response13:
+      type: object
+      properties:
         daemon:
           $ref: "#/components/schemas/DaemonConfigurationDto"
-    Response13:
+    Response14:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry2"
-    Response14:
+    Response15:
       type: object
       properties:
         daemon:
           $ref: "#/components/schemas/DaemonConfigurationDto"
-    Response15:
+    Response16:
       type: object
       properties:
         success:
           type: boolean
-    Response16:
+    Response17:
       type: object
       properties:
         daemon:
           $ref: "#/components/schemas/DaemonConfigurationDto"
-    Response17:
-      type: object
-      properties:
-        instance:
-          $ref: "#/components/schemas/DaemonInstanceDto"
     Response18:
       type: object
       properties:
@@ -800,10 +849,8 @@ components:
     Response19:
       type: object
       properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry3"
+        instance:
+          $ref: "#/components/schemas/DaemonInstanceDto"
     Response2:
       type: object
       properties:
@@ -812,10 +859,10 @@ components:
     Response20:
       type: object
       properties:
-        events:
+        entries:
           type: array
           items:
-            $ref: "#/components/schemas/DaemonEventDto"
+            $ref: "#/components/schemas/Entry3"
     Response21:
       type: object
       properties:
@@ -1270,6 +1317,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogObserverInput"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogSourceInput"
     UpdateFeatureFlowConfigurationRequest:
       type: object
       properties:
@@ -1345,6 +1396,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogObserverInput"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogSourceInput"
     WorktreeDto:
       type: object
       properties:
@@ -1612,6 +1667,10 @@ paths:
         required: true
         schema:
           type: string
+      - name: severity
+        in: query
+        schema:
+          $ref: "#/components/schemas/LogSeverity"
       responses:
         "200":
           description: OK
@@ -1765,6 +1824,54 @@ paths:
       summary: Delete
       tags:
       - Daemon Configuration Controller
+  /api/daemon-events:
+    get:
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 500
+          minimum: 1
+      - name: repoId
+        in: query
+        schema:
+          type: string
+      - name: severity
+        in: query
+        schema:
+          $ref: "#/components/schemas/DaemonEventSeverity"
+      - name: since
+        in: query
+        schema:
+          $ref: "#/components/schemas/Instant"
+      - name: source
+        in: query
+        schema:
+          type: string
+      - name: worktreeId
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response12"
+      summary: List
+      tags:
+      - Daemon Event Controller
   /api/echo/reactive:
     post:
       requestBody:
@@ -2837,31 +2944,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response19"
-      summary: List
-      tags:
-      - Worktree Daemon Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/daemons/events:
-    get:
-      parameters:
-      - name: repoId
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: worktreeId
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
                 $ref: "#/components/schemas/Response20"
-      summary: Events
+      summary: List
       tags:
       - Worktree Daemon Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/daemons/{daemonId}/start:
@@ -2888,7 +2972,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response18"
+                $ref: "#/components/schemas/Response19"
       summary: Start
       tags:
       - Worktree Daemon Controller
@@ -2916,7 +3000,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response17"
+                $ref: "#/components/schemas/Response18"
       summary: Stop
       tags:
       - Worktree Daemon Controller
@@ -3173,7 +3257,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response13"
+                $ref: "#/components/schemas/Response14"
       summary: List
       tags:
       - Repository Daemon Controller
@@ -3196,7 +3280,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response16"
+                $ref: "#/components/schemas/Response17"
         "400":
           description: Bad Request
       summary: Create
@@ -3227,7 +3311,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response12"
+                $ref: "#/components/schemas/Response13"
         "400":
           description: Bad Request
       summary: Update
@@ -3251,7 +3335,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response14"
+                $ref: "#/components/schemas/Response15"
       summary: Get
       tags:
       - Repository Daemon Controller
@@ -3273,7 +3357,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response15"
+                $ref: "#/components/schemas/Response16"
       summary: Delete
       tags:
       - Repository Daemon Controller

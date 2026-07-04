@@ -33,4 +33,11 @@ public class DaemonConfiguration extends AbstractDaemonDefinition {
       joinColumns = @JoinColumn(name = "daemon_configuration_id"))
   @OrderColumn(name = "observer_index")
   public List<LogObserver> observers = new ArrayList<>();
+
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+      name = "daemon_configuration_source",
+      joinColumns = @JoinColumn(name = "daemon_configuration_id"))
+  @OrderColumn(name = "source_index")
+  public List<LogSource> sources = new ArrayList<>();
 }

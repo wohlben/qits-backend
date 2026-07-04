@@ -1,7 +1,10 @@
 package eu.wohlben.qits.domain.command.control;
 
 import eu.wohlben.qits.domain.command.entity.Command;
+import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandLogLine;
+import eu.wohlben.qits.domain.command.entity.LogChannel;
+import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import eu.wohlben.qits.domain.command.persistence.CommandLogLineRepository;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,7 +19,10 @@ import java.util.Map;
  * Persists a batch of captured log lines in one transaction, off the request path. Isolated in its
  * own bean so {@code CommandLogService}'s background writer thread invokes it through the CDI proxy
  * (so {@link Transactional}/{@link ActivateRequestContext} actually apply — a self-invocation would
- * bypass them). The owning command is loaded once per batch and shared across its lines.
+ * bypass them). The owning command is loaded once per batch and shared across its lines. DAEMON
+ * commands' OUTPUT lines are additionally stamped with a classified {@link LogSeverity} — local,
+ * cheap, and off the hot path, which is what makes {@code ?severity=} filters possible without
+ * re-parsing.
  */
 @ApplicationScoped
 public class CommandLogBatchPersister {
@@ -24,6 +30,8 @@ public class CommandLogBatchPersister {
   @Inject CommandRepository commandRepository;
 
   @Inject CommandLogLineRepository commandLogLineRepository;
+
+  @Inject LogLineClassifier logLineClassifier;
 
   @Transactional
   @ActivateRequestContext
@@ -40,8 +48,16 @@ public class CommandLogBatchPersister {
               .sequence(line.sequence())
               .channel(line.channel())
               .content(line.content())
+              .severity(classify(command, line))
               .timestamp(line.timestamp())
               .build());
     }
+  }
+
+  private LogSeverity classify(Command command, CommandLogService.PendingLine line) {
+    if (command.kind != CommandKind.DAEMON || line.channel() != LogChannel.OUTPUT) {
+      return null;
+    }
+    return logLineClassifier.classify(line.content()).orElse(null);
   }
 }

@@ -5,11 +5,12 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
- * The PATTERN observer: every output line matching the regex becomes an {@code ERROR_DETECTED}
- * finding with the configured severity and the line as evidence. Throttled so a crash-looping
- * daemon doesn't flood the event feed (and the agent's chat) with one event per line.
+ * The PATTERN observer: every observed line matching the regex becomes an {@code ERROR_DETECTED}
+ * finding with the configured severity, the line as evidence, and the line's place in its source as
+ * the anchor. Throttled so a crash-looping daemon doesn't flood the event feed (and the agent's
+ * chat) with one event per line. One instance per (observer, source).
  */
-final class PatternLogObserver extends LineFramingSink {
+final class PatternLogObserver implements ObservedLineListener {
 
   /** At most one finding per observer per this interval; suppressed matches are dropped. */
   private static final long THROTTLE_MILLIS = 10_000;
@@ -27,8 +28,8 @@ final class PatternLogObserver extends LineFramingSink {
   }
 
   @Override
-  protected void onLine(String line) {
-    if (!pattern.matcher(line).find()) {
+  public synchronized void onLine(ObservedLine line) {
+    if (!pattern.matcher(line.content()).find()) {
       return;
     }
     long now = System.currentTimeMillis();
@@ -37,6 +38,14 @@ final class PatternLogObserver extends LineFramingSink {
     }
     lastEmitMillis = now;
     onFinding.accept(
-        new ObserverFinding(severity, "pattern:" + pattern.pattern(), line.strip(), line));
+        new ObserverFinding(
+            severity,
+            "pattern:" + pattern.pattern(),
+            line.content().strip(),
+            line.content(),
+            line.source(),
+            line.position(),
+            line.position(),
+            line.sourceEpoch()));
   }
 }

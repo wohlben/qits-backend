@@ -42,7 +42,8 @@ public class DaemonSeeder {
         RestartPolicy.ON_FAILURE,
         3,
         null,
-        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)));
+        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
+        null);
     LOG.infof("Seeded global daemon '%s'", HTTP_SERVER_NAME);
   }
 }

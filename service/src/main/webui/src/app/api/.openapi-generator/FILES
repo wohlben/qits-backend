@@ -8,6 +8,7 @@ api/api.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
 api/daemonConfigurationController.service.ts
+api/daemonEventController.service.ts
 api/featureFlowConfigurationController.service.ts
 api/featureFlowPhaseActionController.service.ts
 api/featureFlowPhaseController.service.ts
@@ -85,6 +86,9 @@ model/logChannel.ts
 model/logObserverDto.ts
 model/logObserverInput.ts
 model/logObserverKind.ts
+model/logSeverity.ts
+model/logSourceDto.ts
+model/logSourceInput.ts
 model/mergeBranchRequest.ts
 model/mergeWorktreeRequest.ts
 model/models.ts

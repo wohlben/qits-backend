@@ -20,6 +20,11 @@ export interface DaemonObserverRow {
   severity: 'INFO' | 'WARNING' | 'ERROR';
 }
 
+export interface DaemonSourceRow {
+  path: string;
+  label: string;
+}
+
 export interface DaemonConfigurationFormData {
   name: string;
   description: string;
@@ -31,6 +36,7 @@ export interface DaemonConfigurationFormData {
   maxRestarts: string;
   environment: DaemonEnvVarRow[];
   observers: DaemonObserverRow[];
+  sources: DaemonSourceRow[];
 }
 
 @Component({
@@ -144,6 +150,48 @@ export interface DaemonConfigurationFormData {
         </div>
       </fieldset>
 
+      <!-- FILE log sources: worktree-relative files tailed alongside the process output; every
+           observer above watches these too. -->
+      <fieldset class="flex flex-col gap-2">
+        <legend class="text-sm font-medium">Log sources (tailed files)</legend>
+        @for (row of model().sources; track $index) {
+          <div class="flex items-center gap-2">
+            <input
+              z-input
+              class="flex-1"
+              placeholder="worktree-relative path, e.g. logs/app.log"
+              autocomplete="off"
+              [value]="row.path"
+              (input)="updateSource($index, 'path', $any($event.target).value)"
+              [attr.aria-label]="'Source ' + ($index + 1) + ' path'"
+            />
+            <input
+              z-input
+              class="flex-1"
+              placeholder="label (optional)"
+              autocomplete="off"
+              [value]="row.label"
+              (input)="updateSource($index, 'label', $any($event.target).value)"
+              [attr.aria-label]="'Source ' + ($index + 1) + ' label'"
+            />
+            <button
+              z-button
+              zType="ghost"
+              type="button"
+              (click)="removeSource($index)"
+              [attr.aria-label]="'Remove source ' + ($index + 1)"
+            >
+              Remove
+            </button>
+          </div>
+        }
+        <div>
+          <button z-button zType="secondary" type="button" (click)="addSource()">
+            Add log source
+          </button>
+        </div>
+      </fieldset>
+
       <!-- Environment variables overlaid on the process env when the daemon runs. -->
       <fieldset class="flex flex-col gap-2">
         <legend class="text-sm font-medium">Environment variables</legend>
@@ -208,6 +256,7 @@ export class DaemonConfigurationFormComponent {
     maxRestarts: '3',
     environment: [],
     observers: [],
+    sources: [],
   });
   readonly form = form(this.model, (schemaPath) => {
     required(schemaPath.name, { message: 'Name is required' });
@@ -239,6 +288,27 @@ export class DaemonConfigurationFormComponent {
     this.model.update((m) => ({
       ...m,
       observers: m.observers.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    }));
+  }
+
+  addSource() {
+    this.model.update((m) => ({
+      ...m,
+      sources: [...m.sources, { path: '', label: '' }],
+    }));
+  }
+
+  removeSource(index: number) {
+    this.model.update((m) => ({
+      ...m,
+      sources: m.sources.filter((_, i) => i !== index),
+    }));
+  }
+
+  updateSource(index: number, field: keyof DaemonSourceRow, value: string) {
+    this.model.update((m) => ({
+      ...m,
+      sources: m.sources.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
     }));
   }
 

@@ -57,6 +57,14 @@ public class CommandLogLine extends PanacheEntityBase {
   @Column(nullable = false)
   public String content;
 
+  /**
+   * Classified severity, stamped at persist time for DAEMON commands' OUTPUT lines; null where the
+   * classifier saw nothing (routine output) and for other command kinds. Enables {@code ?severity=}
+   * filters without re-parsing.
+   */
+  @Enumerated(EnumType.STRING)
+  public LogSeverity severity;
+
   /** When the line completed (captured at line-completion time, not at persist time). */
   @Column(name = "at", nullable = false)
   public Instant timestamp;

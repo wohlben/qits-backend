@@ -8,12 +8,14 @@
  * Do not edit the class manually.
  */
 import { LogChannel } from './logChannel';
+import { LogSeverity } from './logSeverity';
 
 
 export interface CommandLogLineDto { 
     sequence?: number;
     channel?: LogChannel;
     content?: string;
+    severity?: LogSeverity;
     timestamp?: string;
 }
 export namespace CommandLogLineDto {

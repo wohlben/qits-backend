@@ -36,7 +36,8 @@ public class DaemonConfigurationControllerTest {
                 List.of(
                     new LogObserverInput(
                         LogObserverKind.PATTERN, "ERROR", DaemonEventSeverity.ERROR),
-                    new LogObserverInput(LogObserverKind.LOG_LEVEL, null, null))))
+                    new LogObserverInput(LogObserverKind.LOG_LEVEL, null, null)),
+                List.of(new LogSourceInput("logs/app.log", "app log"))))
         .post("/api/daemon-configurations")
         .then()
         .statusCode(200)
@@ -51,6 +52,8 @@ public class DaemonConfigurationControllerTest {
         .body("daemonConfiguration.observers[0].kind", equalTo("PATTERN"))
         .body("daemonConfiguration.observers[0].pattern", equalTo("ERROR"))
         .body("daemonConfiguration.observers[1].kind", equalTo("LOG_LEVEL"))
+        .body("daemonConfiguration.sources[0].path", equalTo("logs/app.log"))
+        .body("daemonConfiguration.sources[0].label", equalTo("app log"))
         .extract()
         .path("daemonConfiguration.id");
   }
@@ -86,7 +89,8 @@ public class DaemonConfigurationControllerTest {
                 null,
                 List.of(
                     new LogObserverInput(
-                        LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING))))
+                        LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING)),
+                null))
         .put("/api/daemon-configurations/" + id)
         .then()
         .statusCode(200)
@@ -95,7 +99,10 @@ public class DaemonConfigurationControllerTest {
         .body("daemonConfiguration.readyPattern", equalTo(null))
         .body("daemonConfiguration.restartPolicy", equalTo("NEVER"))
         .body("daemonConfiguration.observers.size()", equalTo(1))
-        .body("daemonConfiguration.observers[0].pattern", equalTo("FATAL"));
+        .body("daemonConfiguration.observers[0].pattern", equalTo("FATAL"))
+        .body(
+            "daemonConfiguration.sources[0].path",
+            equalTo("logs/app.log")); // null sources on update means "keep as-is"
 
     given()
         .delete("/api/daemon-configurations/" + id)
@@ -112,7 +119,16 @@ public class DaemonConfigurationControllerTest {
         .contentType(ContentType.JSON)
         .body(
             new CreateDaemonConfigurationRequest(
-                "Broken regex", null, "npm run dev", "([unclosed", null, null, null, null, null))
+                "Broken regex",
+                null,
+                "npm run dev",
+                "([unclosed",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null))
         .post("/api/daemon-configurations")
         .then()
         .statusCode(400);
@@ -132,10 +148,34 @@ public class DaemonConfigurationControllerTest {
                 null,
                 null,
                 null,
-                List.of(new LogObserverInput(LogObserverKind.PATTERN, null, null))))
+                List.of(new LogObserverInput(LogObserverKind.PATTERN, null, null)),
+                null))
         .post("/api/daemon-configurations")
         .then()
         .statusCode(400);
+  }
+
+  @Test
+  public void rejectsTraversalInLogSourcePaths() {
+    for (String path : List.of("../outside.log", "/etc/passwd", ".git/config")) {
+      given()
+          .contentType(ContentType.JSON)
+          .body(
+              new CreateDaemonConfigurationRequest(
+                  "Bad source",
+                  null,
+                  "npm run dev",
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  List.of(new LogSourceInput(path, null))))
+          .post("/api/daemon-configurations")
+          .then()
+          .statusCode(400);
+    }
   }
 
   @Test

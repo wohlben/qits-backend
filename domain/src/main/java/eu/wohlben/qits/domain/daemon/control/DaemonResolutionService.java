@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.dto.DaemonConfigurationDto;
 import eu.wohlben.qits.domain.daemon.dto.LogObserverDto;
+import eu.wohlben.qits.domain.daemon.dto.LogSourceDto;
 import eu.wohlben.qits.domain.daemon.entity.DaemonScope;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.daemon.mapper.DaemonConfigurationMapper;
@@ -44,7 +45,8 @@ public class DaemonResolutionService {
       DaemonScope scope,
       String repositoryId,
       Map<String, String> environment,
-      List<LogObserverDto> observers) {
+      List<LogObserverDto> observers,
+      List<LogSourceDto> sources) {
 
     static ResolvedDaemon of(DaemonConfigurationDto dto) {
       return new ResolvedDaemon(
@@ -59,7 +61,8 @@ public class DaemonResolutionService {
           dto.scope(),
           dto.repositoryId(),
           dto.environment(),
-          dto.observers());
+          dto.observers(),
+          dto.sources());
     }
   }
 
