@@ -111,7 +111,8 @@ public class CodingAgentFactoryTest {
     LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE).chat();
 
     assertEquals(
-        "exec claude --print --input-format stream-json --output-format stream-json --verbose",
+        "exec claude --print --input-format stream-json --output-format stream-json"
+            + " --include-hook-events --verbose",
         spec.script());
     assertFalse(spec.interactive());
   }

@@ -13,7 +13,7 @@ structured, stack traces attached, correlated by trace id.
 
 Related/dependent plans:
 
-- Delivery vehicle is [daemons](daemons.md): daemon definitions grow an `otel` toggle that
+- Delivery vehicle is [daemons](../features/2026-07-04_daemons.md): daemon definitions grow an `otel` toggle that
   injects `OTEL_EXPORTER_OTLP_*` env vars at launch, and the observability data upgrades the
   daemons idea's error detection (structured exception events instead of log-regex guesses).
   Works without daemons too — anything run in a qits terminal can export to the endpoint.

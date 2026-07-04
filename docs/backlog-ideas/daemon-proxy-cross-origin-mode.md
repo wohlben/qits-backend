@@ -18,7 +18,7 @@ Related/dependent plans:
 - Changes the proxy and picker shipped by the
   [daemon web-view picker](../feature-ideas/daemon-webview-picker.md) — this is a modification
   of that code, not a parallel implementation. Everything here assumes that feature exists.
-- The proxied thing is still a [daemon](../feature-ideas/daemons.md) instance; the daemon
+- The proxied thing is still a [daemon](../features/2026-07-04_daemons.md) instance; the daemon
   definition gains a mode field (below).
 
 ## What exists today (the code being changed)

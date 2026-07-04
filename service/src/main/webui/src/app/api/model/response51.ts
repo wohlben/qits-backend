@@ -7,11 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { RepositoryDto } from './repositoryDto';
 
 
 export interface Response51 { 
-    worktreeId?: string;
-    branch?: string;
-    commandId?: string;
+    repository?: RepositoryDto;
+    projectId?: string;
 }
 

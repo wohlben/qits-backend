@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { LazyDirDto } from './lazyDirDto';
+import { ProjectDto } from './projectDto';
 
 
 export interface Response53 { 
-    paths?: Array<string>;
-    lazyDirs?: Array<LazyDirDto>;
+    project?: ProjectDto;
 }
 

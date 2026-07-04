@@ -10,6 +10,9 @@
 
 
 export interface Response58 { 
-    files?: Array<string>;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
+    cleanedUp?: boolean;
 }
 

@@ -10,6 +10,6 @@
 
 
 export interface Response56 { 
-    success?: boolean;
+    output?: string;
 }
 

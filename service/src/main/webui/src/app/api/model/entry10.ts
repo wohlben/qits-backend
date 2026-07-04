@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorktreeHistoryDto } from './worktreeHistoryDto';
+import { FeatureFlowConfigurationDto } from './featureFlowConfigurationDto';
 
 
 export interface Entry10 { 
-    worktree?: WorktreeHistoryDto;
+    featureFlowConfiguration?: FeatureFlowConfigurationDto;
 }
 

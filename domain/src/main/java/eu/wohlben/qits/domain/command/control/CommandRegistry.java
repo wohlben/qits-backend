@@ -188,6 +188,15 @@ public class CommandRegistry {
     return true;
   }
 
+  /**
+   * Send a named signal (e.g. TERM) to a running PTY command's process group — the graceful half of
+   * a daemon stop. False if the command is not a running PTY session or delivery failed.
+   */
+  public boolean signal(String commandId, String signal) {
+    CommandSession session = sessions.get(commandId);
+    return session != null && session.signal(signal);
+  }
+
   /** Force-kill a running command (terminal or chat); false if it is not in the registry. */
   public boolean terminate(String commandId) {
     CommandSession session = sessions.get(commandId);

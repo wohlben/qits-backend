@@ -6,6 +6,7 @@ import { lastValueFrom } from 'rxjs';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
+import { WorktreeDaemonsComponent } from '@/pattern/daemon/worktree-daemons.component';
 import { WorktreeChatComponent } from '@/pattern/worktree/worktree-chat.component';
 import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-browser.component';
 
@@ -16,7 +17,12 @@ import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-b
  */
 @Component({
   selector: 'app-worktree-detail-page',
-  imports: [PageLayoutComponent, WorktreeChatComponent, WorktreeFileBrowserComponent],
+  imports: [
+    PageLayoutComponent,
+    WorktreeChatComponent,
+    WorktreeDaemonsComponent,
+    WorktreeFileBrowserComponent,
+  ],
   template: `
     <app-page-layout
       [request]="worktreesQuery"
@@ -45,7 +51,10 @@ import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-b
         />
       </ng-template>
 
-      <app-worktree-file-browser [repoId]="repoId" [worktreeId]="worktreeId" />
+      <div class="flex flex-col gap-6">
+        <app-worktree-daemons [repoId]="repoId" [worktreeId]="worktreeId" />
+        <app-worktree-file-browser [repoId]="repoId" [worktreeId]="worktreeId" />
+      </div>
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

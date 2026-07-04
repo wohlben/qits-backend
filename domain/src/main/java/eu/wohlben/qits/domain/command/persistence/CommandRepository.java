@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.command.persistence;
 
 import eu.wohlben.qits.domain.command.entity.Command;
+import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -26,5 +27,20 @@ public class CommandRepository implements PanacheRepositoryBase<Command, String>
   /** Commands that ran in a worktree (by surrogate id), in launch order. */
   public List<Command> findByWorktree(Long worktreeId) {
     return list("worktree.id = ?1 order by launchedAt", worktreeId);
+  }
+
+  /**
+   * RUNNING commands of {@code kind} in a worktree (by repository id + worktree slug), newest first
+   * — the server-side twin of the frontend's newest-running-chat resolution rule.
+   */
+  public List<Command> findRunningByKindAndWorktree(
+      CommandKind kind, String repositoryId, String worktreeId) {
+    return list(
+        "kind = ?1 and status = ?2 and worktree.repository.id = ?3 and worktree.worktreeId = ?4"
+            + " order by launchedAt desc",
+        kind,
+        CommandStatus.RUNNING,
+        repositoryId,
+        worktreeId);
   }
 }

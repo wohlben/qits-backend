@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.agent.control;
 import eu.wohlben.qits.domain.command.control.CommandRegistry;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.entity.Repository;
@@ -65,6 +66,8 @@ public class AgentLaunchService {
 
   @Inject RepositoryRepository repositoryRepository;
 
+  @Inject DaemonEventSpool daemonEventSpool;
+
   @ConfigProperty(name = "qits.actions-mcp.url", defaultValue = "http://localhost:8080/mcp/actions")
   String actionsMcpUrl;
 
@@ -104,6 +107,12 @@ public class AgentLaunchService {
       // Seed the conversation as the first user turn. A stream-json chat only speaks over stdin,
       // so the seed can't be a CLI argument; the pipe buffers it until claude starts reading.
       commandRegistry.chatSend(command.id(), initialContext);
+    }
+    // Daemon events that fired while no chat was running land in the new session right after the
+    // seed prompt, so the agent starts with the worktree's recent daemon history.
+    List<String> spooledEvents = daemonEventSpool.drain(repoId, worktreeId);
+    if (!spooledEvents.isEmpty()) {
+      commandRegistry.chatSend(command.id(), String.join("\n\n", spooledEvents));
     }
     return command;
   }

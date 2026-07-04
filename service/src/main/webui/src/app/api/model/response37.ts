@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDto } from './repositoryDto';
+import { FeatureFlowPhaseDto } from './featureFlowPhaseDto';
 
 
 export interface Response37 { 
-    repository?: RepositoryDto;
-    projectId?: string;
+    featureFlowPhase?: FeatureFlowPhaseDto;
 }
 

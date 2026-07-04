@@ -47,11 +47,14 @@ public class ClaudeCodeAgent extends CodingAgent {
     // Bidirectional stream-json: user messages are fed on stdin as JSON, structured events
     // (assistant
     // messages, tool calls, result) come back on stdout — driven programmatically over plain pipes,
-    // not a PTY. --verbose emits every event, not just the final result. exec'd because the process
-    // is long-lived and managed.
+    // not a PTY. --verbose emits every event, not just the final result. --include-hook-events
+    // surfaces hook lifecycle events (e.g. Stop) in the stream, giving qits turn-boundary
+    // awareness for busy/idle detection and well-timed daemon-event injection. exec'd because the
+    // process is long-lived and managed.
     StringBuilder command =
         new StringBuilder(
-            "exec claude --print --input-format stream-json --output-format stream-json --verbose");
+            "exec claude --print --input-format stream-json --output-format stream-json"
+                + " --include-hook-events --verbose");
     appendFlags(command);
     return new LaunchSpec(command.toString(), false, environment);
   }

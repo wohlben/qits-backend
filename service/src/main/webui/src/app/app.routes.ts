@@ -26,6 +26,10 @@ export const routes: Routes = [
         loadChildren: () => import('./pages/action-configurations/action-configurations.routes').then(m => m.actionConfigurationsRoutes),
       },
       {
+        path: 'daemon-configurations',
+        loadChildren: () => import('./pages/daemon-configurations/daemon-configurations.routes').then(m => m.daemonConfigurationsRoutes),
+      },
+      {
         path: 'feature-flows',
         loadChildren: () => import('./pages/feature-flows/feature-flows.routes').then(m => m.featureFlowsRoutes),
       },
