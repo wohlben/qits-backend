@@ -117,12 +117,16 @@ container) and `stopContainer` pushes before removing, but an *unexpected* conta
 `docker rm`, a crash) still loses unpushed commits. A periodic checkpoint-push to bound that window is a
 deferred open question.
 
-## Prerequisites
+## Prerequisites (git-host is auto-resolved)
 
-`ensureContainer` clones over HTTP, so on WSL2 + Docker Desktop `qits.workspace.git-host` must point at
-a container-reachable address (the WSL2 `eth0` IP), not `host.docker.internal` (kept locally in a
-gitignored `service/.env`). §C's error surfacing is what makes a misconfiguration diagnosable instead
-of a silent abandon-loop.
+`ensureContainer` clones over HTTP, so the container must be able to reach this app. That address now
+**auto-resolves** (`qits.workspace.git-host=auto`, the default — see `GitHostResolver`):
+`host.docker.internal` on plain Linux docker (wired via `--add-host=…:host-gateway`), or the WSL2
+distro's **eth0 IP** on WSL2 + Docker Desktop, where `host.docker.internal` isn't container-reachable.
+So it just works on both with no per-machine override; the old gitignored `service/.env` pin is no
+longer needed (and can't go stale across WSL2 restarts). Set an explicit IP/hostname only if the
+auto-detection picks the wrong interface (multi-homed host / VPN). §C's error surfacing still makes any
+remaining misconfiguration diagnosable instead of a silent abandon-loop.
 
 ## Testing
 
@@ -142,10 +146,10 @@ of a silent abandon-loop.
     the real `DockerExecutor` runs, not the fake): create a repo + worktree over REST, push a commit
     and make an unpushed one through the container, `docker rm -f` it, then `POST …/ensure-container`
     and assert the recreated container is a fresh clone at the **pushed** commit while the **unpushed**
-    commit is gone (the §D loss window). It clones/pushes over the real `/git` server, so on WSL2 +
-    Docker Desktop — where a container can't reach `host.docker.internal` — pass the distro's eth0 IP:
-    `-Dqits.workspace.git-host=<ip>` (else it self-skips, the same reachability the feature needs).
+    commit is gone (the §D loss window). It clones/pushes over the real `/git` server; the git-host
+    auto-resolves (§ Prerequisites) so it just runs on both Linux and WSL2 with no override, and
+    self-skips only if docker/the image is absent or the resolved host still isn't reachable.
 
-  Build the image first: `docker build -t qits/workspace docker/workspace`. Example:
+  Build the image first: `docker build -t qits/workspace docker/workspace`. Run:
   `./mvnw -pl service verify -Pextended -Dtest=__none__ -Dsurefire.failIfNoSpecifiedTests=false
-  -Dit.test=WorkspaceRecreateIT -Dqits.workspace.git-host=<eth0-ip>`.
+  -Dit.test=WorkspaceRecreateIT`.

@@ -44,15 +44,14 @@ public class WorktreeService {
   @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
   String dataDir;
 
-  @ConfigProperty(name = "qits.workspace.git-host", defaultValue = "host.docker.internal")
-  String gitHost;
+  @Inject GitHostResolver gitHostResolver;
 
   @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
   String qitsPort;
 
   /** The URL a worktree container clones/pushes its branch over (the in-process JGit host). */
   private String cloneUrl(String repoId) {
-    return "http://" + gitHost + ":" + qitsPort + "/git/" + repoId;
+    return "http://" + gitHostResolver.gitHost() + ":" + qitsPort + "/git/" + repoId;
   }
 
   /**
