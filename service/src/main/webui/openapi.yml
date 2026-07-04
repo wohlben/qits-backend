@@ -1315,6 +1315,10 @@ components:
           type: boolean
         status:
           $ref: "#/components/schemas/WorktreeStatus"
+        runtimeStatus:
+          $ref: "#/components/schemas/WorktreeRuntimeStatus"
+        runtimeError:
+          type: string
         preamble:
           type: string
         result:
@@ -1399,6 +1403,13 @@ components:
           $ref: "#/components/schemas/Instant"
         resolvedAt:
           $ref: "#/components/schemas/Instant"
+    WorktreeRuntimeStatus:
+      type: string
+      enum:
+      - RUNNING
+      - STOPPED
+      - PROVISIONING
+      - FAILED
     WorktreeStatus:
       type: string
       enum:
@@ -2840,6 +2851,29 @@ paths:
       summary: Discard
       tags:
       - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/ensure-container:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorktreeDto"
+      summary: Ensure Container
+      tags:
+      - Worktree Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/fast-forward:
     post:
       parameters:
@@ -3023,6 +3057,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Response60"
       summary: Resolve Conflict
+      tags:
+      - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/stop-container:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorktreeDto"
+      summary: Stop Container
       tags:
       - Worktree Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/update-from-parent:

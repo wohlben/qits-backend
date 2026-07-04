@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -57,6 +57,15 @@ import { ZardButtonComponent } from '@/shared/components/button';
         </button>
       </div>
 
+      <!-- Surface a failed agent launch instead of the old silent no-op: the usual cause is a lost
+           container the backend now re-provisions, but a genuinely dead branch or unreachable
+           git-host reports here so the button never just does nothing. -->
+      @if (agentError(); as error) {
+        <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {{ error }}
+        </div>
+      }
+
       <div class="flex flex-col gap-6">
         <app-repository-sync [repoId]="repoId" />
         <app-branch-list [repoId]="repoId" />
@@ -100,6 +109,9 @@ export class RepositoryDetailPage {
   // Launch a Claude agent in the worktree backing a branch (resolving the worktree from the branch),
   // then open its command terminal. The process is owned by the backend registry and survives
   // navigation.
+  /** The last agent-launch failure, surfaced as a banner (cleared when a launch starts/succeeds). */
+  readonly agentError = signal<string | null>(null);
+
   readonly agentMutation = injectMutation(() => ({
     mutationFn: async (vars: { branch: string; scope: AgentMcpScope }) => {
       const worktrees = await lastValueFrom(
@@ -120,18 +132,33 @@ export class RepositoryDetailPage {
       );
     },
     onSuccess: (res) => {
+      this.agentError.set(null);
       const commandId = res.command?.id;
       if (commandId) {
         this.router.navigate(['/commands', commandId]);
       }
     },
+    onError: (error: unknown) => this.agentError.set(this.errorMessage(error)),
   }));
 
   /** Open Claude Code in the main worktree, with the actions + repository MCP scoped to this repo. */
   configureWithClaude() {
     const branch = this.mainBranch();
     if (!branch) return;
+    this.agentError.set(null);
     this.agentMutation.mutate({ branch, scope: AgentMcpScope.Actions });
+  }
+
+  /** A human-readable message from a failed launch: the backend {@code {message}} body, or fallback. */
+  private errorMessage(error: unknown): string {
+    const httpError = error as { error?: unknown; message?: string } | null;
+    const body = httpError?.error;
+    if (typeof body === 'string' && body.trim()) return body;
+    if (body && typeof body === 'object') {
+      const message = (body as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return httpError?.message ?? 'Failed to launch the agent';
   }
 
   onDelete() {

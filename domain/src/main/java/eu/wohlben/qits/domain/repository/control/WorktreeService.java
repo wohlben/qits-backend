@@ -207,6 +207,14 @@ public class WorktreeService {
         .toList();
   }
 
+  /** A single active worktree's current DTO (runtime status computed live), or 404. */
+  public WorktreeDto getWorktree(String repoId, String worktreeId) {
+    return listWorktrees(repoId).stream()
+        .filter(w -> worktreeId.equals(w.worktreeId()))
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
+  }
+
   /**
    * Whether {@code branch} — worktree-backed or plain — can be removed with no data loss: it is not
    * its own parent (the main branch can't be cleaned up), has no unmerged commits ({@code ahead ==

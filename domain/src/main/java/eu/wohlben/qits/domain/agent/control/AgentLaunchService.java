@@ -109,6 +109,9 @@ public class AgentLaunchService {
     if (!WORKTREE_ID_PATTERN.matcher(worktreeId == null ? "" : worktreeId).matches()) {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
+    // Guard the repo id (a UUID) before ensureContainer, so a bad id is a 400 here rather than a
+    // 404 "worktree not found" from the lookup below.
+    requireUuid(repoId, "repository id");
 
     // Re-provision a lost container up front so the sign-in probe below runs against a live
     // container (a stopped one would read as not-signed-in and wrongly redirect to login, even

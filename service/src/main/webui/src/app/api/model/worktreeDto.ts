@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { WorktreeStatus } from './worktreeStatus';
+import { WorktreeRuntimeStatus } from './worktreeRuntimeStatus';
 
 
 export interface WorktreeDto { 
@@ -18,6 +19,8 @@ export interface WorktreeDto {
     behind?: number;
     conflictsWithParent?: boolean;
     status?: WorktreeStatus;
+    runtimeStatus?: WorktreeRuntimeStatus;
+    runtimeError?: string;
     preamble?: string;
     result?: string;
     resolvedAt?: string;
