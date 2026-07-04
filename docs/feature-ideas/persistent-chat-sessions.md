@@ -83,18 +83,16 @@ non-deterministically). Server-side, the sequence numbers make the seam exact:
 
 ## Full-fidelity storage
 
-- Drop `MAX_LOG_LINE_CHARS` truncation in `ChatSession` — persist the full line; the CLOB
-  column absorbs it. (Leave `CommandSession`'s 16 KB terminal cap alone: raw PTY output is a
-  different beast with different pathologies.)
-- Keep a guard only against the truly pathological (say, > 8 MB single line): instead of
-  corrupting the JSON, *replace* the line with a small synthetic, still-valid event such as
-  `{"type":"oversized_event","original_bytes":N}` so replay renders an honest placeholder
-  bubble rather than a parse error. The ring/broadcast path stays untouched — only what is
-  persisted is substituted.
+- Drop `MAX_LOG_LINE_CHARS` (and the truncation it drives) from `ChatSession` entirely — every
+  line is persisted whole, however large; the CLOB column absorbs it. No size guard, no
+  placeholder substitution: what went over the wire is exactly what is stored, so persisted
+  lines are always valid JSON and replay is byte-for-byte the live stream. (Leave
+  `CommandSession`'s 16 KB terminal cap alone: raw PTY output is a different beast with
+  different pathologies.)
 
 ## Implementation sketch
 
-1. `ChatSession`: ring of `(seq, line)`; remove truncation; oversized-event placeholder.
+1. `ChatSession`: ring of `(seq, line)`; delete `MAX_LOG_LINE_CHARS` and the truncation branch.
 2. `CommandLogReader` interface in `command.control`, implemented on `CommandLogService`
    (a `findByCommandAndSeqLessThanOrderBySeq` on `CommandLogLineRepository`).
 3. `CommandRegistry` threads the reader into `ChatSession` construction (alongside the writer).
@@ -104,10 +102,9 @@ non-deterministically). Server-side, the sequence numbers make the seam exact:
 ## Tests
 
 - Unit: `ChatSession` attach after ring eviction replays DB head + ring with no gap/overlap at
-  the seam (fake reader/writer capturing seqs); oversized line persists as the placeholder
-  event while the live broadcast keeps the original.
-- Regression: a >64 KB event round-trips through persistence and parses as valid JSON in the
-  `/log` replay (this is the bug fix for gap 2).
+  the seam (fake reader/writer capturing seqs).
+- Regression: a >64 KB event round-trips through persistence *un-truncated* and parses as
+  valid JSON in the `/log` replay (this is the bug fix for gap 2).
 - Existing `running-chat.spec.ts` behaviour unchanged (wire protocol identical).
 
 ## Out of scope
