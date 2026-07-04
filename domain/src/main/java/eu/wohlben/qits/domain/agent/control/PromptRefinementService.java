@@ -3,26 +3,30 @@ package eu.wohlben.qits.domain.agent.control;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
 import eu.wohlben.qits.domain.error.NotFoundException;
-import eu.wohlben.qits.domain.repository.control.GitExecutor;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Turns a raw speech-to-text transcript into a coherent coding-agent prompt by running a one-shot
- * Claude call on a small model. The refinement is ephemeral — it runs directly via {@link
- * ProcessExecutor} instead of the command registry, so it never shows up in command history. The
- * call runs in a neutral cwd (not the worktree) on purpose: loading the target repo's CLAUDE.md
- * would only add latency to a pure text-rewriting task; the worktree context the model needs
- * (branch, goal) is passed explicitly in the meta-prompt.
+ * Claude call on a small model. The refinement is ephemeral — it runs as a {@code <runtime> exec}
+ * into the worktree's container (via {@link ProcessExecutor}, so stdout/stderr stay separate and it
+ * never shows up in command history), reusing the container's {@code claude} binary and the shared
+ * credential volume. The container is provisioned on demand ({@link
+ * WorktreeService#ensureContainer}) and the worktree context the model needs (branch, goal) is
+ * passed explicitly in the meta-prompt.
  */
 @ApplicationScoped
 public class PromptRefinementService {
@@ -57,13 +61,15 @@ public class PromptRefinementService {
 
   @Inject WorktreeRepository worktreeRepository;
 
-  @Inject GitExecutor git;
+  @Inject WorktreeService worktreeService;
+
+  @Inject ContainerRuntime containers;
 
   @ConfigProperty(name = "qits.refinement.model", defaultValue = "haiku")
   String refinementModel;
 
-  @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
-  String dataDir;
+  @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
+  String claudeMount;
 
   /** Refines {@code transcript} into a coding-agent prompt, contextualized by the worktree. */
   public String refine(String repoId, String worktreeId, String transcript) {
@@ -74,21 +80,37 @@ public class PromptRefinementService {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
 
-    String preamble = preambleFor(repoId, worktreeId);
-    String branch = branchFor(repoId, worktreeId);
+    WorktreeContext context = worktreeContext(repoId, worktreeId);
+    // Provision the container on demand — the refinement runs claude inside it, using the shared
+    // credential volume, so a stopped container is re-materialized rather than failing.
+    worktreeService.ensureContainer(repoId, worktreeId);
 
     String metaPrompt =
         META_PROMPT.formatted(
-            branch, preamble == null || preamble.isBlank() ? "(none)" : preamble, transcript);
+            context.branch(),
+            context.preamble() == null || context.preamble().isBlank()
+                ? "(none)"
+                : context.preamble(),
+            transcript);
     LaunchSpec spec =
         CodingAgentFactory.ofType(AgentType.CLAUDE).model(refinementModel).run(metaPrompt);
 
+    // Run inside the worktree container: docker exec -w /workspace -e HOME=<claude-mount> … bash
+    // -lc
+    // <claude>. Driving it through ProcessExecutor (rather than ContainerRuntime.exec) keeps stdout
+    // separate from stderr — the refined prompt is stdout only — and preserves timeout handling.
+    Map<String, String> env = new HashMap<>(spec.environment());
+    if (claudeMount != null && !claudeMount.isBlank()) {
+      env.put("HOME", claudeMount);
+    }
+    String container = containers.containerName(worktreeId, repoId);
+    List<String> argv = new ArrayList<>(containers.execArgv(container, false, "/workspace", env));
+    argv.add("bash");
+    argv.add("-lc");
+    argv.add(spec.script());
+
     ProcessExecutor.Result result =
-        processExecutor.exec(
-            List.of("bash", "-c", spec.script()),
-            Path.of(System.getProperty("user.home")),
-            spec.environment(),
-            TIMEOUT);
+        processExecutor.exec(argv, Path.of(System.getProperty("user.home")), Map.of(), TIMEOUT);
 
     if (result.timedOut()) {
       throw new InternalServerErrorException(
@@ -105,8 +127,14 @@ public class PromptRefinementService {
     return prompt;
   }
 
-  /** The worktree's preamble, read in its own transaction; 404 if the worktree doesn't exist. */
-  private String preambleFor(String repoId, String worktreeId) {
+  private record WorktreeContext(String branch, String preamble) {}
+
+  /**
+   * The worktree's branch and preamble, read in one transaction; 404 if the worktree doesn't exist.
+   * The branch comes from the stored column (there is no host checkout to read it from); it falls
+   * back to the worktree id for a row that predates the stored branch.
+   */
+  private WorktreeContext worktreeContext(String repoId, String worktreeId) {
     return QuarkusTransaction.requiringNew()
         .call(
             () -> {
@@ -115,14 +143,12 @@ public class PromptRefinementService {
                       .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
                       .orElseThrow(
                           () -> new NotFoundException("Worktree not found: " + worktreeId));
-              return worktree.preamble;
+              String branch =
+                  worktree.branch == null || worktree.branch.isBlank()
+                      ? worktreeId
+                      : worktree.branch;
+              return new WorktreeContext(branch, worktree.preamble);
             });
-  }
-
-  /** The checkout's current branch, or the worktree id when no checkout exists on disk. */
-  private String branchFor(String repoId, String worktreeId) {
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
-    return Files.exists(worktreePath) ? git.getCurrentBranch(worktreePath) : worktreeId;
   }
 
   private static String tail(String text) {

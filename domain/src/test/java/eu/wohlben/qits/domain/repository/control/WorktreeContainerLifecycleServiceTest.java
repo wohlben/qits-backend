@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.repository.control;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -146,5 +147,58 @@ public class WorktreeContainerLifecycleServiceTest {
     // ...and it can be brought straight back.
     worktreeService.ensureContainer(repoId, "feat");
     assertTrue(containers.exists(container));
+  }
+
+  @Test
+  public void gracefulStopPushesUnpushedWorkSoRecreationIsLossless() throws Exception {
+    String repoId = clonedRepo();
+    worktreeService.createWorktree(repoId, "feat", "master", "feat", null);
+    String container = containers.containerName("feat", repoId);
+    String head = commitInContainer(container, "graceful.txt");
+
+    // A graceful stop pushes before removing the container...
+    worktreeService.stopContainer(repoId, "feat");
+    Path originPath = Path.of(dataDir, repoId, "origin");
+    assertEquals(
+        head,
+        git.exec(originPath.toFile(), "git", "rev-parse", "refs/heads/feat").trim(),
+        "graceful stop pushed the commit to origin");
+
+    // ...so the recreated container still has it.
+    worktreeService.ensureContainer(repoId, "feat");
+    assertEquals(head, containerHead(container), "recreated container has the pushed commit");
+  }
+
+  @Test
+  public void unpushedWorkDiesWithAnUnexpectedlyRemovedContainer() throws Exception {
+    String repoId = clonedRepo();
+    worktreeService.createWorktree(repoId, "feat", "master", "feat", null);
+    String container = containers.containerName("feat", repoId);
+    String head = commitInContainer(container, "doomed.txt");
+
+    // Unexpected death (no push) — recreation restores origin state only, so the commit is gone.
+    containers.rm(container);
+    worktreeService.ensureContainer(repoId, "feat");
+    assertNotEquals(
+        head, containerHead(container), "an unpushed commit is lost on unexpected container death");
+  }
+
+  /** Makes a commit in the container's /workspace without pushing it, returning the new HEAD. */
+  private String commitInContainer(String container, String file) {
+    containers.exec(
+        container,
+        "/workspace",
+        Map.of(),
+        "bash",
+        "-lc",
+        "echo hi > " + file + " && git add " + file + " && git commit -m local");
+    return containerHead(container);
+  }
+
+  private String containerHead(String container) {
+    return containers
+        .exec(container, "/workspace", Map.of(), "git", "rev-parse", "HEAD")
+        .output()
+        .trim();
   }
 }
