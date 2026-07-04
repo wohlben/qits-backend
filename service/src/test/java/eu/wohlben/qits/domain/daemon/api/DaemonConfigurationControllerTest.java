@@ -35,8 +35,8 @@ public class DaemonConfigurationControllerTest {
                 Map.of("PORT", "3000"),
                 List.of(
                     new LogObserverInput(
-                        LogObserverKind.PATTERN, "ERROR", DaemonEventSeverity.ERROR, null),
-                    new LogObserverInput(LogObserverKind.MODEL, null, null, "custom prompt"))))
+                        LogObserverKind.PATTERN, "ERROR", DaemonEventSeverity.ERROR),
+                    new LogObserverInput(LogObserverKind.LOG_LEVEL, null, null))))
         .post("/api/daemon-configurations")
         .then()
         .statusCode(200)
@@ -50,8 +50,7 @@ public class DaemonConfigurationControllerTest {
         .body("daemonConfiguration.environment.PORT", equalTo("3000"))
         .body("daemonConfiguration.observers[0].kind", equalTo("PATTERN"))
         .body("daemonConfiguration.observers[0].pattern", equalTo("ERROR"))
-        .body("daemonConfiguration.observers[1].kind", equalTo("MODEL"))
-        .body("daemonConfiguration.observers[1].prompt", equalTo("custom prompt"))
+        .body("daemonConfiguration.observers[1].kind", equalTo("LOG_LEVEL"))
         .extract()
         .path("daemonConfiguration.id");
   }
@@ -87,7 +86,7 @@ public class DaemonConfigurationControllerTest {
                 null,
                 List.of(
                     new LogObserverInput(
-                        LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING, null))))
+                        LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING))))
         .put("/api/daemon-configurations/" + id)
         .then()
         .statusCode(200)
@@ -133,7 +132,7 @@ public class DaemonConfigurationControllerTest {
                 null,
                 null,
                 null,
-                List.of(new LogObserverInput(LogObserverKind.PATTERN, null, null, null))))
+                List.of(new LogObserverInput(LogObserverKind.PATTERN, null, null))))
         .post("/api/daemon-configurations")
         .then()
         .statusCode(400);

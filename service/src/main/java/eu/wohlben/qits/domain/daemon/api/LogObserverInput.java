@@ -8,10 +8,10 @@ import java.util.List;
 
 /** One observer as submitted by clients; shared by the global and repo-scoped daemon requests. */
 public record LogObserverInput(
-    @NotNull LogObserverKind kind, String pattern, DaemonEventSeverity severity, String prompt) {
+    @NotNull LogObserverKind kind, String pattern, DaemonEventSeverity severity) {
 
   public LogObserver toEntity() {
-    return new LogObserver(kind, pattern, severity, prompt);
+    return new LogObserver(kind, pattern, severity);
   }
 
   /** Null stays null (meaning "keep as-is" on update); a present list is converted wholesale. */

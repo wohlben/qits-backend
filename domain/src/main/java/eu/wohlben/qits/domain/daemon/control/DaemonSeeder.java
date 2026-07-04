@@ -1,6 +1,5 @@
 package eu.wohlben.qits.domain.daemon.control;
 
-import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
@@ -15,8 +14,8 @@ import org.jboss.logging.Logger;
 
 /**
  * Seeds one demo global daemon on startup (idempotent by name, mirroring {@code
- * ActionConfigurationSeeder}): a Python static file server with a ready pattern and both observer
- * kinds attached — enough to watch the whole lifecycle without any project-specific setup.
+ * ActionConfigurationSeeder}): a Python static file server with a ready pattern and a LOG_LEVEL
+ * observer attached — enough to watch the whole lifecycle without any project-specific setup.
  */
 @ApplicationScoped
 public class DaemonSeeder {
@@ -43,10 +42,7 @@ public class DaemonSeeder {
         RestartPolicy.ON_FAILURE,
         3,
         null,
-        List.of(
-            new LogObserver(
-                LogObserverKind.PATTERN, "Traceback|Exception", DaemonEventSeverity.ERROR, null),
-            new LogObserver(LogObserverKind.MODEL, null, null, null)));
+        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)));
     LOG.infof("Seeded global daemon '%s'", HTTP_SERVER_NAME);
   }
 }

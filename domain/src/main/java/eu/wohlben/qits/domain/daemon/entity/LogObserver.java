@@ -18,25 +18,19 @@ public class LogObserver {
   @Column(nullable = false)
   public LogObserverKind kind;
 
-  /** For PATTERN observers: the regex matched against each output line. Unused for MODEL. */
+  /** For PATTERN observers: the regex matched against each output line. Unused for LOG_LEVEL. */
   @Column(length = 500)
   public String pattern;
 
-  /** Severity stamped on PATTERN events; MODEL observers classify severity themselves. */
+  /** Severity stamped on PATTERN events; LOG_LEVEL observers classify severity themselves. */
   @Enumerated(EnumType.STRING)
   public DaemonEventSeverity severity;
 
-  /** For MODEL observers: an optional classifier-prompt override; a good default lives in code. */
-  @Column(length = 4000)
-  public String prompt;
-
   public LogObserver() {}
 
-  public LogObserver(
-      LogObserverKind kind, String pattern, DaemonEventSeverity severity, String prompt) {
+  public LogObserver(LogObserverKind kind, String pattern, DaemonEventSeverity severity) {
     this.kind = kind;
     this.pattern = pattern;
     this.severity = severity;
-    this.prompt = prompt;
   }
 }

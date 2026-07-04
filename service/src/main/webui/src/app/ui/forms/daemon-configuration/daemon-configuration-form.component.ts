@@ -15,10 +15,9 @@ export interface DaemonEnvVarRow {
 }
 
 export interface DaemonObserverRow {
-  kind: 'PATTERN' | 'MODEL';
+  kind: 'PATTERN' | 'LOG_LEVEL';
   pattern: string;
   severity: 'INFO' | 'WARNING' | 'ERROR';
-  prompt: string;
 }
 
 export interface DaemonConfigurationFormData {
@@ -87,8 +86,8 @@ export interface DaemonConfigurationFormData {
         />
       </div>
 
-      <!-- Observers watch the daemon's output: PATTERN emits an event per matching line, MODEL
-           batches output and asks a cheap model to classify errors. -->
+      <!-- Observers watch the daemon's output: PATTERN emits an event per matching line,
+           LOG_LEVEL classifies output batches locally off standard severity tokens. -->
       <fieldset class="flex flex-col gap-2">
         <legend class="text-sm font-medium">Log observers</legend>
         @for (row of model().observers; track $index) {
@@ -100,7 +99,7 @@ export interface DaemonConfigurationFormData {
               [attr.aria-label]="'Observer ' + ($index + 1) + ' kind'"
             >
               <option value="PATTERN">Pattern</option>
-              <option value="MODEL">Model</option>
+              <option value="LOG_LEVEL">Log level</option>
             </select>
             @if (row.kind === 'PATTERN') {
               <input
@@ -123,15 +122,9 @@ export interface DaemonConfigurationFormData {
                 <option value="ERROR">Error</option>
               </select>
             } @else {
-              <input
-                z-input
-                class="flex-1"
-                placeholder="classifier prompt override (optional)"
-                autocomplete="off"
-                [value]="row.prompt"
-                (input)="updateObserver($index, 'prompt', $any($event.target).value)"
-                [attr.aria-label]="'Observer ' + ($index + 1) + ' prompt override'"
-              />
+              <span class="flex-1 text-xs text-muted-foreground">
+                Classifies ERROR/WARN tokens, exception names and stack traces in the output
+              </span>
             }
             <button
               z-button
@@ -231,7 +224,7 @@ export class DaemonConfigurationFormComponent {
   addObserver() {
     this.model.update((m) => ({
       ...m,
-      observers: [...m.observers, { kind: 'PATTERN', pattern: '', severity: 'ERROR', prompt: '' }],
+      observers: [...m.observers, { kind: 'PATTERN', pattern: '', severity: 'ERROR' }],
     }));
   }
 

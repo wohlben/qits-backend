@@ -15,7 +15,6 @@ export interface LogObserverDto {
     kind?: LogObserverKind;
     pattern?: string;
     severity?: DaemonEventSeverity;
-    prompt?: string;
 }
 export namespace LogObserverDto {
 }

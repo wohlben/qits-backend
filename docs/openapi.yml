@@ -671,8 +671,6 @@ components:
           type: string
         severity:
           $ref: "#/components/schemas/DaemonEventSeverity"
-        prompt:
-          type: string
     LogObserverInput:
       type: object
       required:
@@ -684,13 +682,11 @@ components:
           type: string
         severity:
           $ref: "#/components/schemas/DaemonEventSeverity"
-        prompt:
-          type: string
     LogObserverKind:
       type: string
       enum:
       - PATTERN
-      - MODEL
+      - LOG_LEVEL
     MergeBranchRequest:
       type: object
       required:

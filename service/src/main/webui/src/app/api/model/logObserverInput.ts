@@ -15,7 +15,6 @@ export interface LogObserverInput {
     kind: LogObserverKind;
     pattern?: string;
     severity?: DaemonEventSeverity;
-    prompt?: string;
 }
 export namespace LogObserverInput {
 }
