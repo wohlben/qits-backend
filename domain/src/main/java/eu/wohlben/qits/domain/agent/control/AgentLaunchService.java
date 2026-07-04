@@ -11,7 +11,9 @@ import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -68,6 +70,8 @@ public class AgentLaunchService {
 
   @Inject DaemonEventSpool daemonEventSpool;
 
+  @Inject AgentAuthStatus agentAuthStatus;
+
   @ConfigProperty(name = "qits.actions-mcp.url", defaultValue = "http://localhost:8080/mcp/actions")
   String actionsMcpUrl;
 
@@ -103,6 +107,14 @@ public class AgentLaunchService {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
 
+    // The agent can't authenticate until an operator has signed in on the shared credential volume.
+    // When it hasn't, launch an interactive `claude auth login` terminal instead — the caller
+    // redirects to its command page (a real PTY), the operator finishes OAuth there, and the next
+    // chat launch (this worktree or any other, same volume) sees the login and proceeds.
+    if (!agentAuthStatus.isLoggedIn(repoId, worktreeId)) {
+      return launchLogin(repoId, worktreeId);
+    }
+
     LaunchSpec spec = renderChat(repoId, scope);
 
     CommandDto command =
@@ -131,6 +143,30 @@ public class AgentLaunchService {
     LaunchSpec spec = renderAutonomous(prompt);
     return commandService.launchAgent(
         repoId, worktreeId, name, spec.script(), true, spec.environment());
+  }
+
+  /**
+   * Launches an interactive {@code claude auth login} terminal (a normal PTY command, kind {@code
+   * TERMINAL}) in the worktree's container so an operator can complete the one-time OAuth. Writes
+   * to the shared credential volume (HOME overlay), so it signs in every worktree at once. Returned
+   * by {@link #launchChat} when the agent isn't signed in yet; the caller redirects to its
+   * terminal.
+   */
+  public CommandDto launchLogin(String repoId, String worktreeId) {
+    LaunchSpec spec = renderLogin();
+    return commandService.launchAgent(
+        repoId, worktreeId, "Claude sign-in", spec.script(), true, spec.environment());
+  }
+
+  /** Renders the interactive login command with the shared-volume {@code HOME} overlay. */
+  LaunchSpec renderLogin() {
+    Map<String, String> env = new HashMap<>();
+    if (claudeMount != null && !claudeMount.isBlank()) {
+      env.put("HOME", claudeMount);
+    }
+    // `--claudeai` = Claude subscription (the common case); the operator can switch to API billing
+    // by running `claude auth login --console` in the terminal themselves.
+    return new LaunchSpec("exec claude auth login --claudeai", true, env);
   }
 
   /**
