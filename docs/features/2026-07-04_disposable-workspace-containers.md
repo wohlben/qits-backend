@@ -19,9 +19,9 @@ Related / dependent:
   the "container missing → hard fail" problem this fixes (now they lazily re-provision).
 - Reworks reconciliation from [repository-discovery](2026-05-01_repository-discovery.md) and the
   ACTIVE/ABANDONED lifecycle from [worktree-history](2026-06-30_worktree-history.md).
-- **Deferred follow-up**: the worktree→workspace **rename** (§G of the original idea) is parked as
-  [worktree-to-workspace-rename](../backlog-ideas/worktree-to-workspace-rename.md) — kept out of this
-  behaviour diff on purpose.
+- **Planned next step**: the worktree→workspace **rename** (§G of the original idea) is captured as
+  [worktree-to-workspace-rename](../feature-ideas/worktree-to-workspace-rename.md) — a committed
+  follow-up, kept out of this behaviour diff on purpose and to be done soon.
 
 ## The through-line
 
@@ -107,15 +107,15 @@ Claude" launch **surfaces its error in a banner** instead of the old silent no-o
 - **§F kept on `ProcessExecutor`.** Rather than route the refinement through `ContainerRuntime.exec`
   (which combines stdout+stderr), it runs the container-exec argv via `ProcessExecutor` to preserve
   stdout/stderr separation and timeout handling.
-- **§G rename deferred** to [worktree-to-workspace-rename](../backlog-ideas/worktree-to-workspace-rename.md).
+- **§G rename deferred** to [worktree-to-workspace-rename](../feature-ideas/worktree-to-workspace-rename.md).
 
 ## Loss window (important)
 
 Recreation restores **origin state only**. Commits made in a container but never pushed die with it.
 The live-container guard protects the graceful case (`ensureContainer` never re-clones over a running
 container) and `stopContainer` pushes before removing, but an *unexpected* container death (host reboot,
-`docker rm`, a crash) still loses unpushed commits. A periodic checkpoint-push to bound that window is a
-deferred open question.
+`docker rm`, a crash) still loses unpushed commits. Bounding that window with a periodic checkpoint-push
+is captured as its own follow-up: [periodic-checkpoint-push](../feature-ideas/periodic-checkpoint-push.md).
 
 ## Prerequisites (git-host is auto-resolved)
 
