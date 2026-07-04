@@ -1,6 +1,5 @@
 package eu.wohlben.qits.domain.repository.control;
 
-import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -23,8 +22,9 @@ public interface LazyDirectoryStrategy {
    * stubs rather than recursed into. Cheap by contract — a strategy must not walk the directories
    * it marks lazy.
    *
-   * @param worktreeRoot the canonical worktree root
-   * @param git the git CLI executor, for strategies that consult git
+   * @param repoId the repository the worktree belongs to
+   * @param worktreeId the worktree whose tree is being listed
+   * @param access the worktree file access (reads run inside the worktree's container)
    */
-  List<String> lazyDirectories(Path worktreeRoot, GitExecutor git);
+  List<String> lazyDirectories(String repoId, String worktreeId, WorktreeFileAccess access);
 }

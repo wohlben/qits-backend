@@ -14,10 +14,10 @@ for execution, not a mode — there is no host-execution fallback.**
 This is **Phase 1 of 3** (container lifecycle, in-process git hosting + clone, routing command
 execution through `docker exec`). Related/dependent plans:
 
-- **Phase 2 — [container-file-access](../feature-ideas/container-file-access.md)** (depends on
-  this): the worktree file browser reads files via `docker exec` instead of host paths. Phase 1
-  leaves the file browser reading host paths; in tests the container is a host-clone at the old
-  worktree path so the browser keeps working unchanged.
+- **Phase 2 — [container-file-access](2026-07-04_container-file-access.md)** (depends on
+  this, now implemented): the worktree file browser reads files via `docker exec` instead of host
+  paths. Phase 1 leaves the file browser reading host paths; in tests the container is a host-clone at
+  the old worktree path so the browser keeps working unchanged.
 - **Phase 3 — [container-agent-sessions](../feature-ideas/container-agent-sessions.md)** (depends
   on this): the coding agent works inside the container; credential hand-off.
 - Moves [daemons](2026-07-04_daemons.md) into the container along with all other registry
