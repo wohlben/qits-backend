@@ -7,12 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { BranchDto } from './branchDto';
 
 
 export interface Response58 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
-    cleanedUp?: boolean;
+    branches?: Array<BranchDto>;
 }
 

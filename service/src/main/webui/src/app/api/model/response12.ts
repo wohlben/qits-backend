@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonEventDto } from './daemonEventDto';
+import { RepositoryDaemonDto } from './repositoryDaemonDto';
 
 
 export interface Response12 { 
-    events?: Array<DaemonEventDto>;
+    daemon?: RepositoryDaemonDto;
 }
 

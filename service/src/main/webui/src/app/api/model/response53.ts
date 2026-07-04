@@ -7,10 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ProjectDto } from './projectDto';
 
 
 export interface Response53 { 
-    project?: ProjectDto;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
+    cleanedUp?: boolean;
 }
 

@@ -208,41 +208,6 @@ components:
           type: object
           additionalProperties:
             type: string
-    CreateDaemonConfigurationRequest:
-      type: object
-      required:
-      - name
-      - startScript
-      properties:
-        name:
-          type: string
-          pattern: \S
-        description:
-          type: string
-        startScript:
-          type: string
-          pattern: \S
-        readyPattern:
-          type: string
-        stopSignal:
-          type: string
-        restartPolicy:
-          $ref: "#/components/schemas/RestartPolicy"
-        maxRestarts:
-          type: integer
-          format: int32
-        environment:
-          type: object
-          additionalProperties:
-            type: string
-        observers:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogObserverInput"
-        sources:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogSourceInput"
     CreateFeatureFlowPhaseActionRequest:
       type: object
       required:
@@ -377,42 +342,6 @@ components:
           type: string
         preamble:
           type: string
-    DaemonConfigurationDto:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        description:
-          type: string
-        startScript:
-          type: string
-        readyPattern:
-          type: string
-        stopSignal:
-          type: string
-        restartPolicy:
-          $ref: "#/components/schemas/RestartPolicy"
-        maxRestarts:
-          type: integer
-          format: int32
-        scope:
-          $ref: "#/components/schemas/DaemonScope"
-        repositoryId:
-          type: string
-        environment:
-          type: object
-          additionalProperties:
-            type: string
-        observers:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogObserverDto"
-        sources:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogSourceDto"
     DaemonEventDto:
       type: object
       properties:
@@ -463,7 +392,7 @@ components:
       type: object
       properties:
         daemon:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
+          $ref: "#/components/schemas/RepositoryDaemonDto"
         status:
           $ref: "#/components/schemas/DaemonStatus"
         restartCount:
@@ -471,11 +400,6 @@ components:
           format: int32
         commandId:
           type: string
-    DaemonScope:
-      type: string
-      enum:
-      - GLOBAL
-      - REPOSITORY
     DaemonStatus:
       type: string
       enum:
@@ -511,24 +435,19 @@ components:
     Entry1:
       type: object
       properties:
-        daemonConfiguration:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
+        daemon:
+          $ref: "#/components/schemas/RepositoryDaemonDto"
     Entry10:
-      type: object
-      properties:
-        featureFlowConfiguration:
-          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Entry11:
       type: object
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
-    Entry12:
+    Entry11:
       type: object
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeDto"
-    Entry13:
+    Entry12:
       type: object
       properties:
         worktree:
@@ -536,43 +455,43 @@ components:
     Entry2:
       type: object
       properties:
-        daemon:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
-    Entry3:
-      type: object
-      properties:
         instance:
           $ref: "#/components/schemas/DaemonInstanceDto"
-    Entry4:
+    Entry3:
       type: object
       properties:
         actionConfiguration:
           $ref: "#/components/schemas/ActionConfigurationDto"
-    Entry5:
+    Entry4:
       type: object
       properties:
         featureFlowConfiguration:
           $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Entry6:
+    Entry5:
       type: object
       properties:
         featureFlowPhaseAction:
           $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
-    Entry7:
+    Entry6:
       type: object
       properties:
         featureFlowPhase:
           $ref: "#/components/schemas/FeatureFlowPhaseDto"
-    Entry8:
+    Entry7:
       type: object
       properties:
         featureFlowPhaseStep:
           $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
-    Entry9:
+    Entry8:
       type: object
       properties:
         repository:
           $ref: "#/components/schemas/RepositoryDto"
+    Entry9:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
     FeatureFlowConfigurationDto:
       type: object
       properties:
@@ -774,6 +693,40 @@ components:
       - SERVICE
       - SERVICE_TEMPLATE
       - FORK
+    RepositoryDaemonDto:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        startScript:
+          type: string
+        readyPattern:
+          type: string
+        stopSignal:
+          type: string
+        restartPolicy:
+          $ref: "#/components/schemas/RestartPolicy"
+        maxRestarts:
+          type: integer
+          format: int32
+        repositoryId:
+          type: string
+        environment:
+          type: object
+          additionalProperties:
+            type: string
+        observers:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogObserverDto"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogSourceDto"
     RepositoryDto:
       type: object
       properties:
@@ -800,57 +753,57 @@ components:
     Response10:
       type: object
       properties:
-        success:
-          type: boolean
+        daemon:
+          $ref: "#/components/schemas/RepositoryDaemonDto"
     Response11:
       type: object
       properties:
-        daemonConfiguration:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
+        success:
+          type: boolean
     Response12:
       type: object
       properties:
-        events:
-          type: array
-          items:
-            $ref: "#/components/schemas/DaemonEventDto"
+        daemon:
+          $ref: "#/components/schemas/RepositoryDaemonDto"
     Response13:
       type: object
       properties:
-        daemon:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
+        instance:
+          $ref: "#/components/schemas/DaemonInstanceDto"
     Response14:
+      type: object
+      properties:
+        instance:
+          $ref: "#/components/schemas/DaemonInstanceDto"
+    Response15:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry2"
-    Response15:
+    Response16:
       type: object
       properties:
-        daemon:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
-    Response16:
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+    Response17:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry3"
+    Response18:
+      type: object
+      properties:
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
+    Response19:
       type: object
       properties:
         success:
           type: boolean
-    Response17:
-      type: object
-      properties:
-        daemon:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
-    Response18:
-      type: object
-      properties:
-        instance:
-          $ref: "#/components/schemas/DaemonInstanceDto"
-    Response19:
-      type: object
-      properties:
-        instance:
-          $ref: "#/components/schemas/DaemonInstanceDto"
     Response2:
       type: object
       properties:
@@ -859,15 +812,13 @@ components:
     Response20:
       type: object
       properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry3"
+        actionConfiguration:
+          $ref: "#/components/schemas/ActionConfigurationDto"
     Response21:
       type: object
       properties:
-        actionConfiguration:
-          $ref: "#/components/schemas/ActionConfigurationDto"
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
     Response22:
       type: object
       properties:
@@ -878,8 +829,8 @@ components:
     Response23:
       type: object
       properties:
-        actionConfiguration:
-          $ref: "#/components/schemas/ActionConfigurationDto"
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
     Response24:
       type: object
       properties:
@@ -888,30 +839,30 @@ components:
     Response25:
       type: object
       properties:
-        actionConfiguration:
-          $ref: "#/components/schemas/ActionConfigurationDto"
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
     Response26:
-      type: object
-      properties:
-        featureFlowConfiguration:
-          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Response27:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry5"
-    Response28:
+    Response27:
       type: object
       properties:
-        featureFlowConfiguration:
-          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Response29:
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    Response28:
       type: object
       properties:
         success:
           type: boolean
+    Response29:
+      type: object
+      properties:
+        featureFlowPhaseAction:
+          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
     Response3:
       type: object
       properties:
@@ -922,8 +873,8 @@ components:
     Response30:
       type: object
       properties:
-        featureFlowPhaseAction:
-          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
     Response31:
       type: object
       properties:
@@ -934,8 +885,8 @@ components:
     Response32:
       type: object
       properties:
-        featureFlowPhaseAction:
-          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
     Response33:
       type: object
       properties:
@@ -944,13 +895,13 @@ components:
     Response34:
       type: object
       properties:
-        featureFlowPhaseAction:
-          $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+        featureFlowPhase:
+          $ref: "#/components/schemas/FeatureFlowPhaseDto"
     Response35:
       type: object
       properties:
-        featureFlowPhase:
-          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
     Response36:
       type: object
       properties:
@@ -961,8 +912,8 @@ components:
     Response37:
       type: object
       properties:
-        featureFlowPhase:
-          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
     Response38:
       type: object
       properties:
@@ -971,8 +922,8 @@ components:
     Response39:
       type: object
       properties:
-        featureFlowPhase:
-          $ref: "#/components/schemas/FeatureFlowPhaseDto"
+        featureFlowPhaseStep:
+          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
     Response4:
       type: object
       properties:
@@ -983,8 +934,8 @@ components:
     Response40:
       type: object
       properties:
-        featureFlowPhaseStep:
-          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
+        project:
+          $ref: "#/components/schemas/ProjectDto"
     Response41:
       type: object
       properties:
@@ -995,49 +946,49 @@ components:
     Response42:
       type: object
       properties:
-        featureFlowPhaseStep:
-          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
-    Response43:
-      type: object
-      properties:
-        success:
-          type: boolean
-    Response44:
-      type: object
-      properties:
-        featureFlowPhaseStep:
-          $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
-    Response45:
-      type: object
-      properties:
-        project:
-          $ref: "#/components/schemas/ProjectDto"
-    Response46:
-      type: object
-      properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry9"
-    Response47:
+    Response43:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry10"
-    Response48:
-      type: object
-      properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry11"
-    Response49:
+    Response44:
       type: object
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
+    Response45:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response46:
+      type: object
+      properties:
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
+        projectId:
+          type: string
+    Response47:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+    Response48:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/ProjectDto"
+    Response49:
+      type: object
+      properties:
+        output:
+          type: string
     Response5:
       type: object
       properties:
@@ -1046,46 +997,19 @@ components:
     Response50:
       type: object
       properties:
-        success:
-          type: boolean
+        repository:
+          $ref: "#/components/schemas/RepositoryDto"
     Response51:
       type: object
       properties:
-        repository:
-          $ref: "#/components/schemas/RepositoryDto"
-        projectId:
+        output:
           type: string
     Response52:
       type: object
       properties:
-        featureFlowConfiguration:
-          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
+        output:
+          type: string
     Response53:
-      type: object
-      properties:
-        project:
-          $ref: "#/components/schemas/ProjectDto"
-    Response54:
-      type: object
-      properties:
-        output:
-          type: string
-    Response55:
-      type: object
-      properties:
-        repository:
-          $ref: "#/components/schemas/RepositoryDto"
-    Response56:
-      type: object
-      properties:
-        output:
-          type: string
-    Response57:
-      type: object
-      properties:
-        output:
-          type: string
-    Response58:
       type: object
       properties:
         commitHash:
@@ -1096,11 +1020,38 @@ components:
           type: string
         cleanedUp:
           type: boolean
-    Response59:
+    Response54:
       type: object
       properties:
         repository:
           $ref: "#/components/schemas/RepositoryDto"
+    Response55:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response56:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response57:
+      type: object
+      properties:
+        success:
+          type: boolean
+    Response58:
+      type: object
+      properties:
+        branches:
+          type: array
+          items:
+            $ref: "#/components/schemas/BranchDto"
+    Response59:
+      type: object
+      properties:
+        output:
+          type: string
     Response6:
       type: object
       properties:
@@ -1109,40 +1060,13 @@ components:
     Response60:
       type: object
       properties:
-        success:
-          type: boolean
-    Response61:
-      type: object
-      properties:
-        success:
-          type: boolean
-    Response62:
-      type: object
-      properties:
-        success:
-          type: boolean
-    Response63:
-      type: object
-      properties:
-        branches:
-          type: array
-          items:
-            $ref: "#/components/schemas/BranchDto"
-    Response64:
-      type: object
-      properties:
-        output:
-          type: string
-    Response65:
-      type: object
-      properties:
         worktreeId:
           type: string
         branch:
           type: string
         commandId:
           type: string
-    Response66:
+    Response61:
       type: object
       properties:
         commitHash:
@@ -1151,7 +1075,7 @@ components:
           type: boolean
         output:
           type: string
-    Response67:
+    Response62:
       type: object
       properties:
         paths:
@@ -1162,58 +1086,60 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LazyDirDto"
-    Response68:
+    Response63:
       type: object
       properties:
         entries:
           type: array
           items:
-            $ref: "#/components/schemas/Entry12"
-    Response69:
+            $ref: "#/components/schemas/Entry11"
+    Response64:
       type: object
       properties:
         output:
           type: string
-    Response7:
-      type: object
-      properties:
-        daemonConfiguration:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
-    Response70:
+    Response65:
       type: object
       properties:
         success:
           type: boolean
-    Response71:
+    Response66:
       type: object
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeDto"
-    Response72:
+    Response67:
       type: object
       properties:
         files:
           type: array
           items:
             type: string
-    Response73:
+    Response68:
       type: object
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeHistoryDetailDto"
-    Response74:
+    Response69:
       type: object
       properties:
         entries:
           type: array
           items:
-            $ref: "#/components/schemas/Entry13"
-    Response75:
+            $ref: "#/components/schemas/Entry12"
+    Response7:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/DaemonEventDto"
+    Response70:
       type: object
       properties:
         worktree:
           $ref: "#/components/schemas/WorktreeHistoryDetailDto"
-    Response76:
+    Response71:
       type: object
       properties:
         text:
@@ -1221,15 +1147,15 @@ components:
     Response8:
       type: object
       properties:
+        daemon:
+          $ref: "#/components/schemas/RepositoryDaemonDto"
+    Response9:
+      type: object
+      properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry1"
-    Response9:
-      type: object
-      properties:
-        daemonConfiguration:
-          $ref: "#/components/schemas/DaemonConfigurationDto"
     RestartPolicy:
       type: string
       enum:
@@ -1291,36 +1217,6 @@ components:
           type: object
           additionalProperties:
             type: string
-    UpdateDaemonConfigurationRequest:
-      type: object
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        startScript:
-          type: string
-        readyPattern:
-          type: string
-        stopSignal:
-          type: string
-        restartPolicy:
-          $ref: "#/components/schemas/RestartPolicy"
-        maxRestarts:
-          type: integer
-          format: int32
-        environment:
-          type: object
-          additionalProperties:
-            type: string
-        observers:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogObserverInput"
-        sources:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogSourceInput"
     UpdateFeatureFlowConfigurationRequest:
       type: object
       properties:
@@ -1518,7 +1414,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response22"
+                $ref: "#/components/schemas/Response17"
       summary: List
       tags:
       - Action Configuration Controller
@@ -1535,7 +1431,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response25"
+                $ref: "#/components/schemas/Response20"
         "400":
           description: Bad Request
       summary: Create
@@ -1561,7 +1457,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response21"
+                $ref: "#/components/schemas/Response16"
         "400":
           description: Bad Request
       summary: Update
@@ -1580,7 +1476,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response23"
+                $ref: "#/components/schemas/Response18"
       summary: Get
       tags:
       - Action Configuration Controller
@@ -1597,7 +1493,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response24"
+                $ref: "#/components/schemas/Response19"
       summary: Delete
       tags:
       - Action Configuration Controller
@@ -1733,97 +1629,6 @@ paths:
       summary: Get Trace
       tags:
       - Context Propagation Controller
-  /api/daemon-configurations:
-    get:
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Response8"
-      summary: List
-      tags:
-      - Daemon Configuration Controller
-    post:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateDaemonConfigurationRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Response11"
-        "400":
-          description: Bad Request
-      summary: Create
-      tags:
-      - Daemon Configuration Controller
-  /api/daemon-configurations/{id}:
-    put:
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateDaemonConfigurationRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Response7"
-        "400":
-          description: Bad Request
-      summary: Update
-      tags:
-      - Daemon Configuration Controller
-    get:
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Response9"
-      summary: Get
-      tags:
-      - Daemon Configuration Controller
-    delete:
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Response10"
-      summary: Delete
-      tags:
-      - Daemon Configuration Controller
   /api/daemon-events:
     get:
       parameters:
@@ -1868,7 +1673,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response12"
+                $ref: "#/components/schemas/Response7"
       summary: List
       tags:
       - Daemon Event Controller
@@ -1918,7 +1723,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response27"
+                $ref: "#/components/schemas/Response22"
       summary: List
       tags:
       - Feature Flow Configuration Controller
@@ -1942,7 +1747,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response26"
+                $ref: "#/components/schemas/Response21"
         "400":
           description: Bad Request
       summary: Update
@@ -1961,7 +1766,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response28"
+                $ref: "#/components/schemas/Response23"
       summary: Get
       tags:
       - Feature Flow Configuration Controller
@@ -1978,7 +1783,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response29"
+                $ref: "#/components/schemas/Response24"
       summary: Delete
       tags:
       - Feature Flow Configuration Controller
@@ -1995,7 +1800,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response31"
+                $ref: "#/components/schemas/Response26"
       summary: List
       tags:
       - Feature Flow Phase Action Controller
@@ -2012,7 +1817,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response34"
+                $ref: "#/components/schemas/Response29"
         "400":
           description: Bad Request
       summary: Create
@@ -2038,7 +1843,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response30"
+                $ref: "#/components/schemas/Response25"
         "400":
           description: Bad Request
       summary: Update
@@ -2057,7 +1862,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response32"
+                $ref: "#/components/schemas/Response27"
       summary: Get
       tags:
       - Feature Flow Phase Action Controller
@@ -2074,7 +1879,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response33"
+                $ref: "#/components/schemas/Response28"
       summary: Delete
       tags:
       - Feature Flow Phase Action Controller
@@ -2091,7 +1896,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response41"
+                $ref: "#/components/schemas/Response36"
       summary: List
       tags:
       - Feature Flow Phase Step Controller
@@ -2108,7 +1913,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response44"
+                $ref: "#/components/schemas/Response39"
         "400":
           description: Bad Request
       summary: Create
@@ -2134,7 +1939,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response40"
+                $ref: "#/components/schemas/Response35"
         "400":
           description: Bad Request
       summary: Update
@@ -2153,7 +1958,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response42"
+                $ref: "#/components/schemas/Response37"
       summary: Get
       tags:
       - Feature Flow Phase Step Controller
@@ -2170,7 +1975,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response43"
+                $ref: "#/components/schemas/Response38"
       summary: Delete
       tags:
       - Feature Flow Phase Step Controller
@@ -2187,7 +1992,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response36"
+                $ref: "#/components/schemas/Response31"
       summary: List
       tags:
       - Feature Flow Phase Controller
@@ -2204,7 +2009,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response39"
+                $ref: "#/components/schemas/Response34"
         "400":
           description: Bad Request
       summary: Create
@@ -2230,7 +2035,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response35"
+                $ref: "#/components/schemas/Response30"
         "400":
           description: Bad Request
       summary: Update
@@ -2249,7 +2054,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response37"
+                $ref: "#/components/schemas/Response32"
       summary: Get
       tags:
       - Feature Flow Phase Controller
@@ -2266,7 +2071,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response38"
+                $ref: "#/components/schemas/Response33"
       summary: Delete
       tags:
       - Feature Flow Phase Controller
@@ -2278,7 +2083,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response48"
+                $ref: "#/components/schemas/Response43"
       summary: List
       tags:
       - Project Controller
@@ -2295,7 +2100,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response53"
+                $ref: "#/components/schemas/Response48"
         "400":
           description: Bad Request
       summary: Create
@@ -2321,7 +2126,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response45"
+                $ref: "#/components/schemas/Response40"
         "400":
           description: Bad Request
       summary: Update
@@ -2340,7 +2145,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response49"
+                $ref: "#/components/schemas/Response44"
       summary: Get
       tags:
       - Project Controller
@@ -2357,7 +2162,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response50"
+                $ref: "#/components/schemas/Response45"
       summary: Delete
       tags:
       - Project Controller
@@ -2375,7 +2180,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response47"
+                $ref: "#/components/schemas/Response42"
       summary: List Feature Flow Configurations
       tags:
       - Project Controller
@@ -2398,7 +2203,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response52"
+                $ref: "#/components/schemas/Response47"
         "400":
           description: Bad Request
       summary: Create Feature Flow Configuration
@@ -2418,7 +2223,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response46"
+                $ref: "#/components/schemas/Response41"
       summary: List Repositories
       tags:
       - Project Controller
@@ -2441,7 +2246,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response51"
+                $ref: "#/components/schemas/Response46"
         "400":
           description: Bad Request
       summary: Create Repository
@@ -2461,7 +2266,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response59"
+                $ref: "#/components/schemas/Response54"
       summary: Get
       tags:
       - Repository Controller
@@ -2478,7 +2283,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response61"
+                $ref: "#/components/schemas/Response56"
       summary: Delete
       tags:
       - Repository Controller
@@ -2502,7 +2307,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response60"
+                $ref: "#/components/schemas/Response55"
       summary: Delete Branch
       tags:
       - Repository Controller
@@ -2519,7 +2324,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response63"
+                $ref: "#/components/schemas/Response58"
       summary: Branches
       tags:
       - Repository Controller
@@ -2543,7 +2348,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response62"
+                $ref: "#/components/schemas/Response57"
         "400":
           description: Bad Request
       summary: Cleanup Branch
@@ -2569,7 +2374,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response58"
+                $ref: "#/components/schemas/Response53"
         "400":
           description: Bad Request
       summary: Merge Branch
@@ -2673,7 +2478,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response74"
+                $ref: "#/components/schemas/Response69"
       summary: List
       tags:
       - Worktree History Controller
@@ -2703,7 +2508,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response73"
+                $ref: "#/components/schemas/Response68"
       summary: Update
       tags:
       - Worktree History Controller
@@ -2726,7 +2531,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response75"
+                $ref: "#/components/schemas/Response70"
       summary: Get
       tags:
       - Worktree History Controller
@@ -2750,7 +2555,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response55"
+                $ref: "#/components/schemas/Response50"
         "400":
           description: Bad Request
       summary: Set Main Branch
@@ -2770,7 +2575,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response57"
+                $ref: "#/components/schemas/Response52"
       summary: Pull
       tags:
       - Repository Controller
@@ -2788,7 +2593,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response56"
+                $ref: "#/components/schemas/Response51"
       summary: Push
       tags:
       - Repository Controller
@@ -2806,7 +2611,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response54"
+                $ref: "#/components/schemas/Response49"
       summary: Sync
       tags:
       - Repository Controller
@@ -2842,7 +2647,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response68"
+                $ref: "#/components/schemas/Response63"
       summary: List
       tags:
       - Worktree Controller
@@ -2865,7 +2670,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response71"
+                $ref: "#/components/schemas/Response66"
         "400":
           description: Bad Request
       summary: Create
@@ -2921,7 +2726,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response72"
+                $ref: "#/components/schemas/Response67"
       summary: Conflicts
       tags:
       - Worktree Controller
@@ -2944,7 +2749,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response20"
+                $ref: "#/components/schemas/Response15"
       summary: List
       tags:
       - Worktree Daemon Controller
@@ -2972,7 +2777,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response19"
+                $ref: "#/components/schemas/Response14"
       summary: Start
       tags:
       - Worktree Daemon Controller
@@ -3000,7 +2805,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response18"
+                $ref: "#/components/schemas/Response13"
       summary: Stop
       tags:
       - Worktree Daemon Controller
@@ -3029,7 +2834,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response70"
+                $ref: "#/components/schemas/Response65"
         "400":
           description: Bad Request
       summary: Discard
@@ -3054,7 +2859,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response69"
+                $ref: "#/components/schemas/Response64"
       summary: Fast Forward
       tags:
       - Worktree Controller
@@ -3081,7 +2886,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response67"
+                $ref: "#/components/schemas/Response62"
       summary: List Files
       tags:
       - Worktree Controller
@@ -3160,7 +2965,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response66"
+                $ref: "#/components/schemas/Response61"
         "400":
           description: Bad Request
       summary: Merge
@@ -3216,7 +3021,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response65"
+                $ref: "#/components/schemas/Response60"
       summary: Resolve Conflict
       tags:
       - Worktree Controller
@@ -3239,7 +3044,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response64"
+                $ref: "#/components/schemas/Response59"
       summary: Update From Parent
       tags:
       - Worktree Controller
@@ -3257,7 +3062,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response14"
+                $ref: "#/components/schemas/Response9"
       summary: List
       tags:
       - Repository Daemon Controller
@@ -3280,7 +3085,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response17"
+                $ref: "#/components/schemas/Response12"
         "400":
           description: Bad Request
       summary: Create
@@ -3311,7 +3116,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response13"
+                $ref: "#/components/schemas/Response8"
         "400":
           description: Bad Request
       summary: Update
@@ -3335,7 +3140,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response15"
+                $ref: "#/components/schemas/Response10"
       summary: Get
       tags:
       - Repository Daemon Controller
@@ -3357,7 +3162,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response16"
+                $ref: "#/components/schemas/Response11"
       summary: Delete
       tags:
       - Repository Daemon Controller
@@ -3375,7 +3180,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response76"
+                $ref: "#/components/schemas/Response71"
         "400":
           description: Bad Request
       summary: Transcribe

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ProjectDto } from './projectDto';
+import { WorktreeDto } from './worktreeDto';
 
 
 export interface Entry11 { 
-    project?: ProjectDto;
+    worktree?: WorktreeDto;
 }
 

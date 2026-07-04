@@ -1,5 +1,9 @@
 package eu.wohlben.qits.cli;
 
+import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
+import eu.wohlben.qits.domain.daemon.entity.LogObserver;
+import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
+import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
@@ -10,6 +14,7 @@ import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -44,6 +49,8 @@ public class SeedService {
   @Inject ProjectService projectService;
 
   @Inject WorktreeService worktreeService;
+
+  @Inject RepositoryDaemonService repositoryDaemonService;
 
   /** Override the clone source; defaults to the in-repo testing-repo.git fixture. */
   @ConfigProperty(name = "qits.seed.repo-url")
@@ -81,6 +88,22 @@ public class SeedService {
     // independent merge of the same content makes it both ahead of and behind mainline.
     worktreeService.mergeWorktree(repo.id, "feeder", "mainline");
     worktreeService.mergeWorktree(repo.id, "feeder", "diverged");
+
+    // A demo daemon on the repository (daemons only exist at repository scope): a Python static
+    // file server with a ready pattern and a LOG_LEVEL observer — enough to watch the whole
+    // supervised lifecycle in any of the worktrees above.
+    repositoryDaemonService.create(
+        repo.id,
+        "Python HTTP server",
+        "Serves the worktree over HTTP on :8000 — a demo daemon for the supervisor",
+        "python3 -m http.server 8000",
+        "Serving HTTP",
+        "TERM",
+        RestartPolicy.ON_FAILURE,
+        3,
+        null,
+        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
+        null);
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
     System.out.println(

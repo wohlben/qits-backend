@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonConfigurationDto } from './daemonConfigurationDto';
+import { Entry1 } from './entry1';
 
 
 export interface Response9 { 
-    daemonConfiguration?: DaemonConfigurationDto;
+    entries?: Array<Entry1>;
 }
 

@@ -1,9 +1,11 @@
 package eu.wohlben.qits.domain.daemon.control;
 
+import eu.wohlben.qits.domain.daemon.dto.RepositoryDaemonDto;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
+import eu.wohlben.qits.domain.daemon.mapper.RepositoryDaemonMapper;
 import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
@@ -17,13 +19,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** CRUD over one repository's own daemons; every access enforces ownership. */
+/**
+ * CRUD over one repository's daemons — the only scope daemons have; every access enforces
+ * ownership. Also the supervisor's resolution point ({@link #resolve}/{@link #resolveAll}).
+ */
 @ApplicationScoped
 public class RepositoryDaemonService {
 
   @Inject RepositoryDaemonRepository repositoryDaemonRepository;
 
   @Inject RepositoryRepository repositoryRepository;
+
+  @Inject RepositoryDaemonMapper repositoryDaemonMapper;
 
   @Transactional
   public RepositoryDaemon create(
@@ -84,6 +91,18 @@ public class RepositoryDaemonService {
 
   public List<RepositoryDaemon> list(String repositoryId) {
     return repositoryDaemonRepository.findByRepositoryId(repositoryId);
+  }
+
+  /** The single daemon {@code daemonId} of {@code repositoryId}, flattened for the supervisor. */
+  @Transactional
+  public RepositoryDaemonDto resolve(String repositoryId, String daemonId) {
+    return repositoryDaemonMapper.toDto(get(repositoryId, daemonId));
+  }
+
+  /** Every daemon of {@code repositoryId}, flattened for the supervisor. */
+  @Transactional
+  public List<RepositoryDaemonDto> resolveAll(String repositoryId) {
+    return list(repositoryId).stream().map(repositoryDaemonMapper::toDto).toList();
   }
 
   @Transactional

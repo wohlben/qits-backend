@@ -33,8 +33,9 @@ Related/dependent plans:
 ### Log sources (`LogSource`, `FileTailSource`)
 
 - `LogSource` embeddable (`path` worktree-relative + optional `label`) as an element collection
-  on both definition scopes (`daemon_configuration_source` / `repository_daemon_source`,
-  `V16__daemon_log_sources.sql`), editable in the definition form and REST inputs. Only FILE
+  on the daemon definition (`repository_daemon_source`; `V16__daemon_log_sources.sql` also
+  created a `daemon_configuration_source` twin for the since-removed global scope — dropped by
+  `V19`), editable in the REST/MCP inputs. Only FILE
   sources are stored — `PROCESS_OUTPUT` is implicit, so the embeddable has no kind column.
   Paths are validated lexically at definition time (no absolute paths, no `..`, not `.git`) and
   re-checked against the resolved worktree root when the tail starts — the same two-layer guard
@@ -133,7 +134,7 @@ Related/dependent plans:
   stay null).
 - `DaemonEventControllerTest`: published events served durably from `/api/daemon-events`,
   newest first, with severity/source/since filters and pagination.
-- `DaemonConfigurationControllerTest`: sources round-trip on CRUD, keep-as-is on null update,
+- `RepositoryDaemonControllerTest`: sources round-trip on CRUD, keep-as-is on null update,
   traversal paths rejected (`../`, absolute, `.git/`).
 - `worktree-daemons.component.spec.ts`: source badges, the seq-range command-log link, and the
   file-anchor `openFile` output.
