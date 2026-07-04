@@ -133,6 +133,32 @@ public class CommandServiceTest {
         "captured JSONL should include the result event: " + lines);
   }
 
+  @Test
+  public void chatLogRoundTripsEventsLargerThan64KbUntruncated() throws Exception {
+    String repoId = repoWithWorktree();
+
+    // A single stream-json event well past the old 64 KB truncation cap, which used to corrupt
+    // the stored line into invalid JSON.
+    CommandDto command =
+        commandService.launchChat(
+            repoId,
+            "work",
+            "Claude chat",
+            "printf '{\"type\":\"assistant\",\"text\":\"%s\"}\\n'"
+                + " \"$(head -c 70000 /dev/zero | tr '\\0' x)\"",
+            Map.of());
+
+    List<CommandLogLineDto> lines = awaitLog(command.id());
+    CommandLogLineDto big =
+        lines.stream()
+            .filter(l -> l.content().length() > 64 * 1024)
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionError("no un-truncated large line persisted: " + lines));
+    var event = new com.fasterxml.jackson.databind.ObjectMapper().readTree(big.content());
+    assertEquals(70000, event.get("text").asText().length(), "stored event must be intact JSON");
+  }
+
   private List<CommandLogLineDto> awaitLog(String commandId) throws InterruptedException {
     for (int i = 0; i < 40; i++) {
       List<CommandLogLineDto> lines = commandService.log(commandId);

@@ -12,4 +12,11 @@ public class CommandLogLineRepository implements PanacheRepository<CommandLogLin
   public List<CommandLogLine> findByCommandOrderBySeq(String commandId) {
     return list("command.id = ?1 order by sequence", commandId);
   }
+
+  /** The head of a command's log: lines with sequence strictly below the bound, in order. */
+  public List<CommandLogLine> findByCommandAndSeqLessThanOrderBySeq(
+      String commandId, long sequenceExclusive) {
+    return list(
+        "command.id = ?1 and sequence < ?2 order by sequence", commandId, sequenceExclusive);
+  }
 }
