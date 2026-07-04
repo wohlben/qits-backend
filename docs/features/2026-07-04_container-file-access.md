@@ -66,11 +66,17 @@ keeps only orchestration, sorting and path-safety **policy**; the DTOs (`Listing
 
 - **Validation** now requires the repo row, an active worktree row, and the worktree's **container to
   exist** (replacing the old on-disk existence check).
-- **Path safety** is a lexical guard (`requireSafeRelativePath`: reject absolute paths, any `..`
-  segment, NUL) plus **outright symlink rejection** — a committed in-repo symlink is never
-  dereferenced (`SYMLINK` → 400), since in-container we can't cheaply prove its target stays inside
-  `/workspace` and cloned repos are untrusted. (The old host code followed in-tree symlinks; no test
-  relied on that and rejection is strictly safer.)
+- **Path safety** is three layers: a lexical guard (`requireSafeRelativePath`: reject absolute paths,
+  any `..` segment, NUL); outright rejection of a **final-segment** symlink via the `stat` lstat
+  (`SYMLINK` → 400); and a **full-path containment** check (`resolvesInsideRoot`) that `realpath -e`s
+  the whole path — following *every* segment — and rejects it unless it still resolves under the
+  worktree root. That last layer is essential: the lstat only vets the final component, but an
+  **intermediate** symlinked directory (`linkdir/ -> /etc` in `linkdir/passwd`) is transparently
+  followed by the kernel during path resolution, so without it `find`/`cat` would escape the worktree.
+  It compares against the *resolved* root (not a literal `/workspace`) so it stays correct under the
+  test fake, where the container is a host clone at a different path. (The old host code got this from
+  `toRealPath()`; the container reimplementation initially regressed it — restored here, caught by a
+  security review.)
 - `MAX_CONTENT_BYTES` (2 MB) and the NUL-byte binary heuristic stay host-side, applied to the bytes
   `read` returns; the size cap is enforced from `stat` before any content is streamed.
 

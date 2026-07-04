@@ -123,6 +123,29 @@ public class ContainerFileAccess implements WorktreeFileAccess {
   }
 
   @Override
+  public boolean resolvesInsideRoot(String repoId, String worktreeId, String path) {
+    String container = containers.containerName(worktreeId, repoId);
+    // Canonicalize both the worktree root and the target (all symlinks followed, -e requires
+    // existence) and confirm the target stays under the root. Comparing the resolved root rather
+    // than
+    // a literal "/workspace" keeps this correct under the test fake, where the container is a host
+    // clone at a different absolute path.
+    ContainerRuntime.ExecResult result =
+        containers.exec(
+            container, "/workspace", Map.of(), "realpath", "-e", "--", ".", "./" + path);
+    if (result.exitCode() != 0) {
+      return false; // missing path, or a broken/looping symlink
+    }
+    List<String> lines = result.output().lines().filter(l -> !l.isBlank()).toList();
+    if (lines.size() < 2) {
+      return false;
+    }
+    String rootReal = lines.get(0);
+    String pathReal = lines.get(1);
+    return pathReal.equals(rootReal) || pathReal.startsWith(rootReal + "/");
+  }
+
+  @Override
   public byte[] read(String repoId, String worktreeId, String path) {
     String container = containers.containerName(worktreeId, repoId);
     List<String> argv =
