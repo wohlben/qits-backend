@@ -54,8 +54,10 @@ agent's home (`~/.claude` — the login + state):
   `CommandService.prepare` → `-e`). CWD stays `/workspace`, so the agent's project detection is
   unaffected.
 - The one-time **interactive OAuth login** is done by the operator via `docker/workspace/agent-login.sh`
-  (runs `claude /login` in a throwaway container as the host uid, writing `~/.claude` onto the
-  volume). Nothing about the login is qits' job at runtime.
+  (runs `claude auth login` in a throwaway container as the host uid, writing `~/.claude` onto the
+  volume). The login can equally be done from any worktree's terminal in the qits UI — that terminal
+  already runs in a container with the shared volume mounted, so `claude auth login` there populates
+  the same volume for every worktree. Nothing about the login is qits' job at runtime.
 
 Git identity (`qits@local`) is already set repo-locally at container init
 (`WorktreeService.createContainerWorktree`), so agent commits just work; pushes go only to the
