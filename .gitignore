@@ -30,3 +30,6 @@ allure-results/
 # Starter migration scratch file — written to the repo root by `cli generate-migration`
 # as a reminder/template; turn it into a hand-written db/migration/V#__name.sql, then delete it.
 PENDING_MIGRATION.sql
+
+# Local per-machine Quarkus config overrides (e.g. WSL2 git-host); never committed.
+.env
