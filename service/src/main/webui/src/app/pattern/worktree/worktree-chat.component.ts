@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMessageSquare } from '@ng-icons/lucide';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
@@ -15,12 +16,13 @@ import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { CommandDto } from '@/api/model/commandDto';
+import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
 import { CommandChatComponent } from '@/pattern/command/command-chat.component';
 import { newestRunningChat } from '@/pattern/command/running-chat';
 import { WorktreePromptPanelComponent } from '@/pattern/speech/worktree-prompt-panel.component';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { ZardDialogService } from '@/shared/components/dialog';
+import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 
 /**
  * The worktree's chat entry point: a header button that opens a near-fullscreen dialog holding the
@@ -93,8 +95,11 @@ export class WorktreeChatComponent {
   private readonly commandService = inject(CommandControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly dialog = inject(ZardDialogService);
+  private readonly router = inject(Router);
 
   private readonly chatTpl = viewChild<TemplateRef<unknown>>('chatTpl');
+
+  private dialogRef: ZardDialogRef<unknown> | null = null;
 
   // Same key AND shape as the commands list's query, so both share one cache entry.
   readonly commandsQuery = injectQuery(() => ({
@@ -141,7 +146,7 @@ export class WorktreeChatComponent {
       return;
     }
     // Backdrop click must not close: it would silently drop an unsent transcript.
-    this.dialog.create({
+    this.dialogRef = this.dialog.create({
       zContent: content,
       zHideFooter: true,
       zMaskClosable: false,
@@ -150,7 +155,18 @@ export class WorktreeChatComponent {
   }
 
   onLaunched(commandId: string) {
-    this.launchedCommandId.set(commandId);
-    void this.queryClient.invalidateQueries({ queryKey: ['commands'] });
+    // When the agent isn't signed in the backend returns an interactive `claude auth login`
+    // terminal instead of a chat — it can't render inline, so close the dialog and redirect to its
+    // command page (a real PTY) to finish OAuth. A chat stays here.
+    void lastValueFrom(this.commandService.apiCommandsCommandIdGet(commandId)).then((response) => {
+      const command = response.command;
+      if (command?.kind && command.kind !== CommandKind.Chat) {
+        this.dialogRef?.close();
+        void this.router.navigate(['/commands', commandId]);
+        return;
+      }
+      this.launchedCommandId.set(commandId);
+      void this.queryClient.invalidateQueries({ queryKey: ['commands'] });
+    });
   }
 }

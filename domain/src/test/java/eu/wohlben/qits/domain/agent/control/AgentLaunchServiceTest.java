@@ -129,4 +129,15 @@ public class AgentLaunchServiceTest {
     assertEquals("/claude-home", spec.environment().get("HOME"));
     assertTrue(spec.script().startsWith("claude -p 'resolve the conflict'"), spec.script());
   }
+
+  @Test
+  public void loginTerminalRunsClaudeAuthLoginWithTheSharedHome() {
+    // When the agent isn't signed in, launchChat redirects to this interactive terminal so the
+    // operator completes OAuth in a real PTY; it writes to the shared credential volume.
+    LaunchSpec spec = agentLaunchService.renderLogin();
+
+    assertEquals("exec claude auth login --claudeai", spec.script());
+    assertTrue(spec.interactive());
+    assertEquals("/claude-home", spec.environment().get("HOME"));
+  }
 }

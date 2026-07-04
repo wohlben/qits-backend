@@ -63,6 +63,25 @@ Git identity (`qits@local`) is already set repo-locally at container init
 (`WorktreeService.createContainerWorktree`), so agent commits just work; pushes go only to the
 qits-hosted origin.
 
+### Sign-in redirect (no CLI needed)
+
+An operator doesn't have to know about `agent-login.sh`. When a chat is launched and the agent isn't
+signed in, qits redirects to the login instead of failing:
+
+- `AgentAuthStatus.isLoggedIn` runs `claude auth status` in the worktree container (HOME → the shared
+  volume) and reads the `loggedIn` field.
+- If not signed in, `AgentLaunchService.launchChat` returns an **interactive `claude auth login`
+  terminal** (a normal registry PTY command, kind `TERMINAL`, named "Claude sign-in") instead of a
+  chat. Because `claude auth login` is a real TTY flow (it prints a URL and reads the pasted code —
+  it will *not* complete over a plain pipe), it has to run in an actual terminal; the registry PTY is
+  exactly that.
+- The "Configure … with Claude" buttons and the WIP route already `navigate(['/commands', id])`, and
+  the command page renders a PTY for a `TERMINAL` command — so the operator lands in a normal
+  terminal, opens the printed URL, pastes the code, and is signed in. The worktree chat *dialog*
+  (which embeds a chat inline) gets a one-line guard: a non-`CHAT` launch closes the dialog and
+  redirects to the command page. Signing in writes the shared volume, so every worktree is then
+  authenticated; re-open the chat to start it.
+
 ### Removed: the seeded bare "Claude Code" action
 
 `ActionConfigurationSeeder` no longer seeds a "Claude Code" run action. The three "Configure … with

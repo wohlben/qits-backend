@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -30,8 +31,13 @@ describe('WorktreeChatComponent', () => {
   const commandService = {
     apiCommandsGet: vi.fn().mockReturnValue(of({ entries: [] })),
     apiCommandsCommandIdTerminatePost: vi.fn().mockReturnValue(of({})),
+    // Default: a launched command resolves as a chat (echoing the requested id).
+    apiCommandsCommandIdGet: vi
+      .fn()
+      .mockImplementation((id: string) => of({ command: chat({ id }) })),
   };
   const dialog = { create: vi.fn().mockReturnValue({ close: vi.fn() }) };
+  const router = { navigate: vi.fn() };
   let queryClient: QueryClient;
 
   beforeEach(async () => {
@@ -47,6 +53,7 @@ describe('WorktreeChatComponent', () => {
         provideTanStackQuery(queryClient),
         { provide: CommandControllerService, useValue: commandService },
         { provide: ZardDialogService, useValue: dialog },
+        { provide: Router, useValue: router },
       ],
     }).compileComponents();
   });
@@ -127,11 +134,36 @@ describe('WorktreeChatComponent', () => {
     const cmp = fixture.componentInstance;
 
     cmp.onLaunched('cmd-9');
+    await flush(); // onLaunched resolves the command's kind before bridging
     expect(cmp.activeChatId()).toBe('cmd-9');
 
     // The registry catches up and reports it as already finished → the bridge drops.
     queryClient.setQueryData(['commands'], [chat({ id: 'cmd-9', status: CommandStatus.Exited })]);
     await flush();
+    expect(cmp.activeChatId()).toBeNull();
+  });
+
+  it('redirects to the command page when the launch is a login terminal, not a chat', async () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+    cmp.open(); // establishes the dialog ref so it can be closed on redirect
+
+    // Not signed in → the backend returns an interactive `claude auth login` terminal.
+    commandService.apiCommandsCommandIdGet.mockReturnValueOnce(
+      of({
+        command: {
+          id: 'login-1',
+          kind: CommandKind.Terminal,
+          status: CommandStatus.Running,
+        } as CommandDto,
+      }),
+    );
+
+    cmp.onLaunched('login-1');
+    await flush();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/commands', 'login-1']);
+    // A terminal is never bridged as a chat.
     expect(cmp.activeChatId()).toBeNull();
   });
 
