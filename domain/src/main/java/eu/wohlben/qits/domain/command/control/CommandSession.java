@@ -167,6 +167,25 @@ final class CommandSession {
   }
 
   /**
+   * Send a named signal (e.g. TERM, INT) to the process <em>group</em> — the PTY leader is a
+   * session leader, so {@code kill -- -pid} reaches a compound script's children too. This is the
+   * graceful half of a daemon stop; {@link #terminate()} stays the kill fallback. Returns false if
+   * the signal could not be delivered.
+   */
+  boolean signal(String signal) {
+    try {
+      Process kill = new ProcessBuilder("kill", "-s", signal, "--", "-" + process.pid()).start();
+      return kill.waitFor() == 0;
+    } catch (IOException e) {
+      LOG.debugf(e, "signal %s failed for command %s", signal, commandId);
+      return false;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
+  /**
    * Force-kill the process. A login {@code bash -l} ignores the SIGHUP that {@code destroy()}
    * sends, so a SIGKILL is needed; closing the streams unblocks the reader's native {@code read()}.
    */

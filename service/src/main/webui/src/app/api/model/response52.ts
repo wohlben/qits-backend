@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { FeatureFlowConfigurationDto } from './featureFlowConfigurationDto';
 
 
 export interface Response52 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    featureFlowConfiguration?: FeatureFlowConfigurationDto;
 }
 

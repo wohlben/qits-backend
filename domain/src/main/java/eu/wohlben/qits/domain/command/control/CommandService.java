@@ -165,6 +165,42 @@ public class CommandService {
   }
 
   /**
+   * Launch a supervised daemon run as a registry command (kind {@code DAEMON}) — a PTY process like
+   * an interactive action, so the existing terminal socket gives log tailing and re-attach. The
+   * caller (the daemon supervisor) owns the lifecycle around it: {@code exitListener} is invoked
+   * <em>after</em> the persisted status update, and {@code observerSinks} are attached before the
+   * first output byte so ready/error observers never miss early lines.
+   */
+  public CommandDto launchDaemon(
+      String repoId,
+      String worktreeId,
+      String name,
+      String script,
+      Map<String, String> environment,
+      CommandExitListener exitListener,
+      CommandOutputSink... observerSinks) {
+    Prepared p =
+        prepare(
+            repoId,
+            worktreeId,
+            new LaunchDescriptor(null, name, script, true, environment, CommandKind.DAEMON));
+    CommandExitListener composite =
+        (commandId, exitCode, terminatedManually) -> {
+          onExit(commandId, exitCode, terminatedManually);
+          exitListener.onExit(commandId, exitCode, terminatedManually);
+        };
+    registry.spawn(
+        p.dto().id(),
+        p.worktreePath(),
+        p.script(),
+        p.env(),
+        composite,
+        commandLogService,
+        observerSinks);
+    return p.dto();
+  }
+
+  /**
    * Launch a non-interactive action and block for its result (the one-off run path). The command is
    * still registered and persisted, so it shows up in the Commands list and survives as history.
    */

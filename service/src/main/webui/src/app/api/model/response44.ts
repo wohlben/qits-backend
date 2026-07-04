@@ -7,12 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { FeatureFlowPhaseStepDto } from './featureFlowPhaseStepDto';
 
 
 export interface Response44 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
-    cleanedUp?: boolean;
+    featureFlowPhaseStep?: FeatureFlowPhaseStepDto;
 }
 

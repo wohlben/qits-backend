@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Once [daemons](daemons.md) run the project's dev server, the rendered app is *right there* on a
+Once [daemons](../features/2026-07-04_daemons.md) run the project's dev server, the rendered app is *right there* on a
 loopback port — but invisible to the coding agent, which only ever sees source. This idea closes
 that loop from the human side: a floaty button opens a full-screen dialog with an **iframe of the
 daemon-served app**, plus a **DOM picker** — hover an element, click it, and its HTML lands in a
@@ -29,7 +29,7 @@ serves itself under the proxied prefix and the proxy stays a dumb passthrough.
 
 Related/dependent plans:
 
-- Hard dependency on [daemons](daemons.md): the thing being framed is a daemon instance (a
+- Hard dependency on [daemons](../features/2026-07-04_daemons.md): the thing being framed is a daemon instance (a
   `CommandKind.DAEMON` registry command). This idea adds one field to the daemon definition
   (`httpPort`), uses the daemon environment-injection slot (the same one observability uses for
   `OTEL_EXPORTER_OTLP_*`) for `QITS_PUBLIC_BASE`, and leans on the singleton-per-(worktree,

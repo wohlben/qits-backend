@@ -1,0 +1,141 @@
+package eu.wohlben.qits.domain.daemon.control;
+
+import eu.wohlben.qits.domain.daemon.entity.LogObserver;
+import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
+import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
+import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
+import eu.wohlben.qits.domain.error.BadRequestException;
+import eu.wohlben.qits.domain.error.NotFoundException;
+import eu.wohlben.qits.domain.repository.entity.Repository;
+import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** CRUD over one repository's own daemons; every access enforces ownership. */
+@ApplicationScoped
+public class RepositoryDaemonService {
+
+  @Inject RepositoryDaemonRepository repositoryDaemonRepository;
+
+  @Inject RepositoryRepository repositoryRepository;
+
+  @Transactional
+  public RepositoryDaemon create(
+      String repositoryId,
+      String name,
+      String description,
+      String startScript,
+      String readyPattern,
+      String stopSignal,
+      RestartPolicy restartPolicy,
+      Integer maxRestarts,
+      Map<String, String> environment,
+      List<LogObserver> observers) {
+    if (name == null || name.isBlank()) {
+      throw new BadRequestException("name is required");
+    }
+    if (startScript == null || startScript.isBlank()) {
+      throw new BadRequestException("startScript is required");
+    }
+    DaemonDefinitionValidator.requireValidRegex(readyPattern, "readyPattern");
+    DaemonDefinitionValidator.requireValidObservers(observers);
+
+    Repository repository =
+        repositoryRepository
+            .findByIdOptional(repositoryId)
+            .orElseThrow(() -> new NotFoundException("Repository not found: " + repositoryId));
+
+    RepositoryDaemon daemon = new RepositoryDaemon();
+    daemon.repository = repository;
+    daemon.name = name;
+    daemon.description = description;
+    daemon.startScript = startScript;
+    daemon.readyPattern = blankToNull(readyPattern);
+    daemon.stopSignal = DaemonDefinitionValidator.normalizeStopSignal(stopSignal);
+    daemon.restartPolicy = restartPolicy != null ? restartPolicy : RestartPolicy.ON_FAILURE;
+    daemon.maxRestarts = maxRestarts != null ? maxRestarts : 3;
+    daemon.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
+    daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
+    repositoryDaemonRepository.persist(daemon);
+
+    return daemon;
+  }
+
+  /** The daemon, if it exists and belongs to {@code repositoryId}; 404 otherwise. */
+  public RepositoryDaemon get(String repositoryId, String daemonId) {
+    RepositoryDaemon daemon =
+        repositoryDaemonRepository
+            .findByIdOptional(daemonId)
+            .orElseThrow(() -> new NotFoundException("RepositoryDaemon not found: " + daemonId));
+    if (!daemon.repository.id.equals(repositoryId)) {
+      throw new NotFoundException("RepositoryDaemon not found: " + daemonId);
+    }
+    return daemon;
+  }
+
+  public List<RepositoryDaemon> list(String repositoryId) {
+    return repositoryDaemonRepository.findByRepositoryId(repositoryId);
+  }
+
+  @Transactional
+  public RepositoryDaemon update(
+      String repositoryId,
+      String daemonId,
+      String name,
+      String description,
+      String startScript,
+      String readyPattern,
+      String stopSignal,
+      RestartPolicy restartPolicy,
+      Integer maxRestarts,
+      Map<String, String> environment,
+      List<LogObserver> observers) {
+    RepositoryDaemon daemon = get(repositoryId, daemonId);
+
+    if (name != null && !name.isBlank()) {
+      daemon.name = name;
+    }
+    if (description != null) {
+      daemon.description = description;
+    }
+    if (startScript != null && !startScript.isBlank()) {
+      daemon.startScript = startScript;
+    }
+    if (readyPattern != null) {
+      DaemonDefinitionValidator.requireValidRegex(readyPattern, "readyPattern");
+      daemon.readyPattern = blankToNull(readyPattern);
+    }
+    if (stopSignal != null) {
+      daemon.stopSignal = DaemonDefinitionValidator.normalizeStopSignal(stopSignal);
+    }
+    if (restartPolicy != null) {
+      daemon.restartPolicy = restartPolicy;
+    }
+    if (maxRestarts != null) {
+      daemon.maxRestarts = maxRestarts;
+    }
+    if (environment != null) {
+      daemon.environment = new HashMap<>(environment);
+    }
+    if (observers != null) {
+      DaemonDefinitionValidator.requireValidObservers(observers);
+      daemon.observers = new ArrayList<>(observers);
+    }
+
+    return daemon;
+  }
+
+  @Transactional
+  public void delete(String repositoryId, String daemonId) {
+    repositoryDaemonRepository.delete(get(repositoryId, daemonId));
+  }
+
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() ? null : value;
+  }
+}
