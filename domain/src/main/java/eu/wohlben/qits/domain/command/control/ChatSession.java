@@ -2,6 +2,7 @@ package eu.wohlben.qits.domain.command.control;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -50,6 +51,9 @@ final class ChatSession {
   private final ObjectMapper mapper = new ObjectMapper();
   private final String commandId;
   private final Process process;
+  private final String container;
+  private final ContainerRuntime containers;
+  private final long graceMillis;
   private final BufferedWriter stdin;
   private final CommandExitListener exitListener;
   private final Runnable onComplete;
@@ -69,12 +73,18 @@ final class ChatSession {
   ChatSession(
       String commandId,
       Process process,
+      String container,
+      ContainerRuntime containers,
+      long graceMillis,
       CommandExitListener exitListener,
       Runnable onComplete,
       CommandLogWriter logWriter,
       CommandLogReader logReader) {
     this.commandId = commandId;
     this.process = process;
+    this.container = container;
+    this.containers = containers;
+    this.graceMillis = graceMillis;
     this.exitListener = exitListener;
     this.onComplete = onComplete;
     this.logWriter = logWriter;
@@ -202,8 +212,37 @@ final class ChatSession {
     } catch (IOException ignored) {
       // best effort
     }
+    // Killing the host-side `docker exec` client alone would orphan the claude process inside the
+    // container, so signal its process group (recorded under setsid to a pid file), escalating to
+    // SIGKILL after the grace period.
+    killGroup("TERM");
+    if (awaitExit(graceMillis) < 0) {
+      killGroup("KILL");
+    }
     process.destroy();
     awaitExit(TimeUnit.SECONDS.toMillis(2));
+  }
+
+  /**
+   * Read the launched script's pgid from its pid file and signal that group inside the container.
+   */
+  private boolean killGroup(String signal) {
+    ContainerRuntime.ExecResult pid =
+        containers.exec(container, null, Map.of(), "cat", "/tmp/qits-cmd-" + commandId + ".pid");
+    if (pid.exitCode() != 0 || pid.output().isBlank()) {
+      return false;
+    }
+    String pgid = pid.output().trim();
+    // The pid file is written by the (untrusted) container, so accept only a plain number before
+    // interpolating it into a shell line. `kill` runs via `sh -c` (the shell builtin) so it works
+    // even in an image without a /bin/kill; the signal name is a controlled, validated value.
+    if (!pgid.matches("\\d+")) {
+      return false;
+    }
+    ContainerRuntime.ExecResult result =
+        containers.exec(
+            container, null, Map.of(), "sh", "-c", "kill -s " + signal + " -- -" + pgid);
+    return result.exitCode() == 0;
   }
 
   boolean isAlive() {

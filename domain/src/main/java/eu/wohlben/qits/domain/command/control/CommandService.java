@@ -12,19 +12,18 @@ import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService.ResolvedAction;
-import eu.wohlben.qits.domain.repository.control.GitExecutor;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 /**
@@ -62,10 +61,9 @@ public class CommandService {
 
   @Inject ActionResolutionService actionResolutionService;
 
-  @Inject GitExecutor git;
+  @Inject WorktreeRepository worktreeRepository;
 
-  @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
-  String dataDir;
+  @Inject ContainerRuntime containers;
 
   /** The outcome of a non-interactive run: combined output and exit code. */
   public record RunOutcome(String actionId, String actionName, int exitCode, String output) {}
@@ -80,7 +78,7 @@ public class CommandService {
 
   /** A persisted RUNNING command plus what the registry needs to spawn its process. */
   private record Prepared(
-      CommandDto dto, Path worktreePath, String script, Map<String, String> env) {}
+      CommandDto dto, String container, String script, Map<String, String> env) {}
 
   /**
    * What a launch needs regardless of where it came from: an action or a coding agent. {@code
@@ -110,7 +108,7 @@ public class CommandService {
     ResolvedAction action = actionResolutionService.resolveForRepository(repoId, actionId);
     Prepared p = prepare(repoId, worktreeId, LaunchDescriptor.of(action));
     registry.spawn(
-        p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
+        p.dto().id(), p.container(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
   }
 
@@ -134,7 +132,7 @@ public class CommandService {
             new LaunchDescriptor(
                 null, name, script, interactive, environment, CommandKind.TERMINAL));
     registry.spawn(
-        p.dto().id(), p.worktreePath(), p.script(), p.env(), this::onExit, commandLogService);
+        p.dto().id(), p.container(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
   }
 
@@ -156,7 +154,7 @@ public class CommandService {
             new LaunchDescriptor(null, name, script, false, environment, CommandKind.CHAT));
     registry.spawnChat(
         p.dto().id(),
-        p.worktreePath(),
+        p.container(),
         p.script(),
         p.env(),
         this::onExit,
@@ -206,7 +204,7 @@ public class CommandService {
               }
             };
     registry.spawn(
-        p.dto().id(), p.worktreePath(), p.script(), p.env(), composite, logWriter, observerSinks);
+        p.dto().id(), p.container(), p.script(), p.env(), composite, logWriter, observerSinks);
     return p.dto();
   }
 
@@ -227,7 +225,7 @@ public class CommandService {
     int exitCode =
         registry.spawnAndAwait(
             p.dto().id(),
-            p.worktreePath(),
+            p.container(),
             p.script(),
             p.env(),
             this::onExit,
@@ -241,17 +239,34 @@ public class CommandService {
    * Validate the worktree, snapshot its branch/commit, and persist a RUNNING row — but don't spawn.
    */
   private Prepared prepare(String repoId, String worktreeId, LaunchDescriptor descriptor) {
-    // Reject path-traversal in worktreeId before it ever reaches a filesystem path or git.
+    // Reject path-traversal in worktreeId before it ever reaches a container name or git.
     if (!worktreeId.matches(WORKTREE_ID_PATTERN)) {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
-    Path worktreePath = Path.of(dataDir, repoId, "worktrees", worktreeId).toAbsolutePath();
-    if (!Files.exists(worktreePath)) {
-      throw new BadRequestException("Worktree checkout missing on disk");
+
+    // Branch comes from the stored column. Read it in its own transaction: launches also come from
+    // non-request threads (the daemon supervisor's scheduler on relaunch), where the Panache
+    // session would otherwise have no active context.
+    String branch =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () ->
+                    worktreeRepository
+                        .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+                        .map(w -> w.branch)
+                        .orElseThrow(
+                            () -> new BadRequestException("Worktree not found: " + worktreeId)));
+
+    String container = containers.containerName(worktreeId, repoId);
+    if (!containers.exists(container)) {
+      throw new BadRequestException("Worktree container is not running");
     }
 
-    String branch = git.getCurrentBranch(worktreePath);
-    String commitHash = git.getCurrentCommit(worktreePath);
+    // The commit is read from the container's checkout so unpushed work is captured (the origin
+    // ref may lag behind /workspace's HEAD).
+    ContainerRuntime.ExecResult head =
+        containers.exec(container, "/workspace", Map.of(), "git", "rev-parse", "HEAD");
+    String commitHash = head.exitCode() == 0 ? head.output().trim() : null;
 
     // Persist RUNNING first (this also validates the worktree belongs to the repo). If the spawn
     // fails afterwards the registry marks it via the exit listener; the row is never left dangling.
@@ -267,11 +282,13 @@ public class CommandService {
             descriptor.interactive(),
             descriptor.kind());
 
-    Map<String, String> env = new HashMap<>(System.getenv());
+    // Only the resolved overlay reaches the container (as `docker exec -e` flags) — the host
+    // environment (and its credentials) is deliberately never inherited into a workspace container.
+    Map<String, String> env = new HashMap<>();
     env.put("TERM", "xterm-256color");
     env.putAll(descriptor.environment());
 
-    return new Prepared(dto, worktreePath, descriptor.script(), env);
+    return new Prepared(dto, container, descriptor.script(), env);
   }
 
   /** The single bridge from a process ending to its persisted status (via the lifecycle proxy). */

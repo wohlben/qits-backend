@@ -38,6 +38,14 @@ public class Worktree extends PanacheEntityBase {
   @Column(name = "parent_id")
   public String parent;
 
+  /**
+   * The branch this worktree owns. Stored (not derived from an on-disk checkout) because the
+   * checkout now lives inside the worktree's container, not on the host — there is no host path to
+   * read {@code git branch --show-current} from.
+   */
+  @Column(name = "branch")
+  public String branch;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   public WorktreeStatus status = WorktreeStatus.ACTIVE;

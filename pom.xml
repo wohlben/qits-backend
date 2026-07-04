@@ -139,4 +139,19 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- The "extended" suite: heavier, environment-dependent integration tests (JUnit `*IT`
+             classes, tagged @Tag("extended")) that need a real backend such as docker — e.g. the
+             real-docker WorkspaceContainerIT. Skipped by every default build (skipITs=true); opt in
+             with `-Pextended` to run the full spectrum. Failsafe binds in the `service` module, so
+             the ITs live there. Each IT self-skips (JUnit Assumptions) when its prerequisite is
+             absent, so `-Pextended` is safe to run even without docker. -->
+        <profile>
+            <id>extended</id>
+            <properties>
+                <skipITs>false</skipITs>
+            </properties>
+        </profile>
+    </profiles>
 </project>

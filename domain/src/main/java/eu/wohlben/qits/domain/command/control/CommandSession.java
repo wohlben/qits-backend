@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.command.control;
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -40,6 +42,13 @@ final class CommandSession {
 
   private final String commandId;
   private final PtyProcess process;
+
+  /** The container the launched script runs inside, and the runtime used to signal it. */
+  private final String container;
+
+  private final ContainerRuntime containers;
+  private final long graceMillis;
+
   private final CommandExitListener exitListener;
   private final Runnable onComplete;
 
@@ -78,11 +87,17 @@ final class CommandSession {
   CommandSession(
       String commandId,
       PtyProcess process,
+      String container,
+      ContainerRuntime containers,
+      long graceMillis,
       CommandExitListener exitListener,
       Runnable onComplete,
       CommandLogWriter logWriter) {
     this.commandId = commandId;
     this.process = process;
+    this.container = container;
+    this.containers = containers;
+    this.graceMillis = graceMillis;
     this.exitListener = exitListener;
     this.onComplete = onComplete;
     this.logWriter = logWriter;
@@ -167,30 +182,34 @@ final class CommandSession {
   }
 
   /**
-   * Send a named signal (e.g. TERM, INT) to the process <em>group</em> — the PTY leader is a
-   * session leader, so {@code kill -- -pid} reaches a compound script's children too. This is the
+   * Send a named signal (e.g. TERM, INT) to the launched script's process <em>group</em> inside the
+   * container. The script runs under {@code setsid} as a session/group leader with its pgid written
+   * to a pid file, so {@code kill -- -pgid} reaches a compound script's children too. Killing the
+   * host-side {@code docker exec} client instead would orphan the process alive — this is the
    * graceful half of a daemon stop; {@link #terminate()} stays the kill fallback. Returns false if
    * the signal could not be delivered.
    */
   boolean signal(String signal) {
-    try {
-      Process kill = new ProcessBuilder("kill", "-s", signal, "--", "-" + process.pid()).start();
-      return kill.waitFor() == 0;
-    } catch (IOException e) {
-      LOG.debugf(e, "signal %s failed for command %s", signal, commandId);
-      return false;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return false;
-    }
+    return killGroup(signal);
   }
 
   /**
-   * Force-kill the process. A login {@code bash -l} ignores the SIGHUP that {@code destroy()}
-   * sends, so a SIGKILL is needed; closing the streams unblocks the reader's native {@code read()}.
+   * Force-kill the containerized process. Killing the host-side {@code docker exec} client does not
+   * kill the process inside the container — so signal the group SIGTERM, escalate to SIGKILL after
+   * the grace period, and fall back to restarting the container if even that leaves it running. The
+   * host client is then destroyed and its streams closed to unblock the reader's native {@code
+   * read()}.
    */
   void terminate() {
     terminatedManually = true;
+    killGroup("TERM");
+    if (awaitExit(graceMillis) < 0) {
+      killGroup("KILL");
+      if (awaitExit(TimeUnit.SECONDS.toMillis(2)) < 0) {
+        // Nothing reached the process (e.g. no pid file): restart the container as a last resort.
+        containers.restart(container);
+      }
+    }
     process.destroyForcibly();
     try {
       process.getInputStream().close();
@@ -199,6 +218,28 @@ final class CommandSession {
       // Best-effort: the process is already being killed.
     }
     awaitExit(TimeUnit.SECONDS.toMillis(2));
+  }
+
+  /**
+   * Read the launched script's pgid from its pid file and signal that group inside the container.
+   */
+  private boolean killGroup(String signal) {
+    ContainerRuntime.ExecResult pid =
+        containers.exec(container, null, Map.of(), "cat", "/tmp/qits-cmd-" + commandId + ".pid");
+    if (pid.exitCode() != 0 || pid.output().isBlank()) {
+      return false;
+    }
+    String pgid = pid.output().trim();
+    // The pid file is written by the (untrusted) container, so accept only a plain number before
+    // interpolating it into a shell line. `kill` runs via `sh -c` (the shell builtin) so it works
+    // even in an image without a /bin/kill; the signal name is a controlled, validated value.
+    if (!pgid.matches("\\d+")) {
+      return false;
+    }
+    ContainerRuntime.ExecResult result =
+        containers.exec(
+            container, null, Map.of(), "sh", "-c", "kill -s " + signal + " -- -" + pgid);
+    return result.exitCode() == 0;
   }
 
   boolean isAlive() {
