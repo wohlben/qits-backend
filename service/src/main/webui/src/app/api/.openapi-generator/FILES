@@ -1,4 +1,5 @@
 .gitignore
+.openapi-generator-ignore
 README.md
 api.base.service.ts
 api.module.ts
@@ -7,7 +8,6 @@ api/agentController.service.ts
 api/api.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
-api/daemonConfigurationController.service.ts
 api/daemonEventController.service.ts
 api/featureFlowConfigurationController.service.ts
 api/featureFlowPhaseActionController.service.ts
@@ -42,7 +42,6 @@ model/commitFileChangeDto.ts
 model/commitFileDiffDto.ts
 model/commitLogDto.ts
 model/createActionConfigurationRequest.ts
-model/createDaemonConfigurationRequest.ts
 model/createFeatureFlowPhaseActionRequest.ts
 model/createFeatureFlowPhaseRequest.ts
 model/createFeatureFlowPhaseStepRequest.ts
@@ -51,12 +50,10 @@ model/createProjectRepositoryRequest.ts
 model/createProjectRequest.ts
 model/createRepositoryDaemonRequest.ts
 model/createWorktreeRequest.ts
-model/daemonConfigurationDto.ts
 model/daemonEventDto.ts
 model/daemonEventKind.ts
 model/daemonEventSeverity.ts
 model/daemonInstanceDto.ts
-model/daemonScope.ts
 model/daemonStatus.ts
 model/discardWorktreeRequest.ts
 model/echoRequest.ts
@@ -66,7 +63,6 @@ model/entry1.ts
 model/entry10.ts
 model/entry11.ts
 model/entry12.ts
-model/entry13.ts
 model/entry2.ts
 model/entry3.ts
 model/entry4.ts
@@ -95,6 +91,7 @@ model/models.ts
 model/projectDto.ts
 model/refinePromptRequest.ts
 model/repositoryArchetype.ts
+model/repositoryDaemonDto.ts
 model/repositoryDto.ts
 model/response.ts
 model/response1.ts
@@ -166,11 +163,6 @@ model/response69.ts
 model/response7.ts
 model/response70.ts
 model/response71.ts
-model/response72.ts
-model/response73.ts
-model/response74.ts
-model/response75.ts
-model/response76.ts
 model/response8.ts
 model/response9.ts
 model/restartPolicy.ts
@@ -179,7 +171,6 @@ model/syncStatusDto.ts
 model/traceResponse.ts
 model/transcribeRequest.ts
 model/updateActionConfigurationRequest.ts
-model/updateDaemonConfigurationRequest.ts
 model/updateFeatureFlowConfigurationRequest.ts
 model/updateFeatureFlowPhaseActionRequest.ts
 model/updateFeatureFlowPhaseRequest.ts

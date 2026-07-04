@@ -1,7 +1,7 @@
 package eu.wohlben.qits.domain.daemon.api;
 
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
-import eu.wohlben.qits.domain.daemon.dto.DaemonConfigurationDto;
+import eu.wohlben.qits.domain.daemon.dto.RepositoryDaemonDto;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.daemon.mapper.RepositoryDaemonMapper;
 import eu.wohlben.qits.validation.NotBlankIfPresent;
@@ -41,7 +41,7 @@ public class RepositoryDaemonController {
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
       List<@Valid LogSourceInput> sources) {
-    public record Response(DaemonConfigurationDto daemon) {}
+    public record Response(RepositoryDaemonDto daemon) {}
   }
 
   @POST
@@ -65,7 +65,7 @@ public class RepositoryDaemonController {
   }
 
   public static record GetRepositoryDaemonRequest() {
-    public record Response(DaemonConfigurationDto daemon) {}
+    public record Response(RepositoryDaemonDto daemon) {}
   }
 
   @GET
@@ -78,7 +78,7 @@ public class RepositoryDaemonController {
 
   public static record ListRepositoryDaemonsRequest() {
     public record Response(List<Entry> entries) {
-      public record Entry(DaemonConfigurationDto daemon) {}
+      public record Entry(RepositoryDaemonDto daemon) {}
     }
   }
 
@@ -106,7 +106,7 @@ public class RepositoryDaemonController {
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
       List<@Valid LogSourceInput> sources) {
-    public record Response(DaemonConfigurationDto daemon) {}
+    public record Response(RepositoryDaemonDto daemon) {}
   }
 
   @PUT

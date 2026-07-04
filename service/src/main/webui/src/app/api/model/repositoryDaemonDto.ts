@@ -10,10 +10,9 @@
 import { LogObserverDto } from './logObserverDto';
 import { LogSourceDto } from './logSourceDto';
 import { RestartPolicy } from './restartPolicy';
-import { DaemonScope } from './daemonScope';
 
 
-export interface DaemonConfigurationDto { 
+export interface RepositoryDaemonDto { 
     id?: string;
     name?: string;
     description?: string;
@@ -22,13 +21,12 @@ export interface DaemonConfigurationDto {
     stopSignal?: string;
     restartPolicy?: RestartPolicy;
     maxRestarts?: number;
-    scope?: DaemonScope;
     repositoryId?: string;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverDto>;
     sources?: Array<LogSourceDto>;
 }
-export namespace DaemonConfigurationDto {
+export namespace RepositoryDaemonDto {
 }
 
 

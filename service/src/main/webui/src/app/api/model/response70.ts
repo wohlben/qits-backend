@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { WorktreeHistoryDetailDto } from './worktreeHistoryDetailDto';
 
 
 export interface Response70 { 
-    success?: boolean;
+    worktree?: WorktreeHistoryDetailDto;
 }
 

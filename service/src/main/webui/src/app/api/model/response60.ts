@@ -10,6 +10,8 @@
 
 
 export interface Response60 { 
-    success?: boolean;
+    worktreeId?: string;
+    branch?: string;
+    commandId?: string;
 }
 

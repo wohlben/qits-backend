@@ -10,6 +10,8 @@
 
 
 export interface Response61 { 
-    success?: boolean;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
 }
 

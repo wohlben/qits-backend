@@ -10,8 +10,6 @@
 
 
 export interface Response65 { 
-    worktreeId?: string;
-    branch?: string;
-    commandId?: string;
+    success?: boolean;
 }
 

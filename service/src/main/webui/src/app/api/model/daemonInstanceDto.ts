@@ -8,11 +8,11 @@
  * Do not edit the class manually.
  */
 import { DaemonStatus } from './daemonStatus';
-import { DaemonConfigurationDto } from './daemonConfigurationDto';
+import { RepositoryDaemonDto } from './repositoryDaemonDto';
 
 
 export interface DaemonInstanceDto { 
-    daemon?: DaemonConfigurationDto;
+    daemon?: RepositoryDaemonDto;
     status?: DaemonStatus;
     restartCount?: number;
     commandId?: string;

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorktreeDto } from './worktreeDto';
+import { WorktreeHistoryDto } from './worktreeHistoryDto';
 
 
 export interface Entry12 { 
-    worktree?: WorktreeDto;
+    worktree?: WorktreeHistoryDto;
 }
 
