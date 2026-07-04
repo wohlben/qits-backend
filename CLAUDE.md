@@ -121,7 +121,7 @@ The Angular app lives in `service/src/main/webui/` — Quinoa's default UI direc
 
 - Feature drafts live in `docs/feature-ideas/*.md`; once implemented they move to `docs/features/YYYY-MM-DD_*.md`.
 - Parked follow-ups live in `docs/backlog-ideas/*.md`: fully written idea docs deliberately not being built yet, phrased as changes to their parent feature's **already-implemented** code (never as an alternative design), each naming a **Trigger** for when to pick it up. Distinct from `docs/backlog.md` (loose one-liner TODOs).
-- Active bugs are documented in `docs/bugs/*.md`; resolved ones move to `docs/bugs/resolved/YYYY-MM-DD_*.md`.
+- Active bugs/issues are documented in `docs/issues/YYYY-MM-DD_*.md`; resolved ones move to `docs/issues/resolved/YYYY-MM-DD_*.md`. **Document bugs on encounter, proactively**: whenever you notice a bug during any task — even out of scope — write the issue doc immediately as part of that same task (observed repro, suspected cause with code pointers, suggested fix direction). Don't just flag it in your summary for review; the doc is the hand-off for later in-depth analysis. The current task's scope doesn't change.
 - All of these docs must include an **Introduction** section listing related/dependent plans.
 - Aim for full test coverage; add a regression test when fixing a bug. Tests are JUnit `*Test.java` classes.
 
