@@ -8,6 +8,7 @@ import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.project.entity.Project;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
 import io.quarkus.test.junit.QuarkusMock;
@@ -41,6 +42,8 @@ public class PromptRefinementServiceTest {
 
   @Inject PromptRefinementService service;
 
+  @Inject ContainerRuntime containers;
+
   FakeProcessExecutor executor;
 
   String repoId;
@@ -50,6 +53,9 @@ public class PromptRefinementServiceTest {
     executor = new FakeProcessExecutor();
     QuarkusMock.installMockForType(executor, ProcessExecutor.class);
     repoId = seedWorktree();
+    // The refinement provisions the worktree container; pre-create it so ensureContainer no-ops
+    // (there is no real origin to clone from in this unit test).
+    containers.run(repoId, "wt-feature", "feature-branch", null);
   }
 
   @Transactional
@@ -68,6 +74,7 @@ public class PromptRefinementServiceTest {
     Worktree worktree = new Worktree();
     worktree.worktreeId = "wt-feature";
     worktree.repository = repository;
+    worktree.branch = "feature-branch";
     worktree.preamble = "Add a health endpoint";
     worktree.persist();
     return repository.id;
@@ -78,16 +85,17 @@ public class PromptRefinementServiceTest {
     String prompt = service.refine(repoId, "wt-feature", "umm add a healthcheck please");
 
     assertEquals("refined prompt", prompt);
-    assertEquals(List.of("bash", "-c").subList(0, 2), executor.lastCommand.subList(0, 2));
-    String script = executor.lastCommand.get(2);
+    // The claude run is routed into the worktree container: the command ends with `bash -lc
+    // <claude script>` behind the container exec prefix.
+    int n = executor.lastCommand.size();
+    assertEquals(List.of("bash", "-lc"), executor.lastCommand.subList(n - 3, n - 1));
+    String script = executor.lastCommand.get(n - 1);
     assertTrue(script.startsWith("claude -p "), script);
     assertTrue(script.contains("--model 'haiku'"), script);
     assertTrue(script.contains("umm add a healthcheck please"), script);
     assertTrue(script.contains("Add a health endpoint"), script);
-    // No checkout exists in tests, so the branch context falls back to the worktree id.
-    assertTrue(script.contains("Worktree branch: wt-feature"), script);
-    // Neutral cwd — never the worktree (would pull the target repo's CLAUDE.md into context).
-    assertEquals(Path.of(System.getProperty("user.home")), executor.lastCwd);
+    // Branch context comes from the worktree's stored branch column.
+    assertTrue(script.contains("Worktree branch: feature-branch"), script);
   }
 
   @Test

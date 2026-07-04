@@ -1026,7 +1026,10 @@ public class WorktreeService {
     try {
       String branch = worktree.branch;
 
-      // Remove the worktree's container (its clone dies with it — a clone is cheap to redo).
+      // Remove the worktree's container. Discard is intentionally lossy: unlike the graceful
+      // stopContainer (which pushes first so recreation is lossless), here we delete the branch
+      // right after, so pushing unpushed /workspace commits would be pointless — the operator asked
+      // to throw this work away.
       containers.rm(containers.containerName(worktree.worktreeId, repoId));
 
       if (branch != null && !branch.isBlank()) {
