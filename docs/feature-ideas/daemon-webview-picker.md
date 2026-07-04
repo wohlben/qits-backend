@@ -43,6 +43,10 @@ Related/dependent plans:
   the agent about it" want to sit next to each other.
 - Orthogonal to [observability](observability.md), but the same shape of idea — qits obtaining a
   view into a running app the source alone can't give. Neither requires the other.
+- Parked follow-up:
+  [daemon-proxy-cross-origin-mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md) extends
+  the proxy built here with a cross-origin subdomain mode + injected picker for base-incapable
+  or untrusted apps.
 
 ## Architecture overview
 
@@ -241,10 +245,11 @@ it lives there (see Explicitly deferred), not in the primary path.
 
 ## Explicitly deferred
 
-- **Wildcard-subdomain proxy mode** (`{key}.qits.localhost`) for apps that can't serve under a
-  base path — full asset fidelity with zero app config, at the cost of a cross-origin frame. Only
-  this mode needs the retired machinery: proxy-side `<script>` injection into `<head>` (HTML
-  buffering, content-length/encoding fixups) and the postMessage picker protocol.
+- **Wildcard-subdomain proxy mode** for apps that can't serve under a base path (or shouldn't
+  share the qits origin) — full asset fidelity with zero app config, at the cost of a
+  cross-origin frame and the retired injection/postMessage machinery. Written up as a change to
+  this feature's implemented code in
+  [backlog-ideas/daemon-proxy-cross-origin-mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md).
 - **Port auto-allocation** — inherited limitation from daemons.md; `httpPort` is hardcoded in the
   definition, so parallel worktrees running the same daemon collide. The proxy resolves through
   the registry precisely so this lands later without touching it.

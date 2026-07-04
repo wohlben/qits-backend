@@ -4,7 +4,8 @@
 
 - **Rough drafts** for feature ideas live in `docs/feature-ideas/*.md`.
 - Once a feature is implemented, its plan moves to `docs/features/$date_*.md` (e.g., `docs/features/2026-04-24_auth-system.md`).
-- Both types of documents must include an **Introduction** section that clearly lists any related or dependent plans. This makes dependencies explicit and helps track which ideas build on others.
+- **Parked follow-ups** live in `docs/backlog-ideas/*.md`: fully written idea docs for changes we have deliberately decided not to build yet. They are written from the perspective of their parent feature **already being implemented** — as a change to existing code, never as an alternative design — and must name a **Trigger**: the condition under which the idea gets picked up. When one is picked up it is treated like any other feature draft and moves to `docs/features/` once implemented. (Distinct from `docs/backlog.md`, which is only loose one-liner TODOs.)
+- All of these documents must include an **Introduction** section that clearly lists any related or dependent plans. This makes dependencies explicit and helps track which ideas build on others.
 
 ## Bug Tracking & Documentation
 
