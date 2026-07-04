@@ -35,7 +35,7 @@ public class WorktreeFilesService {
 
   @Inject WorktreeRepository worktreeRepository;
 
-  @Inject ContainerRuntime containers;
+  @Inject WorktreeService worktreeService;
 
   @Inject WorktreeFileAccess access;
 
@@ -184,8 +184,9 @@ public class WorktreeFilesService {
 
   /**
    * Validates the worktree is browsable: the repository row exists, the worktree has an active row,
-   * and its container exists (the container holds the {@code /workspace} clone every read runs
-   * against).
+   * and its container is running — re-provisioning it on demand if the container was lost (the
+   * container holds the {@code /workspace} clone every read runs against, and it is a recreatable
+   * cache of the durable branch, so a missing one is restored rather than a hard error).
    */
   private void validate(String repoId, String worktreeId) {
     repositoryRepository
@@ -194,9 +195,7 @@ public class WorktreeFilesService {
     worktreeRepository
         .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
         .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
-    if (!containers.exists(containers.containerName(worktreeId, repoId))) {
-      throw new NotFoundException("Worktree container not found");
-    }
+    worktreeService.ensureContainer(repoId, worktreeId);
   }
 
   /**
