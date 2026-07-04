@@ -11,7 +11,7 @@
 
 export const LogObserverKind = {
     Pattern: 'PATTERN',
-    Model: 'MODEL'
+    LogLevel: 'LOG_LEVEL'
 } as const;
 export type LogObserverKind = typeof LogObserverKind[keyof typeof LogObserverKind];
 

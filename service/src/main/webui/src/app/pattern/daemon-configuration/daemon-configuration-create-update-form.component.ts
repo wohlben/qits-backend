@@ -66,7 +66,6 @@ export class DaemonConfigurationCreateUpdateFormComponent {
             kind: o.kind ?? 'PATTERN',
             pattern: o.pattern ?? '',
             severity: o.severity ?? 'ERROR',
-            prompt: o.prompt ?? '',
           })),
         }
       : undefined;
@@ -134,11 +133,11 @@ export class DaemonConfigurationCreateUpdateFormComponent {
     return Number.isNaN(parsed) || parsed < 0 ? 3 : parsed;
   }
 
-  /** Only the fields of the selected kind travel; the others stay unset server-side. */
+  /** Only the fields of the selected kind travel; LOG_LEVEL needs no configuration. */
   private toObserver(row: DaemonObserverRow) {
     return row.kind === 'PATTERN'
       ? { kind: row.kind, pattern: row.pattern, severity: row.severity }
-      : { kind: row.kind, prompt: row.prompt || undefined };
+      : { kind: row.kind };
   }
 
   /** Collapse the editor rows into a map, dropping rows with a blank key and keeping the last dup. */

@@ -6,18 +6,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 import org.jboss.logging.Logger;
 
 /**
- * The MODEL observer: buffers output lines and, after a debounce (idle gap or size cap), sends one
- * classification call per batch — never per line. A regex pre-filter gates the model call entirely,
- * so quiet, healthy logs cost zero; and with no API key configured the whole observer is inert.
- * Classification runs on the supervisor's scheduler, never on the session's reader thread.
+ * The LOG_LEVEL observer: buffers output lines and, after a debounce (idle gap or size cap),
+ * classifies the batch locally via {@link LogClassifier} — one finding per burst instead of one per
+ * line, with the excerpt starting at the reported offset. Throttled like the PATTERN observer so a
+ * crash-looping daemon can't flood the feed or the agent's chat. Classification runs on the
+ * supervisor's scheduler, never on the session's reader thread.
  */
-final class ModelLogObserver extends LineFramingSink {
+final class LogLevelObserver extends LineFramingSink {
 
-  private static final Logger LOG = Logger.getLogger(ModelLogObserver.class);
+  private static final Logger LOG = Logger.getLogger(LogLevelObserver.class);
 
   /** Flush a batch after this much idle time on the stream. */
   private static final long DEBOUNCE_MILLIS = 2_000;
@@ -25,11 +25,9 @@ final class ModelLogObserver extends LineFramingSink {
   /** …or immediately once the buffered batch reaches this size. */
   private static final int MAX_BATCH_CHARS = 16 * 1024;
 
-  /** Only batches with at least one line matching this ever reach the model. */
-  private static final Pattern PRE_FILTER =
-      Pattern.compile("error|exception|warn|fail|fatal|panic|traceback", Pattern.CASE_INSENSITIVE);
+  /** At most one finding per observer per this interval; suppressed batches are dropped. */
+  private static final long THROTTLE_MILLIS = 10_000;
 
-  private final String promptOverride;
   private final LogClassifier classifier;
   private final ScheduledExecutorService scheduler;
   private final Consumer<ObserverFinding> onFinding;
@@ -37,13 +35,12 @@ final class ModelLogObserver extends LineFramingSink {
   private final List<String> pending = new ArrayList<>();
   private int pendingChars;
   private ScheduledFuture<?> flushTask;
+  private volatile long lastEmitMillis;
 
-  ModelLogObserver(
-      String promptOverride,
+  LogLevelObserver(
       LogClassifier classifier,
       ScheduledExecutorService scheduler,
       Consumer<ObserverFinding> onFinding) {
-    this.promptOverride = promptOverride;
     this.classifier = classifier;
     this.scheduler = scheduler;
     this.onFinding = onFinding;
@@ -51,9 +48,6 @@ final class ModelLogObserver extends LineFramingSink {
 
   @Override
   protected synchronized void onLine(String line) {
-    if (!classifier.enabled()) {
-      return;
-    }
     pending.add(line);
     pendingChars += line.length();
     if (flushTask != null) {
@@ -83,16 +77,23 @@ final class ModelLogObserver extends LineFramingSink {
     return batch;
   }
 
-  /** Runs on the scheduler, off the reader thread; a failed call is logged and dropped. */
+  /**
+   * Runs on the scheduler, off the reader thread; a failed classification is logged and dropped.
+   */
   private void classify(List<String> batch) {
-    if (batch.isEmpty() || batch.stream().noneMatch(l -> PRE_FILTER.matcher(l).find())) {
+    if (batch.isEmpty()) {
+      return;
+    }
+    long now = System.currentTimeMillis();
+    if (now - lastEmitMillis < THROTTLE_MILLIS) {
       return;
     }
     try {
       classifier
-          .classify(promptOverride, String.join("\n", batch))
+          .classify(String.join("\n", batch))
           .ifPresent(
               classification -> {
+                lastEmitMillis = now;
                 int offset =
                     Math.clamp(classification.firstLineOffset(), 0, Math.max(0, batch.size() - 1));
                 String excerpt = String.join("\n", batch.subList(offset, batch.size()));
