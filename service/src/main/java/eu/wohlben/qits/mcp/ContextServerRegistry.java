@@ -2,6 +2,7 @@ package eu.wohlben.qits.mcp;
 
 import eu.wohlben.qits.domain.featureflow.mcp.RepositoryScope;
 import eu.wohlben.qits.domain.repository.mcp.ProjectScope;
+import eu.wohlben.qits.domain.telemetry.mcp.WorktreeScope;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -55,7 +56,10 @@ public class ContextServerRegistry {
                 + " branch off a worktree, clean up a branch, integrate a branch, and merge a"
                 + " parent (e.g. master) into a worktree. Also owns the repositories' daemons —"
                 + " long-running processes such as a dev server: define/edit them and start/stop"
-                + " them in a worktree.",
+                + " them in a worktree. Sessions additionally narrowed to a worktree (the '"
+                + WorktreeScope.WORKTREE_HEADER
+                + "' header or '?worktreeId=') also get the telemetry* tools: structured spans,"
+                + " logs and metrics exported by the worktree's instrumented processes.",
             repositoryPath,
             repositoryPath + "/sse",
             ProjectScope.PROJECT_HEADER,

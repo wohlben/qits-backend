@@ -20,6 +20,7 @@ export interface CreateRepositoryDaemonRequest {
     stopSignal?: string;
     restartPolicy?: RestartPolicy;
     maxRestarts?: number;
+    otel?: boolean;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverInput>;
     sources?: Array<LogSourceInput>;

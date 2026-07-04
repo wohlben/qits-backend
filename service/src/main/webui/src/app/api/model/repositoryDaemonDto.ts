@@ -21,6 +21,7 @@ export interface RepositoryDaemonDto {
     stopSignal?: string;
     restartPolicy?: RestartPolicy;
     maxRestarts?: number;
+    otel?: boolean;
     repositoryId?: string;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverDto>;

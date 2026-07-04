@@ -7,8 +7,10 @@ import { WorktreeControllerService } from '@/api/api/worktreeController.service'
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { WorktreeDaemonsComponent } from '@/pattern/daemon/worktree-daemons.component';
+import { WorktreeTelemetryComponent } from '@/pattern/telemetry/worktree-telemetry.component';
 import { WorktreeChatComponent } from '@/pattern/worktree/worktree-chat.component';
 import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-browser.component';
+import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
 
 /**
  * The worktree detail page: browse the worktree's files with a tree + syntax-highlighted viewer,
@@ -22,6 +24,9 @@ import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-b
     WorktreeChatComponent,
     WorktreeDaemonsComponent,
     WorktreeFileBrowserComponent,
+    WorktreeTelemetryComponent,
+    ZardTabComponent,
+    ZardTabGroupComponent,
   ],
   template: `
     <app-page-layout
@@ -57,7 +62,19 @@ import { WorktreeFileBrowserComponent } from '@/pattern/worktree/worktree-file-b
           [worktreeId]="worktreeId"
           (openFile)="fileBrowser.openAtLine($event.path, $event.startLine, $event.endLine)"
         />
-        <app-worktree-file-browser #fileBrowser [repoId]="repoId" [worktreeId]="worktreeId" />
+        <!-- The file browser stays mounted on the hidden tab so openFile anchors keep working. -->
+        <z-tab-group>
+          <z-tab label="Files">
+            <app-worktree-file-browser
+              #fileBrowser
+              [repoId]="repoId"
+              [worktreeId]="worktreeId"
+            />
+          </z-tab>
+          <z-tab label="Telemetry">
+            <app-worktree-telemetry [repoId]="repoId" [worktreeId]="worktreeId" />
+          </z-tab>
+        </z-tab-group>
       </div>
     </app-page-layout>
   `,

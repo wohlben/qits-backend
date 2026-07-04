@@ -14,6 +14,7 @@ public record RepositoryDaemonDto(
     String stopSignal,
     RestartPolicy restartPolicy,
     int maxRestarts,
+    boolean otel,
     String repositoryId,
     Map<String, String> environment,
     List<LogObserverDto> observers,

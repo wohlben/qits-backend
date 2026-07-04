@@ -62,6 +62,7 @@ export class RepositoryDaemonCreateUpdateFormComponent {
           stopSignal: d.stopSignal ?? 'TERM',
           restartPolicy: d.restartPolicy ?? 'ON_FAILURE',
           maxRestarts: String(d.maxRestarts ?? 3),
+          otel: d.otel ?? false,
           environment: Object.entries(d.environment ?? {}).map(([key, value]) => ({ key, value })),
           observers: (d.observers ?? []).map((o) => ({
             kind: o.kind ?? 'PATTERN',
@@ -117,6 +118,7 @@ export class RepositoryDaemonCreateUpdateFormComponent {
       stopSignal: data.stopSignal,
       restartPolicy: data.restartPolicy,
       maxRestarts: this.parseMaxRestarts(data.maxRestarts),
+      otel: data.otel,
       environment: this.toEnvMap(data.environment),
       observers: data.observers.map((row) => this.toObserver(row)),
       sources: data.sources

@@ -316,6 +316,8 @@ components:
         maxRestarts:
           type: integer
           format: int32
+        otel:
+          type: boolean
         environment:
           type: object
           additionalProperties:
@@ -713,6 +715,8 @@ components:
         maxRestarts:
           type: integer
           format: int32
+        otel:
+          type: boolean
         repositoryId:
           type: string
         environment:
@@ -1144,6 +1148,39 @@ components:
       properties:
         text:
           type: string
+    Response72:
+      type: object
+      properties:
+        trace:
+          $ref: "#/components/schemas/TelemetryTraceDto"
+    Response73:
+      type: object
+      properties:
+        spans:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetrySpanDto"
+    Response74:
+      type: object
+      properties:
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryMetricDto"
+    Response75:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryLogDto"
+    Response76:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryErrorGroupDto"
     Response8:
       type: object
       properties:
@@ -1170,6 +1207,20 @@ components:
         branch:
           type: string
           pattern: \S
+    SpanEvent:
+      type: object
+      properties:
+        name:
+          type: string
+        epochNanos:
+          type: integer
+          format: int64
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        exception:
+          type: boolean
     SyncStatusDto:
       type: object
       properties:
@@ -1185,6 +1236,115 @@ components:
         behind:
           type: integer
           format: int32
+    TelemetryErrorGroupDto:
+      type: object
+      properties:
+        traceId:
+          type: string
+        serviceName:
+          type: string
+        errorSpans:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetrySpanDto"
+        errorLogs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryLogDto"
+    TelemetryLogDto:
+      type: object
+      properties:
+        epochNanos:
+          type: integer
+          format: int64
+        severityNumber:
+          type: integer
+          format: int32
+        severityText:
+          type: string
+        body:
+          type: string
+        traceId:
+          type: string
+        spanId:
+          type: string
+        serviceName:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+    TelemetryMetricDto:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        unit:
+          type: string
+        type:
+          type: string
+        value:
+          type: number
+          format: double
+        epochNanos:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+    TelemetrySpanDto:
+      type: object
+      properties:
+        traceId:
+          type: string
+        spanId:
+          type: string
+        parentSpanId:
+          type: string
+        serviceName:
+          type: string
+        scopeName:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        startEpochNanos:
+          type: integer
+          format: int64
+        durationMs:
+          type: integer
+          format: int64
+        status:
+          type: string
+        statusMessage:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpanEvent"
+    TelemetryTraceDto:
+      type: object
+      properties:
+        traceId:
+          type: string
+        spans:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetrySpanDto"
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryLogDto"
     TraceResponse:
       type: object
       properties:
@@ -1284,6 +1444,8 @@ components:
         maxRestarts:
           type: integer
           format: int32
+        otel:
+          type: boolean
         environment:
           type: object
           additionalProperties:
@@ -3082,6 +3244,159 @@ paths:
       summary: Stop Container
       tags:
       - Worktree Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/errors:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sinceMinutes
+        in: query
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response76"
+      summary: Errors
+      tags:
+      - Worktree Telemetry Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/logs:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: query
+        in: query
+        schema:
+          type: string
+      - name: service
+        in: query
+        schema:
+          type: string
+      - name: sinceMinutes
+        in: query
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response75"
+      summary: Logs
+      tags:
+      - Worktree Telemetry Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/metrics:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response74"
+      summary: Metrics
+      tags:
+      - Worktree Telemetry Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/slow-spans:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: sinceMinutes
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: thresholdMs
+        in: query
+        schema:
+          type: integer
+          format: int64
+          default: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response73"
+      summary: Slow Spans
+      tags:
+      - Worktree Telemetry Controller
+  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/traces/{traceId}:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: traceId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: worktreeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response72"
+      summary: Trace
+      tags:
+      - Worktree Telemetry Controller
   /api/repositories/{repoId}/worktrees/{worktreeId}/update-from-parent:
     post:
       parameters:

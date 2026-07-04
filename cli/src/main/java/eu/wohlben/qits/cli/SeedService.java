@@ -102,6 +102,7 @@ public class SeedService {
         RestartPolicy.ON_FAILURE,
         3,
         null,
+        null,
         List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
         null);
 

@@ -42,6 +42,7 @@ public class RepositoryDaemonService {
       String stopSignal,
       RestartPolicy restartPolicy,
       Integer maxRestarts,
+      Boolean otel,
       Map<String, String> environment,
       List<LogObserver> observers,
       List<LogSource> sources) {
@@ -69,6 +70,7 @@ public class RepositoryDaemonService {
     daemon.stopSignal = DaemonDefinitionValidator.normalizeStopSignal(stopSignal);
     daemon.restartPolicy = restartPolicy != null ? restartPolicy : RestartPolicy.ON_FAILURE;
     daemon.maxRestarts = maxRestarts != null ? maxRestarts : 3;
+    daemon.otel = otel != null && otel;
     daemon.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
     daemon.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
@@ -116,6 +118,7 @@ public class RepositoryDaemonService {
       String stopSignal,
       RestartPolicy restartPolicy,
       Integer maxRestarts,
+      Boolean otel,
       Map<String, String> environment,
       List<LogObserver> observers,
       List<LogSource> sources) {
@@ -142,6 +145,9 @@ public class RepositoryDaemonService {
     }
     if (maxRestarts != null) {
       daemon.maxRestarts = maxRestarts;
+    }
+    if (otel != null) {
+      daemon.otel = otel;
     }
     if (environment != null) {
       daemon.environment = new HashMap<>(environment);

@@ -3,6 +3,7 @@ import { form, required, submit } from '@angular/forms/signals';
 
 import { FormField } from '@angular/forms/signals';
 import { ZardButtonComponent } from '@/shared/components/button';
+import { ZardCheckboxComponent } from '@/shared/components/checkbox';
 import { ZardInputDirective } from '@/shared/components/input';
 import { ZardSelectComponent } from '@/shared/components/select';
 import { ZardSelectItemComponent } from '@/shared/components/select/select-item.component';
@@ -34,6 +35,7 @@ export interface DaemonFormData {
   restartPolicy: 'NEVER' | 'ON_FAILURE' | 'ALWAYS';
   /** Kept as text in the form (signal-form fields are string-typed); parsed on submit. */
   maxRestarts: string;
+  otel: boolean;
   environment: DaemonEnvVarRow[];
   observers: DaemonObserverRow[];
   sources: DaemonSourceRow[];
@@ -46,6 +48,7 @@ export interface DaemonFormData {
     FormFieldLayoutComponent,
     FormFieldSlotDirective,
     ZardButtonComponent,
+    ZardCheckboxComponent,
     ZardInputDirective,
     ZardSelectComponent,
     ZardSelectItemComponent,
@@ -91,6 +94,13 @@ export interface DaemonFormData {
           autocomplete="off"
         />
       </div>
+
+      <!-- With OTel on, the launch injects OTEL_EXPORTER_* env vars so an instrumented process
+           exports traces/logs/metrics to qits — queryable in the worktree's Telemetry tab and by
+           its agent. Instrumentation itself stays the app's business. -->
+      <z-checkbox [formField]="form.otel">
+        OpenTelemetry export (inject OTEL_* env vars at launch)
+      </z-checkbox>
 
       <!-- Observers watch the daemon's output: PATTERN emits an event per matching line,
            LOG_LEVEL classifies output batches locally off standard severity tokens. -->
@@ -254,6 +264,7 @@ export class DaemonFormComponent {
     stopSignal: 'TERM',
     restartPolicy: 'ON_FAILURE',
     maxRestarts: '3',
+    otel: false,
     environment: [],
     observers: [],
     sources: [],

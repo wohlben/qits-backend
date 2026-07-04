@@ -73,6 +73,13 @@ public class RepositoryDaemon extends PanacheEntityBase {
   @Column(name = "max_restarts", nullable = false)
   public int maxRestarts = 3;
 
+  /**
+   * When set, launches inject the {@code OTEL_EXPORTER_OTLP_*} environment so the process exports
+   * telemetry to qits' in-process OTLP receiver, pre-tagged with worktree/repository/command ids.
+   */
+  @Column(nullable = false)
+  public boolean otel;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   public Instant createdAt;

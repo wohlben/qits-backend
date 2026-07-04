@@ -79,6 +79,7 @@ public class RepositoryDaemonControllerTest {
                 "SIGINT",
                 RestartPolicy.ALWAYS,
                 5,
+                true,
                 Map.of("PORT", "3000"),
                 List.of(
                     new LogObserverInput(
@@ -94,6 +95,7 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.stopSignal", equalTo("INT"))
         .body("daemon.restartPolicy", equalTo("ALWAYS"))
         .body("daemon.maxRestarts", equalTo(5))
+        .body("daemon.otel", equalTo(true))
         .body("daemon.repositoryId", equalTo(repoId))
         .body("daemon.environment.PORT", equalTo("3000"))
         .body("daemon.observers[0].kind", equalTo("PATTERN"))
@@ -133,6 +135,7 @@ public class RepositoryDaemonControllerTest {
                 "",
                 null,
                 RestartPolicy.NEVER,
+                null,
                 null,
                 null,
                 List.of(
@@ -191,6 +194,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
+                null,
                 null))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
@@ -207,6 +211,7 @@ public class RepositoryDaemonControllerTest {
                 "Observer without pattern",
                 null,
                 "npm run dev",
+                null,
                 null,
                 null,
                 null,
@@ -230,6 +235,7 @@ public class RepositoryDaemonControllerTest {
                   "Bad source",
                   null,
                   "npm run dev",
+                  null,
                   null,
                   null,
                   null,
