@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideBot, lucideMic } from '@ng-icons/lucide';
+import { lucideBot, lucideFolderOpen } from '@ng-icons/lucide';
 
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -33,10 +33,9 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div class="flex flex-wrap items-center justify-end gap-2">
         <button z-button zType="ghost" (click)="viewCommits.emit()">View commits</button>
         @if (worktree()) {
-          <!-- Opens the worktree's "work in progress" page: speak what to do, refine it into a
-               prompt, and launch an agent on it. -->
-          <button z-button zType="ghost" title="Work on this worktree" (click)="openWip.emit()">
-            <ng-icon name="lucideMic" class="size-4" />
+          <!-- Opens the worktree's detail page: browse its files and chat with its agent. -->
+          <button z-button zType="ghost" title="Open this worktree" (click)="openWorktree.emit()">
+            <ng-icon name="lucideFolderOpen" class="size-4" />
             Work on it
           </button>
           <button z-button zType="ghost" (click)="run.emit()">Run…</button>
@@ -73,7 +72,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </div>
     </div>
   `,
-  viewProviders: [provideIcons({ lucideBot, lucideMic })],
+  viewProviders: [provideIcons({ lucideBot, lucideFolderOpen })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BranchRowComponent {
@@ -90,8 +89,8 @@ export class BranchRowComponent {
    */
   readonly canCleanup = input(false);
   readonly viewCommits = output<void>();
-  /** Open this worktree's "work in progress" page (speak → prompt → agent). */
-  readonly openWip = output<void>();
+  /** Open this worktree's detail page (file browser + chat dialog). */
+  readonly openWorktree = output<void>();
   /** Open the "Run…" dialog to pick a preconfigured action to run in this worktree. */
   readonly run = output<void>();
   /** Launch the repository-MCP Claude action in this worktree's terminal. */

@@ -83,7 +83,7 @@ describe('BranchRowComponent', () => {
     expect(abandoned).toBe(true);
   });
 
-  it('offers to open the WIP page only for worktree-backed branches', () => {
+  it('offers to open the worktree only for worktree-backed branches', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
     fixture.componentRef.setInput('worktree', {
@@ -94,7 +94,7 @@ describe('BranchRowComponent', () => {
     fixture.detectChanges();
 
     let opened = false;
-    fixture.componentInstance.openWip.subscribe(() => (opened = true));
+    fixture.componentInstance.openWorktree.subscribe(() => (opened = true));
 
     const el = fixture.nativeElement as HTMLElement;
     const buttons = Array.from(el.querySelectorAll('button'));

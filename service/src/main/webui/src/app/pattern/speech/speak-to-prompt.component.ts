@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMic, lucideSparkles, lucideSquare } from '@ng-icons/lucide';
@@ -137,6 +144,10 @@ import { WavRecorder } from './wav-recorder';
 export class SpeakToPromptComponent {
   readonly repoId = input.required<string>();
   readonly worktreeId = input.required<string>();
+  /** Off when a host (e.g. the chat dialog) renders the launched chat in place instead. */
+  readonly navigateOnLaunch = input(true);
+  /** Emits the launched command's id — always, whether or not we also navigate. */
+  readonly launched = output<string>();
 
   private readonly speechService = inject(SpeechControllerService);
   private readonly refinementService = inject(PromptRefinementControllerService);
@@ -205,7 +216,10 @@ export class SpeakToPromptComponent {
     onSuccess: (res) => {
       const commandId = res.command?.id;
       if (commandId) {
-        this.router.navigate(['/commands', commandId]);
+        this.launched.emit(commandId);
+        if (this.navigateOnLaunch()) {
+          this.router.navigate(['/commands', commandId]);
+        }
       }
     },
   }));
