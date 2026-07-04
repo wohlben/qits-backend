@@ -135,8 +135,17 @@ of a silent abandon-loop.
   push / recreate logic is genuinely exercised — only the literal `docker exec` transport is faked.
 - **Controller** — `WorktreeControllerTest`: the ensure/stop endpoints round-trip the runtime status.
 - **Frontend** — `branch-row.component.spec.ts`: the status badge + Start/Stop/Recreate controls.
-- **Real docker (extended)** — `WorkspaceContainerIT` covers the `docker run`/exec/rm mechanics. The
-  full end-to-end recreate-from-git-server round-trip (and the WSL2 git-host reachability trap) is a
-  **manual** verification: build the image (`docker build -t qits/workspace docker/workspace`), run
-  `./mvnw -pl service quarkus:dev`, create a worktree, `docker rm -f` its container, then hit "Configure
-  with Claude" / the file browser and watch it re-provision transparently.
+- **Real docker (extended)** — two `@Tag("extended")` ITs, opt in with `./mvnw verify -Pextended`
+  (both self-skip when docker/the image/reachability is absent):
+  - `WorkspaceContainerIT` — the `docker run`/exec/rm + PTY + credential-volume mechanics.
+  - `WorkspaceRecreateIT` — the **full end-to-end recreate round-trip** (`@QuarkusIntegrationTest`, so
+    the real `DockerExecutor` runs, not the fake): create a repo + worktree over REST, push a commit
+    and make an unpushed one through the container, `docker rm -f` it, then `POST …/ensure-container`
+    and assert the recreated container is a fresh clone at the **pushed** commit while the **unpushed**
+    commit is gone (the §D loss window). It clones/pushes over the real `/git` server, so on WSL2 +
+    Docker Desktop — where a container can't reach `host.docker.internal` — pass the distro's eth0 IP:
+    `-Dqits.workspace.git-host=<ip>` (else it self-skips, the same reachability the feature needs).
+
+  Build the image first: `docker build -t qits/workspace docker/workspace`. Example:
+  `./mvnw -pl service verify -Pextended -Dtest=__none__ -Dsurefire.failIfNoSpecifiedTests=false
+  -Dit.test=WorkspaceRecreateIT -Dqits.workspace.git-host=<eth0-ip>`.
