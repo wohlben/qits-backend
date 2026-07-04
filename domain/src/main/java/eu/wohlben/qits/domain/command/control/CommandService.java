@@ -13,6 +13,7 @@ import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService.ResolvedAction;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.runtime.StartupEvent;
@@ -62,6 +63,8 @@ public class CommandService {
   @Inject ActionResolutionService actionResolutionService;
 
   @Inject WorktreeRepository worktreeRepository;
+
+  @Inject WorktreeService worktreeService;
 
   @Inject ContainerRuntime containers;
 
@@ -257,10 +260,13 @@ public class CommandService {
                         .orElseThrow(
                             () -> new BadRequestException("Worktree not found: " + worktreeId)));
 
+    // Provision the container on demand: a lost container is a recreatable cache of the durable
+    // branch, not a dead worktree, so re-materialize it instead of failing. ensureContainer is a
+    // no-op when it's already running (and never clobbers a live container's unpushed work); it
+    // throws a clear error if the branch is gone or provisioning fails (e.g. git-host unreachable),
+    // which the caller/UI surfaces rather than the old silent "container is not running" 400.
+    worktreeService.ensureContainer(repoId, worktreeId);
     String container = containers.containerName(worktreeId, repoId);
-    if (!containers.exists(container)) {
-      throw new BadRequestException("Worktree container is not running");
-    }
 
     // The commit is read from the container's checkout so unpushed work is captured (the origin
     // ref may lag behind /workspace's HEAD).

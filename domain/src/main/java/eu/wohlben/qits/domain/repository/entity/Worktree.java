@@ -50,6 +50,20 @@ public class Worktree extends PanacheEntityBase {
   @Column(nullable = false)
   public WorktreeStatus status = WorktreeStatus.ACTIVE;
 
+  /**
+   * The state of this worktree's container — a recreatable cache of the durable branch, not part of
+   * the {@link #status} lifecycle. {@code RUNNING} is normally recomputed live from the container
+   * listing; the persisted value carries the {@code STOPPED}/{@code PROVISIONING}/{@code FAILED}
+   * signal across restarts and out-of-band container loss.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "runtime_status", nullable = false)
+  public WorktreeRuntimeStatus runtimeStatus = WorktreeRuntimeStatus.STOPPED;
+
+  /** The reason the last re-provision failed (when {@link #runtimeStatus} is FAILED); else null. */
+  @Column(name = "runtime_error", length = 2000)
+  public String runtimeError;
+
   /** Markdown: the reason/goal, authored at creation, editable while ACTIVE. */
   @Lob public String preamble;
 

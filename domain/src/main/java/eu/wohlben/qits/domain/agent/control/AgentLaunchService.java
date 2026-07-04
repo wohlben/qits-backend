@@ -6,6 +6,7 @@ import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
+import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -72,6 +73,8 @@ public class AgentLaunchService {
 
   @Inject AgentAuthStatus agentAuthStatus;
 
+  @Inject WorktreeService worktreeService;
+
   @ConfigProperty(name = "qits.actions-mcp.url", defaultValue = "http://localhost:8080/mcp/actions")
   String actionsMcpUrl;
 
@@ -106,6 +109,11 @@ public class AgentLaunchService {
     if (!WORKTREE_ID_PATTERN.matcher(worktreeId == null ? "" : worktreeId).matches()) {
       throw new BadRequestException("Invalid worktree id: " + worktreeId);
     }
+
+    // Re-provision a lost container up front so the sign-in probe below runs against a live
+    // container (a stopped one would read as not-signed-in and wrongly redirect to login, even
+    // though the credentials live on the shared volume). Also lets a missing branch fail loudly.
+    worktreeService.ensureContainer(repoId, worktreeId);
 
     // The agent can't authenticate until an operator has signed in on the shared credential volume.
     // When it hasn't, launch an interactive `claude auth login` terminal instead — the caller

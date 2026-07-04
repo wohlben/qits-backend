@@ -8,10 +8,12 @@ import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.Worktree;
 import eu.wohlben.qits.domain.repository.entity.WorktreeEvent;
 import eu.wohlben.qits.domain.repository.entity.WorktreeEventType;
+import eu.wohlben.qits.domain.repository.entity.WorktreeRuntimeStatus;
 import eu.wohlben.qits.domain.repository.entity.WorktreeStatus;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeEventRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -20,6 +22,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -160,6 +164,12 @@ public class WorktreeService {
         .orElseThrow(() -> new NotFoundException("Repository not found: " + repoId));
 
     Path originPath = Path.of(dataDir, repoId, "origin");
+    // Live container set (one docker ps), so RUNNING stays accurate even when docker state changed
+    // out-of-band; the persisted column carries the STOPPED/PROVISIONING/FAILED signal otherwise.
+    Set<String> runningIds =
+        containers.listWorktreeContainers(repoId).stream()
+            .map(ContainerRuntime.ContainerInfo::worktreeId)
+            .collect(Collectors.toSet());
     // The branch tree shows only live worktrees; resolved ones live in the history view.
     return worktreeRepository.findActiveByRepositoryId(repoId).stream()
         .map(
@@ -174,6 +184,12 @@ public class WorktreeService {
                       && ab.ahead() > 0
                       && ab.behind() > 0
                       && wouldConflict(originPath, wt.parent, branch);
+              WorktreeRuntimeStatus runtime =
+                  runningIds.contains(wt.worktreeId)
+                      ? WorktreeRuntimeStatus.RUNNING
+                      : wt.runtimeStatus == WorktreeRuntimeStatus.RUNNING
+                          ? WorktreeRuntimeStatus.STOPPED
+                          : wt.runtimeStatus;
               return new WorktreeDto(
                   wt.worktreeId,
                   wt.parent,
@@ -182,6 +198,8 @@ public class WorktreeService {
                   ab.behind(),
                   conflicts,
                   wt.status,
+                  runtime,
+                  wt.runtimeError,
                   wt.preamble,
                   wt.result,
                   wt.resolvedAt);
@@ -439,6 +457,7 @@ public class WorktreeService {
     worktree.parent = parentBranch;
     worktree.branch = newBranch;
     worktree.status = WorktreeStatus.ACTIVE;
+    worktree.runtimeStatus = WorktreeRuntimeStatus.RUNNING;
     worktree.preamble = preamble;
     worktreeRepository.persist(worktree);
     recordEvent(worktree, WorktreeEventType.CREATED, newBranch, parentBranch, null);
@@ -489,6 +508,7 @@ public class WorktreeService {
     worktree.parent = null; // the main branch is the tree root — it has no fork point
     worktree.branch = branch;
     worktree.status = WorktreeStatus.ACTIVE;
+    worktree.runtimeStatus = WorktreeRuntimeStatus.RUNNING;
     worktreeRepository.persist(worktree);
     recordEvent(worktree, WorktreeEventType.CREATED, branch, null, null);
 
@@ -512,6 +532,168 @@ public class WorktreeService {
       slug = "main";
     }
     return slug;
+  }
+
+  private record BranchParent(String branch, String parent) {}
+
+  /**
+   * Guarantees a running container for an ACTIVE worktree whose branch still exists, provisioning
+   * one on demand — the container is a recreatable cache of the durable branch, so losing it is a
+   * non-event. Idempotent:
+   *
+   * <ul>
+   *   <li>container already running → stamp {@code RUNNING}, no-op. A live container is
+   *       <em>never</em> re-cloned over, so unpushed {@code /workspace} commits are safe.
+   *   <li>container absent but the branch ref survives in origin → re-materialize a fresh container
+   *       from that branch ({@code createBranchRef=false}, the {@link #createMainWorktree} path).
+   *   <li>branch ref gone from origin → the work no longer exists anywhere: the worktree is
+   *       ABANDONED here (now the <em>only</em> path to abandonment) and a 404 is thrown.
+   * </ul>
+   *
+   * <p><strong>Loss window:</strong> recreation restores <em>origin</em> state only. Commits made
+   * in a container but never pushed die with it; the live-container guard protects the graceful
+   * case, but an unexpected container death is still lossy (see {@link #stopContainer} for the
+   * lossless stop). Not {@code @Transactional}: each status transition commits in its own
+   * transaction so a FAILED/ABANDONED outcome is persisted even though the method then throws, and
+   * so it is safe to call from non-request threads (like {@code CommandService.prepare}).
+   */
+  public void ensureContainer(String repoId, String worktreeId) {
+    String container = containers.containerName(worktreeId, repoId);
+
+    // Load branch/parent and short-circuit a live container, in its own transaction.
+    BranchParent snapshot =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () -> {
+                  Worktree wt =
+                      worktreeRepository
+                          .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+                          .orElseThrow(
+                              () -> new NotFoundException("Worktree not found: " + worktreeId));
+                  if (containers.exists(container)) {
+                    wt.runtimeStatus = WorktreeRuntimeStatus.RUNNING;
+                    wt.runtimeError = null;
+                    return null; // already running — nothing to provision
+                  }
+                  return new BranchParent(wt.branch, wt.parent);
+                });
+    if (snapshot == null) {
+      return;
+    }
+
+    Path originPath = Path.of(dataDir, repoId, "origin");
+    if (snapshot.branch() == null
+        || snapshot.branch().isBlank()
+        || !branchExists(originPath, snapshot.branch())) {
+      // The durable branch is gone: this is genuine death, so abandon (persisted before we throw).
+      QuarkusTransaction.requiringNew()
+          .run(
+              () -> {
+                Worktree wt =
+                    worktreeRepository
+                        .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+                        .orElseThrow(
+                            () -> new NotFoundException("Worktree not found: " + worktreeId));
+                wt.status = WorktreeStatus.ABANDONED;
+                wt.resolvedAt = Instant.now();
+                wt.runtimeStatus = WorktreeRuntimeStatus.STOPPED;
+                recordEvent(wt, WorktreeEventType.ABANDONED, wt.branch, null, null);
+              });
+      throw new NotFoundException(
+          "Worktree '" + worktreeId + "' has no branch to recreate from; abandoned");
+    }
+
+    QuarkusTransaction.requiringNew()
+        .run(() -> markRuntime(repoId, worktreeId, WorktreeRuntimeStatus.PROVISIONING, null));
+    try {
+      createContainerWorktree(
+          repoId, worktreeId, snapshot.branch(), snapshot.parent(), originPath, false);
+      QuarkusTransaction.requiringNew()
+          .run(() -> markRuntime(repoId, worktreeId, WorktreeRuntimeStatus.RUNNING, null));
+    } catch (RuntimeException e) {
+      QuarkusTransaction.requiringNew()
+          .run(
+              () ->
+                  markRuntime(
+                      repoId, worktreeId, WorktreeRuntimeStatus.FAILED, truncate(e.getMessage())));
+      throw e;
+    }
+  }
+
+  private void markRuntime(
+      String repoId, String worktreeId, WorktreeRuntimeStatus status, String error) {
+    worktreeRepository
+        .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+        .ifPresent(
+            wt -> {
+              wt.runtimeStatus = status;
+              wt.runtimeError = error;
+            });
+  }
+
+  private static String truncate(String s) {
+    if (s == null) {
+      return null;
+    }
+    return s.length() <= 2000 ? s : s.substring(0, 2000);
+  }
+
+  /** Whether {@code branch} still exists as a ref in the given repo's bare origin. */
+  public boolean branchExists(String repoId, String branch) {
+    return branchExists(Path.of(dataDir, repoId, "origin"), branch);
+  }
+
+  /** Whether {@code branch} still exists as a ref in the bare origin at {@code originPath}. */
+  private boolean branchExists(Path originPath, String branch) {
+    if (branch == null || branch.isBlank() || branch.startsWith("-") || !Files.exists(originPath)) {
+      return false;
+    }
+    try {
+      GitExecutor.ExecResult r =
+          git.execAllowNonZero(
+              originPath.toFile(),
+              "git",
+              "rev-parse",
+              "--verify",
+              "--quiet",
+              "refs/heads/" + branch);
+      return r.exitCode() == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  /**
+   * Best-effort push of a worktree's branch to origin from inside its container (no-op if absent).
+   */
+  private void pushBranch(String repoId, String worktreeId, String branch) {
+    String container = containers.containerName(worktreeId, repoId);
+    if (branch == null || branch.isBlank() || !containers.exists(container)) {
+      return;
+    }
+    try {
+      containers.exec(container, "/workspace", java.util.Map.of(), "git", "push", "origin", branch);
+    } catch (RuntimeException ignored) {
+      // best effort — a failed push must not block the stop it guards
+    }
+  }
+
+  /**
+   * Gracefully stops a worktree's container: pushes its branch to origin first (so committed work
+   * is durable), removes the container, and marks the worktree {@code STOPPED} while leaving it
+   * ACTIVE. The container is re-provisioned on next access via {@link #ensureContainer}. This is
+   * the lossless counterpart to an unexpected container death — the one path that guarantees
+   * unpushed commits are preserved before the container goes away.
+   */
+  @Transactional
+  public void stopContainer(String repoId, String worktreeId) {
+    Worktree worktree =
+        worktreeRepository
+            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+            .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
+    pushBranch(repoId, worktreeId, worktree.branch);
+    containers.rm(containers.containerName(worktreeId, repoId));
+    worktree.runtimeStatus = WorktreeRuntimeStatus.STOPPED;
   }
 
   @Transactional
@@ -729,10 +911,7 @@ public class WorktreeService {
     // (it may have advanced out-of-band, e.g. a host-side integration into it), then fast-forward
     // onto the parent and push. --ff-only refuses (400) on divergence or a dirty tree — so a branch
     // that diverged from its parent is correctly rejected even though the container was stale.
-    String container = containers.containerName(worktreeId, repoId);
-    if (!containers.exists(container)) {
-      throw new NotFoundException("Worktree container not found");
-    }
+    ensureContainer(repoId, worktreeId); // re-provision a lost container from the branch first
     try {
       containerGit(repoId, worktreeId, "fetch", "origin");
       containerGit(repoId, worktreeId, "merge", "--ff-only", "origin/" + worktree.branch);
@@ -777,10 +956,8 @@ public class WorktreeService {
       throw new BadRequestException("Invalid parent branch");
     }
 
+    ensureContainer(repoId, worktreeId); // re-provision a lost container from the branch first
     String container = containers.containerName(worktreeId, repoId);
-    if (!containers.exists(container)) {
-      throw new NotFoundException("Worktree container not found");
-    }
 
     // Inside the container: fetch, sync the container's own branch to origin's ref (it may have
     // advanced out-of-band), then merge the parent in (a merge commit — works where ff-only can't).
