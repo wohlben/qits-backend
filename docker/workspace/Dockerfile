@@ -12,18 +12,34 @@ FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
 # git + a shell toolchain (setsid/kill come from util-linux/procps, needed for the registry's
-# process-group termination), python, and the JDK.
+# process-group termination), python, and unzip. `unzip` is required by the Maven wrapper: with
+# `distributionType=only-script` the mvnw script silently falls back from the `.zip` distribution to
+# `.tar.gz` when unzip is absent, which then fails `distributionSha256Sum` validation (the pinned sum
+# is the zip's) — see docs/issues/2026-07-05_workspace-image-cannot-build-fixture.md.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
         ca-certificates \
         curl \
         bash \
+        gpg \
+        unzip \
         util-linux \
         procps \
         python3 \
         python3-venv \
-        openjdk-17-jdk-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# JDK 25 (Temurin, via the Adoptium apt repo). The projects this image builds — the Quarkus+Angular
+# fixture and qits itself — target `maven.compiler.release=25`, so JDK 17 (bookworm's default openjdk)
+# cannot compile them.
+RUN install -d -m 0755 /etc/apt/keyrings \
+    && curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public \
+        | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" \
+        > /etc/apt/sources.list.d/adoptium.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends temurin-25-jdk \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js (via NodeSource) + pnpm through corepack.
