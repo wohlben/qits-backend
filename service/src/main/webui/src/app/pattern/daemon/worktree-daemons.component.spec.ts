@@ -97,7 +97,7 @@ describe('WorktreeDaemonsComponent', () => {
     expect(element.querySelector('a[href="/commands/cmd-9"]')).not.toBeNull();
   });
 
-  it('starting a daemon posts to the start endpoint for its id', async () => {
+  it('starting a daemon posts with the generated (daemonId, repoId, worktreeId) arg order', async () => {
     queryClient.setQueryData(['worktree-daemons', 'repo-1', 'wt-1'], [instance({})]);
     const fixture = createComponent();
 
@@ -107,9 +107,29 @@ describe('WorktreeDaemonsComponent', () => {
     startButton!.click();
     await flush();
 
+    // The generated client orders path params alphabetically (daemonId, repoId, worktreeId), not in
+    // path order — asserting the exact order guards against the scrambled-URL 404 regression.
     expect(
       daemonService.apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsDaemonIdStartPost,
-    ).toHaveBeenCalledWith('repo-1', 'wt-1', 'daemon-1');
+    ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
+  });
+
+  it('stopping a daemon posts with the generated (daemonId, repoId, worktreeId) arg order', async () => {
+    queryClient.setQueryData(
+      ['worktree-daemons', 'repo-1', 'wt-1'],
+      [instance({ status: DaemonStatus.Ready })],
+    );
+    const fixture = createComponent();
+
+    const stopButton = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((b) => b.textContent?.trim() === 'Stop');
+    stopButton!.click();
+    await flush();
+
+    expect(
+      daemonService.apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsDaemonIdStopPost,
+    ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
   });
 
   it('renders the events feed severity-colored with expandable excerpts and source badges', () => {
