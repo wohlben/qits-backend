@@ -148,7 +148,7 @@ describe('WorktreeChatComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.open(); // establishes the dialog ref so it can be closed on redirect
 
-    // Not signed in → the backend returns an interactive `claude auth login` terminal.
+    // Not signed in → the backend returns an interactive `claude` REPL login terminal.
     commandService.apiCommandsCommandIdGet.mockReturnValueOnce(
       of({
         command: {

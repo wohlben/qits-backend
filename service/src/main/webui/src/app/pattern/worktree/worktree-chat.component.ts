@@ -155,7 +155,7 @@ export class WorktreeChatComponent {
   }
 
   onLaunched(commandId: string) {
-    // When the agent isn't signed in the backend returns an interactive `claude auth login`
+    // When the agent isn't signed in the backend returns an interactive `claude` REPL login
     // terminal instead of a chat — it can't render inline, so close the dialog and redirect to its
     // command page (a real PTY) to finish OAuth. A chat stays here.
     void lastValueFrom(this.commandService.apiCommandsCommandIdGet(commandId)).then((response) => {

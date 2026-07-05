@@ -14,9 +14,9 @@
 #   QITS_CLAUDE_VOLUME           default qits_shared_dot_claude  (qits.workspace.claude-volume)
 #   QITS_CLAUDE_MOUNT            default /claude-home            (qits.workspace.claude-mount)
 #
-# Any extra arguments are passed through to `claude auth login`, e.g.:
-#   ./agent-login.sh --console          # Anthropic Console (API-usage billing) instead of subscription
-#   ./agent-login.sh --email you@x.dev  # pre-fill the email on the login page
+# It opens the `claude` REPL; complete sign-in through its onboarding (pick a login method — Claude
+# subscription or Anthropic Console — then follow the URL and paste the code back), then exit the
+# REPL (Ctrl-C twice or /exit). The credentials land on the shared volume.
 set -euo pipefail
 
 IMAGE="${QITS_WORKSPACE_IMAGE:-qits/workspace:latest}"
@@ -28,16 +28,14 @@ MOUNT="${QITS_CLAUDE_MOUNT:-/claude-home}"
 docker volume create "${VOLUME}" >/dev/null
 
 echo "Logging in to Claude Code; credentials will be stored on the shared volume '${VOLUME}'."
-echo "Follow the printed URL to complete the OAuth flow, then paste the code back here."
-# `claude auth login` is the CLI sign-in (default: Claude subscription; pass --console for API
-# billing). It needs a TTY (-it); no browser in the container, so it prints a URL + prompts for the
-# code you paste back. Default to --claudeai unless the caller passes their own auth flags.
-if [ "$#" -eq 0 ]; then
-  set -- --claudeai
-fi
+echo "Complete sign-in in the REPL onboarding (follow the printed URL, paste the code back), then exit."
+# Run the `claude` REPL, NOT `claude auth login`. The REPL's onboarding has an interactive
+# paste-the-code login that works over a TTY (-it); the `auth login` subcommand instead blocks on a
+# loopback callback the host browser can't reach and never prompts for a code. See the resolved issue
+# docs/issues/resolved/2026-07-05_claude-auth-login-terminal-no-input.md.
 exec docker run -it --rm \
   --user "$(id -u)" \
   -e HOME="${MOUNT}" \
   -v "${VOLUME}:${MOUNT}" \
   "${IMAGE}" \
-  claude auth login "$@"
+  claude

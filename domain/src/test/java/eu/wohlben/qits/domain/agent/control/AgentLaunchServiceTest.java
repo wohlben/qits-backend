@@ -143,12 +143,16 @@ public class AgentLaunchServiceTest {
   }
 
   @Test
-  public void loginTerminalRunsClaudeAuthLoginWithTheSharedHome() {
+  public void loginTerminalRunsTheInteractiveClaudeRepl() {
     // When the agent isn't signed in, launchChat redirects to this interactive terminal so the
-    // operator completes OAuth in a real PTY; it writes to the shared credential volume.
+    // operator completes OAuth in a real PTY; it writes to the shared credential volume. It runs
+    // the
+    // `claude` REPL (whose onboarding has a paste-the-code login), NOT `claude auth login` — that
+    // subcommand blocks on an unreachable loopback callback and reads no stdin (see the resolved
+    // issue doc 2026-07-05_claude-auth-login-terminal-no-input.md).
     LaunchSpec spec = agentLaunchService.renderLogin();
 
-    assertEquals("exec claude auth login --claudeai", spec.script());
+    assertEquals("exec claude", spec.script());
     assertTrue(spec.interactive());
     assertEquals("/claude-home", spec.environment().get("HOME"));
   }
