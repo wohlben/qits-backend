@@ -1,9 +1,9 @@
-# Lazy directory exploration in the worktree file tree
+# Lazy directory exploration in the workspace file tree
 
 ## Introduction
 
-The worktree file browser
-([2026-07-02_worktree-file-browser.md](2026-07-02_worktree-file-browser.md)) fetched the entire
+The workspace file browser
+([2026-07-02_workspace-file-browser.md](2026-07-02_workspace-file-browser.md)) fetched the entire
 file list up front and, to keep that payload small, hid gitignored directories entirely
 (`git ls-files … --exclude-standard`) — so `node_modules/`, `dist/` and build output never reached
 the UI. This replaces "hide it entirely" with **lazy directory exploration**: a gitignored
@@ -12,7 +12,7 @@ contents are fetched only when the user opens it. The default view is unchanged 
 are collapsed stubs instead of missing), but the user can now click into them.
 
 This **folds in the deferred backend Part 3** of the ordered-rules/ignorelists feature
-([2026-07-03_worktree-filter-ordered-rules-and-ignorelists.md](2026-07-03_worktree-filter-ordered-rules-and-ignorelists.md)):
+([2026-07-03_workspace-filter-ordered-rules-and-ignorelists.md](2026-07-03_workspace-filter-ordered-rules-and-ignorelists.md)):
 that plan wanted to expose ignored files and re-hide via rules, and parked the resulting
 payload-size problem. Lazy loading resolves it a better way — ignored dirs are *present as openable
 stubs*, not silently dropped, **without** the payload cost. The two compose: **lazy loading owns
@@ -22,8 +22,8 @@ bulk directory size; the rule pipeline owns fine-grained per-file hide/show.**
 
 ### Backend — a lazily-resolvable, level-addressable `/files`
 
-`GET .../{worktreeId}/files` now returns `{ paths: string[], lazyDirs: LazyDirDto[] }` and takes an
-optional `?path=<dir>` (`WorktreeController` + `WorktreeFilesService`, `Listing`/`LazyDir` records):
+`GET .../{workspaceId}/files` now returns `{ paths: string[], lazyDirs: LazyDirDto[] }` and takes an
+optional `?path=<dir>` (`WorkspaceController` + `WorkspaceFilesService`, `Listing`/`LazyDir` records):
 
 - **root** (`no path`): eager files from `git ls-files --cached --others --exclude-standard`
   (unchanged) **plus** the directories the active strategy marked lazy, each a
@@ -39,7 +39,7 @@ optional `?path=<dir>` (`WorktreeController` + `WorktreeFilesService`, `Listing`
   without recursing. Future heuristics (commit-frequency, size, …) slot in behind the interface
   without touching transport or UI. Individually-ignored *files* stay hidden, as today.
 - **Path safety**: `?path=` is user-supplied, so the traversal guard `readFile` already used was
-  extracted into a shared `resolveWithinWorktree(root, path)` (lexical `..`/absolute reject, then
+  extracted into a shared `resolveWithinWorkspace(root, path)` (lexical `..`/absolute reject, then
   symlink-resolve + re-check containment), reused by both the file read and the new directory
   listing; the listing also rejects non-directories and `.git`.
 
@@ -47,11 +47,11 @@ OpenAPI (`docs/openapi.yml` + the webui copy) and the typed client were regenera
 
 ### Frontend — render stubs, fetch on open
 
-`worktree-file-browser.component.ts`:
+`workspace-file-browser.component.ts`:
 
 - `filesQuery` now carries the `{ paths, lazyDirs }` root level. `openedLazyPaths` tracks expanded
   lazy dirs; each is fetched reactively via `injectQueries`, keyed
-  `['worktree-files', repoId, worktreeId, dir]` — a per-dir cache entry, so re-expanding is instant.
+  `['workspace-files', repoId, workspaceId, dir]` — a per-dir cache entry, so re-expanding is instant.
 - `allEagerPaths` (root + every loaded lazy level) feeds the whole filter pipeline, so the existing
   fuzzy/rule filters and dynamic ignorelists just work over loaded content.
 - Tree assembly injects a **lazy stub** node per unopened lazy dir (`markLazyStubs` + a
@@ -70,10 +70,10 @@ OpenAPI (`docs/openapi.yml` + the webui copy) and the typed client were regenera
 
 - `GitignoreLazyDirectoryStrategyTest` — the ignored-dir boundary set, `--directory` collapsing a
   wholly-ignored tree to one stub, and that ignored files / empty dirs are excluded.
-- `WorktreeControllerTest` — root `/files` returns a gitignored `node_modules` in `lazyDirs` (right
+- `WorkspaceControllerTest` — root `/files` returns a gitignored `node_modules` in `lazyDirs` (right
   `childCount` + `href`) and *not* its contents; `?path=node_modules` lists one level with the
   nested subdir still lazy; `?path=../` / symlinked-dir escape / non-directory / `.git` → 400.
-- `worktree-file-browser.component.spec.ts` — stub renders with a count label; expanding fetches and
+- `workspace-file-browser.component.spec.ts` — stub renders with a count label; expanding fetches and
   splices real children; `Loading…` placeholder while pending; a nested subdir stays lazy after its
   parent opens; filtering neither auto-opens a lazy dir nor omits the unsearched hint.
 - Verified end-to-end in the running app (headless browser): a gitignored `node_modules/` shows as

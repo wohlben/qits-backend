@@ -7,7 +7,7 @@ import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -21,10 +21,10 @@ import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Launches a coding agent (Claude Code) into a worktree with an MCP server attached, scoped to the
+ * Launches a coding agent (Claude Code) into a workspace with an MCP server attached, scoped to the
  * repository or project it runs in. This is the separate "agent code path" that replaced the old
  * {@code CLAUDE_*} action variants: it renders the launch with {@link CodingAgentFactory}, writes
- * any seed prompt into the worktree, and spawns it as a registry {@link CommandDto} — so an agent
+ * any seed prompt into the workspace, and spawns it as a registry {@link CommandDto} — so an agent
  * session still shows up in the Commands list and is attachable/terminable like any other command.
  *
  * <p>Owns the MCP scope→URL construction (the read-only allowlists and the {@code ?repositoryId=} /
@@ -38,8 +38,8 @@ public class AgentLaunchService {
   /** Repository and project ids are generated UUIDs; only hex and dashes ever appear. */
   private static final Pattern UUID_PATTERN = Pattern.compile("[0-9a-fA-F-]{36}");
 
-  /** Worktree ids are path segments, so they must be strict slugs (mirrors WorktreeService). */
-  private static final Pattern WORKTREE_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+  /** Workspace ids are path segments, so they must be strict slugs (mirrors WorkspaceService). */
+  private static final Pattern WORKSPACE_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
   /**
    * The read-only tools of the {@code actions} MCP server, pre-approved so the session can
@@ -59,7 +59,7 @@ public class AgentLaunchService {
       List.of(
           "mcp__repository__listRepositories",
           "mcp__repository__listBranches",
-          "mcp__repository__listWorktrees",
+          "mcp__repository__listWorkspaces",
           "mcp__repository__listCommits",
           "mcp__repository__listCommitChanges",
           "mcp__repository__getCommitFileDiff",
@@ -80,7 +80,7 @@ public class AgentLaunchService {
 
   @Inject AgentAuthStatus agentAuthStatus;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject QitsHostResolver qitsHostResolver;
 
@@ -116,7 +116,7 @@ public class AgentLaunchService {
   String claudeMount;
 
   /**
-   * Launches Claude Code as a stream-json <strong>chat</strong> command in {@code worktreeId} of
+   * Launches Claude Code as a stream-json <strong>chat</strong> command in {@code workspaceId} of
    * {@code repoId}, with the MCP server(s) for {@code scope} attached. The session is rendered as a
    * conversation and tracked in the command registry (re-attachable, logged). Tools run
    * auto-approved ({@code --dangerously-skip-permissions}): the CLI does not expose the stream-json
@@ -124,45 +124,45 @@ public class AgentLaunchService {
    * would want that. Returns the spawned command.
    */
   public CommandDto launchChat(
-      String repoId, String worktreeId, AgentMcpScope scope, String initialContext) {
+      String repoId, String workspaceId, AgentMcpScope scope, String initialContext) {
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
-    if (!WORKTREE_ID_PATTERN.matcher(worktreeId == null ? "" : worktreeId).matches()) {
-      throw new BadRequestException("Invalid worktree id: " + worktreeId);
+    if (!WORKSPACE_ID_PATTERN.matcher(workspaceId == null ? "" : workspaceId).matches()) {
+      throw new BadRequestException("Invalid workspace id: " + workspaceId);
     }
     // Guard the repo id (a UUID) before ensureContainer, so a bad id is a 400 here rather than a
-    // 404 "worktree not found" from the lookup below.
+    // 404 "workspace not found" from the lookup below.
     requireUuid(repoId, "repository id");
 
     // Re-provision a lost container up front so the sign-in probe below runs against a live
     // container (a stopped one would read as not-signed-in and wrongly redirect to login, even
     // though the credentials live on the shared volume). Also lets a missing branch fail loudly.
-    worktreeService.ensureContainer(repoId, worktreeId);
+    workspaceService.ensureContainer(repoId, workspaceId);
 
     // The agent can't authenticate until an operator has signed in on the shared credential volume.
     // When it hasn't, launch an interactive `claude` REPL terminal instead — the caller redirects
     // to
     // its command page (a real PTY), the operator finishes OAuth through the REPL onboarding there,
-    // and the next chat launch (this worktree or any other, same volume) sees the login and
+    // and the next chat launch (this workspace or any other, same volume) sees the login and
     // proceeds.
-    if (!agentAuthStatus.isLoggedIn(repoId, worktreeId)) {
-      return launchLogin(repoId, worktreeId);
+    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId)) {
+      return launchLogin(repoId, workspaceId);
     }
 
-    LaunchSpec spec = renderChat(repoId, worktreeId, scope);
+    LaunchSpec spec = renderChat(repoId, workspaceId, scope);
 
     CommandDto command =
         commandService.launchChat(
-            repoId, worktreeId, nameFor(scope), spec.script(), spec.environment());
+            repoId, workspaceId, nameFor(scope), spec.script(), spec.environment());
     if (initialContext != null && !initialContext.isBlank()) {
       // Seed the conversation as the first user turn. A stream-json chat only speaks over stdin,
       // so the seed can't be a CLI argument; the pipe buffers it until claude starts reading.
       commandRegistry.chatSend(command.id(), initialContext);
     }
     // Daemon events that fired while no chat was running land in the new session right after the
-    // seed prompt, so the agent starts with the worktree's recent daemon history.
-    List<String> spooledEvents = daemonEventSpool.drain(repoId, worktreeId);
+    // seed prompt, so the agent starts with the workspace's recent daemon history.
+    List<String> spooledEvents = daemonEventSpool.drain(repoId, workspaceId);
     if (!spooledEvents.isEmpty()) {
       commandRegistry.chatSend(command.id(), String.join("\n\n", spooledEvents));
     }
@@ -174,23 +174,24 @@ public class AgentLaunchService {
    * prompts skipped ({@code claude -p '…' --dangerously-skip-permissions}) — watched in a terminal.
    * Used by composed flows such as conflict resolution. Returns the spawned command.
    */
-  public CommandDto launchAutonomous(String repoId, String worktreeId, String name, String prompt) {
+  public CommandDto launchAutonomous(
+      String repoId, String workspaceId, String name, String prompt) {
     LaunchSpec spec = renderAutonomous(prompt);
     return commandService.launchAgent(
-        repoId, worktreeId, name, spec.script(), true, spec.environment());
+        repoId, workspaceId, name, spec.script(), true, spec.environment());
   }
 
   /**
    * Launches an interactive {@code claude} REPL terminal (a normal PTY command, kind {@code
-   * TERMINAL}) in the worktree's container so an operator can complete the one-time OAuth through
+   * TERMINAL}) in the workspace's container so an operator can complete the one-time OAuth through
    * its onboarding paste flow. Writes to the shared credential volume (HOME overlay), so it signs
-   * in every worktree at once. Returned by {@link #launchChat} when the agent isn't signed in yet;
+   * in every workspace at once. Returned by {@link #launchChat} when the agent isn't signed in yet;
    * the caller redirects to its terminal.
    */
-  public CommandDto launchLogin(String repoId, String worktreeId) {
+  public CommandDto launchLogin(String repoId, String workspaceId) {
     LaunchSpec spec = renderLogin();
     return commandService.launchAgent(
-        repoId, worktreeId, "Claude sign-in", spec.script(), true, spec.environment());
+        repoId, workspaceId, "Claude sign-in", spec.script(), true, spec.environment());
   }
 
   /** Renders the interactive login command with the shared-volume {@code HOME} overlay. */
@@ -215,9 +216,9 @@ public class AgentLaunchService {
    * HOME} pointed at the shared credential volume. Package-visible so the credential overlay is
    * assertable without spawning a container.
    */
-  LaunchSpec renderChat(String repoId, String worktreeId, AgentMcpScope scope) {
+  LaunchSpec renderChat(String repoId, String workspaceId, AgentMcpScope scope) {
     CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
-    for (ScopedMcp server : serversFor(repoId, worktreeId, scope)) {
+    for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
     return withAgentHome(agent).skipPermissions().chat();
@@ -249,12 +250,12 @@ public class AgentLaunchService {
    * The scoped MCP servers for {@code scope}, with their read-only allowlists. Package-visible for
    * tests.
    */
-  List<ScopedMcp> serversFor(String repoId, String worktreeId, AgentMcpScope scope) {
+  List<ScopedMcp> serversFor(String repoId, String workspaceId, AgentMcpScope scope) {
     String repo = requireUuid(repoId, "repository id");
     String projectId = projectIdFor(repo);
     // Project-scoped, then narrowed to this one repository so a per-subtree session only sees its
-    // own repo, not its siblings in the project. The worktree narrowing is the third dimension:
-    // it unlocks (and fences) the telemetry tools, which answer only for the session's worktree.
+    // own repo, not its siblings in the project. The workspace narrowing is the third dimension:
+    // it unlocks (and fences) the telemetry tools, which answer only for the session's workspace.
     ScopedMcp narrowedRepositoryServer =
         new ScopedMcp(
             "repository",
@@ -263,8 +264,8 @@ public class AgentLaunchService {
                 + projectId
                 + "&repositoryId="
                 + repo
-                + "&worktreeId="
-                + worktreeId,
+                + "&workspaceId="
+                + workspaceId,
             READ_ONLY_REPOSITORY_TOOLS);
     return switch (scope) {
       case ACTIONS ->
@@ -278,7 +279,7 @@ public class AgentLaunchService {
       case REPOSITORY -> List.of(narrowedRepositoryServer);
       case PROJECT ->
           // Project scope only, no repository narrowing — the session sees every repository in the
-          // project. It still runs in some repository's worktree (the terminal needs a checkout).
+          // project. It still runs in some repository's workspace (the terminal needs a checkout).
           List.of(
               new ScopedMcp(
                   "repository",
@@ -289,7 +290,7 @@ public class AgentLaunchService {
 
   /**
    * The {@code actions} MCP base URL: the explicit override if set, else derived from the
-   * container-reachable qits host + port (composed exactly like {@code WorktreeService}'s git URL
+   * container-reachable qits host + port (composed exactly like {@code WorkspaceService}'s git URL
    * and {@code OtelEnvironment}'s OTLP endpoint).
    */
   private String actionsMcpUrl() {

@@ -37,7 +37,7 @@ import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.com
     } @else if ((commandsQuery.data() ?? []).length === 0) {
       <app-empty-state>
         <span title>No commands yet</span>
-        <span description>Run an action in a worktree and it will show up here.</span>
+        <span description>Run an action in a workspace and it will show up here.</span>
       </app-empty-state>
     } @else {
       @if (running().length) {
@@ -89,7 +89,7 @@ import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.com
       }
     }
 
-    <!-- Where the command came from: branch/worktree, the commit checked out at launch, and when. -->
+    <!-- Where the command came from: branch/workspace, the commit checked out at launch, and when. -->
     <ng-template #meta let-command>
       <dl class="mt-1 flex flex-col gap-0.5 text-sm text-muted-foreground">
         <div class="flex gap-2">
@@ -97,7 +97,7 @@ import { EmptyStateComponent } from '@/ui/components/empty-state/empty-state.com
           <span>·</span>
           <span class="font-mono text-xs">{{ command.shortCommitHash }}</span>
         </div>
-        <div class="text-xs">worktree {{ command.worktreeId }}</div>
+        <div class="text-xs">workspace {{ command.workspaceId }}</div>
         <div class="text-xs">{{ command.launchedAt | date: 'short' }}</div>
         @if (command.exitCode !== undefined && command.exitCode !== null) {
           <div class="text-xs">exit {{ command.exitCode }}</div>

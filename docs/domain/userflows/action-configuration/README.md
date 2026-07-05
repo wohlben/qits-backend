@@ -14,7 +14,7 @@ Actions exist at two scopes, merged into one effective set per repository:
 ## Where actions are consumed
 
 - **Feature flows**: a lead developer attaches action configurations to phase steps as either **Prerequisites** or **Quality Gates**. The action-configuration domain is authored by developers and consumed by lead developers during feature flow design.
-- **Direct execution in worktrees**: an *interactive* action can be run against a worktree from the repository's branch tree ("Run…"). The run is spawned as a persistent **command** (see the command domain) and opens in a live terminal.
+- **Direct execution in workspaces**: an *interactive* action can be run against a workspace from the repository's branch tree ("Run…"). The run is spawned as a persistent **command** (see the command domain) and opens in a live terminal.
 
 The UI reflects the feature-flow relationship: the **Actions** page is reachable from the Feature Flows list and detail pages as a secondary navigation action, not as a top-level sidebar item.
 

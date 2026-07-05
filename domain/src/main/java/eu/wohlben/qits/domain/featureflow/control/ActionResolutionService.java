@@ -65,7 +65,7 @@ public class ActionResolutionService {
   /**
    * Resolves {@code actionId} to run it in {@code repositoryId}. A global action resolves anywhere;
    * a repository action resolves only in its own repository. Throws {@link NotFoundException} if
-   * the id is unknown or belongs to another repository — so a worktree can only ever run its
+   * the id is unknown or belongs to another repository — so a workspace can only ever run its
    * effective set.
    */
   @Transactional

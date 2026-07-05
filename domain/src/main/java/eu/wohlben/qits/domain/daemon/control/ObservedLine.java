@@ -9,7 +9,7 @@ import java.time.Instant;
  * <ul>
  *   <li>process output — {@code source} is {@link #PROCESS_OUTPUT} and {@code position} is the
  *       line's {@code command_log_line} sequence (the lines are already persisted there);
- *   <li>a tailed file — {@code source} is the worktree-relative path, {@code position} is the
+ *   <li>a tailed file — {@code source} is the workspace-relative path, {@code position} is the
  *       1-based line number in the file since the last rotation, and {@code sourceEpoch} marks when
  *       the tail (re)opened the file so a rolled file doesn't mislead.
  * </ul>

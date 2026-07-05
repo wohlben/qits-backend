@@ -73,7 +73,7 @@ public class AgentLaunchServiceTest {
                     + projectId
                     + "&repositoryId="
                     + repoId
-                    + "&worktreeId=work"),
+                    + "&workspaceId=work"),
         repository.url());
   }
 
@@ -95,7 +95,7 @@ public class AgentLaunchServiceTest {
                     + projectId
                     + "&repositoryId="
                     + repoId
-                    + "&worktreeId=work"),
+                    + "&workspaceId=work"),
         server.url());
     assertTrue(server.allowedTools().contains("mcp__repository__listBranches"));
     assertFalse(server.allowedTools().contains("mcp__repository__runAction"));
@@ -117,7 +117,7 @@ public class AgentLaunchServiceTest {
   @Test
   public void mcpUrlsUseTheContainerReachableGitHostNotLocalhost() {
     // Regression: the MCP base URL used to be hardcoded to http://localhost:8080, which from inside
-    // the worktree container is the container's own loopback — not qits. It must derive from the
+    // the workspace container is the container's own loopback — not qits. It must derive from the
     // same QitsHostResolver the git clone uses, so the agent's MCP server is actually reachable.
     // See docs/issues/resolved/2026-07-05_agent-mcp-unreachable-from-container.md.
     String projectId = "88888888-8888-8888-8888-888888888888";

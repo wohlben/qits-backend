@@ -9,10 +9,10 @@ describe('BranchRowComponent', () => {
     }).compileComponents();
   });
 
-  it('offers to branch off a branch that has no worktree, without an inline Integrate', () => {
+  it('offers to branch off a branch that has no workspace, without an inline Integrate', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'develop');
-    fixture.componentRef.setInput('worktree', null);
+    fixture.componentRef.setInput('workspace', null);
     fixture.detectChanges();
 
     let branchedOff = false;
@@ -23,14 +23,14 @@ describe('BranchRowComponent', () => {
     const buttons = Array.from(el.querySelectorAll('button'));
     // Integrate moved into the commit popover (Forward tab) — not on the row anymore.
     expect(buttons.some((b) => b.textContent?.includes('Integrate'))).toBe(false);
-    buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
+    buttons.find((b) => b.textContent?.includes('Branch off workspace'))!.click();
     expect(branchedOff).toBe(true);
   });
 
-  it('offers to delete a childless branch with no worktree', () => {
+  it('offers to delete a childless branch with no workspace', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'stale');
-    fixture.componentRef.setInput('worktree', null);
+    fixture.componentRef.setInput('workspace', null);
     fixture.componentRef.setInput('hasChildren', false);
     fixture.detectChanges();
 
@@ -46,7 +46,7 @@ describe('BranchRowComponent', () => {
   it('hides delete when the branch has children', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'master');
-    fixture.componentRef.setInput('worktree', null);
+    fixture.componentRef.setInput('workspace', null);
     fixture.componentRef.setInput('hasChildren', true);
     fixture.detectChanges();
 
@@ -55,11 +55,11 @@ describe('BranchRowComponent', () => {
     expect(buttons.some((b) => b.textContent?.includes('Delete'))).toBe(false);
   });
 
-  it('shows the worktree and emits branch off/abandon when one is present', () => {
+  it('shows the workspace and emits branch off/abandon when one is present', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
-    fixture.componentRef.setInput('worktree', {
-      worktreeId: 'login-fix',
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
       branch: 'feature/login',
       parent: 'develop',
     });
@@ -74,35 +74,35 @@ describe('BranchRowComponent', () => {
     expect(el.textContent).toContain('login-fix');
     expect(el.textContent).toContain('develop');
     const buttons = Array.from(el.querySelectorAll('button'));
-    // Worktree-backed branches use Abandon, not Delete; Integrate lives in the commit popover.
+    // Workspace-backed branches use Abandon, not Delete; Integrate lives in the commit popover.
     expect(buttons.some((b) => b.textContent?.includes('Delete'))).toBe(false);
     expect(buttons.some((b) => b.textContent?.includes('Integrate'))).toBe(false);
-    buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
+    buttons.find((b) => b.textContent?.includes('Branch off workspace'))!.click();
     buttons.find((b) => b.textContent?.includes('Abandon'))!.click();
     expect(branchedOff).toBe(true);
     expect(abandoned).toBe(true);
   });
 
-  it('offers to open the worktree only for worktree-backed branches', () => {
+  it('offers to open the workspace only for workspace-backed branches', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
-    fixture.componentRef.setInput('worktree', {
-      worktreeId: 'login-fix',
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
       branch: 'feature/login',
       parent: 'develop',
     });
     fixture.detectChanges();
 
     let opened = false;
-    fixture.componentInstance.openWorktree.subscribe(() => (opened = true));
+    fixture.componentInstance.openWorkspace.subscribe(() => (opened = true));
 
     const el = fixture.nativeElement as HTMLElement;
     const buttons = Array.from(el.querySelectorAll('button'));
     buttons.find((b) => b.textContent?.includes('Work on it'))!.click();
     expect(opened).toBe(true);
 
-    // A plain branch (no worktree) has nothing to work in.
-    fixture.componentRef.setInput('worktree', null);
+    // A plain branch (no workspace) has nothing to work in.
+    fixture.componentRef.setInput('workspace', null);
     fixture.detectChanges();
     const plainButtons = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
@@ -113,8 +113,8 @@ describe('BranchRowComponent', () => {
   it('shows a STOPPED container and recreates it on Start', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
-    fixture.componentRef.setInput('worktree', {
-      worktreeId: 'login-fix',
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
       branch: 'feature/login',
       parent: 'develop',
       runtimeStatus: 'STOPPED',
@@ -136,8 +136,8 @@ describe('BranchRowComponent', () => {
   it('shows a RUNNING container and stops it on Stop', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
-    fixture.componentRef.setInput('worktree', {
-      worktreeId: 'login-fix',
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
       branch: 'feature/login',
       parent: 'develop',
       runtimeStatus: 'RUNNING',
@@ -158,8 +158,8 @@ describe('BranchRowComponent', () => {
   it('labels the control Recreate and shows the reason when provisioning FAILED', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');
-    fixture.componentRef.setInput('worktree', {
-      worktreeId: 'login-fix',
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
       branch: 'feature/login',
       parent: 'develop',
       runtimeStatus: 'FAILED',
@@ -173,11 +173,11 @@ describe('BranchRowComponent', () => {
     expect(buttons.some((b) => b.textContent?.includes('Recreate'))).toBe(true);
   });
 
-  it('replaces integrate/abandon with cleanup when the worktree can be cleaned up', () => {
+  it('replaces integrate/abandon with cleanup when the workspace can be cleaned up', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/done');
-    fixture.componentRef.setInput('worktree', {
-      worktreeId: 'done',
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'done',
       branch: 'feature/done',
       parent: 'master',
       ahead: 0,

@@ -39,26 +39,26 @@ export class AgentControllerService extends BaseService {
 
     /**
      * Launch
-     * @endpoint post /api/repositories/{repoId}/worktrees/{worktreeId}/agents
+     * @endpoint post /api/repositories/{repoId}/workspaces/{workspaceId}/agents
      * @param repoId 
-     * @param worktreeId 
+     * @param workspaceId 
      * @param launchAgentRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(repoId: string, worktreeId: string, launchAgentRequest: LaunchAgentRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(repoId: string, worktreeId: string, launchAgentRequest: LaunchAgentRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(repoId: string, worktreeId: string, launchAgentRequest: LaunchAgentRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(repoId: string, worktreeId: string, launchAgentRequest: LaunchAgentRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(repoId: string, workspaceId: string, launchAgentRequest: LaunchAgentRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(repoId: string, workspaceId: string, launchAgentRequest: LaunchAgentRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(repoId: string, workspaceId: string, launchAgentRequest: LaunchAgentRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(repoId: string, workspaceId: string, launchAgentRequest: LaunchAgentRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
-            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost.');
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.');
         }
-        if (worktreeId === null || worktreeId === undefined) {
-            throw new Error('Required parameter worktreeId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost.');
+        if (workspaceId === null || workspaceId === undefined) {
+            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.');
         }
         if (launchAgentRequest === null || launchAgentRequest === undefined) {
-            throw new Error('Required parameter launchAgentRequest was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost.');
+            throw new Error('Required parameter launchAgentRequest was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -95,7 +95,7 @@ export class AgentControllerService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/worktrees/${this.configuration.encodeParam({name: "worktreeId", value: worktreeId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/agents`;
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/agents`;
         const { basePath, withCredentials } = this.configuration;
         return this.httpClient.request<Response>('post', `${basePath}${localVarPath}`,
             {

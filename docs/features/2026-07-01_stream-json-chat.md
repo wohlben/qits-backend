@@ -54,7 +54,7 @@ categories (nothing hidden by default). `command-terminal.page.ts` routes on `co
 The CLI's stream-json mode has no answerable permission prompt: with
 `--dangerously-skip-permissions` tools auto-run, and without it a mutating tool is **auto-denied**
 (it surfaces in the result's `permission_denials`, no `control_request` event to answer). Chats
-therefore run **auto-approved** so the buttons can actually configure (create actions, worktrees,
+therefore run **auto-approved** so the buttons can actually configure (create actions, workspaces,
 etc.). In-UI Approve/Deny would require driving Claude's SDK control protocol (`canUseTool`), which the
 raw CLI does not expose — a future enhancement. Because a chat spawns an autonomous session, a
 networked deployment must add real authentication on the socket (qits has no auth layer today).

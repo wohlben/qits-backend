@@ -1,7 +1,7 @@
 import { buildFileTree } from './build-file-tree';
 import { compactFileTree, type CompactedChain } from './compact-file-tree';
 
-/** Builds the worktree-browser-style forest (collapsed, with icons) from plain paths. */
+/** Builds the workspace-browser-style forest (collapsed, with icons) from plain paths. */
 function forest(paths: string[]) {
   return buildFileTree(
     paths.map((path) => ({ path })),

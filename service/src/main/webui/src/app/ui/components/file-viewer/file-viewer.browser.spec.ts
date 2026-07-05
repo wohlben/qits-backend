@@ -15,7 +15,7 @@ import { FileViewerComponent } from './file-viewer.component';
 
 const README = `# qits
 
-Manages Git repositories, worktrees and *feature flow* configurations.
+Manages Git repositories, workspaces and *feature flow* configurations.
 
 ## Getting started
 

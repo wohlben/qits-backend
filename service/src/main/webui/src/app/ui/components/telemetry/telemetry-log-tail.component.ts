@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TelemetryLogDto } from '@/api/model/telemetryLogDto';
 
 /**
- * The live log tail of the worktree telemetry tab: the buffered log records, filterable by the
+ * The live log tail of the workspace telemetry tab: the buffered log records, filterable by the
  * exporting service. The parent owns the query (and its polling); this only renders and emits the
  * chosen service filter.
  */

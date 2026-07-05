@@ -5,7 +5,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
-import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { RepositoryDetailHeaderComponent } from '@/ui/components/repository/repository-detail-header.component';
@@ -36,7 +36,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div pageActions class="flex items-center gap-2">
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'daemons']">Daemons</a>
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
-        <!-- Launches Claude Code in the main worktree with the actions MCP scoped to this repo plus
+        <!-- Launches Claude Code in the main workspace with the actions MCP scoped to this repo plus
              the repository MCP narrowed to it, so both actions and repository-owned configuration
              (daemons) can be managed from inside Claude. -->
         <button
@@ -78,7 +78,7 @@ export class RepositoryDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly repositoryService = inject(RepositoryControllerService);
-  private readonly worktreeService = inject(WorktreeControllerService);
+  private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly agentService = inject(AgentControllerService);
   private readonly queryClient = inject(QueryClient);
 
@@ -106,7 +106,7 @@ export class RepositoryDetailPage {
     },
   }));
 
-  // Launch a Claude agent in the worktree backing a branch (resolving the worktree from the branch),
+  // Launch a Claude agent in the workspace backing a branch (resolving the workspace from the branch),
   // then open its command terminal. The process is owned by the backend registry and survives
   // navigation.
   /** The last agent-launch failure, surfaced as a banner (cleared when a launch starts/succeeds). */
@@ -114,19 +114,19 @@ export class RepositoryDetailPage {
 
   readonly agentMutation = injectMutation(() => ({
     mutationFn: async (vars: { branch: string; scope: AgentMcpScope }) => {
-      const worktrees = await lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesGet(this.repoId),
+      const workspaces = await lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesGet(this.repoId),
       );
-      const worktreeId = worktrees.entries
-        ?.map((e) => e.worktree)
-        .find((w) => w?.branch === vars.branch)?.worktreeId;
-      if (!worktreeId) {
-        throw new Error('No worktree backs branch ' + vars.branch);
+      const workspaceId = workspaces.entries
+        ?.map((e) => e.workspace)
+        .find((w) => w?.branch === vars.branch)?.workspaceId;
+      if (!workspaceId) {
+        throw new Error('No workspace backs branch ' + vars.branch);
       }
       return lastValueFrom(
-        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+        this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           this.repoId,
-          worktreeId,
+          workspaceId,
           { scope: vars.scope },
         ),
       );
@@ -141,7 +141,7 @@ export class RepositoryDetailPage {
     onError: (error: unknown) => this.agentError.set(this.errorMessage(error)),
   }));
 
-  /** Open Claude Code in the main worktree, with the actions + repository MCP scoped to this repo. */
+  /** Open Claude Code in the main workspace, with the actions + repository MCP scoped to this repo. */
   configureWithClaude() {
     const branch = this.mainBranch();
     if (!branch) return;

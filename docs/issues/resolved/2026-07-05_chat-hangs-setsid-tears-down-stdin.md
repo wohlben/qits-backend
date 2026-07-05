@@ -5,7 +5,7 @@
 Related / dependent plans:
 
 - `docs/features/2026-07-04_container-agent-sessions.md` — the stream-json chat over a container `docker exec` pipe.
-- `docs/features/2026-07-04_workspace-containers.md` — the per-worktree container execution model and the `CommandRegistry` spawn seams.
+- `docs/features/2026-07-04_workspace-containers.md` — the per-workspace container execution model and the `CommandRegistry` spawn seams.
 - `docs/issues/2026-07-05_agent-mcp-unreachable-from-container.md` — a **separate** bug surfaced while diagnosing this one (the agent's MCP server is unreachable from the container).
 
 ## Symptom
@@ -28,7 +28,7 @@ without ever answering (sometimes after emitting only its `system/init` line). T
 `-it` path doesn't need it — docker makes the shell a session leader). But plain `setsid` is
 incompatible with keeping the exec's pipes open.
 
-Reproduced live in a worktree container (A/B, identical command otherwise):
+Reproduced live in a workspace container (A/B, identical command otherwise):
 
 - `bash -lc "exec claude --print --input-format stream-json …"` → responds (`result` emitted).
 - `setsid bash -lc "…"` → 0 output lines, exit 0, no response.
@@ -49,7 +49,7 @@ terminates claude and `setsid -w` then reaps it.
 ## Verification
 
 Live A/B reproduction (above) plus an end-to-end `PROJECT` chat via
-`POST /api/repositories/{repoId}/worktrees/{worktreeId}/agents` observed over the chat websocket
+`POST /api/repositories/{repoId}/workspaces/{workspaceId}/agents` observed over the chat websocket
 returning `result.is_error=false`.
 
 No unit test added: the affected path is a private `docker exec` argv builder that `FakeContainerRuntime`

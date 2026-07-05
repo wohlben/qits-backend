@@ -31,10 +31,10 @@ Each feature gets its own directory exporting a `*.routes.ts`, lazy-loaded via `
 | `/repositories/:repoId` | `RepositoryDetailPage` | drill-down only — no list route |
 | `/repositories/:repoId/branch/:branchName/commits` | `BranchCommitsPage` | |
 | `/repositories/:repoId/branch/:branchName/commits/:commitHash` | `CommitDetailPage` | optional `?parent=` |
-| `/repositories/:repoId/worktrees/:worktreeId` | `WorktreeDetailPage` | file browser |
-| `/repositories/:repoId/worktrees/:worktreeId/wip` | `WorktreeWipPage` | speak-to-prompt |
-| `/repositories/:repoId/history` | `WorktreeHistoryPage` | |
-| `/repositories/:repoId/history/:id` | `WorktreeHistoryDetailPage` | |
+| `/repositories/:repoId/workspaces/:workspaceId` | `WorkspaceDetailPage` | file browser |
+| `/repositories/:repoId/workspaces/:workspaceId/wip` | `WorkspaceWipPage` | speak-to-prompt |
+| `/repositories/:repoId/history` | `WorkspaceHistoryPage` | |
+| `/repositories/:repoId/history/:id` | `WorkspaceHistoryDetailPage` | |
 | `/commands` | `CommandListPage` | records, not forms — no `new`/`edit` |
 | `/commands/:commandId` | `CommandTerminalPage` | dispatches on command kind + status |
 | `/action-configurations` (+ `new`, `:id`, `:id/edit`) | standard entity pattern | secondary nav from Feature Flows |
@@ -73,8 +73,8 @@ These related entities are shown as lists or cards. They are **not** routed inde
 These are deliberate, and new routes in the same situations should follow them:
 
 - **Parent-scoped creation**: an entity that only exists under an aggregate gets its create route under the parent (`/projects/:projectId/repositories/new`), not a top-level `new`.
-- **Drill-down entities**: entities with no standalone "list all" requirement (repositories, worktrees) have no list route; they are reached from their parent's detail page.
-- **Record views**: system-produced records (commands, worktree history) have list + detail routes but no `new`/`edit` — creation happens through domain flows, not forms. Narrative edits (history preamble/result) mutate inline on the detail page.
+- **Drill-down entities**: entities with no standalone "list all" requirement (repositories, workspaces) have no list route; they are reached from their parent's detail page.
+- **Record views**: system-produced records (commands, workspace history) have list + detail routes but no `new`/`edit` — creation happens through domain flows, not forms. Narrative edits (history preamble/result) mutate inline on the detail page.
 - **View dispatch inside one route**: `/commands/:commandId` renders a live chat, a chat replay, a live terminal, or a read-only log depending on the command's kind and status. Route on the entity; let the page pick the representation.
 
 ## Builder Pattern (Nested Sub-Entities)

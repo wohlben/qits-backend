@@ -67,8 +67,8 @@ final class DaemonDefinitionValidator {
   }
 
   /**
-   * FILE source paths are worktree-relative and untrusted, so traversal is rejected lexically at
-   * definition time (the tail re-checks containment at runtime against the resolved worktree root,
+   * FILE source paths are workspace-relative and untrusted, so traversal is rejected lexically at
+   * definition time (the tail re-checks containment at runtime against the resolved workspace root,
    * mirroring the file browser's guard).
    */
   static void requireValidSources(List<LogSource> sources) {
@@ -81,7 +81,7 @@ final class DaemonDefinitionValidator {
       }
       String path = source.path;
       if (path.startsWith("/") || path.contains("\\")) {
-        throw new BadRequestException("Log source path must be worktree-relative: " + path);
+        throw new BadRequestException("Log source path must be workspace-relative: " + path);
       }
       for (String segment : path.split("/")) {
         if (segment.isEmpty() || segment.equals("..")) {

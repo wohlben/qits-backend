@@ -26,7 +26,7 @@ export interface BuildFileTreeOptions {
  * explorer. Entries without a path are ignored.
  *
  * Used both for a commit's changed files (default: all expanded, no icons) and for browsing a whole
- * worktree (collapsed by default, with folder/file icons) — hence the {@link BuildFileTreeOptions}.
+ * workspace (collapsed by default, with folder/file icons) — hence the {@link BuildFileTreeOptions}.
  */
 export function buildFileTree<T extends HasPath>(
   files: T[],

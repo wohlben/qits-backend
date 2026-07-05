@@ -3,7 +3,7 @@ package eu.wohlben.qits.domain.repository.control;
 import java.util.List;
 
 /**
- * Decides which directories of a worktree are returned as <em>lazy stubs</em> — shown in the file
+ * Decides which directories of a workspace are returned as <em>lazy stubs</em> — shown in the file
  * tree as collapsed folders whose contents are fetched on demand — instead of being walked eagerly.
  *
  * <p>This is the pluggable seam behind lazy directory exploration: the default {@link
@@ -18,13 +18,13 @@ public interface LazyDirectoryStrategy {
   String id();
 
   /**
-   * The worktree-root-relative directory paths (no trailing slash) that should be returned as lazy
+   * The workspace-root-relative directory paths (no trailing slash) that should be returned as lazy
    * stubs rather than recursed into. Cheap by contract — a strategy must not walk the directories
    * it marks lazy.
    *
-   * @param repoId the repository the worktree belongs to
-   * @param worktreeId the worktree whose tree is being listed
-   * @param access the worktree file access (reads run inside the worktree's container)
+   * @param repoId the repository the workspace belongs to
+   * @param workspaceId the workspace whose tree is being listed
+   * @param access the workspace file access (reads run inside the workspace's container)
    */
-  List<String> lazyDirectories(String repoId, String worktreeId, WorktreeFileAccess access);
+  List<String> lazyDirectories(String repoId, String workspaceId, WorkspaceFileAccess access);
 }

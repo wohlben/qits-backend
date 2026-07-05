@@ -12,7 +12,7 @@ describe('DaemonTerminalComponent', () => {
   function createComponent() {
     const fixture = TestBed.createComponent(DaemonTerminalComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
-    fixture.componentRef.setInput('worktreeId', 'wt-1');
+    fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.componentRef.setInput('daemonId', 'd-1');
     fixture.componentRef.setInput('name', 'dev server');
     fixture.detectChanges();

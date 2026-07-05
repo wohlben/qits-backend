@@ -5,7 +5,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCircleAlert, lucideX } from '@ng-icons/lucide';
 
 import { CommitDto } from '@/api/model/commitDto';
-import { WorktreeDto } from '@/api/model/worktreeDto';
+import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardPopoverComponent, ZardPopoverDirective } from '@/shared/components/popover';
 import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
@@ -13,10 +13,10 @@ import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import { TreeNode } from '@/shared/components/tree/tree.types';
 import { BranchRowComponent } from './branch-row.component';
 
-export type BranchTreeNode = TreeNode<WorktreeDto | null>;
+export type BranchTreeNode = TreeNode<WorkspaceDto | null>;
 
-/** Per-branch ahead/behind vs its parent — supplied for branches without a worktree (the parent is
- * the repository's main branch). Worktree-backed branches get this from their {@link WorktreeDto}. */
+/** Per-branch ahead/behind vs its parent — supplied for branches without a workspace (the parent is
+ * the repository's main branch). Workspace-backed branches get this from their {@link WorkspaceDto}. */
 export interface BranchSummary {
   parent: string | null;
   ahead: number | null;
@@ -32,15 +32,15 @@ export interface CommitsPreview {
   outgoing: CommitDto[];
 }
 
-/** Normalized view of a node for the connector/popover, unifying worktree and plain branches. */
+/** Normalized view of a node for the connector/popover, unifying workspace and plain branches. */
 interface NodeSummary {
   branch: string;
   parent: string;
   ahead: number;
   behind: number;
   conflictsWithParent: boolean;
-  /** The backing worktree, or null for a plain branch (no in-place pull, integrate-only). */
-  worktree: WorktreeDto | null;
+  /** The backing workspace, or null for a plain branch (no in-place pull, integrate-only). */
+  workspace: WorkspaceDto | null;
 }
 
 /**
@@ -70,7 +70,7 @@ interface NodeSummary {
         <div class="flex flex-1 items-center gap-2">
           @if (nodeSummary(node); as s) {
             @if (showConflict(s)) {
-              <!-- Clicking the conflict marker opens the resolve dialog: it forks a worktree and
+              <!-- Clicking the conflict marker opens the resolve dialog: it forks a workspace and
                    has Claude merge the parent in and fix the conflicts. -->
               <button
                 type="button"
@@ -78,7 +78,7 @@ interface NodeSummary {
                 [attr.title]="
                   'Conflicts with ' + s.parent + ' — click to resolve the merge conflict with Claude'
                 "
-                (click)="resolveConflict.emit(s.worktree!)"
+                (click)="resolveConflict.emit(s.workspace!)"
               >
                 <ng-icon name="lucideCircleAlert" class="size-3 text-destructive" />
                 <span class="font-semibold text-foreground">+{{ s.ahead }}</span>
@@ -99,7 +99,7 @@ interface NodeSummary {
                 (zVisibleChange)="onPeek(s.branch, $event)"
                 (click)="togglePopover(s.branch)"
               >
-                @if (s.worktree && s.behind > 0) {
+                @if (s.workspace && s.behind > 0) {
                   <span>-{{ s.behind }}</span>
                 } @else {
                   <span class="invisible">-0</span>
@@ -116,7 +116,7 @@ interface NodeSummary {
               </div>
             }
 
-            <!-- Tabbed popover: Behind (commits to pull, worktree-backed only) / Forward (this
+            <!-- Tabbed popover: Behind (commits to pull, workspace-backed only) / Forward (this
                  branch's own commits). Behind is rendered first so it is the default when present;
                  otherwise Forward is the only (and default) tab. Defined per node so it closes over
                  the node; commits load lazily when it opens. -->
@@ -137,7 +137,7 @@ interface NodeSummary {
                 <z-tab-group
                   class="[&_[role=tablist]]:pr-8 [&_[role=tablist]_button]:grow [&_[role=tablist]_button]:basis-0"
                 >
-                  @if (s.worktree && s.behind > 0) {
+                  @if (s.workspace && s.behind > 0) {
                     <z-tab [label]="s.behind + ' behind'">
                       @if (incomingFor(s.branch); as commits) {
                         @if (commits.length === 0) {
@@ -160,9 +160,9 @@ interface NodeSummary {
                           zType="secondary"
                           zSize="sm"
                           class="w-full"
-                          (click)="runAction(s.worktree)"
+                          (click)="runAction(s.workspace)"
                         >
-                          {{ actionLabel(s.worktree) }}
+                          {{ actionLabel(s.workspace) }}
                         </button>
                       </div>
                     </z-tab>
@@ -243,14 +243,14 @@ interface NodeSummary {
           <app-branch-row
             class="flex-1"
             [branch]="node.label"
-            [worktree]="node.data ?? null"
+            [workspace]="node.data ?? null"
             [hasChildren]="(node.children?.length ?? 0) > 0"
             [canCleanup]="cleanupable().has(node.label)"
             [claudeConfigurable]="claudeConfigurable()"
             (viewCommits)="viewCommits.emit(node.label)"
             (ensureContainer)="ensureContainer.emit(node.data!)"
             (stopContainer)="stopContainer.emit(node.data!)"
-            (openWorktree)="openWorktree.emit(node.data!)"
+            (openWorkspace)="openWorkspace.emit(node.data!)"
             (run)="run.emit(node.label)"
             (configureWithClaude)="configureWithClaude.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
@@ -273,29 +273,29 @@ export class BranchTreeComponent {
   readonly cleanupable = input<ReadonlySet<string>>(new Set());
   /** Whether the per-subtree "Configure with Claude" button is offered (repository-MCP action exists). */
   readonly claudeConfigurable = input(false);
-  /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no worktree. */
+  /** Per-branch ahead/behind vs parent, keyed by branch name — used for branches with no workspace. */
   readonly branchSummaries = input<Record<string, BranchSummary>>({});
   readonly viewCommits = output<string>();
-  /** Start/recreate a worktree's container (carries the worktree). */
-  readonly ensureContainer = output<WorktreeDto>();
-  /** Gracefully stop a worktree's container (carries the worktree). */
-  readonly stopContainer = output<WorktreeDto>();
-  /** Open a worktree's detail page (carries the worktree). */
-  readonly openWorktree = output<WorktreeDto>();
-  /** Open the "Run…" dialog for a worktree-backed branch (carries the branch name). */
+  /** Start/recreate a workspace's container (carries the workspace). */
+  readonly ensureContainer = output<WorkspaceDto>();
+  /** Gracefully stop a workspace's container (carries the workspace). */
+  readonly stopContainer = output<WorkspaceDto>();
+  /** Open a workspace's detail page (carries the workspace). */
+  readonly openWorkspace = output<WorkspaceDto>();
+  /** Open the "Run…" dialog for a workspace-backed branch (carries the branch name). */
   readonly run = output<string>();
   /** Launch the repository-MCP Claude action in a subtree's terminal (carries the branch name). */
   readonly configureWithClaude = output<string>();
   readonly branchOff = output<string>();
-  /** Open the resolve-conflict flow for a conflicting worktree (carries the worktree). */
-  readonly resolveConflict = output<WorktreeDto>();
+  /** Open the resolve-conflict flow for a conflicting workspace (carries the workspace). */
+  readonly resolveConflict = output<WorkspaceDto>();
   readonly integrate = output<string>();
-  readonly abandon = output<WorktreeDto>();
+  readonly abandon = output<WorkspaceDto>();
   readonly cleanup = output<string>();
   readonly delete = output<string>();
-  readonly fastForward = output<WorktreeDto>();
-  /** Merge the parent into a diverged-but-cleanly-mergeable worktree to catch it up. */
-  readonly update = output<WorktreeDto>();
+  readonly fastForward = output<WorkspaceDto>();
+  /** Merge the parent into a diverged-but-cleanly-mergeable workspace to catch it up. */
+  readonly update = output<WorkspaceDto>();
   /** The incoming/outgoing commits for the currently-open branch (loaded lazily by the parent). */
   readonly commitsPreview = input<CommitsPreview | null>(null);
   /** Emitted when a branch's popover opens, so the parent can fetch that branch's commits. */
@@ -306,7 +306,7 @@ export class BranchTreeComponent {
 
   /**
    * Normalizes a node into a {@link NodeSummary}, or null when there's nothing to compare (the main
-   * branch, or a branch with no resolvable parent). Worktree-backed branches use their worktree;
+   * branch, or a branch with no resolvable parent). Workspace-backed branches use their workspace;
    * plain branches use {@link branchSummaries} with the main branch as their parent.
    */
   nodeSummary(node: BranchTreeNode): NodeSummary | null {
@@ -319,7 +319,7 @@ export class BranchTreeComponent {
         ahead: wt.ahead ?? 0,
         behind: wt.behind ?? 0,
         conflictsWithParent: wt.conflictsWithParent === true,
-        worktree: wt,
+        workspace: wt,
       };
     }
     const s = this.branchSummaries()[node.label];
@@ -330,18 +330,18 @@ export class BranchTreeComponent {
       ahead: s.ahead ?? 0,
       behind: s.behind ?? 0,
       conflictsWithParent: false,
-      worktree: null,
+      workspace: null,
     };
   }
 
-  /** A worktree-backed branch that has diverged with real conflicts — can't fast-forward cleanly. */
+  /** A workspace-backed branch that has diverged with real conflicts — can't fast-forward cleanly. */
   showConflict(s: NodeSummary): boolean {
-    return !!s.worktree && s.behind > 0 && s.ahead > 0 && s.conflictsWithParent;
+    return !!s.workspace && s.behind > 0 && s.ahead > 0 && s.conflictsWithParent;
   }
 
-  /** Whether there's anything to act on: a worktree to pull into, or commits to integrate. */
+  /** Whether there's anything to act on: a workspace to pull into, or commits to integrate. */
   hasTrigger(s: NodeSummary): boolean {
-    return (!!s.worktree && s.behind > 0) || s.ahead > 0;
+    return (!!s.workspace && s.behind > 0) || s.ahead > 0;
   }
 
   summaryTitle(s: NodeSummary): string {
@@ -377,13 +377,13 @@ export class BranchTreeComponent {
   }
 
   /** The footer action label: a fast-forward when level, otherwise a merge of the parent in. */
-  actionLabel(wt: WorktreeDto | null): string {
+  actionLabel(wt: WorkspaceDto | null): string {
     const parent = wt?.parent ?? 'parent';
     return this.canFastForward(wt) ? `Fast-forward to ${parent}` : `Merge ${parent} in`;
   }
 
   /** Run the Behind-tab action: fast-forward when possible, otherwise merge the parent in. */
-  runAction(wt: WorktreeDto | null): void {
+  runAction(wt: WorkspaceDto | null): void {
     if (!wt) return;
     if (this.canFastForward(wt)) {
       this.fastForward.emit(wt);
@@ -400,7 +400,7 @@ export class BranchTreeComponent {
   }
 
   /** Behind the parent with no commits of its own — a clean fast-forward is possible. */
-  canFastForward(wt: WorktreeDto | null): boolean {
+  canFastForward(wt: WorkspaceDto | null): boolean {
     return !!wt && (wt.behind ?? 0) > 0 && (wt.ahead ?? 0) === 0;
   }
 }

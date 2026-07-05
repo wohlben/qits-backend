@@ -1,11 +1,11 @@
-# Workspace containers: sandboxed per-worktree execution (Phase 1 — container, clone, exec)
+# Workspace containers: sandboxed per-workspace execution (Phase 1 — container, clone, exec)
 
 ## Introduction
 
 Everything qits executes — action scripts, dependency installs, dev servers, daemons, the coding
 agent and every command it decides to run — used to execute directly on the host as the desktop
 user, with the entire home directory (`~/.ssh`, cloud creds, `~/.npmrc` tokens, browser profiles)
-reachable by one malicious transitive dependency. This feature makes a **per-worktree Docker
+reachable by one malicious transitive dependency. This feature makes a **per-workspace Docker
 container** the execution environment for all of it: the container sees only a clone of the
 repository (pulled from qits' own in-process git server) and nothing else; the host keeps the
 credentials, the bare origins, and every trusted git operation. **Containers are a prerequisite
@@ -15,14 +15,14 @@ This is **Phase 1 of 3** (container lifecycle, in-process git hosting + clone, r
 execution through `docker exec`). Related/dependent plans:
 
 - **Phase 2 — [container-file-access](2026-07-04_container-file-access.md)** (depends on
-  this, now implemented): the worktree file browser reads files via `docker exec` instead of host
+  this, now implemented): the workspace file browser reads files via `docker exec` instead of host
   paths. Phase 1 leaves the file browser reading host paths; in tests the container is a host-clone at
-  the old worktree path so the browser keeps working unchanged.
+  the old workspace path so the browser keeps working unchanged.
 - **Phase 3 — [container-agent-sessions](2026-07-04_container-agent-sessions.md)** (depends
   on this, now implemented): the coding agent works inside the container; credential hand-off via a
   shared `~/.claude` volume.
 - Moves [daemons](2026-07-04_daemons.md) into the container along with all other registry
-  execution — dissolving the port-collision limitation: every worktree's daemon binds its
+  execution — dissolving the port-collision limitation: every workspace's daemon binds its
   canonical port inside its own container network namespace.
 - The [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) proxy resolves targets
   through registry runtime state. As built, the container publishes each web-viewable daemon port to
@@ -32,10 +32,10 @@ execution through `docker exec`). Related/dependent plans:
 - Rebuilds the launch/terminate path of the
   [command registry](2026-06-30_command-registry.md); everything above the process spawn — ring
   buffer, re-attach, terminal sockets, audit log — is untouched.
-- Reworks the on-disk half of the worktree lifecycle from
-  [worktree-history](2026-06-30_worktree-history.md): the host checkout under `worktrees/<id>` is
+- Reworks the on-disk half of the workspace lifecycle from
+  [workspace-history](2026-06-30_workspace-history.md): the host checkout under `workspaces/<id>` is
   replaced by the container's clone. The durable-record model is unchanged.
-- [Repository discovery](2026-05-01_repository-discovery.md)'s worktree reconciliation moves from
+- [Repository discovery](2026-05-01_repository-discovery.md)'s workspace reconciliation moves from
   on-disk metadata files to container labels.
 
 ## The decision (recap)
@@ -65,38 +65,38 @@ read host secrets but can exfiltrate what it finds inside the container); the do
 
 - `repository.control.ContainerRuntime` interface + `DockerExecutor` impl (shells the `docker`
   CLI via `ProcessBuilder`, no docker-java dep; runtime binary configurable). Methods:
-  `run` (`docker run -d --init --user <hostUid> --label qits.{repository,worktree,branch,parent}
+  `run` (`docker run -d --init --user <hostUid> --label qits.{repository,workspace,branch,parent}
   --add-host=host.docker.internal:host-gateway <image> sleep infinity`), `exec`, `execArgv` (the
   `docker exec` prefix the registry prepends), `exists`, `rm`, `restart`,
-  `listWorktreeContainers` (reads the labels back).
+  `listWorkspaceContainers` (reads the labels back).
 - Committed `docker/workspace/Dockerfile` (git + node/pnpm + JDK + python; `/workspace` made
   world-writable and `HOME`, since the container runs as an arbitrary host uid). Build locally:
   `docker build -t qits/workspace docker/workspace`.
 - Config `qits.workspace.{image,container-runtime,git-host,qits-port,term-grace-ms}` in `service`
   and `cli` properties.
 
-### Worktree model → branch column + container lifecycle (`domain`)
+### Workspace model → branch column + container lifecycle (`domain`)
 
-- **`Worktree.branch` is now a stored column** (`V20__worktree_branch.sql`) — there is no host
-  checkout to derive it from. `currentBranchOrNull`/`findWorktreeByBranch` read the column;
-  `listWorktrees` uses `wt.branch`.
-- **`createWorktree`/`createMainWorktree`**: create the branch ref host-side in the bare origin
+- **`Workspace.branch` is now a stored column** (`V20__worktree_branch.sql`) — there is no host
+  checkout to derive it from. `currentBranchOrNull`/`findWorkspaceByBranch` read the column;
+  `listWorkspaces` uses `wt.branch`.
+- **`createWorkspace`/`createMainWorkspace`**: create the branch ref host-side in the bare origin
   (`git branch <new> <parent>`), `docker run` the container, then `git clone --branch <new>
   http://<git-host>:<port>/git/<repoId> /workspace` + set the `qits@local` identity
-  (`createContainerWorktree`, with rollback of the branch + container on failure).
+  (`createContainerWorkspace`, with rollback of the branch + container on failure).
 - **`doDiscard`**: `docker rm -f` the container (its clone dies with it), delete the branch ref in
   origin, soft-delete the row. No host checkout to remove.
-- **Worktree-local git verbs are container execs**: `isWorktreeClean` (`git status --porcelain`);
-  `fastForwardWorktree`/`updateWorktreeFromParent` fetch origin, **first fast-forward the
+- **Workspace-local git verbs are container execs**: `isWorkspaceClean` (`git status --porcelain`);
+  `fastForwardWorkspace`/`updateWorkspaceFromParent` fetch origin, **first fast-forward the
   container's own branch to origin's ref** (it may have advanced out-of-band via a host-side
   integration), then ff/merge the parent and push.
 - **New safety invariant "fully pushed"**: `canCleanupBranch` additionally requires the
   container's HEAD to equal the origin's branch ref (origin-side ahead/behind can't see
   container-local commits).
-- **Host-side unchanged**: `listWorktrees` ahead/behind, the `merge-tree` probe, and
-  `mergeBranch`/`mergeIntoTarget` — which now **always** use a throwaway host worktree in the bare
-  origin, since no branch has a host checkout (`findWorktreePathForBranch`/`worktreePathForBranch`
-  return empty). `mergeWorktree` pushes the source container's branch before integrating so the
+- **Host-side unchanged**: `listWorkspaces` ahead/behind, the `merge-tree` probe, and
+  `mergeBranch`/`mergeIntoTarget` — which now **always** use a throwaway host workspace in the bare
+  origin, since no branch has a host checkout (`findWorkspacePathForBranch`/`workspacePathForBranch`
+  return empty). `mergeWorkspace` pushes the source container's branch before integrating so the
   origin refs reflect unpushed work.
 
 ### Command execution → the `docker exec` prefix (`domain.command`)
@@ -120,8 +120,8 @@ read host secrets but can exfiltrate what it finds inside the container); the do
 
 - Command registry reconciliation (`RUNNING → INTERRUPTED`) is unchanged — the exec clients die
   with the JVM; containers survive.
-- `RepositoryDiscoveryService.discover` reconciles ACTIVE worktree rows against
-  `listWorktreeContainers` (labels) instead of the metadata sidecar files: a container with no
+- `RepositoryDiscoveryService.discover` reconciles ACTIVE workspace rows against
+  `listWorkspaceContainers` (labels) instead of the metadata sidecar files: a container with no
   active row rebuilds the row from its labels; an active row with no container is soft-deleted
   ABANDONED.
 
@@ -130,7 +130,7 @@ read host secrets but can exfiltrate what it finds inside the container); the do
 - The exec wrapper does **not** `exec` the script (compound daemon scripts like `while …; do …;
   done` aren't a simple command), and the TTY path drops `setsid` (`docker exec -it` already makes
   the shell a session leader; `setsid -c` fails EPERM re-stealing the controlling terminal).
-- `fastForwardWorktree`/`updateWorktreeFromParent` gained a "sync the container's branch to origin
+- `fastForwardWorkspace`/`updateWorkspaceFromParent` gained a "sync the container's branch to origin
   first" step so a branch advanced origin-side (host integration) is reflected before the ff/merge.
 - The branch lookup in `CommandService.prepare` runs in its own transaction (daemon relaunch is on
   a non-request scheduler thread).
@@ -139,7 +139,7 @@ read host secrets but can exfiltrate what it finds inside the container); the do
 
 File browsing into the container (Phase 2); agent sessions + credential hand-off (Phase 3);
 per-repo images / devcontainer.json; resource limits; egress allowlisting; remote execution
-nodes; idle-stop/restart policies; migration of pre-existing host worktrees (resolve or reseed).
+nodes; idle-stop/restart policies; migration of pre-existing host workspaces (resolve or reseed).
 
 ## Open questions carried forward
 
@@ -153,10 +153,10 @@ networks vs the shared bridge; git-server exposure once qits binds beyond localh
   over `/git/<repoId>` moves the ref in the served bare origin; unknown id → 404; traversal-shaped
   id rejected; info/refs advertises upload-pack.
 - **`ContainerRuntime` faked** — `FakeContainerRuntime` (a Quarkus `@Mock` in each module's test
-  sources) emulates a container as a host clone at the old worktree path, running commands via
-  `env -C` and rewriting the clone URL to the on-disk origin and `/workspace` to the worktree dir.
+  sources) emulates a container as a host clone at the old workspace path, running commands via
+  `env -C` and rewriting the clone URL to the on-disk origin and `/workspace` to the workspace dir.
   Because it runs real host processes, the `setsid`/process-group termination works end-to-end.
-  The whole existing suite (command lifecycle, daemon supervisor, worktree merge/ff/cleanup,
+  The whole existing suite (command lifecycle, daemon supervisor, workspace merge/ff/cleanup,
   discovery, resolve-conflict, seed) passes against it — the tests that create divergence now
   push (origin-side probes only see pushed commits).
 - **Real-docker IT** — `service` `WorkspaceContainerIT`, part of the **extended** suite
@@ -169,7 +169,7 @@ networks vs the shared bridge; git-server exposure once qits binds beyond localh
   TTY is allocated (`test -t 1`), output streams back through the PTY, `setWinSize` resize
   propagates, and the inner exit code passes through.
 - **Live registry PTY run against real docker** (packaged app, real `DockerExecutor` + JGit
-  server): a daemon (a PTY registry command) started in a real worktree container reached **READY**
+  server): a daemon (a PTY registry command) started in a real workspace container reached **READY**
   via its ready-pattern — i.e. its `tick` stdout streamed back through `pty4j ← docker exec -it`
   and was captured as `OUTPUT` log lines; the process (its `bash`/`sleep` group) was confirmed
   running inside the container; graceful **stop** (`registry.signal` SIGTERM → terminate) and a
@@ -177,7 +177,7 @@ networks vs the shared bridge; git-server exposure once qits binds beyond localh
   with `kill -0 -<pgid>`), and the command/daemon settled STOPPED/TERMINATED. This closes the
   interactive-terminal and launch-through-the-registry-then-terminate paths end-to-end.
 - **Ran end-to-end against real docker** (packaged app + real `DockerExecutor` + real JGit server):
-  create-repo → main-worktree container clones `/workspace` from `/git/<repoId>` (upload-pack);
+  create-repo → main-workspace container clones `/workspace` from `/git/<repoId>` (upload-pack);
   container git verbs work; a commit made in the container **pushes back through the JGit server**
   (receive-pack) and shows up as origin-side `ahead 1`. Two real bugs were found and fixed this
   way: (1) `docker exec … kill` runs `kill` as a bare executable absent from minimal images — now
@@ -198,7 +198,7 @@ This is the deferred-hardening reachability limit the design flagged, now pinned
 
 ## Manual verification checklist
 
-Build `qits/workspace`; start the service; create a repo/worktree (container runs, `/workspace`
+Build `qits/workspace`; start the service; create a repo/workspace (container runs, `/workspace`
 cloned from the git server); `docker exec` a command through the registry terminal; terminate
 (inner group gone); kill qits and restart (reconciliation finds the container, command reads
 INTERRUPTED); commit in the container without pushing → `canCleanupBranch` false, push → true.

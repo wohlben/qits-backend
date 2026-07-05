@@ -6,7 +6,7 @@ import static org.hamcrest.Matchers.*;
 import eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest;
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRepositoryRequest;
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest;
-import eu.wohlben.qits.domain.repository.api.WorktreeController.CreateWorktreeRequest;
+import eu.wohlben.qits.domain.repository.api.WorkspaceController.CreateWorkspaceRequest;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -40,8 +40,8 @@ public class CommandControllerTest {
     fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
   }
 
-  /** Clones the fixture and forks a {@code cmd-wt} worktree off master to launch commands in. */
-  private String repoWithWorktree() {
+  /** Clones the fixture and forks a {@code cmd-wt} workspace off master to launch commands in. */
+  private String repoWithWorkspace() {
     String projectId =
         given()
             .contentType(ContentType.JSON)
@@ -66,9 +66,9 @@ public class CommandControllerTest {
 
     given()
         .contentType(ContentType.JSON)
-        .body(new CreateWorktreeRequest("cmd-wt", "master", "cmd-wt", null))
+        .body(new CreateWorkspaceRequest("cmd-wt", "master", "cmd-wt", null))
         .when()
-        .post("/api/repositories/" + repoId + "/worktrees")
+        .post("/api/repositories/" + repoId + "/workspaces")
         .then()
         .statusCode(Response.Status.OK.getStatusCode());
 
@@ -91,7 +91,7 @@ public class CommandControllerTest {
 
   @Test
   public void launchListGetAndTerminate() {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String actionId = createSleepAction();
 
     String commandId =
@@ -103,7 +103,7 @@ public class CommandControllerTest {
             .then()
             .statusCode(Response.Status.OK.getStatusCode())
             .body("command.status", equalTo("RUNNING"))
-            .body("command.worktreeId", equalTo("cmd-wt"))
+            .body("command.workspaceId", equalTo("cmd-wt"))
             .body("command.branch", equalTo("cmd-wt"))
             .body("command.actionName", equalTo("sleep-action"))
             .body("command.id", not(emptyOrNullString()))
@@ -153,7 +153,7 @@ public class CommandControllerTest {
 
   @Test
   public void capturesAndServesTheLog() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String actionId = createEchoAction();
 
     String commandId =

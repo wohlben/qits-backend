@@ -20,7 +20,7 @@ for terminated commands — including visualizing long pauses in output.
 
 ## Conventions to mirror
 
-- High-volume rows use a `@GeneratedValue` Long sequence id (like `Worktree`).
+- High-volume rows use a `@GeneratedValue` Long sequence id (like `Workspace`).
 - Migrations: `V9__*.sql` next; `Instant` → `timestamp(6) with time zone`. **CLOB is unused so far** —
   the log-content column is the first; the hand-written DDL must match the JPA mapping exactly
   (Hibernate validates the schema at startup).

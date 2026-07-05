@@ -17,7 +17,7 @@ src/app/ui/forms/
     project-form.component.ts
   repository/
     repository-form.component.ts
-    worktree-create-form.component.ts
+    workspace-create-form.component.ts
 ```
 
 ## Conventions

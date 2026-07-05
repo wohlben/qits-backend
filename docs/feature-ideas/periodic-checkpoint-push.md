@@ -34,8 +34,8 @@ origin and the commits are gone — silently. The `canCleanupBranch` "fully push
 A background checkpoint that periodically pushes each running container's branch to origin.
 
 - **A scheduler** (a periodic task, cadence configurable via `qits.workspace.checkpoint-interval` —
-  e.g. off by default or a few minutes) iterates running worktree containers and runs the existing
-  best-effort `pushBranch(repoId, worktreeId)` for each. Best-effort: a failed checkpoint must never
+  e.g. off by default or a few minutes) iterates running workspace containers and runs the existing
+  best-effort `pushBranch(repoId, workspaceId)` for each. Best-effort: a failed checkpoint must never
   disrupt the container or the user.
 - **Push only when ahead**: skip the push when the container's HEAD already matches the origin ref
   (no new commits), to avoid needless pushes and ref churn.
@@ -48,7 +48,7 @@ A background checkpoint that periodically pushes each running container's branch
 - **Cadence vs. noise.** Frequent pushes bound the loss window tightly but churn origin refs and can
   make the ahead-behind UI flicker (a branch briefly shows 0-ahead right after a checkpoint). Slower
   cadence is quieter but loses more on a crash. Likely: a modest default (a few minutes) or opt-in.
-- **Per-worktree vs. global schedule.** One timer sweeping all containers is simpler; per-worktree
+- **Per-workspace vs. global schedule.** One timer sweeping all containers is simpler; per-workspace
   timers align better with activity but multiply state.
 - **Push semantics.** A plain `git push origin <branch>` from the container is the obvious choice
   (same as `stopContainer`); consider whether a checkpoint should ever force-push (it should not —

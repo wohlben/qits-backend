@@ -26,7 +26,7 @@ public class PromptRefinementControllerTest {
         .contentType(ContentType.JSON)
         .body(body)
         .when()
-        .post("/api/repositories/some-repo/worktrees/wt/prompt-refinements")
+        .post("/api/repositories/some-repo/workspaces/wt/prompt-refinements")
         .then()
         .statusCode(anyOf(equalTo(Response.Status.BAD_REQUEST.getStatusCode()), equalTo(422)));
   }
@@ -37,29 +37,29 @@ public class PromptRefinementControllerTest {
         .contentType(ContentType.JSON)
         .body(Map.of("transcript", "   "))
         .when()
-        .post("/api/repositories/some-repo/worktrees/wt/prompt-refinements")
+        .post("/api/repositories/some-repo/workspaces/wt/prompt-refinements")
         .then()
         .statusCode(anyOf(equalTo(Response.Status.BAD_REQUEST.getStatusCode()), equalTo(422)));
   }
 
   @Test
-  public void anInvalidWorktreeIdIsRejected() {
+  public void anInvalidWorkspaceIdIsRejected() {
     given()
         .contentType(ContentType.JSON)
         .body(Map.of("transcript", "add a healthcheck"))
         .when()
-        .post("/api/repositories/some-repo/worktrees/..traversal/prompt-refinements")
+        .post("/api/repositories/some-repo/workspaces/..traversal/prompt-refinements")
         .then()
         .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
   }
 
   @Test
-  public void anUnknownWorktreeIsNotFound() {
+  public void anUnknownWorkspaceIsNotFound() {
     given()
         .contentType(ContentType.JSON)
         .body(Map.of("transcript", "add a healthcheck"))
         .when()
-        .post("/api/repositories/no-such-repo/worktrees/no-such-wt/prompt-refinements")
+        .post("/api/repositories/no-such-repo/workspaces/no-such-wt/prompt-refinements")
         .then()
         .statusCode(Response.Status.NOT_FOUND.getStatusCode());
   }

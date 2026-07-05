@@ -32,8 +32,8 @@ process survives disconnect; reconnect re-attaches and replays scrollback.
 ### Decisions (locked with the user)
 - **Channels:** keep the PTY. Two channels — `STDIN` (MitM'd at the socket) and `OUTPUT` (merged
   stdout+stderr; a PTY cannot separate them). `STDERR` is reserved in the enum for a future pipe mode.
-- **Concurrency:** allow multiple concurrent commands per (worktree, action). Commands carry their own
-  durable id; the terminal route is keyed by command id, not by (worktree, action).
+- **Concurrency:** allow multiple concurrent commands per (workspace, action). Commands carry their own
+  durable id; the terminal route is keyed by command id, not by (workspace, action).
 - **Scope:** unify *all* execution through the registry now — interactive terminal runs, non-interactive
   one-offs (`ActionRunService`), and the headless resolve-conflict launch. This makes Phase 1 the heavy
   phase.
@@ -45,11 +45,11 @@ process survives disconnect; reconnect re-attaches and replays scrollback.
 - No registry precedent exists. The closest pattern is `TerminalSocket.sessions`
   (`ConcurrentHashMap<connId, TerminalSession>`); lift it into a first-of-its-kind `@ApplicationScoped`
   stateful singleton, rekeyed by durable command id.
-- Branches and commits are **not** entities — plain `String`s. The only real FK is to `Worktree`;
+- Branches and commits are **not** entities — plain `String`s. The only real FK is to `Workspace`;
   `branch` and `commitHash` are String snapshot columns captured at launch (the commit checked out at
   execution time).
-- `Worktree` has a surrogate `Long id` (sequence); FK `Command.worktree` joins it. `repository` is
-  reachable via `command.worktree.repository`.
+- `Workspace` has a surrogate `Long id` (sequence); FK `Command.workspace` joins it. `repository` is
+  reachable via `command.workspace.repository`.
 - Entity style: `PanacheEntityBase`, public fields. `AbstractActionDefinition` is the template for
   `Command` (`@GeneratedValue(strategy=UUID)` + `@CreationTimestamp`).
 - `ActionResolutionService.resolveForRepository(repoId, actionId)` →
@@ -65,7 +65,7 @@ New `command/` domain area (BCE layout):
 
 - `entity/Command.java` — `@Entity @Table(name="command")`, `PanacheEntityBase`. Fields:
   `@Id @GeneratedValue(strategy=UUID) String id`; `@ManyToOne(optional=false)
-  @JoinColumn(name="worktree_id_fk") Worktree worktree`; `String branch`;
+  @JoinColumn(name="workspace_id_fk") Workspace workspace`; `String branch`;
   `@Column(name="commit_hash") String commitHash`; `String actionId`; `String actionName`;
   `@Column(name="execute_script", length=4000) String executeScript`;
   `@Enumerated(STRING) CommandStatus status`; `Integer exitCode`; `boolean interactive`;
@@ -73,9 +73,9 @@ New `command/` domain area (BCE layout):
 - `entity/CommandStatus.java` — enum `RUNNING, EXITED, TERMINATED, INTERRUPTED` (INTERRUPTED = process
   lost to a JVM restart).
 - `persistence/CommandRepository.java` — `PanacheRepositoryBase<Command, String>`; finders
-  `findByStatus`, `findByWorktree`, `listAllOrderByLaunchedAtDesc`.
+  `findByStatus`, `findByWorkspace`, `listAllOrderByLaunchedAtDesc`.
 - `dto/CommandDto.java` record + `mapper/CommandMapper.java` (`@Mapper(componentModel="jakarta")`;
-  flatten `worktree.worktreeId`, `worktree.repository.id`).
+  flatten `workspace.workspaceId`, `workspace.repository.id`).
 - `control/CommandRegistry.java` — `@ApplicationScoped`, `ConcurrentHashMap<commandId, CommandSession>`.
   `CommandSession` owns the `PtyProcess`, the single daemon reader thread, a bounded **raw-output ring
   buffer** (~256 KB) for replay, the set of attached `WebSocketConnection`s (output fan-out), the stdin
@@ -83,9 +83,9 @@ New `command/` domain area (BCE layout):
   EOF/exit: set `EXITED` + `exitCode` + `finishedAt`, drop the live session. `terminate()` =
   `destroyForcibly()` + `TERMINATED`. No timeout, no kill-on-detach. Resize with multiple concurrent
   viewers is last-writer-wins.
-- `control/CommandService.java` — `@ApplicationScoped`, `@Transactional`. `launch(repoId, worktreeId,
-  actionId)`: validate worktree (`existsByRepositoryAndWorktreeId`), derive path
-  `dataDir/repoId/worktrees/worktreeId`, capture `branch` (`getCurrentBranch`) + `commitHash`
+- `control/CommandService.java` — `@ApplicationScoped`, `@Transactional`. `launch(repoId, workspaceId,
+  actionId)`: validate workspace (`existsByRepositoryAndWorkspaceId`), derive path
+  `dataDir/repoId/workspaces/workspaceId`, capture `branch` (`getCurrentBranch`) + `commitHash`
   (`getCurrentCommit`), resolve action, persist `Command` (RUNNING), spawn via registry, return
   `CommandDto`. Also `launchAndAwait(...)` (blocks on exit; returns exit code + captured text to
   preserve the old synchronous `RunResult` contract); `terminate(id)`; `list(filters)`; `get(id)`.
@@ -93,7 +93,7 @@ New `command/` domain area (BCE layout):
   `INTERRUPTED`.
 - `GitExecutor.getCurrentCommit(Path)` → `git rev-parse HEAD` (trimmed).
 - `CommandController` (`service`, `command.api`), nested request/response records, in `openapi.yml`:
-  - `POST /api/commands` `{repoId, worktreeId, actionId}` → `CommandDto`
+  - `POST /api/commands` `{repoId, workspaceId, actionId}` → `CommandDto`
   - `POST /api/commands/{commandId}/terminate` → `CommandDto`
   - `GET /api/commands` (optional `?status=` / `?repoId=`)
   - `GET /api/commands/{commandId}`
@@ -104,14 +104,14 @@ New `command/` domain area (BCE layout):
 - Unify non-interactive: `ActionRunService.run` delegates to `CommandService.launchAndAwait` (keeps
   `RunResult` but leaves a `Command` row behind); `ResolveConflictService` launches a command and
   returns its `commandId`. *Verify exact run-now callers during implementation.*
-- Migration `V8__command.sql` — `command` table + FK to `worktree(id)`, mirroring
+- Migration `V8__command.sql` — `command` table + FK to `workspace(id)`, mirroring
   `V6__repository_action.sql` DDL style.
 
 ## Frontend (minimal — re-point the terminal route only)
 
 - `pnpm generate:api` → `commandController.service.ts`.
 - New command-centric terminal route `/commands/:commandId` (refactor `branch-terminal.page.ts` into a
-  command terminal page that fetches `GET /api/commands/{id}` for its header: repo / branch / worktree /
+  command terminal page that fetches `GET /api/commands/{id}` for its header: repo / branch / workspace /
   short commit / action / status).
 - `web-terminal.component.ts`: connect to `/api/terminal/commands/{commandId}`; `ngOnDestroy` closes the
   socket only (detach, no kill).
@@ -121,7 +121,7 @@ New `command/` domain area (BCE layout):
 ## Tests
 
 - `CommandServiceTest` (domain, `@QuarkusTest`, temp `data-dir` profile like `ResolveConflictServiceTest`):
-  launch a trivial `echo`/`sleep` action in a real cloned-fixture worktree; assert the `Command` row
+  launch a trivial `echo`/`sleep` action in a real cloned-fixture workspace; assert the `Command` row
   (FK, branch, commitHash, status RUNNING→EXITED, exitCode); assert detach does **not** terminate;
   assert `terminate()` flips status to TERMINATED; assert startup reconciliation flips stale
   RUNNING → INTERRUPTED.
@@ -134,7 +134,7 @@ New `command/` domain area (BCE layout):
 3. `./mvnw -pl service quarkus:dev`, seed, open a branch terminal, start `sleep 300; echo done`.
 4. Navigate away and back (or refresh) → the **same** process is still running, scrollback replays,
    output continues. (Previously this killed it.)
-5. `GET /api/commands` lists it RUNNING with the right worktree/branch/commit/action.
+5. `GET /api/commands` lists it RUNNING with the right workspace/branch/commit/action.
 6. `POST /api/commands/{id}/terminate` → process dies, status flips to TERMINATED.
 7. Restart the dev server with a command RUNNING → it returns as INTERRUPTED, not stuck RUNNING.
 

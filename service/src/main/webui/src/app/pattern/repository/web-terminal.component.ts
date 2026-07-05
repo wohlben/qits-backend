@@ -11,7 +11,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 
 /**
- * Smart component that renders a live PTY server-side (a process running in its worktree) over a
+ * Smart component that renders a live PTY server-side (a process running in its workspace) over a
  * WebSocket, with xterm.js. By default it attaches to a registry command by `commandId` (opening
  * the socket re-attaches — replaying scrollback — and closing it only detaches; the process keeps
  * running). Pass an explicit `socketPath` to point it at a different terminal endpoint — e.g. the

@@ -22,9 +22,9 @@ import { formatSnippetsForPrompt } from '@/shared/state/snippet-format';
 import { WavRecorder } from './wav-recorder';
 
 /**
- * The speak-to-prompt flow for a worktree: record speech (transcribed server-side by Parakeet),
+ * The speak-to-prompt flow for a workspace: record speech (transcribed server-side by Parakeet),
  * edit the transcript, have a small Claude model rewrite it into a coherent agent prompt, then
- * launch the worktree's agent with that prompt and jump to its chat.
+ * launch the workspace's agent with that prompt and jump to its chat.
  */
 @Component({
   selector: 'app-speak-to-prompt',
@@ -75,7 +75,7 @@ import { WavRecorder } from './wav-recorder';
           <textarea
             rows="6"
             class="rounded-md border bg-background p-2 text-sm"
-            placeholder="Press Record and describe what should happen in this worktree…"
+            placeholder="Press Record and describe what should happen in this workspace…"
             [value]="transcript()"
             (input)="transcript.set(transcriptArea.value)"
             #transcriptArea
@@ -170,7 +170,7 @@ import { WavRecorder } from './wav-recorder';
 })
 export class SpeakToPromptComponent {
   readonly repoId = input.required<string>();
-  readonly worktreeId = input.required<string>();
+  readonly workspaceId = input.required<string>();
   /** Off when a host (e.g. the chat dialog) renders the launched chat in place instead. */
   readonly navigateOnLaunch = input(true);
   /** Emits the launched command's id — always, whether or not we also navigate. */
@@ -223,9 +223,9 @@ export class SpeakToPromptComponent {
   readonly refineMutation = injectMutation(() => ({
     mutationFn: (transcript: string) =>
       lastValueFrom(
-        this.refinementService.apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost(
+        this.refinementService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost(
           this.repoId(),
-          this.worktreeId(),
+          this.workspaceId(),
           { transcript },
         ),
       ),
@@ -235,9 +235,9 @@ export class SpeakToPromptComponent {
   readonly launchMutation = injectMutation(() => ({
     mutationFn: (prompt: string) =>
       lastValueFrom(
-        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+        this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           this.repoId(),
-          this.worktreeId(),
+          this.workspaceId(),
           { scope: AgentMcpScope.Repository, initialContext: prompt },
         ),
       ),

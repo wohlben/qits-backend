@@ -4,9 +4,9 @@ import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
-import eu.wohlben.qits.domain.repository.entity.Worktree;
-import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
+import eu.wohlben.qits.domain.repository.entity.Workspace;
+import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -22,17 +22,17 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 /**
  * Turns a raw speech-to-text transcript into a coherent coding-agent prompt by running a one-shot
  * Claude call on a small model. The refinement is ephemeral — it runs as a {@code <runtime> exec}
- * into the worktree's container (via {@link ProcessExecutor}, so stdout/stderr stay separate and it
- * never shows up in command history), reusing the container's {@code claude} binary and the shared
- * credential volume. The container is provisioned on demand ({@link
- * WorktreeService#ensureContainer}) and the worktree context the model needs (branch, goal) is
+ * into the workspace's container (via {@link ProcessExecutor}, so stdout/stderr stay separate and
+ * it never shows up in command history), reusing the container's {@code claude} binary and the
+ * shared credential volume. The container is provisioned on demand ({@link
+ * WorkspaceService#ensureContainer}) and the workspace context the model needs (branch, goal) is
  * passed explicitly in the meta-prompt.
  */
 @ApplicationScoped
 public class PromptRefinementService {
 
-  /** Worktree ids are path segments, so they must be strict slugs (mirrors WorktreeService). */
-  private static final Pattern WORKTREE_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+  /** Workspace ids are path segments, so they must be strict slugs (mirrors WorkspaceService). */
+  private static final Pattern WORKSPACE_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
   private static final Duration TIMEOUT = Duration.ofSeconds(120);
 
@@ -40,9 +40,9 @@ public class PromptRefinementService {
       """
       You rewrite raw speech-to-text transcripts into prompts for an autonomous coding agent.
 
-      The transcript below was dictated by a developer describing work to do in a git worktree.
-      Worktree branch: %s
-      Worktree goal (preamble):
+      The transcript below was dictated by a developer describing work to do in a workspace.
+      Workspace branch: %s
+      Workspace goal (preamble):
       %s
 
       Rewrite the transcript into a clear, imperative task prompt for the coding agent:
@@ -59,9 +59,9 @@ public class PromptRefinementService {
 
   @Inject ProcessExecutor processExecutor;
 
-  @Inject WorktreeRepository worktreeRepository;
+  @Inject WorkspaceRepository workspaceRepository;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject ContainerRuntime containers;
 
@@ -71,19 +71,19 @@ public class PromptRefinementService {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
-  /** Refines {@code transcript} into a coding-agent prompt, contextualized by the worktree. */
-  public String refine(String repoId, String worktreeId, String transcript) {
+  /** Refines {@code transcript} into a coding-agent prompt, contextualized by the workspace. */
+  public String refine(String repoId, String workspaceId, String transcript) {
     if (transcript == null || transcript.isBlank()) {
       throw new BadRequestException("transcript is required");
     }
-    if (!WORKTREE_ID_PATTERN.matcher(worktreeId == null ? "" : worktreeId).matches()) {
-      throw new BadRequestException("Invalid worktree id: " + worktreeId);
+    if (!WORKSPACE_ID_PATTERN.matcher(workspaceId == null ? "" : workspaceId).matches()) {
+      throw new BadRequestException("Invalid workspace id: " + workspaceId);
     }
 
-    WorktreeContext context = worktreeContext(repoId, worktreeId);
+    WorkspaceContext context = workspaceContext(repoId, workspaceId);
     // Provision the container on demand — the refinement runs claude inside it, using the shared
     // credential volume, so a stopped container is re-materialized rather than failing.
-    worktreeService.ensureContainer(repoId, worktreeId);
+    workspaceService.ensureContainer(repoId, workspaceId);
 
     String metaPrompt =
         META_PROMPT.formatted(
@@ -95,7 +95,7 @@ public class PromptRefinementService {
     LaunchSpec spec =
         CodingAgentFactory.ofType(AgentType.CLAUDE).model(refinementModel).run(metaPrompt);
 
-    // Run inside the worktree container: docker exec -w /workspace -e HOME=<claude-mount> … bash
+    // Run inside the workspace container: docker exec -w /workspace -e HOME=<claude-mount> … bash
     // -lc
     // <claude>. Driving it through ProcessExecutor (rather than ContainerRuntime.exec) keeps stdout
     // separate from stderr — the refined prompt is stdout only — and preserves timeout handling.
@@ -103,7 +103,7 @@ public class PromptRefinementService {
     if (claudeMount != null && !claudeMount.isBlank()) {
       env.put("HOME", claudeMount);
     }
-    String container = containers.containerName(worktreeId, repoId);
+    String container = containers.containerName(workspaceId, repoId);
     List<String> argv = new ArrayList<>(containers.execArgv(container, false, "/workspace", env));
     argv.add("bash");
     argv.add("-lc");
@@ -127,27 +127,27 @@ public class PromptRefinementService {
     return prompt;
   }
 
-  private record WorktreeContext(String branch, String preamble) {}
+  private record WorkspaceContext(String branch, String preamble) {}
 
   /**
-   * The worktree's branch and preamble, read in one transaction; 404 if the worktree doesn't exist.
-   * The branch comes from the stored column (there is no host checkout to read it from); it falls
-   * back to the worktree id for a row that predates the stored branch.
+   * The workspace's branch and preamble, read in one transaction; 404 if the workspace doesn't
+   * exist. The branch comes from the stored column (there is no host checkout to read it from); it
+   * falls back to the workspace id for a row that predates the stored branch.
    */
-  private WorktreeContext worktreeContext(String repoId, String worktreeId) {
+  private WorkspaceContext workspaceContext(String repoId, String workspaceId) {
     return QuarkusTransaction.requiringNew()
         .call(
             () -> {
-              Worktree worktree =
-                  worktreeRepository
-                      .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+              Workspace workspace =
+                  workspaceRepository
+                      .findActiveByRepositoryAndWorkspaceId(repoId, workspaceId)
                       .orElseThrow(
-                          () -> new NotFoundException("Worktree not found: " + worktreeId));
+                          () -> new NotFoundException("Workspace not found: " + workspaceId));
               String branch =
-                  worktree.branch == null || worktree.branch.isBlank()
-                      ? worktreeId
-                      : worktree.branch;
-              return new WorktreeContext(branch, worktree.preamble);
+                  workspace.branch == null || workspace.branch.isBlank()
+                      ? workspaceId
+                      : workspace.branch;
+              return new WorkspaceContext(branch, workspace.preamble);
             });
   }
 

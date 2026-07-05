@@ -4,7 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
 /**
- * One additional log source of a daemon definition: a file in the worktree whose lines are tailed
+ * One additional log source of a daemon definition: a file in the workspace whose lines are tailed
  * ({@code tail -F} semantics) and fed to the daemon's observers alongside the process output. Every
  * daemon implicitly observes its process output; only FILE sources are stored, so this embeddable
  * carries no kind column. Stored as an element collection on each definition subclass (same split
@@ -13,7 +13,7 @@ import jakarta.persistence.Embeddable;
 @Embeddable
 public class LogSource {
 
-  /** Worktree-relative path of the tailed file; validated against traversal at definition time. */
+  /** Workspace-relative path of the tailed file; validated against traversal at definition time. */
   @Column(nullable = false, length = 1024)
   public String path;
 

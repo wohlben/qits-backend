@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/angular-query-experimental';
 
 /**
- * Invalidates every cached query scoped to a repository. Sync status, branches, worktrees, the
+ * Invalidates every cached query scoped to a repository. Sync status, branches, workspaces, the
  * repository entity and commit logs all key on the repo id, so any action that mutates repository
  * state (pull/sync/push, branch off, integrate, abandon, delete, set main branch) refreshes the
  * whole repository page at once instead of just the caller's own slice — which otherwise leaves

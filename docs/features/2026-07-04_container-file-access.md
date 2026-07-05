@@ -1,10 +1,10 @@
-# Container file access: the worktree file browser reads through `docker exec` (Phase 2)
+# Container file access: the workspace file browser reads through `docker exec` (Phase 2)
 
 ## Introduction
 
-With [workspace containers](2026-07-04_workspace-containers.md) (Phase 1) a worktree's working tree
-lives inside its container under `/workspace`, not on the host — but `WorktreeFilesService` still read
-host paths via `java.nio.file`. For a real container-backed worktree that host path doesn't exist, so
+With [workspace containers](2026-07-04_workspace-containers.md) (Phase 1) a workspace's working tree
+lives inside its container under `/workspace`, not on the host — but `WorkspaceFilesService` still read
+host paths via `java.nio.file`. For a real container-backed workspace that host path doesn't exist, so
 the browser only worked in tests (where `FakeContainerRuntime` happens to materialize the container as
 a host clone at the old path). This phase reroutes every browser read through `docker exec` so the
 tree shows the container's **actual live working tree**, uncommitted changes included. The
@@ -17,35 +17,35 @@ Related/dependent plans:
   container, `DockerExecutor`/`ContainerRuntime`, and exec mechanics all come from there. Phase 3
   ([container-agent-sessions](../feature-ideas/container-agent-sessions.md)) is independent of this
   phase.
-- Reroutes the read path under the [worktree file browser](2026-07-02_worktree-file-browser.md) and
+- Reroutes the read path under the [workspace file browser](2026-07-02_workspace-file-browser.md) and
   everything layered on it: [framework-aware display](2026-07-03_framework-aware-file-browser.md),
   [lazy directory exploration](2026-07-03_lazy-directory-exploration.md),
-  [smart file display](2026-07-03_worktree-smart-file-display.md),
-  [tree path compaction](2026-07-03_worktree-tree-path-compaction.md), and the
-  [ordered filter rules](2026-07-03_worktree-filter-ordered-rules-and-ignorelists.md). All operate on
-  the DTOs `WorktreeFilesService` produces — the goal was that none of them notice the change, and
+  [smart file display](2026-07-03_workspace-smart-file-display.md),
+  [tree path compaction](2026-07-03_workspace-tree-path-compaction.md), and the
+  [ordered filter rules](2026-07-03_workspace-filter-ordered-rules-and-ignorelists.md). All operate on
+  the DTOs `WorkspaceFilesService` produces — the goal was that none of them notice the change, and
   none do.
-- The [worktree chat dialog](2026-07-04_worktree-chat-dialog.md) sits on the same detail route.
+- The [workspace chat dialog](2026-07-04_workspace-chat-dialog.md) sits on the same detail route.
 
 ## What was built
 
-### The `WorktreeFileAccess` seam (`domain`)
+### The `WorkspaceFileAccess` seam (`domain`)
 
-A new interface `repository.control.WorktreeFileAccess` owns the small set of read-only primitives the
+A new interface `repository.control.WorkspaceFileAccess` owns the small set of read-only primitives the
 browser needs, decoupled from *where* the files live:
 
-- `git(repoId, worktreeId, args…)` — a git subcommand in the worktree root (`ls-files` for the eager
+- `git(repoId, workspaceId, args…)` — a git subcommand in the workspace root (`ls-files` for the eager
   list and the lazy-directory boundary).
-- `stat(repoId, worktreeId, path)` — type (`FILE`/`DIRECTORY`/`SYMLINK`/`OTHER`/`MISSING`, symlinks
+- `stat(repoId, workspaceId, path)` — type (`FILE`/`DIRECTORY`/`SYMLINK`/`OTHER`/`MISSING`, symlinks
   **unfollowed**) + byte size of a single path.
-- `list(repoId, worktreeId, dir)` — a directory one level deep, each subdirectory carrying its
+- `list(repoId, workspaceId, dir)` — a directory one level deep, each subdirectory carrying its
   immediate `childCount`.
-- `childCount(repoId, worktreeId, dir)` — the cheap immediate-child count.
-- `read(repoId, worktreeId, path)` — a regular file's **raw bytes**.
+- `childCount(repoId, workspaceId, dir)` — the cheap immediate-child count.
+- `read(repoId, workspaceId, path)` — a regular file's **raw bytes**.
 
 The single production impl `ContainerFileAccess` (`@ApplicationScoped`) runs these through
-`ContainerRuntime` — the sibling of `WorktreeService.containerGit`. Every command runs with workdir
-`/workspace` and worktree-relative paths, prefixed `./` when handed to `find` so a leading-dash
+`ContainerRuntime` — the sibling of `WorkspaceService.containerGit`. Every command runs with workdir
+`/workspace` and workspace-relative paths, prefixed `./` when handed to `find` so a leading-dash
 filename can't be misread as a flag:
 
 - **Directory listing** is one `find ./<dir> -maxdepth 2 -mindepth 1 -printf '%d\t%y\t%s\t%p\n'` exec;
@@ -58,21 +58,21 @@ filename can't be misread as a flag:
   `execArgv` + `cat -- <path>`, discards stderr, and reads the process's raw stdout. No TTY, so bytes
   survive exactly.
 
-### `WorktreeFilesService` → pure orchestration + policy (`domain`)
+### `WorkspaceFilesService` → pure orchestration + policy (`domain`)
 
-The service no longer touches `java.nio.file` or `GitExecutor`. It injects `WorktreeFileAccess` and
+The service no longer touches `java.nio.file` or `GitExecutor`. It injects `WorkspaceFileAccess` and
 keeps only orchestration, sorting and path-safety **policy**; the DTOs (`Listing`, `LazyDir`,
-`WorktreeFileContentDto`), the controller, mappers and the whole frontend are byte-identical.
+`WorkspaceFileContentDto`), the controller, mappers and the whole frontend are byte-identical.
 
-- **Validation** now requires the repo row, an active worktree row, and the worktree's **container to
+- **Validation** now requires the repo row, an active workspace row, and the workspace's **container to
   exist** (replacing the old on-disk existence check).
 - **Path safety** is three layers: a lexical guard (`requireSafeRelativePath`: reject absolute paths,
   any `..` segment, NUL); outright rejection of a **final-segment** symlink via the `stat` lstat
   (`SYMLINK` → 400); and a **full-path containment** check (`resolvesInsideRoot`) that `realpath -e`s
   the whole path — following *every* segment — and rejects it unless it still resolves under the
-  worktree root. That last layer is essential: the lstat only vets the final component, but an
+  workspace root. That last layer is essential: the lstat only vets the final component, but an
   **intermediate** symlinked directory (`linkdir/ -> /etc` in `linkdir/passwd`) is transparently
-  followed by the kernel during path resolution, so without it `find`/`cat` would escape the worktree.
+  followed by the kernel during path resolution, so without it `find`/`cat` would escape the workspace.
   It compares against the *resolved* root (not a literal `/workspace`) so it stays correct under the
   test fake, where the container is a host clone at a different path. (The old host code got this from
   `toRealPath()`; the container reimplementation initially regressed it — restored here, caught by a
@@ -83,7 +83,7 @@ keeps only orchestration, sorting and path-safety **policy**; the DTOs (`Listing
 ### `LazyDirectoryStrategy` (`domain`)
 
 The pluggable seam's contract moved from host-oriented `lazyDirectories(Path, GitExecutor)` to
-`lazyDirectories(repoId, worktreeId, WorktreeFileAccess)`. The default `GitignoreLazyDirectoryStrategy`
+`lazyDirectories(repoId, workspaceId, WorkspaceFileAccess)`. The default `GitignoreLazyDirectoryStrategy`
 becomes one `access.git(… "ls-files","--others","--ignored","--exclude-standard","--directory",
 "--no-empty-directory")` call; its trailing-slash filter/strip/sort logic is untouched.
 
@@ -100,8 +100,8 @@ becomes one `access.git(… "ls-files","--others","--ignored","--exclude-standar
 
 ## Testing
 
-- **`WorktreeControllerTest` (26 cases) passes unchanged** — the "nothing above notices" proof. It
-  creates the main worktree via `FakeContainerRuntime` (a host clone at the worktree path) and writes
+- **`WorkspaceControllerTest` (26 cases) passes unchanged** — the "nothing above notices" proof. It
+  creates the main workspace via `FakeContainerRuntime` (a host clone at the workspace path) and writes
   files there; routing through `access` now runs real `find`/`cat`/`git` against that clone. Every
   case still holds: untracked file listed, text content (trailing newline included), NUL→binary,
   `..`→400, symlink-escape→400, missing→404, gitignored lazy stub + `childCount`, one-level lazy
@@ -109,7 +109,7 @@ becomes one `access.git(… "ls-files","--others","--ignored","--exclude-standar
 - **`ContainerFileAccessTest`** unit-tests the pure `parseFindListing`: leading-`./` stripping,
   depth-2 child counting, names with spaces/unicode, symlink/other types, empty dirs, malformed lines.
 - **`GitignoreLazyDirectoryStrategyTest`** updated to the new signature via a tiny in-test
-  `WorktreeFileAccess` that shells real git in a `@TempDir`.
+  `WorkspaceFileAccess` that shells real git in a `@TempDir`.
 - **`ContainerFileBrowserIT`** (extended, `@Tag("extended")`, self-skips without docker) — verified
   against a **real container + the `qits/workspace` image**: `stat`/`list`/`childCount`/`read`/`git`
   match the working tree, a binary file with an embedded NUL round-trips byte-identical, and an

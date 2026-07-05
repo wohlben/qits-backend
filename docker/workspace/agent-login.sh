@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# One-time coding-agent login. qits runs the coding agent (Claude Code) inside each per-worktree
+# One-time coding-agent login. qits runs the coding agent (Claude Code) inside each per-workspace
 # container; the agent reads its credentials from a shared named volume mounted at /claude-home
 # (HOME) in every container. This script does the interactive OAuth login ONCE, writing ~/.claude
-# onto that volume so every worktree container can authenticate without any credential at rest in
+# onto that volume so every workspace container can authenticate without any credential at rest in
 # the image or per-session env.
 #
 # Run it after building the image (docker build -t qits/workspace docker/workspace) and re-run it
 # whenever you need to re-authenticate. It runs as your host uid so the credential files it writes
-# are owned by the same uid the worktree containers run as.
+# are owned by the same uid the workspace containers run as.
 #
 # Config (must match the qits app):
 #   QITS_WORKSPACE_IMAGE         default qits/workspace:latest   (qits.workspace.image)

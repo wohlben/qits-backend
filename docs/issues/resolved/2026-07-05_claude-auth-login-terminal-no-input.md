@@ -5,7 +5,7 @@
 Related / dependent plans:
 
 - `docs/features/2026-07-04_container-agent-sessions.md` — the shared-credential-volume login model.
-- `docs/features/2026-07-04_workspace-containers.md` — the per-worktree container execution model (the login terminal is one such container command).
+- `docs/features/2026-07-04_workspace-containers.md` — the per-workspace container execution model (the login terminal is one such container command).
 - `docs/features/2026-07-01_coding-agent-harness.md` — the coding-agent code path that triggers the login redirect.
 - `docker/workspace/agent-login.sh` — the host-side one-time login script, which had the same wrong command.
 

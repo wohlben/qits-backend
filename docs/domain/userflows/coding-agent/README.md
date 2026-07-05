@@ -1,11 +1,11 @@
 # Coding Agent
 
-A coding agent is an AI agent (today: Claude Code) that QITS launches into a worktree to do or configure work. Agents are a first-class concept — not specially-typed actions: a harness abstraction assembles each launch from composable capabilities (scoped tool servers, tool allowlists, an initial prompt, a model choice), and every invocation across the application goes through it.
+A coding agent is an AI agent (today: Claude Code) that QITS launches into a workspace to do or configure work. Agents are a first-class concept — not specially-typed actions: a harness abstraction assembles each launch from composable capabilities (scoped tool servers, tool allowlists, an initial prompt, a model choice), and every invocation across the application goes through it.
 
 What makes an agent launch meaningful is its **scope** — the tool server it is connected to:
 
 - **Actions scope** — the agent manages the repository's runnable actions (creating and tuning repository-scoped action configurations).
-- **Repository scope** — the agent works one repository: branches, worktrees, commits, running actions, integrating changes.
+- **Repository scope** — the agent works one repository: branches, workspaces, commits, running actions, integrating changes.
 - **Project scope** — the same working surface across all of a project's repositories.
 
 Agents are granted read tools without prompts; sessions run auto-approved so they can actually make changes.

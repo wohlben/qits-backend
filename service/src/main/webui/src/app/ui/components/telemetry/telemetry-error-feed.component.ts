@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TelemetryErrorGroupDto } from '@/api/model/telemetryErrorGroupDto';
 
 /**
- * The recent-errors feed of the worktree telemetry tab: one card per trace, showing its
+ * The recent-errors feed of the workspace telemetry tab: one card per trace, showing its
  * error-status spans (with any structured exception events) and correlated ERROR logs. Clicking a
  * group emits its traceId so the parent can load the full trace.
  */

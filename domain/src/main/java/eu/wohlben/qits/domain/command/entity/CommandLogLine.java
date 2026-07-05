@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 /**
  * One captured line of a command's interaction — the MitM audit log. Lines are high-volume, so this
  * uses a generated surrogate {@code Long} id from a sequence (like {@link
- * eu.wohlben.qits.domain.repository.entity.Worktree}) rather than a UUID. {@code sequence} is a
+ * eu.wohlben.qits.domain.repository.entity.Workspace}) rather than a UUID. {@code sequence} is a
  * monotonic per-command counter (assigned at capture time across both channels) that gives a stable
  * total order even when two lines share a timestamp.
  */

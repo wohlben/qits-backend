@@ -3,8 +3,8 @@ package eu.wohlben.qits.domain.repository.control;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import eu.wohlben.qits.domain.repository.control.WorktreeFileAccess.Entry;
-import eu.wohlben.qits.domain.repository.control.WorktreeFileAccess.EntryType;
+import eu.wohlben.qits.domain.repository.control.WorkspaceFileAccess.Entry;
+import eu.wohlben.qits.domain.repository.control.WorkspaceFileAccess.EntryType;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

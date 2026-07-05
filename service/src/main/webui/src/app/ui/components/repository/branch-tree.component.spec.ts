@@ -14,7 +14,7 @@ function tree(behind: number, ahead: number, conflictsWithParent = false): Branc
           key: 'feature/x',
           label: 'feature/x',
           data: {
-            worktreeId: 'x',
+            workspaceId: 'x',
             branch: 'feature/x',
             parent: 'master',
             ahead,
@@ -77,7 +77,7 @@ describe('BranchTreeComponent', () => {
     // behind 2, ahead 5, no conflict → behind, not a conflict, so the count is a popover trigger.
     fixture.componentRef.setInput('nodes', tree(2, 5, false));
     fixture.componentRef.setInput('repoId', 'r1');
-    let updated: { worktreeId?: string } | undefined;
+    let updated: { workspaceId?: string } | undefined;
     fixture.componentInstance.update.subscribe((w) => (updated = w));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -111,23 +111,23 @@ describe('BranchTreeComponent', () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     const component = fixture.componentInstance;
 
-    let updated: { worktreeId?: string } | undefined;
-    let fastForwarded: { worktreeId?: string } | undefined;
+    let updated: { workspaceId?: string } | undefined;
+    let fastForwarded: { workspaceId?: string } | undefined;
     component.update.subscribe((w) => (updated = w));
     component.fastForward.subscribe((w) => (fastForwarded = w));
 
     // Diverged (ahead + behind) → the footer offers a merge.
-    const diverged = { worktreeId: 'd', branch: 'd', parent: 'master', behind: 2, ahead: 5 };
+    const diverged = { workspaceId: 'd', branch: 'd', parent: 'master', behind: 2, ahead: 5 };
     expect(component.actionLabel(diverged)).toContain('Merge');
     component.runAction(diverged);
-    expect(updated?.worktreeId).toBe('d');
+    expect(updated?.workspaceId).toBe('d');
     expect(fastForwarded).toBeUndefined();
 
     // Only behind → the footer offers a fast-forward.
-    const behindOnly = { worktreeId: 'b', branch: 'b', parent: 'master', behind: 2, ahead: 0 };
+    const behindOnly = { workspaceId: 'b', branch: 'b', parent: 'master', behind: 2, ahead: 0 };
     expect(component.actionLabel(behindOnly)).toContain('Fast-forward');
     component.runAction(behindOnly);
-    expect(fastForwarded?.worktreeId).toBe('b');
+    expect(fastForwarded?.workspaceId).toBe('b');
 
     // Running the action closes the popover.
     expect(component.openBranch()).toBeNull();
@@ -148,7 +148,7 @@ describe('BranchTreeComponent', () => {
     expect(component.openBranch()).toBeNull();
   });
 
-  it('summarizes a plain (non-worktree) branch against main, integrate-only', () => {
+  it('summarizes a plain (non-workspace) branch against main, integrate-only', () => {
     const fixture = TestBed.createComponent(BranchTreeComponent);
     const c = fixture.componentInstance;
     fixture.componentRef.setInput('branchSummaries', {
@@ -160,9 +160,9 @@ describe('BranchTreeComponent', () => {
     const s = c.nodeSummary(plain)!;
     expect(s.parent).toBe('master');
     expect(s.ahead).toBe(3);
-    expect(s.worktree).toBeNull();
+    expect(s.workspace).toBeNull();
     expect(c.hasTrigger(s)).toBe(true); // ahead > 0 → Forward tab / Integrate
-    expect(c.showConflict(s)).toBe(false); // no worktree → never the conflict icon
+    expect(c.showConflict(s)).toBe(false); // no workspace → never the conflict icon
 
     // The main branch has no parent → nothing to compare → no connector.
     const main = { key: 'master', label: 'master', data: null, children: [] } as BranchTreeNode;
@@ -231,10 +231,10 @@ describe('BranchTreeComponent', () => {
 
     const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
     buttons
-      .find((b) => b.textContent?.includes('Branch off worktree') && b.closest('[title]') === null)
+      .find((b) => b.textContent?.includes('Branch off workspace') && b.closest('[title]') === null)
       ?.click();
     // a branch-off button exists for every card; just assert the event carries a branch name
-    buttons.find((b) => b.textContent?.includes('Branch off worktree'))!.click();
+    buttons.find((b) => b.textContent?.includes('Branch off workspace'))!.click();
     expect(typeof branchedOff).toBe('string');
   });
 });

@@ -2,7 +2,7 @@ package eu.wohlben.qits.mcp;
 
 import eu.wohlben.qits.domain.featureflow.mcp.RepositoryScope;
 import eu.wohlben.qits.domain.repository.mcp.ProjectScope;
-import eu.wohlben.qits.domain.telemetry.mcp.WorktreeScope;
+import eu.wohlben.qits.domain.telemetry.mcp.WorkspaceScope;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -53,20 +53,20 @@ public class ContextServerRegistry {
         new ContextServer(
             "repository",
             "Branches, commits and diffs of a project's repositories, plus the actions on them:"
-                + " branch off a worktree, clean up a branch, integrate a branch, and merge a"
-                + " parent (e.g. master) into a worktree. Also owns the repositories' daemons —"
+                + " branch off a workspace, clean up a branch, integrate a branch, and merge a"
+                + " parent (e.g. master) into a workspace. Also owns the repositories' daemons —"
                 + " long-running processes such as a dev server: define/edit them and start/stop"
-                + " them in a worktree. Sessions additionally narrowed to a worktree (the '"
-                + WorktreeScope.WORKTREE_HEADER
-                + "' header or '?worktreeId=') also get the telemetry* tools: structured spans,"
-                + " logs and metrics exported by the worktree's instrumented processes.",
+                + " them in a workspace. Sessions additionally narrowed to a workspace (the '"
+                + WorkspaceScope.WORKSPACE_HEADER
+                + "' header or '?workspaceId=') also get the telemetry* tools: structured spans,"
+                + " logs and metrics exported by the workspace's instrumented processes.",
             repositoryPath,
             repositoryPath + "/sse",
             ProjectScope.PROJECT_HEADER,
             true),
         new ContextServer(
             "actions",
-            "CRUD over actions: the preconfigured processes worktrees can run (an interactive"
+            "CRUD over actions: the preconfigured processes workspaces can run (an interactive"
                 + " shell/Claude Code, or a one-off command like 'mvn test'). Unscoped, it manages"
                 + " the global library (the *GlobalAction tools). Send the '"
                 + RepositoryScope.REPOSITORY_HEADER

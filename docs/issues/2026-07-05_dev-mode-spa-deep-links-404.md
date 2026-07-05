@@ -4,7 +4,7 @@
 
 Found while browser-verifying the
 [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) — the E2E flow needed to
-open `/repositories/{id}/worktrees/{id}` directly. Not caused by that feature: reproduced with the
+open `/repositories/{id}/workspaces/{id}` directly. Not caused by that feature: reproduced with the
 `/daemon` route unregistered and `quarkus.quinoa.ignored-path-prefixes` reverted to
 `/api,/mcp,/git`. No other plans depend on this; it only affects dev-mode deep links, and
 client-side navigation from `/` works.

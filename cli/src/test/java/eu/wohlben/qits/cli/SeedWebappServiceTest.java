@@ -18,10 +18,10 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseAction;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
-import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
+import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
-import eu.wohlben.qits.domain.repository.entity.WorktreeStatus;
+import eu.wohlben.qits.domain.repository.entity.WorkspaceStatus;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -50,7 +50,7 @@ public class SeedWebappServiceTest {
 
   @Inject SeedWebappService seedWebappService;
   @Inject ProjectService projectService;
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
   @Inject RepositoryDaemonService repositoryDaemonService;
   @Inject FeatureFlowConfigurationService featureFlowConfigurationService;
   @Inject FeatureFlowPhaseService featureFlowPhaseService;
@@ -71,8 +71,8 @@ public class SeedWebappServiceTest {
     assertNotNull(first, "first seed should create the repository");
 
     // Idempotent by reset: a second run tears the prior project down and recreates it, so there is
-    // still exactly one project and its worktrees/daemons/feature-flows are back to the known-good
-    // state (not duplicated, not "already exists" errors from re-creating the same worktree ids).
+    // still exactly one project and its workspaces/daemons/feature-flows are back to the known-good
+    // state (not duplicated, not "already exists" errors from re-creating the same workspace ids).
     Repository second = seedWebappService.seed();
     assertNotNull(second);
     assertEquals(
@@ -93,7 +93,7 @@ public class SeedWebappServiceTest {
     assertEquals("main", repo.mainBranch, "fixture's default branch is 'main'");
 
     assertObservableDaemon(repo.id);
-    assertGreetingWorktree(repo.id);
+    assertGreetingWorkspace(repo.id);
     assertBuildAndVerifyFeatureFlow(project.id);
   }
 
@@ -117,16 +117,16 @@ public class SeedWebappServiceTest {
         "should tail the quarkus.log file source");
   }
 
-  /** A plain feature worktree off feature/greeting exists and is active. */
-  private void assertGreetingWorktree(String repoId) {
-    WorktreeDto greeting =
-        worktreeService.listWorktrees(repoId).stream()
-            .filter(wt -> "greeting".equals(wt.worktreeId()))
+  /** A plain feature workspace off feature/greeting exists and is active. */
+  private void assertGreetingWorkspace(String repoId) {
+    WorkspaceDto greeting =
+        workspaceService.listWorkspaces(repoId).stream()
+            .filter(wt -> "greeting".equals(wt.workspaceId()))
             .findFirst()
             .orElse(null);
-    assertNotNull(greeting, "greeting worktree should exist");
-    assertEquals(WorktreeStatus.ACTIVE, greeting.status(), "greeting worktree should be active");
-    assertEquals("greeting", greeting.branch(), "greeting worktree owns the 'greeting' branch");
+    assertNotNull(greeting, "greeting workspace should exist");
+    assertEquals(WorkspaceStatus.ACTIVE, greeting.status(), "greeting workspace should be active");
+    assertEquals("greeting", greeting.branch(), "greeting workspace owns the 'greeting' branch");
   }
 
   /** The seeded feature-flow renders as Development → Build (prereq) / Lint (parallel) / Test. */

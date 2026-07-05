@@ -18,10 +18,10 @@ import { ActionConfigurationControllerService } from '@/api/api/actionConfigurat
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
-import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
-import { WorktreeDto } from '@/api/model/worktreeDto';
+import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 import { ZardSelectImports } from '@/shared/components/select/select.imports';
@@ -35,7 +35,7 @@ import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-fie
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
 import { invalidateRepository } from './invalidate-repository';
 
-interface CreateWorktreeForm {
+interface CreateWorkspaceForm {
   id: string;
   branch: string;
 }
@@ -56,9 +56,9 @@ interface CreateWorktreeForm {
     <div class="flex flex-col gap-4">
       <h2 class="text-lg font-semibold">Branches</h2>
 
-      @if (branchesQuery.isPending() || worktreesQuery.isPending()) {
+      @if (branchesQuery.isPending() || workspacesQuery.isPending()) {
         <div class="text-sm text-muted-foreground">Loading branches…</div>
-      } @else if (branchesQuery.isError() || worktreesQuery.isError()) {
+      } @else if (branchesQuery.isError() || workspacesQuery.isError()) {
         <div class="text-sm text-destructive">Failed to load branches</div>
       } @else {
         @let branchRows = treeNodes();
@@ -77,7 +77,7 @@ interface CreateWorktreeForm {
             (viewCommits)="viewCommits($event)"
             (ensureContainer)="onEnsureContainer($event)"
             (stopContainer)="onStopContainer($event)"
-            (openWorktree)="openWorktree($event)"
+            (openWorkspace)="openWorkspace($event)"
             (run)="openRun($event)"
             (configureWithClaude)="configureWithClaude($event)"
             (resolveConflict)="openResolveConflict($event)"
@@ -115,21 +115,21 @@ interface CreateWorktreeForm {
     <!-- Branch off (create) -->
     <ng-template #createTpl>
       <p class="text-sm text-muted-foreground">
-        Fork a new worktree from <span class="font-medium">{{ ui().parent }}</span
-        >. The worktree gets its own branch so it never shares commits with another worktree.
+        Fork a new workspace from <span class="font-medium">{{ ui().parent }}</span
+        >. The workspace gets its own branch so it never shares commits with another workspace.
       </p>
       <form (submit)="onCreate($event)" class="flex flex-col gap-3">
         <app-form-field-layout
           [field]="createForm.id"
-          id="worktree-id"
-          label="Worktree ID"
+          id="workspace-id"
+          label="Workspace ID"
           autocomplete="off"
         />
 
         <app-form-field-layout
           [field]="createForm.branch"
-          id="worktree-new-branch"
-          label="New branch name (defaults to worktree ID)"
+          id="workspace-new-branch"
+          label="New branch name (defaults to workspace ID)"
           autocomplete="off"
         />
 
@@ -138,7 +138,7 @@ interface CreateWorktreeForm {
           <textarea
             rows="4"
             class="rounded-md border bg-background p-2 text-sm"
-            placeholder="Why this worktree exists and what 'done' means…"
+            placeholder="Why this workspace exists and what 'done' means…"
             [value]="createPreamble()"
             (input)="createPreamble.set(preambleArea.value)"
             #preambleArea
@@ -150,7 +150,7 @@ interface CreateWorktreeForm {
           <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
         </div>
         @if (createMutation.isError()) {
-          <span class="text-sm text-destructive">Failed to create worktree</span>
+          <span class="text-sm text-destructive">Failed to create workspace</span>
         }
       </form>
     </ng-template>
@@ -195,7 +195,7 @@ interface CreateWorktreeForm {
           <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
         </div>
         @if (mergeMutation.isError()) {
-          <span class="text-sm text-destructive">Failed to integrate worktree</span>
+          <span class="text-sm text-destructive">Failed to integrate workspace</span>
         }
       </form>
     </ng-template>
@@ -203,15 +203,15 @@ interface CreateWorktreeForm {
     <!-- Abandon (discard) -->
     <ng-template #abandonTpl>
       <p class="text-sm text-muted-foreground">
-        Discard <span class="font-medium">{{ ui().selected?.worktreeId }}</span
-        >? The worktree and its branch are removed, but it stays in the repository history.
+        Discard <span class="font-medium">{{ ui().selected?.workspaceId }}</span
+        >? The workspace and its branch are removed, but it stays in the repository history.
       </p>
       <label class="mb-3 flex flex-col gap-1 text-sm">
         <span class="font-medium">Reason / result (markdown, optional)</span>
         <textarea
           rows="3"
           class="rounded-md border bg-background p-2 text-sm"
-          placeholder="Why abandon this worktree…"
+          placeholder="Why abandon this workspace…"
           [value]="abandonResult()"
           (input)="abandonResult.set(abandonResultArea.value)"
           #abandonResultArea
@@ -229,7 +229,7 @@ interface CreateWorktreeForm {
         <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
       </div>
       @if (discardMutation.isError()) {
-        <span class="text-sm text-destructive">Failed to abandon worktree</span>
+        <span class="text-sm text-destructive">Failed to abandon workspace</span>
       }
     </ng-template>
 
@@ -255,12 +255,12 @@ interface CreateWorktreeForm {
       }
     </ng-template>
 
-    <!-- Resolve merge conflict (fork a worktree + have Claude merge the parent in and fix it) -->
+    <!-- Resolve merge conflict (fork a workspace + have Claude merge the parent in and fix it) -->
     <ng-template #resolveTpl>
       <p class="text-sm text-muted-foreground">
-        <span class="font-medium">{{ ui().selected?.worktreeId }}</span> has diverged from
+        <span class="font-medium">{{ ui().selected?.workspaceId }}</span> has diverged from
         <span class="font-medium">{{ ui().selected?.parent }}</span> with conflicts. Resolving forks
-        a new worktree off this branch and runs Claude to merge
+        a new workspace off this branch and runs Claude to merge
         <span class="font-medium">{{ ui().selected?.parent }}</span> in and fix the conflicts.
       </p>
 
@@ -295,7 +295,7 @@ interface CreateWorktreeForm {
       }
     </ng-template>
 
-    <!-- Run… (pick a preconfigured action to run in the worktree) -->
+    <!-- Run… (pick a preconfigured action to run in the workspace) -->
     <ng-template #runTpl>
       <p class="text-sm text-muted-foreground">
         Pick an action to run in <span class="font-medium">{{ ui().branch }}</span
@@ -340,7 +340,7 @@ interface CreateWorktreeForm {
 export class BranchListComponent {
   readonly repoId = input.required<string>();
 
-  private readonly worktreeService = inject(WorktreeControllerService);
+  private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly repositoryService = inject(RepositoryControllerService);
   private readonly actionConfigService = inject(ActionConfigurationControllerService);
   private readonly commandService = inject(CommandControllerService);
@@ -362,9 +362,9 @@ export class BranchListComponent {
   private activeDialogRef?: ZardDialogRef<unknown>;
 
   // Context for whichever dialog is open, read by its template (parent to fork, branch to act on,
-  // worktree to discard). Not a dialog-open flag — the overlay owns visibility now.
+  // workspace to discard). Not a dialog-open flag — the overlay owns visibility now.
   readonly ui = signalState<{
-    selected: WorktreeDto | null;
+    selected: WorkspaceDto | null;
     parent: string | null;
     branch: string | null;
   }>({
@@ -378,9 +378,9 @@ export class BranchListComponent {
     required(schemaPath.target, { message: 'Select a target branch' });
   });
 
-  readonly createModel = signal<CreateWorktreeForm>({ id: '', branch: '' });
+  readonly createModel = signal<CreateWorkspaceForm>({ id: '', branch: '' });
   readonly createForm = form(this.createModel, (schemaPath) => {
-    required(schemaPath.id, { message: 'Worktree ID is required' });
+    required(schemaPath.id, { message: 'Workspace ID is required' });
   });
 
   readonly branchesQuery = injectQuery(() => ({
@@ -391,11 +391,11 @@ export class BranchListComponent {
       ),
   }));
 
-  readonly worktreesQuery = injectQuery(() => ({
-    queryKey: ['worktrees', this.repoId()],
+  readonly workspacesQuery = injectQuery(() => ({
+    queryKey: ['workspaces', this.repoId()],
     queryFn: () =>
-      lastValueFrom(this.worktreeService.apiRepositoriesRepoIdWorktreesGet(this.repoId())).then(
-        (r) => r.entries?.map((e) => e.worktree!).filter((w): w is WorktreeDto => !!w) ?? [],
+      lastValueFrom(this.workspaceService.apiRepositoriesRepoIdWorkspacesGet(this.repoId())).then(
+        (r) => r.entries?.map((e) => e.workspace!).filter((w): w is WorkspaceDto => !!w) ?? [],
       ),
   }));
 
@@ -418,15 +418,15 @@ export class BranchListComponent {
     (this.actionConfigsQuery.data() ?? []).filter((a) => a.interactive),
   );
 
-  // The conflicting files for the worktree in the open resolve dialog (the merge-tree preview).
+  // The conflicting files for the workspace in the open resolve dialog (the merge-tree preview).
   readonly conflictFilesQuery = injectQuery(() => ({
-    queryKey: ['worktree-conflicts', this.repoId(), this.ui.selected()?.worktreeId],
-    enabled: !!this.ui.selected()?.worktreeId,
+    queryKey: ['workspace-conflicts', this.repoId(), this.ui.selected()?.workspaceId],
+    enabled: !!this.ui.selected()?.workspaceId,
     queryFn: () =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdConflictsGet(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdConflictsGet(
           this.repoId(),
-          this.ui.selected()!.worktreeId!,
+          this.ui.selected()!.workspaceId!,
         ),
       ).then((r) => r.files ?? []),
   }));
@@ -434,29 +434,29 @@ export class BranchListComponent {
   /** The branch whose popover is open, driving the lazy incoming/outgoing commit fetch. */
   readonly peekedBranch = signal<string | null>(null);
 
-  /** The worktree backing the open branch, if any (plain branches have none). */
-  readonly peekedWorktreeId = computed(() => {
+  /** The workspace backing the open branch, if any (plain branches have none). */
+  readonly peekedWorkspaceId = computed(() => {
     const branch = this.peekedBranch();
     if (!branch) return null;
-    return (this.worktreesQuery.data() ?? []).find((w) => w.branch === branch)?.worktreeId ?? null;
+    return (this.workspacesQuery.data() ?? []).find((w) => w.branch === branch)?.workspaceId ?? null;
   });
 
   // Commits the parent has that the branch lacks (what a fast-forward/merge pulls in). Only
-  // worktree-backed branches can pull, so this is fetched only when the open branch has a worktree.
+  // workspace-backed branches can pull, so this is fetched only when the open branch has a workspace.
   readonly incomingQuery = injectQuery(() => ({
-    queryKey: ['incoming-commits', this.repoId(), this.peekedWorktreeId()],
-    enabled: !!this.peekedWorktreeId(),
+    queryKey: ['incoming-commits', this.repoId(), this.peekedWorkspaceId()],
+    enabled: !!this.peekedWorkspaceId(),
     queryFn: () =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdIncomingCommitsGet(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdIncomingCommitsGet(
           this.repoId(),
-          this.peekedWorktreeId()!,
+          this.peekedWorkspaceId()!,
         ),
       ),
   }));
 
   // The branch's own commits over its parent (the `+` count) — the existing commit-log endpoint,
-  // which resolves the parent (worktree parent or main) server-side, so it works for any branch.
+  // which resolves the parent (workspace parent or main) server-side, so it works for any branch.
   readonly outgoingQuery = injectQuery(() => ({
     queryKey: ['outgoing-commits', this.repoId(), this.peekedBranch()],
     enabled: !!this.peekedBranch(),
@@ -472,14 +472,14 @@ export class BranchListComponent {
     if (!branch) return null;
     const incoming = this.incomingQuery.data();
     const outgoing = this.outgoingQuery.data();
-    // Wait for the query that drives the visible tabs: incoming for worktree branches (Behind tab),
+    // Wait for the query that drives the visible tabs: incoming for workspace branches (Behind tab),
     // outgoing for plain branches (Forward only).
-    const ready = this.peekedWorktreeId() ? incoming !== undefined : outgoing !== undefined;
+    const ready = this.peekedWorkspaceId() ? incoming !== undefined : outgoing !== undefined;
     if (!ready) return null;
     return { branch, incoming: incoming?.commits ?? [], outgoing: outgoing?.commits ?? [] };
   });
 
-  /** Per-branch ahead/behind vs parent (from the branches endpoint), for branches with no worktree. */
+  /** Per-branch ahead/behind vs parent (from the branches endpoint), for branches with no workspace. */
   readonly branchSummaries = computed<
     Record<string, { parent: string | null; ahead: number | null; behind: number | null }>
   >(() => {
@@ -524,10 +524,10 @@ export class BranchListComponent {
   /** The repository's configured main branch — the default integration target. */
   readonly mainBranch = computed(() => this.repositoryQuery.data()?.mainBranch ?? '');
 
-  /** Branch name → its worktree (when one exists), used to resolve a branch's parent. */
-  readonly worktreeByBranch = computed(() => {
-    const map = new Map<string, WorktreeDto>();
-    for (const wt of this.worktreesQuery.data() ?? []) {
+  /** Branch name → its workspace (when one exists), used to resolve a branch's parent. */
+  readonly workspaceByBranch = computed(() => {
+    const map = new Map<string, WorkspaceDto>();
+    for (const wt of this.workspacesQuery.data() ?? []) {
       if (wt.branch) map.set(wt.branch, wt);
     }
     return map;
@@ -537,14 +537,14 @@ export class BranchListComponent {
   readonly integrateTargets = computed(() => this.branches().filter((b) => b !== this.ui.branch()));
 
   /**
-   * Builds the nested branch tree for `z-tree`. A branch's parent is its worktree's fork point when
-   * worktree-backed, otherwise the repository's main branch (from the branches endpoint) — so plain
+   * Builds the nested branch tree for `z-tree`. A branch's parent is its workspace's fork point when
+   * workspace-backed, otherwise the repository's main branch (from the branches endpoint) — so plain
    * branches nest under main too. Branches with no resolvable parent (e.g. master) are roots. Each
-   * node carries its worktree (or null) as `data`.
+   * node carries its workspace (or null) as `data`.
    */
   readonly treeNodes = computed<BranchTreeNode[]>(() => {
-    const byBranch = new Map<string, WorktreeDto>();
-    for (const wt of this.worktreesQuery.data() ?? []) {
+    const byBranch = new Map<string, WorkspaceDto>();
+    for (const wt of this.workspacesQuery.data() ?? []) {
       if (wt.branch) byBranch.set(wt.branch, wt);
     }
     const summaries = this.branchSummaries();
@@ -573,7 +573,7 @@ export class BranchListComponent {
     return roots;
   });
 
-  // Markdown the user types in the dialogs: the worktree's goal (preamble) at creation and its
+  // Markdown the user types in the dialogs: the workspace's goal (preamble) at creation and its
   // outcome (result) at integrate/abandon. Plain signals — not part of the validated forms.
   readonly createPreamble = signal('');
   readonly integrateResult = signal('');
@@ -582,7 +582,7 @@ export class BranchListComponent {
   readonly createMutation = injectMutation(() => ({
     mutationFn: (data: { id: string; parent: string; branch: string; preamble: string }) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesPost(this.repoId(), {
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesPost(this.repoId(), {
           id: data.id,
           parent: data.parent || undefined,
           branch: data.branch || undefined,
@@ -605,11 +605,11 @@ export class BranchListComponent {
   }));
 
   readonly discardMutation = injectMutation(() => ({
-    mutationFn: ({ worktreeId, result }: { worktreeId: string; result: string }) =>
+    mutationFn: ({ workspaceId, result }: { workspaceId: string; result: string }) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdDiscardPost(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDiscardPost(
           this.repoId(),
-          worktreeId,
+          workspaceId,
           { result: result || undefined },
         ),
       ),
@@ -625,64 +625,64 @@ export class BranchListComponent {
   }));
 
   readonly fastForwardMutation = injectMutation(() => ({
-    mutationFn: (worktreeId: string) =>
+    mutationFn: (workspaceId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdFastForwardPost(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdFastForwardPost(
           this.repoId(),
-          worktreeId,
+          workspaceId,
         ),
       ),
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
   readonly updateMutation = injectMutation(() => ({
-    mutationFn: (worktreeId: string) =>
+    mutationFn: (workspaceId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdUpdateFromParentPost(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdUpdateFromParentPost(
           this.repoId(),
-          worktreeId,
+          workspaceId,
         ),
       ),
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
-  // Start/recreate a worktree's container on demand (it is a recreatable cache of the branch). The
+  // Start/recreate a workspace's container on demand (it is a recreatable cache of the branch). The
   // error is surfaced (below) rather than swallowed, so a failed provision — e.g. the branch is gone
   // or the git-host is unreachable — tells the user why.
   readonly ensureContainerMutation = injectMutation(() => ({
-    mutationFn: (worktreeId: string) =>
+    mutationFn: (workspaceId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdEnsureContainerPost(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdEnsureContainerPost(
           this.repoId(),
-          worktreeId,
+          workspaceId,
         ),
       ),
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
   readonly stopContainerMutation = injectMutation(() => ({
-    mutationFn: (worktreeId: string) =>
+    mutationFn: (workspaceId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdStopContainerPost(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdStopContainerPost(
           this.repoId(),
-          worktreeId,
+          workspaceId,
         ),
       ),
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
   readonly resolveMutation = injectMutation(() => ({
-    mutationFn: (worktreeId: string) =>
+    mutationFn: (workspaceId: string) =>
       lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesWorktreeIdResolveConflictPost(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdResolveConflictPost(
           this.repoId(),
-          worktreeId,
+          workspaceId,
         ),
       ),
     onSuccess: (res) => {
       invalidateRepository(this.queryClient, this.repoId());
       this.closeDialog();
-      // The backend already spawned the autonomous Claude command on the resolution worktree; open
+      // The backend already spawned the autonomous Claude command on the resolution workspace; open
       // its terminal so the human watches it work.
       if (res.commandId) {
         this.router.navigate(['/commands', res.commandId]);
@@ -701,11 +701,11 @@ export class BranchListComponent {
   // Launch an action as a registry command, then open its terminal. The process is owned by the
   // backend and survives leaving the route, so the terminal page just re-attaches to it.
   readonly launchMutation = injectMutation(() => ({
-    mutationFn: (vars: { worktreeId: string; actionId: string }) =>
+    mutationFn: (vars: { workspaceId: string; actionId: string }) =>
       lastValueFrom(
         this.commandService.apiCommandsPost({
           repoId: this.repoId(),
-          worktreeId: vars.worktreeId,
+          workspaceId: vars.workspaceId,
           actionId: vars.actionId,
         }),
       ),
@@ -717,14 +717,14 @@ export class BranchListComponent {
     },
   }));
 
-  // Launch a Claude agent (repository MCP, narrowed to this repo) in a worktree, then open its
+  // Launch a Claude agent (repository MCP, narrowed to this repo) in a workspace, then open its
   // terminal. Not backed by an action — the backend renders the launch and registers the command.
   readonly agentMutation = injectMutation(() => ({
-    mutationFn: (vars: { worktreeId: string; scope: AgentMcpScope }) =>
+    mutationFn: (vars: { workspaceId: string; scope: AgentMcpScope }) =>
       lastValueFrom(
-        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+        this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           this.repoId(),
-          vars.worktreeId,
+          vars.workspaceId,
           { scope: vars.scope },
         ),
       ),
@@ -736,64 +736,64 @@ export class BranchListComponent {
     },
   }));
 
-  /** Resolve the worktree backing a branch (run/launch act on the worktree, not the branch name). */
-  private worktreeIdForBranch(branch: string): string | null {
-    return (this.worktreesQuery.data() ?? []).find((w) => w.branch === branch)?.worktreeId ?? null;
+  /** Resolve the workspace backing a branch (run/launch act on the workspace, not the branch name). */
+  private workspaceIdForBranch(branch: string): string | null {
+    return (this.workspacesQuery.data() ?? []).find((w) => w.branch === branch)?.workspaceId ?? null;
   }
 
-  /** Launch an action in a worktree and navigate to its command terminal. */
-  private launchCommand(worktreeId: string, actionId: string) {
-    this.launchMutation.mutate({ worktreeId, actionId });
+  /** Launch an action in a workspace and navigate to its command terminal. */
+  private launchCommand(workspaceId: string, actionId: string) {
+    this.launchMutation.mutate({ workspaceId, actionId });
   }
 
   viewCommits(branch: string) {
     this.router.navigate(['/repositories', this.repoId(), 'branch', branch, 'commits']);
   }
 
-  /** Open the worktree's detail page (file browser + chat dialog). */
-  openWorktree(worktree: WorktreeDto) {
-    if (!worktree.worktreeId) return;
-    this.router.navigate(['/repositories', this.repoId(), 'worktrees', worktree.worktreeId]);
+  /** Open the workspace's detail page (file browser + chat dialog). */
+  openWorkspace(workspace: WorkspaceDto) {
+    if (!workspace.workspaceId) return;
+    this.router.navigate(['/repositories', this.repoId(), 'workspaces', workspace.workspaceId]);
   }
 
   /** Open the Run… dialog for a branch; the action list comes from actionConfigsQuery. */
   openRun(branch: string) {
     patchState(this.ui, { branch });
-    this.openDialog('Run in worktree', this.runTpl());
+    this.openDialog('Run in workspace', this.runTpl());
   }
 
-  /** Run the chosen action in the branch's worktree by launching a command and opening its terminal. */
+  /** Run the chosen action in the branch's workspace by launching a command and opening its terminal. */
   runAction(actionId: string) {
     const branch = this.ui.branch();
     if (!branch) return;
-    const worktreeId = this.worktreeIdForBranch(branch);
-    if (!worktreeId) return;
+    const workspaceId = this.workspaceIdForBranch(branch);
+    if (!workspaceId) return;
     this.closeDialog();
-    this.launchCommand(worktreeId, actionId);
+    this.launchCommand(workspaceId, actionId);
   }
 
-  /** Launch a repository-MCP Claude agent in this subtree's worktree (narrowed to this repository). */
+  /** Launch a repository-MCP Claude agent in this subtree's workspace (narrowed to this repository). */
   configureWithClaude(branch: string) {
-    const worktreeId = this.worktreeIdForBranch(branch);
-    if (!worktreeId) return;
-    this.agentMutation.mutate({ worktreeId, scope: AgentMcpScope.Repository });
+    const workspaceId = this.workspaceIdForBranch(branch);
+    if (!workspaceId) return;
+    this.agentMutation.mutate({ workspaceId, scope: AgentMcpScope.Repository });
   }
 
-  /** Open the resolve-conflict dialog (file preview + the action button) for a conflicting worktree. */
-  openResolveConflict(worktree: WorktreeDto) {
+  /** Open the resolve-conflict dialog (file preview + the action button) for a conflicting workspace. */
+  openResolveConflict(workspace: WorkspaceDto) {
     patchState(this.ui, {
-      selected: worktree,
-      branch: worktree.branch ?? null,
-      parent: worktree.parent ?? null,
+      selected: workspace,
+      branch: workspace.branch ?? null,
+      parent: workspace.parent ?? null,
     });
     this.openDialog('Resolve merge conflict', this.resolveTpl());
   }
 
-  /** Fork a resolution worktree and launch Claude on it (navigation happens on success). */
+  /** Fork a resolution workspace and launch Claude on it (navigation happens on success). */
   onResolveConflict() {
-    const worktreeId = this.ui.selected()?.worktreeId;
-    if (worktreeId) {
-      this.resolveMutation.mutate(worktreeId);
+    const workspaceId = this.ui.selected()?.workspaceId;
+    if (workspaceId) {
+      this.resolveMutation.mutate(workspaceId);
     }
   }
 
@@ -801,23 +801,23 @@ export class BranchListComponent {
     this.createModel.set({ id: '', branch: '' });
     this.createPreamble.set('');
     patchState(this.ui, { selected: null, parent });
-    this.openDialog('New worktree from ' + parent, this.createTpl());
+    this.openDialog('New workspace from ' + parent, this.createTpl());
   }
 
   openIntegrate(branch: string) {
-    // Default the target to the worktree's parent when this branch is worktree-backed, otherwise
+    // Default the target to the workspace's parent when this branch is workspace-backed, otherwise
     // to the repository's configured main branch.
-    const worktree = this.worktreeByBranch().get(branch) ?? null;
-    this.integrateModel.set({ target: worktree?.parent ?? this.mainBranch() });
+    const workspace = this.workspaceByBranch().get(branch) ?? null;
+    this.integrateModel.set({ target: workspace?.parent ?? this.mainBranch() });
     this.integrateResult.set('');
-    patchState(this.ui, { selected: worktree, branch });
+    patchState(this.ui, { selected: workspace, branch });
     this.openDialog('Integrate Change', this.integrateTpl());
   }
 
-  openAbandon(worktree: WorktreeDto) {
+  openAbandon(workspace: WorkspaceDto) {
     this.abandonResult.set('');
-    patchState(this.ui, { selected: worktree });
-    this.openDialog('Abandon worktree?', this.abandonTpl());
+    patchState(this.ui, { selected: workspace });
+    this.openDialog('Abandon workspace?', this.abandonTpl());
   }
 
   openDelete(branch: string) {
@@ -869,9 +869,9 @@ export class BranchListComponent {
   }
 
   onAbandon() {
-    const worktreeId = this.ui.selected()?.worktreeId;
-    if (worktreeId) {
-      this.discardMutation.mutate({ worktreeId, result: this.abandonResult() });
+    const workspaceId = this.ui.selected()?.workspaceId;
+    if (workspaceId) {
+      this.discardMutation.mutate({ workspaceId, result: this.abandonResult() });
     }
   }
 
@@ -882,15 +882,15 @@ export class BranchListComponent {
     }
   }
 
-  onFastForward(worktree: WorktreeDto) {
-    if (worktree.worktreeId) {
-      this.fastForwardMutation.mutate(worktree.worktreeId);
+  onFastForward(workspace: WorkspaceDto) {
+    if (workspace.workspaceId) {
+      this.fastForwardMutation.mutate(workspace.workspaceId);
     }
   }
 
-  onEnsureContainer(worktree: WorktreeDto) {
-    if (worktree.worktreeId) {
-      this.ensureContainerMutation.mutate(worktree.worktreeId);
+  onEnsureContainer(workspace: WorkspaceDto) {
+    if (workspace.workspaceId) {
+      this.ensureContainerMutation.mutate(workspace.workspaceId);
     }
   }
 
@@ -906,16 +906,16 @@ export class BranchListComponent {
     return httpError?.message ?? 'unknown error';
   }
 
-  onStopContainer(worktree: WorktreeDto) {
-    if (worktree.worktreeId) {
-      this.stopContainerMutation.mutate(worktree.worktreeId);
+  onStopContainer(workspace: WorkspaceDto) {
+    if (workspace.workspaceId) {
+      this.stopContainerMutation.mutate(workspace.workspaceId);
     }
   }
 
-  /** Merge the parent into a diverged-but-clean worktree (no fast-forward possible). */
-  onUpdate(worktree: WorktreeDto) {
-    if (worktree.worktreeId) {
-      this.updateMutation.mutate(worktree.worktreeId);
+  /** Merge the parent into a diverged-but-clean workspace (no fast-forward possible). */
+  onUpdate(workspace: WorkspaceDto) {
+    if (workspace.workspaceId) {
+      this.updateMutation.mutate(workspace.workspaceId);
     }
   }
 

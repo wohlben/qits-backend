@@ -11,7 +11,7 @@ Related / dependent plans:
 
 ## Symptom
 
-After signing `claude` in inside one worktree container, other containers (other worktrees/repos)
+After signing `claude` in inside one workspace container, other containers (other workspaces/repos)
 report signed-out, so the coding agent re-prompts for login per container — the shared-volume
 one-time-login model appears not to work.
 
@@ -32,7 +32,7 @@ Verified on the live fixture:
 - `HOME=/claude-home claude auth status` → `loggedIn: true` in **all four** containers (shared volume
   works when HOME points at it).
 - Default `HOME=/workspace` → `loggedIn: false` in the containers with no local login, but `true` in
-  `qits-wt-greeting-b06e6907`, which had a stray container-local `/workspace/.claude/.credentials.json`
+  `qits-ws-greeting-b06e6907`, which had a stray container-local `/workspace/.claude/.credentials.json`
   from a bash-terminal login — the exact "not persistent across containers" artifact.
 
 Confirmed fix mechanics (live):
@@ -49,7 +49,7 @@ writes its credentials on the shared volume regardless of `HOME`. `HOME` stays `
 git/tools remain container-local, matching the "only `~/.claude` crosses into the sandbox" intent.
 
 - `WorkspaceContainer` gains an `env(key, value)` builder seam rendering `-e key=value`.
-- `WorkspaceContainerFactory.forWorktree(...)` adds `CLAUDE_CONFIG_DIR=<claude-mount>/.claude`, gated
+- `WorkspaceContainerFactory.forWorkspace(...)` adds `CLAUDE_CONFIG_DIR=<claude-mount>/.claude`, gated
   on the shared volume being configured (no volume → nothing to point at, so it is omitted).
 
 Because it is inherited by every `docker exec`, cross-container persistence no longer depends on each
@@ -59,14 +59,14 @@ can be simplified later once all containers are recycled).
 ## Transition note
 
 Existing containers created before this change have no `CLAUDE_CONFIG_DIR` and must be recreated to
-pick it up (qits re-provisions a container on demand via `WorktreeService.ensureContainer`). The
+pick it up (qits re-provisions a container on demand via `WorkspaceService.ensureContainer`). The
 current shared login at `/claude-home/.claude/.credentials.json` is exactly the path
 `CLAUDE_CONFIG_DIR` targets, so recreated containers recognize it with no re-login. The stray
-container-local `/workspace/.claude` in `qits-wt-greeting-b06e6907` is harmless and disappears when
-that worktree's container is recreated.
+container-local `/workspace/.claude` in `qits-ws-greeting-b06e6907` is harmless and disappears when
+that workspace's container is recreated.
 
 ## Regression test
 
-`WorkspaceContainerFactoryTest` asserts `forWorktree(...).toRunArgv()` contains
+`WorkspaceContainerFactoryTest` asserts `forWorkspace(...).toRunArgv()` contains
 `-e CLAUDE_CONFIG_DIR=/claude-home/.claude` (and omits it when the volume is disabled);
 `WorkspaceContainerTest` covers the `-e` rendering seam.

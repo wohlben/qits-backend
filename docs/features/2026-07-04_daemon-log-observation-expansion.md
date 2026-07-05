@@ -9,7 +9,7 @@ that keep stdout quiet while the interesting failures land in a file. This featu
 daemon log observation along three axes that reinforce each other:
 
 1. **Log sources** — observed lines come from the process output (still the implicit default)
-   *or tailed files* in the worktree.
+   *or tailed files* in the workspace.
 2. **Durable classified events** — observer findings and state transitions survive the JVM as
    `daemon_event` rows (previously a 500-entry in-memory ring).
 3. **Correlation** — events anchor to their exact place in their source, per-line severity is
@@ -24,7 +24,7 @@ Related/dependent plans:
 - Raw process output persistence rides the
   [command audit logs](2026-06-30_command-audit-logs.md) (`command_log_line`); correlation for
   that source is expressed as `seq` references, not copied text.
-- The worktree daemons panel (events feed) reads the durable store; the agent spool
+- The workspace daemons panel (events feed) reads the durable store; the agent spool
   ([stream-json chat](2026-07-01_stream-json-chat.md) injection) is unchanged except that
   messages now name the source file.
 
@@ -32,13 +32,13 @@ Related/dependent plans:
 
 ### Log sources (`LogSource`, `FileTailSource`)
 
-- `LogSource` embeddable (`path` worktree-relative + optional `label`) as an element collection
+- `LogSource` embeddable (`path` workspace-relative + optional `label`) as an element collection
   on the daemon definition (`repository_daemon_source`; `V16__daemon_log_sources.sql` also
   created a `daemon_configuration_source` twin for the since-removed global scope — dropped by
   `V19`), editable in the REST/MCP inputs. Only FILE
   sources are stored — `PROCESS_OUTPUT` is implicit, so the embeddable has no kind column.
   Paths are validated lexically at definition time (no absolute paths, no `..`, not `.git`) and
-  re-checked against the resolved worktree root when the tail starts — the same two-layer guard
+  re-checked against the resolved workspace root when the tail starts — the same two-layer guard
   as the file browser.
 - **Runtime** (`FileTailSource`): one tailer per FILE source, started at instance launch,
   polling (`qits.daemons.file-tail-poll-ms`, default 500 ms) on the supervisor's scheduler.
@@ -86,17 +86,17 @@ Related/dependent plans:
   command area, implemented by the daemon area's `LogLevelLineClassifier` via CDI — no
   command→daemon package cycle). `GET /api/commands/{id}/log?severity=ERROR` returns exactly
   the stamped lines without re-parsing.
-- **Retrieval**: `GET /api/daemon-events?repoId=&worktreeId=&severity=&since=&source=&page=&pageSize=`
-  (durable, paginated, newest first) replaced the in-memory worktree events endpoint.
+- **Retrieval**: `GET /api/daemon-events?repoId=&workspaceId=&severity=&since=&source=&page=&pageSize=`
+  (durable, paginated, newest first) replaced the in-memory workspace events endpoint.
 - **Agent messages name the source**: a finding from a tailed file injects as
   `[daemon:<name>:<path>]` so the agent knows where the evidence came from.
-- **UI**: the worktree events feed reads the durable endpoint and shows a source badge
+- **UI**: the workspace events feed reads the durable endpoint and shows a source badge
   (`output` / `path:line`); "open in source" jumps to the command log scrolled to the anchored
   seq range (inverse-video highlight, `?seq=&seqTo=` on the command page) for output events, or
-  opens the file in the worktree file browser scrolled to the anchored line (highlight painted
+  opens the file in the workspace file browser scrolled to the anchored line (highlight painted
   via the code viewer's existing `LineRange` machinery) for file events — including gitignored
   log files the git-aware tree doesn't list, since the content endpoint reads any file in the
-  worktree.
+  workspace.
 
 ## Decisions on the idea's open points
 
@@ -126,7 +126,7 @@ Related/dependent plans:
 - `ObserverSinkTest`: the process-output tap (channel filter, ANSI strip, seq-preserving
   positions), PATTERN and LOG_LEVEL findings carrying source + anchor range, excerpt equal to
   the anchored lines' content.
-- `DaemonSupervisorTest` (real processes in a cloned-fixture worktree): a daemon quiet on
+- `DaemonSupervisorTest` (real processes in a cloned-fixture workspace): a daemon quiet on
   stdout logging into a late-created `app.log` → LOG_LEVEL finding with `source=app.log`,
   1-based anchor, epoch, and a `[daemon:<name>:app.log]`-prefixed spooled agent message; a
   stdout daemon whose event anchor resolves against `command_log_line` to exactly the excerpt,
@@ -136,6 +136,6 @@ Related/dependent plans:
   newest first, with severity/source/since filters and pagination.
 - `RepositoryDaemonControllerTest`: sources round-trip on CRUD, keep-as-is on null update,
   traversal paths rejected (`../`, absolute, `.git/`).
-- `worktree-daemons.component.spec.ts`: source badges, the seq-range command-log link, and the
+- `workspace-daemons.component.spec.ts`: source badges, the seq-range command-log link, and the
   file-anchor `openFile` output.
 - `generate-migration` reports no drift between the entity model and V16–V18.

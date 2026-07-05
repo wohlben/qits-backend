@@ -48,10 +48,10 @@ export interface ActionConfigurationFormData {
         <textarea appFormFieldSlot="input" z-input rows="4" [formField]="form.checkScript"></textarea>
       </app-form-field-layout>
 
-      <!-- Interactive actions (a shell, Claude Code) run in the worktree terminal and are offered by
+      <!-- Interactive actions (a shell, Claude Code) run in the workspace terminal and are offered by
            the Run… picker. One-off commands (e.g. mvn test) are not interactive. -->
       <z-checkbox [formField]="form.interactive">
-        Interactive (runs in a worktree terminal)
+        Interactive (runs in a workspace terminal)
       </z-checkbox>
 
       <!-- Environment variables overlaid on the process env when the action runs in a terminal. -->

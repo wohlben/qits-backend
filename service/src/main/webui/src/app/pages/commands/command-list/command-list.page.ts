@@ -11,7 +11,7 @@ import { CommandsListComponent } from '@/pattern/command/commands-list.component
       <div pageTitle>
         <h1 class="text-2xl font-bold">Commands</h1>
         <p class="text-sm text-muted-foreground">
-          Processes running in your worktrees — re-open one to pick up where you left off, or
+          Processes running in your workspaces — re-open one to pick up where you left off, or
           terminate it.
         </p>
       </div>

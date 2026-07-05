@@ -8,8 +8,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Whether the coding agent (Claude Code) has a usable login on the shared credential volume. Runs
- * {@code claude auth status} inside the worktree container with {@code HOME} pointed at the mounted
- * volume, so it reflects the one-time OAuth login an operator did (see {@code
+ * {@code claude auth status} inside the workspace container with {@code HOME} pointed at the
+ * mounted volume, so it reflects the one-time OAuth login an operator did (see {@code
  * docker/workspace/agent-login.sh}). Used by {@link AgentLaunchService} to redirect a chat launch
  * to an interactive {@code claude} REPL terminal (its onboarding paste login) when the agent isn't
  * signed in yet.
@@ -23,11 +23,11 @@ public class AgentAuthStatus {
   String claudeMount;
 
   /**
-   * Whether the agent is signed in for {@code worktreeId}'s container. A missing container counts
+   * Whether the agent is signed in for {@code workspaceId}'s container. A missing container counts
    * as not-signed-in (the caller surfaces the container-missing error on the actual launch).
    */
-  public boolean isLoggedIn(String repoId, String worktreeId) {
-    String container = containers.containerName(worktreeId, repoId);
+  public boolean isLoggedIn(String repoId, String workspaceId) {
+    String container = containers.containerName(workspaceId, repoId);
     if (!containers.exists(container)) {
       return false;
     }

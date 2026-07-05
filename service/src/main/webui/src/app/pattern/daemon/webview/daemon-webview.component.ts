@@ -14,7 +14,7 @@ import { lucideCrosshair, lucideScan, lucideX } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
-import { WorktreeDaemonControllerService } from '@/api/api/worktreeDaemonController.service';
+import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -31,8 +31,8 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
 
 /**
  * The daemon web view: a floaty button (rendered only while a live web-viewable daemon exists in
- * this worktree) opening a fullscreen dialog that frames the daemon's app through the same-origin
- * `/daemon/{worktreeId}/{daemonId}/` proxy. Pick mode turns on the {@link DomPicker}; picked
+ * this workspace) opening a fullscreen dialog that frames the daemon's app through the same-origin
+ * `/daemon/{workspaceId}/{daemonId}/` proxy. Pick mode turns on the {@link DomPicker}; picked
  * elements land in the root {@link PromptContextStore}, where speak-to-prompt and command chats
  * pick them up — even after this dialog is closed.
  */
@@ -127,9 +127,9 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
 })
 export class DaemonWebviewComponent {
   readonly repoId = input.required<string>();
-  readonly worktreeId = input.required<string>();
+  readonly workspaceId = input.required<string>();
 
-  private readonly daemonService = inject(WorktreeDaemonControllerService);
+  private readonly daemonService = inject(WorkspaceDaemonControllerService);
   private readonly dialog = inject(ZardDialogService);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly promptContext = inject(PromptContextStore);
@@ -137,15 +137,15 @@ export class DaemonWebviewComponent {
   private readonly webviewTpl = viewChild<TemplateRef<unknown>>('webviewTpl');
   private dialogRef: ZardDialogRef<unknown> | null = null;
 
-  // Same key AND result shape as WorktreeDaemonsComponent's daemonsQuery — they share the cache
+  // Same key AND result shape as WorkspaceDaemonsComponent's daemonsQuery — they share the cache
   // entry, so the queryFn must stay identical.
   readonly daemonsQuery = injectQuery(() => ({
-    queryKey: ['worktree-daemons', this.repoId(), this.worktreeId()],
+    queryKey: ['workspace-daemons', this.repoId(), this.workspaceId()],
     queryFn: () =>
       lastValueFrom(
-        this.daemonService.apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsGet(
+        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(
           this.repoId(),
-          this.worktreeId(),
+          this.workspaceId(),
         ),
       ).then(
         (r) =>

@@ -1,7 +1,7 @@
 import { basename, gitignoreGlobToRegExp, type PathFilter } from './filter-file-paths';
 
 /**
- * A language/framework "kind" the worktree browser can recognise, shaped like the viewer's
+ * A language/framework "kind" the workspace browser can recognise, shaped like the viewer's
  * {@link SMART_RENDERERS} registry. A descriptor owns *all* the framework-specific knowledge —
  * how to find its project roots, which files "belong" to it (for the framework filter), and how to
  * map a source file to its test(s) and back (for the viewer's test↔code tabs) — so the component and

@@ -20,14 +20,14 @@ class GitignoreLazyDirectoryStrategyTest {
   @TempDir Path root;
 
   /**
-   * A minimal {@link WorktreeFileAccess} whose {@code git} shells real git in the temp repo — the
+   * A minimal {@link WorkspaceFileAccess} whose {@code git} shells real git in the temp repo — the
    * strategy only ever calls {@code git}, so the other primitives are unsupported. Stands in for
    * the container-backed {@link ContainerFileAccess} without a docker (or CDI) around.
    */
-  private final WorktreeFileAccess access =
-      new WorktreeFileAccess() {
+  private final WorkspaceFileAccess access =
+      new WorkspaceFileAccess() {
         @Override
-        public String git(String repoId, String worktreeId, String... args) {
+        public String git(String repoId, String workspaceId, String... args) {
           String[] argv = new String[args.length + 1];
           argv[0] = "git";
           System.arraycopy(args, 0, argv, 1, args.length);
@@ -39,27 +39,27 @@ class GitignoreLazyDirectoryStrategyTest {
         }
 
         @Override
-        public Entry stat(String repoId, String worktreeId, String path) {
+        public Entry stat(String repoId, String workspaceId, String path) {
           throw new UnsupportedOperationException();
         }
 
         @Override
-        public List<Entry> list(String repoId, String worktreeId, String dir) {
+        public List<Entry> list(String repoId, String workspaceId, String dir) {
           throw new UnsupportedOperationException();
         }
 
         @Override
-        public int childCount(String repoId, String worktreeId, String dir) {
+        public int childCount(String repoId, String workspaceId, String dir) {
           throw new UnsupportedOperationException();
         }
 
         @Override
-        public boolean resolvesInsideRoot(String repoId, String worktreeId, String path) {
+        public boolean resolvesInsideRoot(String repoId, String workspaceId, String path) {
           throw new UnsupportedOperationException();
         }
 
         @Override
-        public byte[] read(String repoId, String worktreeId, String path) {
+        public byte[] read(String repoId, String workspaceId, String path) {
           throw new UnsupportedOperationException();
         }
       };

@@ -13,10 +13,10 @@ import jakarta.ws.rs.core.MediaType;
 
 /**
  * Refines a raw speech-to-text transcript into a coherent coding-agent prompt, contextualized by
- * the worktree it targets. The heavy lifting is a synchronous one-shot Claude call on a small model
- * (see {@link PromptRefinementService}), so a request typically takes a few seconds.
+ * the workspace it targets. The heavy lifting is a synchronous one-shot Claude call on a small
+ * model (see {@link PromptRefinementService}), so a request typically takes a few seconds.
  */
-@Path("/repositories/{repoId}/worktrees/{worktreeId}/prompt-refinements")
+@Path("/repositories/{repoId}/workspaces/{workspaceId}/prompt-refinements")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class PromptRefinementController {
@@ -30,9 +30,9 @@ public class PromptRefinementController {
   @POST
   public RefinePromptRequest.Response refine(
       @PathParam("repoId") String repoId,
-      @PathParam("worktreeId") String worktreeId,
+      @PathParam("workspaceId") String workspaceId,
       @Valid RefinePromptRequest request) {
     return new RefinePromptRequest.Response(
-        promptRefinementService.refine(repoId, worktreeId, request.transcript()));
+        promptRefinementService.refine(repoId, workspaceId, request.transcript()));
   }
 }

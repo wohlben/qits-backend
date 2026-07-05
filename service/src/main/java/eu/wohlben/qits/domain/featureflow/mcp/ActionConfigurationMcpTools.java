@@ -18,8 +18,8 @@ import java.util.Map;
 
 /**
  * The "actions" MCP server — the management surface for actions, exposed to an LLM. An action is a
- * preconfigured process a worktree can run: an interactive one (a shell, Claude Code, launched by a
- * human in the terminal) or a non-interactive one-off command (e.g. {@code mvn test}).
+ * preconfigured process a workspace can run: an interactive one (a shell, Claude Code, launched by
+ * a human in the terminal) or a non-interactive one-off command (e.g. {@code mvn test}).
  *
  * <p><strong>Use case: configuring actions, and only that.</strong> Connect here to define,
  * inspect, edit and delete what actions exist — not to use them. Executing a non-interactive action
@@ -83,16 +83,16 @@ public class ActionConfigurationMcpTools {
   @Tool(
       description =
           "Create a global action (available in every repository). 'executeScript' is the shell"
-              + " command run in the worktree (required). Set 'interactive' true for a process meant"
+              + " command run in the workspace (required). Set 'interactive' true for a process meant"
               + " for the human terminal, false for a one-off command. 'checkScript' and"
               + " 'environment' are optional.")
   @Transactional
   public ActionConfigurationDto createGlobalAction(
       @ToolArg(description = "display name") String name,
       @ToolArg(required = false, description = "human description") String description,
-      @ToolArg(description = "shell command to run in the worktree") String executeScript,
+      @ToolArg(description = "shell command to run in the workspace") String executeScript,
       @ToolArg(required = false, description = "optional probe script") String checkScript,
-      @ToolArg(required = false, description = "runs in a worktree terminal (default false)")
+      @ToolArg(required = false, description = "runs in a workspace terminal (default false)")
           Boolean interactive,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment) {
@@ -173,9 +173,9 @@ public class ActionConfigurationMcpTools {
   public ActionConfigurationDto createRepositoryAction(
       @ToolArg(description = "display name") String name,
       @ToolArg(required = false, description = "human description") String description,
-      @ToolArg(description = "shell command to run in the worktree") String executeScript,
+      @ToolArg(description = "shell command to run in the workspace") String executeScript,
       @ToolArg(required = false, description = "optional probe script") String checkScript,
-      @ToolArg(required = false, description = "runs in a worktree terminal (default false)")
+      @ToolArg(required = false, description = "runs in a workspace terminal (default false)")
           Boolean interactive,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment) {

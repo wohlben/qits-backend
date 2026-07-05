@@ -1,4 +1,4 @@
-# The fat default workspace image every qits worktree container runs. It carries the common
+# The fat default workspace image every qits workspace container runs. It carries the common
 # toolchain a repository's actions/dev servers/agent need — nothing repo-specific (per-repo images
 # and devcontainer.json support are deferred). Build it locally and tag it as the name the
 # `qits.workspace.image` config points at:

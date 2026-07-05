@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Quarkus 3 (Java 25) backend for managing Git repositories, worktrees, and "feature flow" configurations, with an Angular UI served via Quarkus Quinoa. Maven multi-module under group `eu.wohlben`, base package `eu.wohlben.qits`:
+A Quarkus 3 (Java 25) backend for managing Git repositories, workspaces, and "feature flow" configurations, with an Angular UI served via Quarkus Quinoa. Maven multi-module under group `eu.wohlben`, base package `eu.wohlben.qits`:
 
 - **`domain/`** — the shared business core as a plain library jar: entities, services (`control/`), persistence, MapStruct mappers, DTOs, custom validators, framework-free errors (`domain.error`), Flyway migrations. No web/JAX-RS deps. Consumers index its beans via `quarkus.index-dependency.domain.*`.
 - **`service/`** — the Quarkus web app: REST controllers (`<area>.api`), exception mappers (`eu.wohlben.qits.api`), `mutiny`, `health`, and the Angular UI (Quinoa). Depends on `domain`.
@@ -50,14 +50,14 @@ All Maven commands use the wrapper.
 ./mvnw -pl service verify -Pextended \
   -Dtest=__none__ -Dsurefire.failIfNoSpecifiedTests=false   # extended ITs only (skip unit tests)
 
-# Seed demo data (project + branch tree incl. fast-forwardable/diverged worktrees) into the shared
+# Seed demo data (project + branch tree incl. fast-forwardable/diverged workspaces) into the shared
 # H2 file. One-step command-mode run, no web server (the cli pom binds quarkus:run's program args
 # to the cli.args property). Idempotent (skip-if-exists).
 ./mvnw -pl cli quarkus:run -Dcli.args=seed
 
 # Seed the servable Quarkus+Angular demo: a project + repo cloned from the testing-repo-quarkus-angular
 # fixture, a web-viewable OTEL-enabled `quarkus:dev` daemon (LOG_LEVEL + PATTERN observers, a FILE log
-# source), a `greeting` worktree, and a "Build & Verify" feature-flow blueprint. Exercises the
+# source), a `greeting` workspace, and a "Build & Verify" feature-flow blueprint. Exercises the
 # stack-specific feature surface (framework detection, web view, observability, log observation,
 # feature-flows, the coding agent) — the counterpart to `seed` (which owns git merge/divergence).
 # Idempotent by RESET — re-running deletes and recreates the project, so it always returns to the same
@@ -86,7 +86,7 @@ eu.wohlben.qits.domain.<area>.
   dto/          DTO records returned to clients                -> domain module
 ```
 
-Domain areas: `project` (the aggregate root), `repository` (repos + worktrees + git execution), `featureflow` (configurations → phases → actions/steps). Also in `domain`: `validation` (custom Bean Validation), `domain.error` (framework-free exceptions). In `service`: `mutiny` (reactive endpoints + request-context propagation), `api` (global exception mappers), `health`.
+Domain areas: `project` (the aggregate root), `repository` (repos + workspaces + git execution), `featureflow` (configurations → phases → actions/steps). Also in `domain`: `validation` (custom Bean Validation), `domain.error` (framework-free exceptions). In `service`: `mutiny` (reactive endpoints + request-context propagation), `api` (global exception mappers), `health`.
 
 ### Conventions to follow when adding code
 
@@ -109,17 +109,17 @@ It applies the committed migrations to a throwaway in-memory H2, diffs the entit
 
 ### Git operations
 
-`repository.control.GitExecutor` shells out to the `git` CLI via `ProcessBuilder` — the only thing that mutates repositories. It runs against the on-disk **bare origins** (`<data-dir>/<repoId>/origin`, a `--mirror` clone) and throwaway host worktrees for integration; there is no longer a persistent host checkout per worktree. The one JGit use is a wire-protocol *server* only (below).
+`repository.control.GitExecutor` shells out to the `git` CLI via `ProcessBuilder` — the only thing that mutates repositories. It runs against the on-disk **bare origins** (`<data-dir>/<repoId>/origin`, a `--mirror` clone) and throwaway host workspaces for integration; there is no longer a persistent host checkout per workspace. The one JGit use is a wire-protocol *server* only (below).
 
 ### Workspace containers (execution model)
 
-Every worktree executes inside a **per-worktree Docker container** — the sole execution environment for action scripts, dev servers, daemons, and the coding agent (no host-execution fallback). See `docs/features/2026-07-04_workspace-containers.md`.
+Every workspace executes inside a **per-workspace Docker container** — the sole execution environment for action scripts, dev servers, daemons, and the coding agent (no host-execution fallback). See `docs/features/2026-07-04_workspace-containers.md`.
 
-- `repository.control.ContainerRuntime` (impl `DockerExecutor`) is the sibling of `GitExecutor`: it shells the `docker` CLI (`docker run`/`exec`/`rm`, configurable via `qits.workspace.container-runtime`). A worktree is a branch ref in the bare origin **plus** a container that `git clone`s that branch into `/workspace` from qits' in-process git server.
+- `repository.control.ContainerRuntime` (impl `DockerExecutor`) is the sibling of `GitExecutor`: it shells the `docker` CLI (`docker run`/`exec`/`rm`, configurable via `qits.workspace.container-runtime`). A workspace is a branch ref in the bare origin **plus** a container that `git clone`s that branch into `/workspace` from qits' in-process git server.
 - The in-process git server is JGit's `GitServlet` at `/git/*` (`service` module, `eu.wohlben.qits.githost`) — JGit speaks the smart-HTTP protocol only; `GitExecutor` stays the only mutator. Containers reach it via `http://host.docker.internal:<port>/git/<repoId>`.
-- `Worktree.branch` is a **stored column** (no host checkout to read it from). Worktree-local git verbs (`status`, `fetch`+`merge`) run as `docker exec` in the container; `CommandRegistry`'s two spawn seams prepend a `docker exec` prefix; termination reads a pid file and `kill`s the in-container process group.
+- `Workspace.branch` is a **stored column** (no host checkout to read it from). Workspace-local git verbs (`status`, `fetch`+`merge`) run as `docker exec` in the container; `CommandRegistry`'s two spawn seams prepend a `docker exec` prefix; termination reads a pid file and `kill`s the in-container process group.
 - **Build the fat default image locally** before running the app end-to-end: `docker build -t qits/workspace docker/workspace` (config `qits.workspace.image`). The container runs as your host uid.
-- **Tests** don't need docker: `FakeContainerRuntime` (a Quarkus `@Mock` in each module's `src/test`) emulates a container as a host clone at the old worktree path. Because it runs real host processes, process-group termination works end-to-end. Tests that create branch divergence must **push** (origin-side ahead/behind/conflict probes only see pushed commits).
+- **Tests** don't need docker: `FakeContainerRuntime` (a Quarkus `@Mock` in each module's `src/test`) emulates a container as a host clone at the old workspace path. Because it runs real host processes, process-group termination works end-to-end. Tests that create branch divergence must **push** (origin-side ahead/behind/conflict probes only see pushed commits).
 - **Caveat**: the `cli` `seed` command now creates containers + clones from the git server, so seeding requires the `service` running (reachable git host/port) and docker available.
 
 ### Frontend
@@ -139,4 +139,4 @@ The Angular app lives in `service/src/main/webui/` — Quinoa's default UI direc
 `domain/src/test/resources/fixtures/` holds two **bare git repos committed as plain files** (reproducible, network-free clone/pull test data), each with a **gitignored editing checkout** beside it. The bare `*.git` repo is the source of truth; regenerate the checkout with `git clone <name>.git <name>`. The checkouts are plain clones (no longer git submodules), so a fresh `git clone` of qits needs no `--recurse-submodules`.
 
 - **`testing-repo.git`** — a tiny repo (`hello.txt`, branches `master`/`feature`) for pure git mechanics: clone, pull, branch discovery, divergence probes, the JGit git host. Every test/seed reference resolves it via `getClass().getResource("/fixtures/testing-repo.git")`.
-- **`testing-repo-quarkus-angular.git`** — a minimal but **servable** Quarkus 3 + Angular app (`POST /api/greetings` echoing `{name, timestamp}` + an Angular SPA served by Quinoa), shaped like qits itself, for demoing features that run real work in a worktree (dev-server daemons, actions, the coding agent). Branches: `main`, `feature/greeting` (fast-forwardable over `main`), `feature/diverged` (conflicts with `main`). Build/run it with its own committed `./mvnw` (JDK 25 + pnpm); it is **not** part of the qits Maven build. See `docs/features/2026-07-05_servable-quarkus-angular-fixture.md`.
+- **`testing-repo-quarkus-angular.git`** — a minimal but **servable** Quarkus 3 + Angular app (`POST /api/greetings` echoing `{name, timestamp}` + an Angular SPA served by Quinoa), shaped like qits itself, for demoing features that run real work in a workspace (dev-server daemons, actions, the coding agent). Branches: `main`, `feature/greeting` (fast-forwardable over `main`), `feature/diverged` (conflicts with `main`). Build/run it with its own committed `./mvnw` (JDK 25 + pnpm); it is **not** part of the qits Maven build. See `docs/features/2026-07-05_servable-quarkus-angular-fixture.md`.

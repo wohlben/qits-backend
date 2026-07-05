@@ -19,7 +19,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 
 /**
- * The registry-backed command API: launch a process into a worktree, list running/terminated
+ * The registry-backed command API: launch a process into a workspace, list running/terminated
  * commands, inspect one, and terminate one. Launching returns the command immediately; an
  * interactive run is then watched by opening the terminal websocket on {@code command.id}.
  */
@@ -31,14 +31,14 @@ public class CommandController {
   @Inject CommandService commandService;
 
   public static record LaunchCommandRequest(
-      @NotBlank String repoId, @NotBlank String worktreeId, @NotBlank String actionId) {
+      @NotBlank String repoId, @NotBlank String workspaceId, @NotBlank String actionId) {
     public record Response(CommandDto command) {}
   }
 
   @POST
   public LaunchCommandRequest.Response launch(@Valid LaunchCommandRequest request) {
     return new LaunchCommandRequest.Response(
-        commandService.launch(request.repoId(), request.worktreeId(), request.actionId()));
+        commandService.launch(request.repoId(), request.workspaceId(), request.actionId()));
   }
 
   public static record ListCommandsRequest() {

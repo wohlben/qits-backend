@@ -75,7 +75,7 @@ components:
           type: string
         repoId:
           type: string
-        worktreeId:
+        workspaceId:
           type: string
         branch:
           type: string
@@ -333,7 +333,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogSourceInput"
-    CreateWorktreeRequest:
+    CreateWorkspaceRequest:
       type: object
       required:
       - id
@@ -352,7 +352,7 @@ components:
       properties:
         repoId:
           type: string
-        worktreeId:
+        workspaceId:
           type: string
         daemonId:
           type: string
@@ -416,7 +416,7 @@ components:
       - RESTARTING
       - CRASHED
       - STOPPED
-    DiscardWorktreeRequest:
+    DiscardWorkspaceRequest:
       type: object
       properties:
         result:
@@ -452,13 +452,13 @@ components:
     Entry11:
       type: object
       properties:
-        worktree:
-          $ref: "#/components/schemas/WorktreeDto"
+        workspace:
+          $ref: "#/components/schemas/WorkspaceDto"
     Entry12:
       type: object
       properties:
-        worktree:
-          $ref: "#/components/schemas/WorktreeHistoryDto"
+        workspace:
+          $ref: "#/components/schemas/WorkspaceHistoryDto"
     Entry2:
       type: object
       properties:
@@ -584,13 +584,13 @@ components:
       type: object
       required:
       - repoId
-      - worktreeId
+      - workspaceId
       - actionId
       properties:
         repoId:
           type: string
           pattern: \S
-        worktreeId:
+        workspaceId:
           type: string
           pattern: \S
         actionId:
@@ -672,7 +672,7 @@ components:
           type: string
         result:
           type: string
-    MergeWorktreeRequest:
+    MergeWorkspaceRequest:
       type: object
       properties:
         target:
@@ -1072,7 +1072,7 @@ components:
     Response60:
       type: object
       properties:
-        worktreeId:
+        workspaceId:
           type: string
         branch:
           type: string
@@ -1118,8 +1118,8 @@ components:
     Response66:
       type: object
       properties:
-        worktree:
-          $ref: "#/components/schemas/WorktreeDto"
+        workspace:
+          $ref: "#/components/schemas/WorkspaceDto"
     Response67:
       type: object
       properties:
@@ -1130,8 +1130,8 @@ components:
     Response68:
       type: object
       properties:
-        worktree:
-          $ref: "#/components/schemas/WorktreeHistoryDetailDto"
+        workspace:
+          $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
     Response69:
       type: object
       properties:
@@ -1149,8 +1149,8 @@ components:
     Response70:
       type: object
       properties:
-        worktree:
-          $ref: "#/components/schemas/WorktreeHistoryDetailDto"
+        workspace:
+          $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
     Response71:
       type: object
       properties:
@@ -1469,10 +1469,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogSourceInput"
-    WorktreeDto:
+    WorkspaceDto:
       type: object
       properties:
-        worktreeId:
+        workspaceId:
           type: string
         parent:
           type: string
@@ -1487,9 +1487,9 @@ components:
         conflictsWithParent:
           type: boolean
         status:
-          $ref: "#/components/schemas/WorktreeStatus"
+          $ref: "#/components/schemas/WorkspaceStatus"
         runtimeStatus:
-          $ref: "#/components/schemas/WorktreeRuntimeStatus"
+          $ref: "#/components/schemas/WorkspaceRuntimeStatus"
         runtimeError:
           type: string
         preamble:
@@ -1498,11 +1498,11 @@ components:
           type: string
         resolvedAt:
           $ref: "#/components/schemas/Instant"
-    WorktreeEventDto:
+    WorkspaceEventDto:
       type: object
       properties:
         type:
-          $ref: "#/components/schemas/WorktreeEventType"
+          $ref: "#/components/schemas/WorkspaceEventType"
         branch:
           type: string
         parent:
@@ -1515,7 +1515,7 @@ components:
           type: string
         at:
           $ref: "#/components/schemas/Instant"
-    WorktreeEventType:
+    WorkspaceEventType:
       type: string
       enum:
       - CREATED
@@ -1523,7 +1523,7 @@ components:
       - UPDATED_FROM_PARENT
       - INTEGRATED
       - ABANDONED
-    WorktreeFileContentDto:
+    WorkspaceFileContentDto:
       type: object
       properties:
         path:
@@ -1532,18 +1532,18 @@ components:
           type: string
         binary:
           type: boolean
-    WorktreeHistoryDetailDto:
+    WorkspaceHistoryDetailDto:
       type: object
       properties:
         id:
           type: integer
           format: int64
-        worktreeId:
+        workspaceId:
           type: string
         parent:
           type: string
         status:
-          $ref: "#/components/schemas/WorktreeStatus"
+          $ref: "#/components/schemas/WorkspaceStatus"
         preamble:
           type: string
         result:
@@ -1555,35 +1555,35 @@ components:
         events:
           type: array
           items:
-            $ref: "#/components/schemas/WorktreeEventDto"
+            $ref: "#/components/schemas/WorkspaceEventDto"
         commands:
           type: array
           items:
             $ref: "#/components/schemas/CommandDto"
-    WorktreeHistoryDto:
+    WorkspaceHistoryDto:
       type: object
       properties:
         id:
           type: integer
           format: int64
-        worktreeId:
+        workspaceId:
           type: string
         parent:
           type: string
         status:
-          $ref: "#/components/schemas/WorktreeStatus"
+          $ref: "#/components/schemas/WorkspaceStatus"
         createdAt:
           $ref: "#/components/schemas/Instant"
         resolvedAt:
           $ref: "#/components/schemas/Instant"
-    WorktreeRuntimeStatus:
+    WorkspaceRuntimeStatus:
       type: string
       enum:
       - RUNNING
       - STOPPED
       - PROVISIONING
       - FAILED
-    WorktreeStatus:
+    WorkspaceStatus:
       type: string
       enum:
       - ACTIVE
@@ -1847,7 +1847,7 @@ paths:
         in: query
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: query
         schema:
           type: string
@@ -2665,7 +2665,7 @@ paths:
                 $ref: "#/components/schemas/Response69"
       summary: List
       tags:
-      - Worktree History Controller
+      - Workspace History Controller
   /api/repositories/{repoId}/history/{id}:
     patch:
       parameters:
@@ -2695,7 +2695,7 @@ paths:
                 $ref: "#/components/schemas/Response68"
       summary: Update
       tags:
-      - Worktree History Controller
+      - Workspace History Controller
     get:
       parameters:
       - name: id
@@ -2718,7 +2718,7 @@ paths:
                 $ref: "#/components/schemas/Response70"
       summary: Get
       tags:
-      - Worktree History Controller
+      - Workspace History Controller
   /api/repositories/{repoId}/main-branch:
     put:
       parameters:
@@ -2817,7 +2817,7 @@ paths:
       summary: Sync Status
       tags:
       - Repository Controller
-  /api/repositories/{repoId}/worktrees:
+  /api/repositories/{repoId}/workspaces:
     get:
       parameters:
       - name: repoId
@@ -2834,7 +2834,7 @@ paths:
                 $ref: "#/components/schemas/Response63"
       summary: List
       tags:
-      - Worktree Controller
+      - Workspace Controller
     post:
       parameters:
       - name: repoId
@@ -2846,7 +2846,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateWorktreeRequest"
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
         required: true
       responses:
         "200":
@@ -2859,8 +2859,8 @@ paths:
           description: Bad Request
       summary: Create
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/agents:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/agents:
     post:
       parameters:
       - name: repoId
@@ -2868,7 +2868,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -2891,7 +2891,7 @@ paths:
       summary: Launch
       tags:
       - Agent Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/conflicts:
+  /api/repositories/{repoId}/workspaces/{workspaceId}/conflicts:
     get:
       parameters:
       - name: repoId
@@ -2899,7 +2899,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -2913,8 +2913,8 @@ paths:
                 $ref: "#/components/schemas/Response67"
       summary: Conflicts
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/daemons:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/daemons:
     get:
       parameters:
       - name: repoId
@@ -2922,7 +2922,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -2936,8 +2936,8 @@ paths:
                 $ref: "#/components/schemas/Response15"
       summary: List
       tags:
-      - Worktree Daemon Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/daemons/{daemonId}/start:
+      - Workspace Daemon Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/daemons/{daemonId}/start:
     post:
       parameters:
       - name: daemonId
@@ -2950,7 +2950,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -2964,8 +2964,8 @@ paths:
                 $ref: "#/components/schemas/Response14"
       summary: Start
       tags:
-      - Worktree Daemon Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/daemons/{daemonId}/stop:
+      - Workspace Daemon Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/daemons/{daemonId}/stop:
     post:
       parameters:
       - name: daemonId
@@ -2978,7 +2978,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -2992,8 +2992,8 @@ paths:
                 $ref: "#/components/schemas/Response13"
       summary: Stop
       tags:
-      - Worktree Daemon Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/discard:
+      - Workspace Daemon Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/discard:
     post:
       parameters:
       - name: repoId
@@ -3001,7 +3001,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3010,7 +3010,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DiscardWorktreeRequest"
+              $ref: "#/components/schemas/DiscardWorkspaceRequest"
         required: true
       responses:
         "200":
@@ -3023,8 +3023,8 @@ paths:
           description: Bad Request
       summary: Discard
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/ensure-container:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/ensure-container:
     post:
       parameters:
       - name: repoId
@@ -3032,7 +3032,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3043,11 +3043,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorktreeDto"
+                $ref: "#/components/schemas/WorkspaceDto"
       summary: Ensure Container
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/fast-forward:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/fast-forward:
     post:
       parameters:
       - name: repoId
@@ -3055,7 +3055,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3069,8 +3069,8 @@ paths:
                 $ref: "#/components/schemas/Response64"
       summary: Fast Forward
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/files:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/files:
     get:
       parameters:
       - name: repoId
@@ -3078,7 +3078,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3096,8 +3096,8 @@ paths:
                 $ref: "#/components/schemas/Response62"
       summary: List Files
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/files/content:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/files/content:
     get:
       parameters:
       - name: repoId
@@ -3105,7 +3105,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3120,11 +3120,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorktreeFileContentDto"
+                $ref: "#/components/schemas/WorkspaceFileContentDto"
       summary: File Content
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/incoming-commits:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/incoming-commits:
     get:
       parameters:
       - name: repoId
@@ -3132,7 +3132,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3146,8 +3146,8 @@ paths:
                 $ref: "#/components/schemas/CommitLogDto"
       summary: Incoming Commits
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/merge:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/merge:
     post:
       parameters:
       - name: repoId
@@ -3155,7 +3155,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3164,7 +3164,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/MergeWorktreeRequest"
+              $ref: "#/components/schemas/MergeWorkspaceRequest"
         required: true
       responses:
         "200":
@@ -3177,8 +3177,8 @@ paths:
           description: Bad Request
       summary: Merge
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/prompt-refinements:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-refinements:
     post:
       parameters:
       - name: repoId
@@ -3186,7 +3186,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3209,7 +3209,7 @@ paths:
       summary: Refine
       tags:
       - Prompt Refinement Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/resolve-conflict:
+  /api/repositories/{repoId}/workspaces/{workspaceId}/resolve-conflict:
     post:
       parameters:
       - name: repoId
@@ -3217,7 +3217,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3231,8 +3231,8 @@ paths:
                 $ref: "#/components/schemas/Response60"
       summary: Resolve Conflict
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/stop-container:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/stop-container:
     post:
       parameters:
       - name: repoId
@@ -3240,7 +3240,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3251,11 +3251,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorktreeDto"
+                $ref: "#/components/schemas/WorkspaceDto"
       summary: Stop Container
       tags:
-      - Worktree Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/errors:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/telemetry/errors:
     get:
       parameters:
       - name: repoId
@@ -3263,7 +3263,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3282,8 +3282,8 @@ paths:
                 $ref: "#/components/schemas/Response76"
       summary: Errors
       tags:
-      - Worktree Telemetry Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/logs:
+      - Workspace Telemetry Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/telemetry/logs:
     get:
       parameters:
       - name: repoId
@@ -3291,7 +3291,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3318,8 +3318,8 @@ paths:
                 $ref: "#/components/schemas/Response75"
       summary: Logs
       tags:
-      - Worktree Telemetry Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/metrics:
+      - Workspace Telemetry Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/telemetry/metrics:
     get:
       parameters:
       - name: repoId
@@ -3327,7 +3327,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3345,8 +3345,8 @@ paths:
                 $ref: "#/components/schemas/Response74"
       summary: Metrics
       tags:
-      - Worktree Telemetry Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/slow-spans:
+      - Workspace Telemetry Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/telemetry/slow-spans:
     get:
       parameters:
       - name: repoId
@@ -3354,7 +3354,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3379,8 +3379,8 @@ paths:
                 $ref: "#/components/schemas/Response73"
       summary: Slow Spans
       tags:
-      - Worktree Telemetry Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/traces/{traceId}:
+      - Workspace Telemetry Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/telemetry/traces/{traceId}:
     get:
       parameters:
       - name: repoId
@@ -3393,7 +3393,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3407,8 +3407,8 @@ paths:
                 $ref: "#/components/schemas/Response72"
       summary: Trace
       tags:
-      - Worktree Telemetry Controller
-  /api/repositories/{repoId}/worktrees/{worktreeId}/update-from-parent:
+      - Workspace Telemetry Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/update-from-parent:
     post:
       parameters:
       - name: repoId
@@ -3416,7 +3416,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: worktreeId
+      - name: workspaceId
         in: path
         required: true
         schema:
@@ -3430,7 +3430,7 @@ paths:
                 $ref: "#/components/schemas/Response59"
       summary: Update From Parent
       tags:
-      - Worktree Controller
+      - Workspace Controller
   /api/repositories/{repositoryId}/daemons:
     get:
       parameters:

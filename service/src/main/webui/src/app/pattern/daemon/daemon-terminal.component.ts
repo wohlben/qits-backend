@@ -17,7 +17,7 @@ import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 /**
  * The daemon interactive terminal: a per-daemon "Terminal" button that opens a fullscreen dialog
  * framing an xterm.js attached to the daemon's tmux session through the
- * `/api/terminal/daemons/{repoId}/{worktreeId}/{daemonId}` socket (the interactive half of
+ * `/api/terminal/daemons/{repoId}/{workspaceId}/{daemonId}` socket (the interactive half of
  * Increment 2 of tmux-backed daemons — real input/resize, e.g. Quarkus dev's `[r]`/`[e]` keys).
  * Rendered only for a live daemon; closing the dialog detaches the tmux client and leaves the
  * daemon running. Mirrors the daemon web-view's overlay recipe.
@@ -67,7 +67,7 @@ import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 })
 export class DaemonTerminalComponent {
   readonly repoId = input.required<string>();
-  readonly worktreeId = input.required<string>();
+  readonly workspaceId = input.required<string>();
   readonly daemonId = input.required<string>();
   readonly name = input.required<string>();
 
@@ -77,7 +77,7 @@ export class DaemonTerminalComponent {
 
   /** The interactive-attach WS path (relative to origin; the backend gates on daemon liveness). */
   readonly socketPath = computed(
-    () => `api/terminal/daemons/${this.repoId()}/${this.worktreeId()}/${this.daemonId()}`,
+    () => `api/terminal/daemons/${this.repoId()}/${this.workspaceId()}/${this.daemonId()}`,
   );
 
   open() {

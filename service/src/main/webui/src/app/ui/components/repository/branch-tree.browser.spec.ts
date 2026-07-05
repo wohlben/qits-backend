@@ -2,18 +2,18 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { page } from 'vitest/browser';
 
-import { WorktreeDto } from '@/api/model/worktreeDto';
+import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { BranchTreeComponent, BranchTreeNode } from './branch-tree.component';
 
 /**
- * Visual regression for the worktree tree (zard `z-tree` + our cards), run in a
+ * Visual regression for the workspace tree (zard `z-tree` + our cards), run in a
  * real headless Chromium via Vitest browser mode (`ng run qits-ui:test-visual`).
  * Baseline PNGs live under `__screenshots__/`; the run fails on pixel drift, so
  * a human and the agent inspect identical graphics.
  */
 
-function wt(branch: string, parent: string, ahead: number, behind: number): WorktreeDto {
-  return { worktreeId: branch.replace('feature/', ''), branch, parent, ahead, behind };
+function wt(branch: string, parent: string, ahead: number, behind: number): WorkspaceDto {
+  return { workspaceId: branch.replace('feature/', ''), branch, parent, ahead, behind };
 }
 
 // master
@@ -84,6 +84,6 @@ describe('BranchTreeComponent (visual)', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    await expect.element(page.getByTestId('tree')).toMatchScreenshot('worktree-tree');
+    await expect.element(page.getByTestId('tree')).toMatchScreenshot('workspace-tree');
   });
 });

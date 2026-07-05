@@ -41,7 +41,7 @@ WARNING [io.quarkus.opentelemetry.runtime.exporter.otlp.sender.VertxHttpSender] 
 ```
 
 So no traces/logs/metrics reach the qits `/api/otel` receiver — the observability panel for this
-worktree stays empty.
+workspace stays empty.
 
 ## Root cause
 
@@ -52,7 +52,7 @@ qits injects the environment correctly. Confirmed inside the running dev JVM (pi
 OTEL_EXPORTER_OTLP_ENDPOINT=http://192.168.152.4:8080/api/otel   # container-reachable qits host
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 OTEL_SERVICE_NAME=Quarkus dev server
-OTEL_RESOURCE_ATTRIBUTES=qits.worktree.id=greeting,…
+OTEL_RESOURCE_ATTRIBUTES=qits.workspace.id=greeting,…
 ```
 
 and that endpoint **is reachable** from the container (`POST …/api/otel` → HTTP 405, i.e. the receiver
@@ -80,7 +80,7 @@ quarkus.otel.exporter.otlp.endpoint=${OTEL_EXPORTER_OTLP_ENDPOINT:http://localho
 already pinned.) This is a fixture change, so it must be committed on the fixture branches that run the
 daemon (`main` and `feature/greeting`) in the committed bare repo — preserving the branch invariants
 (`feature/greeting` fast-forwardable over `main`, `feature/diverged` conflicting) — and then the
-running demo re-seeded (`cli … seed-webapp`, which is reset-idempotent) so the greeting worktree gets
+running demo re-seeded (`cli … seed-webapp`, which is reset-idempotent) so the greeting workspace gets
 the fixed app.
 
 **qits-side alternative (rejected):** having `OtelEnvironment` also emit `QUARKUS_OTEL_*` would leak a
