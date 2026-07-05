@@ -94,7 +94,9 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 
 # Seed demo data (a project + branch tree, incl. fast-forwardable / diverged worktrees) into the
 # shared local H2 DB so it shows up in the running app. One-step command-mode run, no web server.
-./mvnw -pl cli quarkus:run -Dcli.args=seed
+# NOTE: `quarkus:run` executes the packaged CLI app, so build it first (`install`/`package` above);
+# after a `clean` you must repackage or it fails with "Unable to access jarfile …/quarkus-run.jar".
+./mvnw -pl cli -am install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=seed
 
 # Seed the servable Quarkus + Angular demo: a "Quarkus + Angular Demo" project + a repository cloned
 # from the testing-repo-quarkus-angular fixture, a web-viewable OTEL-enabled `quarkus:dev` daemon
@@ -103,5 +105,6 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 # detection, the daemon web view, observability, log observation, feature-flows, the coding agent).
 # Idempotent by RESET: each run deletes and recreates the project, always returning to the same
 # known-good state — so use it as the fixture for manual UI poking and regression tests.
-./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
+# (Same build prerequisite as `seed` above — package the CLI app before `quarkus:run`.)
+./mvnw -pl cli -am install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
 ```
