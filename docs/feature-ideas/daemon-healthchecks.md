@@ -29,8 +29,9 @@ This feature adds **healthchecks** as a first-class, **repeated, list-valued** p
 each daemon carries an ordered list of named checks (HTTP / TCP / command), the supervisor runs
 them on an interval inside the workspace container, and each check has its own **healthy /
 unhealthy / unknown** state surfaced as an **easily visible row of status dots** next to the
-daemon's lifecycle chip. "Is my dev server up?" becomes "Quarkus ●green, Angular ●red" at a glance
-instead of a single conflated READY.
+daemon's lifecycle chip on the **workspace detail route**. "Is my dev server up?" becomes "Quarkus
+●green, Angular ●red" at a glance instead of a single conflated READY. The result is a **live gauge,
+cached latest-only and never persisted** — no database rows, dropped on restart, re-probed fresh.
 
 Related/dependent plans:
 
@@ -111,8 +112,10 @@ prober thread):
 | `intervalMs` | Poll cadence; falls back to `qits.daemons.health-poll-ms`. |
 | `timeoutMs` | Per-probe timeout before it counts as a failure. |
 | `healthyThreshold` / `unhealthyThreshold` | Consecutive results before flipping state (debounce flapping); defaults `1` / `3`. |
-| `gatesReady` | If true, the daemon does not reach READY until this check is healthy (see below). |
 | `initialDelayMs` | Grace before the first probe, so boot-time refusals aren't counted (defaults to the daemon's ready grace). |
+
+(A `gatesReady` flag — "hold the daemon in STARTING until this check passes" — is a natural
+addition but lands with the deferred lifecycle-gating follow-up, not iteration one; see Deferred.)
 
 **Probe kinds, deliberately ordered by dependency weight:**
 
@@ -139,46 +142,58 @@ supervisor's existing `ScheduledExecutorService` and per-`Instance` runtime stat
 - Each check keeps a small runtime state: `HEALTHY` / `UNHEALTHY` / `UNKNOWN` (pre-first-result or
   probe error), last result timestamp, last latency, consecutive-count for threshold debouncing.
 - On stop/crash the checks are cancelled with the instance; on `adoptIfRunning` (post-restart
-  re-adoption) they are rescheduled — health state is runtime-only, exactly like `DaemonStatus`.
+  re-adoption) they are rescheduled from `UNKNOWN` — health state is runtime-only, exactly like
+  `DaemonStatus`.
 - Config keys follow the `qits.daemons.*` family: `qits.daemons.health-poll-ms` (default e.g.
   `5000`), a global `health-timeout-ms`, and a kill-switch `qits.daemons.health-enabled`.
 
-### How healthchecks relate to `DaemonStatus`
+### Latest result only — ephemeral, never persisted
 
-Healthchecks are **per-check** and orthogonal to the daemon's single lifecycle status, but the
-supervisor **aggregates** them into two lifecycle effects (both opt-in via check flags so existing
-daemons are unchanged):
+This is the defining constraint of the feature: **a healthcheck result is not history, it is a live
+gauge.** The supervisor caches **only the latest result per check** in the in-memory `Instance`
+(next to `status`/`restartCount`/`hostPort`) and overwrites it on each tick. Nothing is written to
+the database:
 
-- **Readiness gating (`gatesReady`).** If any check sets `gatesReady`, the daemon reaches `READY`
-  only once **all** ready-gating checks are healthy — replacing/augmenting the single
-  `readyPattern` for multi-service daemons. The mvn+quinoa daemon declares two HTTP checks, both
-  `gatesReady=true`, and only turns READY when *both* Quarkus and Angular answer. This is the
-  direct fix for the motivating problem: readiness stops being a lie.
-- **Auto-recovering DEGRADED.** While the process is alive and READY, a non-gating (or gating)
-  check going `UNHEALTHY` moves the daemon `READY → DEGRADED` (emitting a `DEGRADED` event with the
-  failing check's name/evidence); the check recovering moves it back `DEGRADED → READY`. This is
-  the auto-recovery `daemons.md` deferred — driven by an objective probe rather than a log finding,
-  so it's safe to auto-clear.
+- **No `daemon_event` rows, no new `DaemonEventKind`, no `DaemonAgentNotifier` injection.** Health
+  deliberately does *not* ride the persisted
+  [daemon-event](../features/2026-07-04_daemon-log-observation-expansion.md) feed the way log
+  observers do — those record *findings* worth keeping ("the crash last night"); a healthcheck is
+  the opposite: a value that is only ever interesting *right now*. A red dot that has since gone
+  green is noise, not a log entry.
+- **A JVM restart drops it**, exactly like `DaemonStatus` — the checks simply re-probe from
+  `UNKNOWN` on `adoptIfRunning` and repopulate within one interval. There is nothing to reconcile.
+- **The cache is not a ring/history** either — one slot per check. "Uptime %" or a timeline is a
+  deliberately deferred, separate concern (see Deferred).
 
-Both remain **advisory**: healthchecks never *kill* or *restart* a daemon on their own in iteration
-one (restart-on-unhealthy is deferred — see below). They report; the restart policy still keys off
-process exit only.
+So the entire read path is: supervisor cache → `DaemonInstanceDto` → the workspace poll → the UI.
+No persistence layer touches health at all.
 
-### Events and agent notification (reuse, no new plumbing)
+### Relationship to `DaemonStatus` (iteration one: display-only)
 
-Health transitions publish `DaemonEventDto`s through the existing `DaemonEventService` — a new
-`DaemonEventKind.HEALTH_CHANGED` (alongside the current lifecycle/finding kinds), severity mapped
-like the rest (unhealthy → WARNING/ERROR, recovered → INFO). That means health changes ride the
-**same** paths daemon events already do for free: the UI events feed, durable `daemon_event` rows
-([daemon-log-observation-expansion](../features/2026-07-04_daemon-log-observation-expansion.md)),
-and — for above-INFO severity — the `DaemonAgentNotifier` injection into the workspace's running
-chat ("`[daemon:quarkus:dev]` Angular healthcheck went unhealthy: connection refused on :4200").
-The agent learns its dev server is half-down without any new wiring.
+**Iteration one keeps health purely a display sidecar** — it does **not** drive the daemon's
+lifecycle status, kill it, or restart it. `DaemonStatus` continues to key off `readyPattern` +
+process liveness + log observers exactly as today; the health dots sit *beside* the status chip and
+tell a richer story the single chip can't. This keeps the feature within the "cache latest, show
+it" scope and touches none of the persisted lifecycle-event machinery.
+
+Two **optional follow-ups** (deferred) would let health *inform* status — noted here only so the
+runtime state is shaped to allow them later, not built now:
+
+- **Readiness gating (`gatesReady`).** A check could hold the daemon in `STARTING` until all
+  gating checks are healthy — the real fix for "readiness is a lie" on the two-server mvn+quinoa
+  daemon (Quarkus green but Angular still compiling ⇒ not actually ready). Deferred because it
+  reaches into the readiness transition (which *does* persist a lifecycle `STATUS_CHANGED` event).
+- **Auto-recovering DEGRADED.** A healthy→unhealthy flip on a live daemon could drive
+  `READY → DEGRADED` and back — the auto-recovering DEGRADED `daemons.md` wanted. Same reason it's
+  deferred: it mutates persisted lifecycle status, which is beyond "cache the latest result."
 
 ## DTO / REST / MCP surface
 
 - **DTO.** `DaemonInstanceDto` gains a `List<HealthCheckStatusDto> health` — `{name, kind,
-  state, lastLatencyMs, lastChangedAt, detail}` — one entry per declared check with its live state.
+  state, lastLatencyMs, lastCheckedAt, detail}` — one entry per declared check, read straight from
+  the supervisor's in-memory cache (nothing DB-backed). Just like `status` and `restartCount`
+  already on this DTO, it reflects live runtime state and is absent (empty) after a restart until
+  the first re-probe.
   `RepositoryDaemonDto` gains the `List<HealthCheckDto>` definition list (mapped by
   `RepositoryDaemonMapper`, MapStruct — never hand-written).
 - **REST.** No new endpoints: the definition list rides `RepositoryDaemonController`'s existing
@@ -201,44 +216,55 @@ on click. A new presentational `DaemonHealthChecksComponent` (`ui/components/dae
 poll already fetches (3s/5s), so no new query.
 
 ```
-● quarkus:dev  READY      Quarkus ●   Angular ●        ← both green: genuinely up
-● quarkus:dev  DEGRADED   Quarkus ●   Angular ●        ← Quarkus green, Angular red at a glance
+● quarkus:dev  READY   Quarkus ●   Angular ●   ← both green: genuinely up
+● quarkus:dev  READY   Quarkus ●   Angular ●   ← lifecycle still READY, but Angular red: half-down at a glance
 ```
+
+The second row is the crux of the feature: the daemon's lifecycle chip says `READY` (its process is
+alive and `readyPattern` matched) — the health dots are what reveal Angular is actually down. That
+gap is exactly what a single conflated status can't show, and why health is a *sidecar*, not a
+replacement.
 
 The daemon **management form** (`repository-daemon-create-update-form.component.ts` /
 `ui/forms/daemon/daemon-form.component.ts`) gains a repeatable health-check editor next to the
-existing observer/source editors: name, kind dropdown, port/path/command by kind, thresholds,
-`gatesReady` toggle. The `repository-daemon-card.component.ts` summary shows the check count.
+existing observer/source editors: name, kind dropdown, port/path/command by kind, and thresholds.
+The `repository-daemon-card.component.ts` summary shows the check count.
 
 ## Seed / fixture
 
-`seed-webapp`'s quarkus-angular daemon becomes the reference example — two HTTP checks,
-`gatesReady=true` on both:
+`seed-webapp`'s quarkus-angular daemon becomes the reference example — two HTTP checks:
 
 - `Quarkus` → `HTTP :8080 /q/health` (the fixture is Quarkus 3; `smallrye-health` is already the
   qits convention, see [health-checks](../features/2026-05-01_health-checks.md)).
 - `Angular` → `HTTP :4200 /` expecting `200`.
 
-So the seeded demo *shows* the feature: start the daemon, watch Angular sit red (compiling) while
-Quarkus goes green, then both green → READY. `seed` (the tiny testing-repo Python daemon) gets one
+So the seeded demo *shows* the feature: start the daemon (it reaches `READY` via `readyPattern` as
+today) and watch the two dots populate independently — Angular sits red while it compiles, Quarkus
+goes green, then Angular flips green. `seed` (the tiny testing-repo Python daemon) gets one
 `TCP :8000` check to exercise the dependency-free path.
 
 ## Explicitly deferred
 
-- **Restart/kill on unhealthy.** Iteration one is report-only; healthchecks don't feed the restart
-  policy. A `restartOnUnhealthy` action policy (with its own threshold/backoff, distinct from the
-  process-exit policy) is the obvious follow-up once real usage shows whether a hung-but-alive
-  process is common enough to auto-recycle.
+- **Health informing lifecycle status** — the `gatesReady` readiness gating and the
+  auto-recovering `DEGRADED` described above. Deferred precisely because they mutate the daemon's
+  *persisted* lifecycle events, stepping outside the "cache the latest result, show it" scope of
+  this iteration. This is where the "readiness is a lie for two-server daemons" fix actually lands.
+- **Agent notification of health flips** — injecting "`[daemon:…]` Angular went unhealthy" into the
+  workspace's running chat via `DaemonAgentNotifier`. Left out on purpose: it would mean routing an
+  ephemeral gauge through the persisted event/notify pipeline. Revisit if the human-facing dots
+  aren't enough and the agent needs to *react* to a mid-work outage.
+- **Restart/kill on unhealthy.** A `restartOnUnhealthy` policy (own threshold/backoff, distinct
+  from the process-exit policy) — once usage shows a hung-but-alive process is common enough to
+  auto-recycle.
 - **Feature-flow phase gate** on "all daemons healthy" — the concrete predicate for the deferred
-  `daemons.md` feature-flow integration.
+  `daemons.md` feature-flow integration; it would read the live cache, no persistence needed.
 - **Per-port web-view.** Converging `httpPort` and healthchecks so the webview picker offers one
   frame per healthy HTTP check (Quarkus vs Angular), instead of a single `httpPort`.
-- **Human push/desktop notifications** on health flips (the UI feed + agent injection cover
-  iteration one), pending the general daemon push-notification item.
 - **Dependency (log-pattern) healthchecks** — "unhealthy if this log line appears" overlaps the
   existing observers; keep the two mechanisms separate for now.
-- **History / uptime %** — health state is live-only; a durable timeline (SLO-style "up 97% this
-  session") builds on the `daemon_event` rows but isn't iteration one.
+- **History / uptime %** — health is deliberately live-only (latest slot per check). A durable
+  timeline (SLO-style "up 97% this session") would need its *own* new persistence — it does not fall
+  out of this feature, which persists nothing — so it's a separate build if ever wanted.
 
 ## Open questions
 
@@ -257,10 +283,9 @@ Quarkus goes green, then both green → READY. `seed` (the tiny testing-repo Pyt
   `COMMAND` too, and probes the app's own loopback. Keep the proxy's host-side Vert.x client as an
   optional fast path for checks whose port is already published (the `httpPort` case), if the extra
   `docker exec` per tick ever measures as too costly.
-- **`gatesReady` vs `readyPattern` coexistence.** When a daemon has *both* a `readyPattern` and
-  `gatesReady` checks — READY on both, or checks win? Lean: if any check gates, checks are
-  authoritative and the pattern is ignored for readiness (still usable as an observer signal);
-  document it rather than silently AND-ing two different mechanisms.
+- **`UNKNOWN` vs `UNHEALTHY` display.** A probe that errors (exec failed, curl missing) vs a probe
+  that ran and got a bad answer — both are "not green," but one is "we couldn't tell." Lean: keep
+  them distinct (grey vs red) so a broken probe config doesn't masquerade as a down service.
 - **Probe cost / cadence.** A `docker exec` per check per interval is cheap but non-zero; default
   `5s` and let per-check `intervalMs` tune. Cap concurrent probes to avoid a many-daemon workspace
   hammering `docker exec`.
@@ -275,20 +300,18 @@ Quarkus goes green, then both green → READY. `seed` (the tiny testing-repo Pyt
   the first result; `initialDelayMs` suppresses boot-time failures; probe command is built
   correctly per kind (HTTP path/status, TCP connect, COMMAND exit code). `FakeContainerRuntime`'s
   exec is scripted to return healthy/unhealthy on demand.
-- **`DaemonSupervisorTest` additions:** two `gatesReady` checks hold the daemon in STARTING until
-  both healthy, then READY; a check going unhealthy while alive → DEGRADED event with the check
-  name, recovery → READY (the auto-recover path); checks cancelled on stop, rescheduled on
-  `adoptIfRunning`.
-- **`DaemonEvent` / notifier:** a health flip publishes a `HEALTH_CHANGED` event, persists a
-  `daemon_event` row, and (above INFO) lands as a `[daemon:…]` chat injection.
+- **`DaemonSupervisorTest` additions:** checks are scheduled on `start`, cancelled on `stop`, and
+  rescheduled from `UNKNOWN` on `adoptIfRunning`; the cached result is what `DaemonInstanceDto`
+  reports; the daemon's `DaemonStatus` is **unaffected** by a check flipping unhealthy (display-only
+  invariant); nothing is written to `daemon_event` (assert no rows).
 - **Controller/MCP:** CRUD round-trip incl. `healthChecks` with validation (bad port/regex/kind →
   400, duplicate check name → 400, cross-repo ownership); `DaemonMcpToolsTest` define→list health;
   `RepositoryMcpToolsTest` surface pin; `OpenApiSchemaExportTest` regenerates `openapi.yml`.
 - **Frontend:** `daemon-health-checks.component.spec.ts` renders green/red/grey dots + tooltips;
   `workspace-daemons.component.spec.ts` shows the health row under the status chip; the form editor
   adds/removes checks.
-- **Manual (packaged app, docker):** `seed-webapp`, start the quarkus:dev daemon → Angular dot red
-  while compiling, Quarkus dot green, both green → READY; `kill` the Angular process inside the
-  container → Angular dot red, daemon DEGRADED, agent chat gets the notification; Angular back →
-  green, daemon READY.
-```
+- **Manual (packaged app, docker):** `seed-webapp`, open the workspace detail route, start the
+  quarkus:dev daemon → Angular dot red while compiling, Quarkus dot green, then Angular green;
+  `kill` the Angular process inside the container → Angular dot flips red within one interval while
+  the daemon chip stays READY; restart Angular → dot green again; restart qits → dots blank then
+  re-populate. Confirm no `daemon_event` rows were written for any of it.
