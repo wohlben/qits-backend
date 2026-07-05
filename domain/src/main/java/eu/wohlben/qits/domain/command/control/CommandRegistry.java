@@ -185,8 +185,13 @@ public class CommandRegistry {
    * <p>The TTY path ({@code -it}) needs no {@code setsid}: {@code docker exec -it} already makes
    * the shell a session leader owning the inner TTY, so {@code $$} is its process-group id (and
    * {@code setsid -c} would fail with EPERM re-stealing the controlling terminal). The no-TTY pipe
-   * path ({@code -i}, chats) prepends {@code setsid} so the shell still becomes a group leader
-   * {@code kill -- -pgid} can address.
+   * path ({@code -i}, chats) prepends {@code setsid -w} so the shell still becomes a group leader
+   * {@code kill -- -pgid} can address. The {@code -w} (wait) is essential: plain {@code setsid}
+   * double-forks and its parent exits immediately, so {@code docker exec -i} sees its direct child
+   * finish and tears down the stdin/stdout pipes out from under the detached process — a
+   * stream-json chat then reads EOF before its first turn arrives and exits without ever answering.
+   * {@code setsid -w} keeps the exec's direct child alive (waiting on the shell) so the pipes stay
+   * open for the whole session.
    *
    * <p>The script runs as the shell body, not {@code exec}'d: {@code $$} (the login shell) is the
    * group leader that {@code kill -- -pgid} reaches along with its children. It is deliberately not
@@ -204,6 +209,9 @@ public class CommandRegistry {
         new ArrayList<>(containers.execArgv(container, tty, "/workspace", environment));
     if (!tty) {
       cmd.add("setsid");
+      // -w: wait for the shell instead of double-forking and exiting, so `docker exec -i` keeps the
+      // stdin/stdout pipes open for the whole session (see the class-level note above).
+      cmd.add("-w");
     }
     cmd.add("bash");
     cmd.add("-lc");
