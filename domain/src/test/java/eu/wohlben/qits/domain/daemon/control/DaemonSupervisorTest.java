@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
@@ -22,15 +21,13 @@ import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.control.ProjectService;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -58,7 +55,9 @@ public class DaemonSupervisorTest {
             "qits.daemons.ready-grace-ms", "300",
             "qits.daemons.stop-grace-ms", "1000",
             "qits.daemons.restart-backoff-initial-ms", "100",
-            "qits.daemons.file-tail-poll-ms", "100");
+            "qits.daemons.file-tail-poll-ms", "100",
+            // Fast crash/exit detection so the state machine tests don't wait on the 2s prod poll.
+            "qits.daemons.liveness-poll-ms", "150");
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -82,6 +81,8 @@ public class DaemonSupervisorTest {
   @Inject DaemonEventSpool daemonEventSpool;
 
   @Inject CommandService commandService;
+
+  @Inject ContainerRuntime containers;
 
   /** Clones the fixture and adds a {@code work} worktree (off master) to run daemons in. */
   private String repoWithWorktree() throws Exception {
@@ -546,92 +547,30 @@ public class DaemonSupervisorTest {
   }
 
   @Test
-  public void startingAWebViewableDaemonFreesItsHttpPortFromAMarkerlessHolder() throws Exception {
-    // The port selector of the reap, complementing the marker path above: a holder the marker
-    // can't reach — one predating the marker, or a run the supervisor lost track of across a
-    // hot reload — is killed by whatever listens on httpPort. Simulate it with a plain listener
-    // that carries no QITS_DAEMON_ID, and assert starting the web-viewable daemon kills it.
-    assumeTrue(commandExists("python3"), "needs python3 to hold a listening port");
-    int port = freePort();
-    Process holder =
-        new ProcessBuilder(
-                "python3",
-                "-c",
-                "import socket,time;s=socket.socket();"
-                    + "s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);"
-                    + "s.bind(('127.0.0.1',"
-                    + port
-                    + "));s.listen();time.sleep(60)")
-            .start();
+  public void reconcileAdoptsADaemonStillRunningFromBeforeARestart() throws Exception {
+    // The core durability guarantee: a daemon whose detached session outlived a qits restart is
+    // re-adopted (not shown STOPPED). Simulate it by starting a session directly, with no
+    // supervisor
+    // instance tracking it — exactly the state a fresh JVM sees — then let the first
+    // effectiveDaemons
+    // probe (via awaitStatus -> instanceOf) find the live session and adopt it as READY.
+    String repoId = repoWithWorktree();
+    String script = "while true; do echo alive; sleep 0.3; done";
+    String daemonId = createDaemon(repoId, "survivor", script, "alive", RestartPolicy.NEVER, 0);
+    String container = containers.containerName("work", repoId);
+    containers.startDaemon(container, daemonId, script, Map.of("QITS_DAEMON_ID", daemonId));
+    assertTrue(containers.daemonAlive(container, daemonId), "the out-of-band session is running");
+
     try {
-      assertTrue(awaitListening(port), "the markerless holder is listening on the port");
-
-      // Definition-before-worktree so the container publishes the port; the script itself need not
-      // bind — we assert the reap killed the holder, which proves the port was freed for it.
-      String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
-      var project = projectService.create("Port Reap Project", null);
-      var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
-      String daemonId =
-          repositoryDaemonService.create(
-                  repo.id,
-                  "web",
-                  null,
-                  "sleep 300",
-                  null,
-                  "TERM",
-                  RestartPolicy.NEVER,
-                  0,
-                  null,
-                  port,
-                  null,
-                  null,
-                  null)
-              .id;
-      worktreeService.createWorktree(repo.id, "work", "master", "work");
-
-      supervisor.start(repo.id, "work", daemonId);
-      try {
-        awaitStatus(repo.id, daemonId, DaemonStatus.READY);
-        assertTrue(
-            awaitProcessExit(holder), "starting the daemon reaps the markerless port holder");
-      } finally {
-        supervisor.stop(repo.id, "work", daemonId);
-        awaitStatus(repo.id, daemonId, DaemonStatus.STOPPED);
-      }
+      DaemonInstanceDto adopted = awaitStatus(repoId, daemonId, DaemonStatus.READY);
+      assertEquals(DaemonStatus.READY, adopted.status(), "the live session is adopted as READY");
+      assertTrue(
+          containers.daemonAlive(container, daemonId), "the session keeps running after adoption");
     } finally {
-      holder.destroyForcibly();
+      supervisor.stop(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
+      assertTrue(!containers.daemonAlive(container, daemonId), "stop tears the session down");
     }
-  }
-
-  private static boolean commandExists(String command) {
-    try {
-      return new ProcessBuilder("sh", "-c", "command -v " + command).start().waitFor() == 0;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private static int freePort() throws Exception {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    }
-  }
-
-  private static boolean awaitListening(int port) throws InterruptedException {
-    long deadline = System.currentTimeMillis() + 10_000;
-    while (System.currentTimeMillis() < deadline) {
-      try (Socket s = new Socket()) {
-        s.connect(new InetSocketAddress("127.0.0.1", port), 200);
-        return true;
-      } catch (Exception retry) {
-        Thread.sleep(50);
-      }
-    }
-    return false;
-  }
-
-  private static boolean awaitProcessExit(Process process) throws InterruptedException {
-    return process.waitFor(AWAIT_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   @Test
