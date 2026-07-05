@@ -55,7 +55,7 @@ public class PromptRefinementServiceTest {
     repoId = seedWorktree();
     // The refinement provisions the worktree container; pre-create it so ensureContainer no-ops
     // (there is no real origin to clone from in this unit test).
-    containers.run(repoId, "wt-feature", "feature-branch", null);
+    containers.run(repoId, "wt-feature", "feature-branch", null, java.util.List.of());
   }
 
   @Transactional

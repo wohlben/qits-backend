@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.repository.control;
 
+import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.InternalServerErrorException;
 import eu.wohlben.qits.domain.error.NotFoundException;
@@ -40,6 +41,8 @@ public class WorktreeService {
   @Inject GitExecutor git;
 
   @Inject ContainerRuntime containers;
+
+  @Inject RepositoryDaemonRepository repositoryDaemonRepository;
 
   @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
   String dataDir;
@@ -102,7 +105,7 @@ public class WorktreeService {
 
     String container;
     try {
-      container = containers.run(repoId, worktreeId, branch, parentBranch);
+      container = containers.run(repoId, worktreeId, branch, parentBranch, daemonPorts(repoId));
     } catch (RuntimeException e) {
       rollbackBranch(createBranchRef, originPath, branch);
       throw e;
@@ -129,6 +132,19 @@ public class WorktreeService {
         container, "/workspace", java.util.Map.of(), "git", "config", "user.email", "qits@local");
     containers.exec(
         container, "/workspace", java.util.Map.of(), "git", "config", "user.name", "qits");
+  }
+
+  /**
+   * The container ports the repository's daemon definitions currently declare, published at
+   * container creation so the daemon web-view proxy can reach them from the host. A definition
+   * gaining a port after the container exists needs a container recreation to pick it up.
+   */
+  private List<Integer> daemonPorts(String repoId) {
+    return repositoryDaemonRepository.findByRepositoryId(repoId).stream()
+        .map(d -> d.httpPort)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
   }
 
   private void rollbackBranch(boolean created, Path originPath, String branch) {
