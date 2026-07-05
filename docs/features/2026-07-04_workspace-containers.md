@@ -24,9 +24,11 @@ execution through `docker exec`). Related/dependent plans:
 - Moves [daemons](2026-07-04_daemons.md) into the container along with all other registry
   execution — dissolving the port-collision limitation: every worktree's daemon binds its
   canonical port inside its own container network namespace.
-- The [daemon web-view picker](../feature-ideas/daemon-webview-picker.md) proxy resolves targets
-  through registry runtime state, so the target becomes the container's bridge address instead of
-  `127.0.0.1`.
+- The [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) proxy resolves targets
+  through registry runtime state. As built, the container publishes each web-viewable daemon port to
+  an ephemeral localhost port (`docker run -p 127.0.0.1:0:<port>`) and the proxy targets that — the
+  bridge-address approach was dropped because container bridge IPs aren't host-reachable under this
+  project's Docker Desktop/WSL2 setup.
 - Rebuilds the launch/terminate path of the
   [command registry](2026-06-30_command-registry.md); everything above the process spawn — ring
   buffer, re-attach, terminal sockets, audit log — is untouched.

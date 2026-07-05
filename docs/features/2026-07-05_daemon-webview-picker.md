@@ -1,5 +1,47 @@
 # Daemon web-view picker: proxy a daemon's app, pick DOM into the prompt
 
+> **Status: implemented 2026-07-05.** This document was the design draft; the notes below record
+> where the built feature diverged from it. Read this banner and the deltas before treating any
+> detail here as current.
+>
+> **As-built deltas (what changed during implementation):**
+> - **Proxy target is a published localhost port, not `127.0.0.1:{httpPort}` directly, and not a
+>   container bridge IP.** Daemons run inside per-worktree docker containers (the workspace-containers
+>   feature, which landed after this draft), so the dev-server port lives in the container's network
+>   namespace. On this project's Docker Desktop/WSL2 host, container bridge IPs are *not*
+>   host-reachable, but ports published with `docker run -p 127.0.0.1:0:<port>` are. So
+>   `ContainerRuntime.run` publishes every `httpPort` the repo's daemon definitions declare (at
+>   container-creation time — docker can't add ports to a live container), and `ContainerRuntime.hostPort`
+>   resolves the ephemeral host port. The proxy targets `127.0.0.1:{hostPort}`. Because publishing is
+>   create-time only, a daemon whose port was declared *after* its worktree container already existed
+>   is not web-viewable until the container is recreated — surfaced as a WARNING daemon event, and
+>   the proxy answers a "recreate the container" 502.
+> - **The daemon definition entity is `RepositoryDaemon`, not `AbstractDaemonDefinition`** (the
+>   mapped superclass was collapsed earlier). The new field is a nullable `Integer httpPort` on it,
+>   threaded through the DTO/mapper/service/REST/MCP exactly like the `otel` boolean.
+> - **`DaemonInstanceDto` carries a single nullable `proxyPath` field, not a separate flag + path.**
+>   Its presence *is* the web-viewable flag (set iff `httpPort` is declared); the frontend combines
+>   it with a live `status`.
+> - **The supervisor exposes `proxyTarget(worktreeId, daemonId) → Optional<ProxyTarget{status, hostPort}>`**
+>   as the proxy's only lookup seam. `DaemonProxyPath` is the shared source of truth for the
+>   `/daemon/{worktreeId}/{daemonId}/` shape.
+> - **`STARTING`/`RESTARTING` serve an auto-refreshing splash; `STOPPED`/`CRASHED` a branded 502**
+>   (the draft's leaning, now decided).
+> - **Floaty button lives on the worktree-detail page, not `main-layout`.** The layout has no route
+>   context (repoId/worktreeId aren't available there) and the feature is only meaningful in a
+>   worktree; the root-scoped prompt-context store still keeps picks alive across the dialog and
+>   navigation, which was the actual goal.
+> - **The fullscreen dialog uses `zCustomClasses` twMerge overrides, not a new ZardUI variant** —
+>   ZardUI files are CLI-managed; `mergeClasses` (twMerge) lets the custom classes override the
+>   dialog's centering classes.
+> - **Startup convention gained `--host 0.0.0.0`**: the in-container dev server must bind all
+>   interfaces, else the published port can't reach it (e.g. `vite --host 0.0.0.0 --base "$QITS_PUBLIC_BASE"`).
+> - The browser-mode picker spec caught a real cross-realm bug: framed elements fail
+>   `instanceof Element` against the parent window's constructor — the picker checks `nodeType`.
+> - Two pre-existing bugs found while verifying are documented in `docs/issues/2026-07-05_*`
+>   (dev-mode SPA deep-links 404; branch-tree screenshot baseline drift) — neither caused by this
+>   feature.
+
 ## Introduction
 
 Once [daemons](../features/2026-07-04_daemons.md) run the project's dev server, the rendered app is *right there* on a
