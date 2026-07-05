@@ -118,6 +118,7 @@ public class DaemonSupervisorTest {
             maxRestarts,
             null,
             null,
+            null,
             observers,
             sources)
         .id;

@@ -129,6 +129,12 @@ public class DaemonMcpTools {
                   "inject OTEL_EXPORTER_* env vars at launch so the process exports telemetry to"
                       + " qits (default false)")
           Boolean otel,
+      @ToolArg(
+              required = false,
+              description =
+                  "HTTP port the daemon serves inside its container; makes it web-viewable through"
+                      + " the qits proxy")
+          Integer httpPort,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment,
       @ToolArg(required = false, description = "log observers watching the daemon's output")
@@ -147,6 +153,7 @@ public class DaemonMcpTools {
             parseRestartPolicy(restartPolicy),
             maxRestarts,
             otel,
+            httpPort,
             environment,
             ObserverArg.toEntities(observers),
             SourceArg.toEntities(sources));
@@ -178,6 +185,11 @@ public class DaemonMcpTools {
               description =
                   "toggle OTEL_EXPORTER_* env injection (telemetry export to qits) at launch")
           Boolean otel,
+      @ToolArg(
+              required = false,
+              description =
+                  "new web-view HTTP port; 0 clears it (makes the daemon not web-viewable)")
+          Integer httpPort,
       @ToolArg(required = false, description = "replacement environment, as key/value pairs")
           Map<String, String> environment,
       @ToolArg(required = false, description = "replacement log observers")
@@ -197,6 +209,7 @@ public class DaemonMcpTools {
             parseRestartPolicy(restartPolicy),
             maxRestarts,
             otel,
+            httpPort,
             environment,
             ObserverArg.toEntities(observers),
             SourceArg.toEntities(sources));

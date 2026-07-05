@@ -80,6 +80,13 @@ public class RepositoryDaemon extends PanacheEntityBase {
   @Column(nullable = false)
   public boolean otel;
 
+  /**
+   * When set, the daemon serves HTTP on this port inside its worktree container and is web-viewable
+   * through the {@code /daemon/{worktreeId}/{daemonId}/} proxy. Null means not web-viewable.
+   */
+  @Column(name = "http_port")
+  public Integer httpPort;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   public Instant createdAt;

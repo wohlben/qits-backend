@@ -80,6 +80,7 @@ public class RepositoryDaemonControllerTest {
                 RestartPolicy.ALWAYS,
                 5,
                 true,
+                5173,
                 Map.of("PORT", "3000"),
                 List.of(
                     new LogObserverInput(
@@ -96,6 +97,7 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.restartPolicy", equalTo("ALWAYS"))
         .body("daemon.maxRestarts", equalTo(5))
         .body("daemon.otel", equalTo(true))
+        .body("daemon.httpPort", equalTo(5173))
         .body("daemon.repositoryId", equalTo(repoId))
         .body("daemon.environment.PORT", equalTo("3000"))
         .body("daemon.observers[0].kind", equalTo("PATTERN"))
@@ -138,6 +140,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
+                null,
                 List.of(
                     new LogObserverInput(
                         LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING)),
@@ -148,6 +151,7 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.name", equalTo("Dev server (renamed)"))
         .body("daemon.startScript", equalTo("npm run dev"))
         .body("daemon.readyPattern", equalTo(null))
+        .body("daemon.httpPort", equalTo(5173)) // null httpPort = keep as-is
         .body("daemon.restartPolicy", equalTo("NEVER"))
         .body("daemon.observers.size()", equalTo(1))
         .body("daemon.observers[0].pattern", equalTo("FATAL"))
@@ -160,6 +164,35 @@ public class RepositoryDaemonControllerTest {
         .body("success", equalTo(true));
 
     given().get("/api/repositories/" + repoId + "/daemons/" + id).then().statusCode(404);
+  }
+
+  @Test
+  public void httpPortClearsWithZeroAndRejectsInvalidValues() {
+    String repoId = createRepository();
+    String id = create(repoId, "Dev server (http port)");
+
+    // 0 clears the port — the daemon is no longer web-viewable.
+    given()
+        .contentType(ContentType.JSON)
+        .body(Map.of("httpPort", 0))
+        .put("/api/repositories/" + repoId + "/daemons/" + id)
+        .then()
+        .statusCode(200)
+        .body("daemon.httpPort", equalTo(null));
+
+    // Out-of-range ports are rejected on create and update.
+    given()
+        .contentType(ContentType.JSON)
+        .body(Map.of("httpPort", 70000))
+        .put("/api/repositories/" + repoId + "/daemons/" + id)
+        .then()
+        .statusCode(400);
+    given()
+        .contentType(ContentType.JSON)
+        .body(Map.of("name", "bad port", "startScript", "run", "httpPort", 70000))
+        .post("/api/repositories/" + repoId + "/daemons")
+        .then()
+        .statusCode(400);
   }
 
   @Test
@@ -195,6 +228,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
+                null,
                 null))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
@@ -211,6 +245,7 @@ public class RepositoryDaemonControllerTest {
                 "Observer without pattern",
                 null,
                 "npm run dev",
+                null,
                 null,
                 null,
                 null,
@@ -235,6 +270,7 @@ public class RepositoryDaemonControllerTest {
                   "Bad source",
                   null,
                   "npm run dev",
+                  null,
                   null,
                   null,
                   null,
