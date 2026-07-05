@@ -318,6 +318,9 @@ components:
           format: int32
         otel:
           type: boolean
+        httpPort:
+          type: integer
+          format: int32
         environment:
           type: object
           additionalProperties:
@@ -717,6 +720,9 @@ components:
           format: int32
         otel:
           type: boolean
+        httpPort:
+          type: integer
+          format: int32
         repositoryId:
           type: string
         environment:
@@ -1446,6 +1452,9 @@ components:
           format: int32
         otel:
           type: boolean
+        httpPort:
+          type: integer
+          format: int32
         environment:
           type: object
           additionalProperties:

@@ -39,6 +39,7 @@ public class RepositoryDaemonController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Boolean otel,
+      Integer httpPort,
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
       List<@Valid LogSourceInput> sources) {
@@ -60,6 +61,7 @@ public class RepositoryDaemonController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.otel(),
+            request.httpPort(),
             request.environment(),
             LogObserverInput.toEntities(request.observers()),
             LogSourceInput.toEntities(request.sources()));
@@ -106,6 +108,7 @@ public class RepositoryDaemonController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Boolean otel,
+      Integer httpPort,
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
       List<@Valid LogSourceInput> sources) {
@@ -130,6 +133,7 @@ public class RepositoryDaemonController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.otel(),
+            request.httpPort(),
             request.environment(),
             LogObserverInput.toEntities(request.observers()),
             LogSourceInput.toEntities(request.sources()));

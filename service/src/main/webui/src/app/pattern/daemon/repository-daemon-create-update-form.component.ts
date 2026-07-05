@@ -63,6 +63,7 @@ export class RepositoryDaemonCreateUpdateFormComponent {
           restartPolicy: d.restartPolicy ?? 'ON_FAILURE',
           maxRestarts: String(d.maxRestarts ?? 3),
           otel: d.otel ?? false,
+          httpPort: d.httpPort != null ? String(d.httpPort) : '',
           environment: Object.entries(d.environment ?? {}).map(([key, value]) => ({ key, value })),
           observers: (d.observers ?? []).map((o) => ({
             kind: o.kind ?? 'PATTERN',
@@ -119,6 +120,7 @@ export class RepositoryDaemonCreateUpdateFormComponent {
       restartPolicy: data.restartPolicy,
       maxRestarts: this.parseMaxRestarts(data.maxRestarts),
       otel: data.otel,
+      httpPort: this.parseHttpPort(data.httpPort),
       environment: this.toEnvMap(data.environment),
       observers: data.observers.map((row) => this.toObserver(row)),
       sources: data.sources
@@ -154,6 +156,18 @@ export class RepositoryDaemonCreateUpdateFormComponent {
   private parseMaxRestarts(value: string): number {
     const parsed = Number.parseInt(value, 10);
     return Number.isNaN(parsed) || parsed < 0 ? 3 : parsed;
+  }
+
+  /**
+   * Empty means "not web-viewable": on update the backend clears the stored port with 0, on
+   * create it must simply be omitted (0 would be rejected as out of range).
+   */
+  private parseHttpPort(value: string): number | undefined {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return this.daemon() ? 0 : undefined;
+    }
+    return parsed;
   }
 
   /** Only the fields of the selected kind travel; LOG_LEVEL needs no configuration. */

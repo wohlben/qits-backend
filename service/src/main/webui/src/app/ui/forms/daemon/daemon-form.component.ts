@@ -36,6 +36,8 @@ export interface DaemonFormData {
   /** Kept as text in the form (signal-form fields are string-typed); parsed on submit. */
   maxRestarts: string;
   otel: boolean;
+  /** HTTP port the daemon serves in its container; empty = not web-viewable. Text like maxRestarts. */
+  httpPort: string;
   environment: DaemonEnvVarRow[];
   observers: DaemonObserverRow[];
   sources: DaemonSourceRow[];
@@ -94,6 +96,16 @@ export interface DaemonFormData {
           autocomplete="off"
         />
       </div>
+
+      <!-- When set, the daemon's app becomes web-viewable in qits through the /daemon proxy;
+           the dev server must listen on 0.0.0.0 and serve under $QITS_PUBLIC_BASE. -->
+      <app-form-field-layout
+        [field]="form.httpPort"
+        id="daemon-http-port"
+        label="HTTP port (optional — makes the daemon web-viewable)"
+      >
+        <input appFormFieldSlot="input" z-input inputmode="numeric" [formField]="form.httpPort" />
+      </app-form-field-layout>
 
       <!-- With OTel on, the launch injects OTEL_EXPORTER_* env vars so an instrumented process
            exports traces/logs/metrics to qits — queryable in the worktree's Telemetry tab and by
@@ -265,6 +277,7 @@ export class DaemonFormComponent {
     restartPolicy: 'ON_FAILURE',
     maxRestarts: '3',
     otel: false,
+    httpPort: '',
     environment: [],
     observers: [],
     sources: [],

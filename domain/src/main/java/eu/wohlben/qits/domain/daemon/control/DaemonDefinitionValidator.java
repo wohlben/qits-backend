@@ -44,6 +44,12 @@ final class DaemonDefinitionValidator {
     return normalized;
   }
 
+  static void requireValidHttpPort(Integer httpPort) {
+    if (httpPort != null && (httpPort < 1 || httpPort > 65535)) {
+      throw new BadRequestException("httpPort must be between 1 and 65535: " + httpPort);
+    }
+  }
+
   static void requireValidObservers(List<LogObserver> observers) {
     if (observers == null) {
       return;

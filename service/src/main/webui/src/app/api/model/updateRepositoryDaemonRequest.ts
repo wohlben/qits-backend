@@ -21,6 +21,7 @@ export interface UpdateRepositoryDaemonRequest {
     restartPolicy?: RestartPolicy;
     maxRestarts?: number;
     otel?: boolean;
+    httpPort?: number;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverInput>;
     sources?: Array<LogSourceInput>;
