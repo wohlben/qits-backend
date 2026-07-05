@@ -10,10 +10,12 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 /**
- * Resolves the address a workspace container uses to reach this qits instance for clone/push
- * (`http://&lt;git-host&gt;:&lt;qits-port&gt;/git/...`). Made a first-class concern because the
- * right value differs by environment and getting it wrong is the silent failure mode of the whole
- * feature:
+ * Resolves the address a workspace container uses to reach this qits instance. Every host-facing
+ * URL a container consumes is composed as {@code http://<qitsHost()>:<qits-port>/...} from this one
+ * resolver: the git clone/push endpoint ({@code /git/...}, {@code WorktreeService}), the OTLP
+ * receiver ({@code /api/otel}, {@code OtelEnvironment}), and the coding agent's MCP servers ({@code
+ * /mcp/...}, {@code AgentLaunchService}). Made a first-class concern because the right value
+ * differs by environment and getting it wrong is the silent failure mode of the whole feature:
  *
  * <ul>
  *   <li><strong>Plain Linux docker</strong>: {@code host.docker.internal} works — {@code
@@ -25,29 +27,31 @@ import org.jboss.logging.Logger;
  *       reachable.
  * </ul>
  *
- * <p>The config {@code qits.workspace.git-host} defaults to the sentinel {@code auto}: auto-detect
- * per environment so it "just works" on both without a machine-local override. Any explicit value
- * (an IP, a hostname, or literally {@code host.docker.internal}) is respected as-is — set one only
- * if the auto-detection picks the wrong interface (e.g. a multi-homed host or a VPN).
+ * <p>The config {@code qits.workspace.git-host} (historical name, kept for compatibility) defaults
+ * to the sentinel {@code auto}: auto-detect per environment so it "just works" on both without a
+ * machine-local override. Any explicit value (an IP, a hostname, or literally {@code
+ * host.docker.internal}) is respected as-is — set one only if the auto-detection picks the wrong
+ * interface (e.g. a multi-homed host or a VPN).
  */
 @ApplicationScoped
-public class GitHostResolver {
+public class QitsHostResolver {
 
-  private static final Logger LOG = Logger.getLogger(GitHostResolver.class);
+  private static final Logger LOG = Logger.getLogger(QitsHostResolver.class);
 
   @ConfigProperty(name = "qits.workspace.git-host", defaultValue = "auto")
   String configured;
 
   private volatile String resolved;
 
-  /** The effective git host, computed once and cached. */
-  public String gitHost() {
+  /** The effective host containers use to reach qits, computed once and cached. */
+  public String qitsHost() {
     String value = resolved;
     if (value == null) {
       synchronized (this) {
         if (resolved == null) {
           resolved = resolve(configured);
-          LOG.infof("Resolved workspace git-host to '%s' (configured: '%s')", resolved, configured);
+          LOG.infof(
+              "Resolved workspace qits-host to '%s' (configured: '%s')", resolved, configured);
         }
         value = resolved;
       }

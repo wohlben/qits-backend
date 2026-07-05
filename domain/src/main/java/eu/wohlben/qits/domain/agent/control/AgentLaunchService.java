@@ -6,6 +6,7 @@ import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
+import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
@@ -15,6 +16,7 @@ import jakarta.inject.Inject;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -80,13 +82,28 @@ public class AgentLaunchService {
 
   @Inject WorktreeService worktreeService;
 
-  @ConfigProperty(name = "qits.actions-mcp.url", defaultValue = "http://localhost:8080/mcp/actions")
-  String actionsMcpUrl;
+  @Inject QitsHostResolver qitsHostResolver;
 
-  @ConfigProperty(
-      name = "qits.repository-mcp.url",
-      defaultValue = "http://localhost:8080/mcp/repository")
-  String repositoryMcpUrl;
+  @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
+  int qitsPort;
+
+  /**
+   * Explicit override for the {@code actions} MCP base URL. Empty by default so the URL is
+   * <strong>derived</strong> from {@link QitsHostResolver} + {@link #qitsPort} — the agent runs
+   * inside a workspace container, so a {@code localhost} default would resolve to the container's
+   * own loopback, not the qits host (see {@code
+   * docs/issues/resolved/2026-07-05_agent-mcp-unreachable-from-container.md}). Set only to point
+   * the agent at a different qits instance.
+   */
+  @ConfigProperty(name = "qits.actions-mcp.url")
+  Optional<String> actionsMcpUrlOverride;
+
+  /**
+   * Explicit override for the {@code repository} MCP base URL; derived like {@link
+   * #actionsMcpUrlOverride}.
+   */
+  @ConfigProperty(name = "qits.repository-mcp.url")
+  Optional<String> repositoryMcpUrlOverride;
 
   /**
    * Where the shared agent-credential volume mounts in the container (mirrors {@code
@@ -241,7 +258,7 @@ public class AgentLaunchService {
     ScopedMcp narrowedRepositoryServer =
         new ScopedMcp(
             "repository",
-            repositoryMcpUrl
+            repositoryMcpUrl()
                 + "?projectId="
                 + projectId
                 + "&repositoryId="
@@ -256,7 +273,7 @@ public class AgentLaunchService {
           // is managed there, and the session needs both to configure the repository fully.
           List.of(
               new ScopedMcp(
-                  "actions", actionsMcpUrl + "?repositoryId=" + repo, READ_ONLY_ACTION_TOOLS),
+                  "actions", actionsMcpUrl() + "?repositoryId=" + repo, READ_ONLY_ACTION_TOOLS),
               narrowedRepositoryServer);
       case REPOSITORY -> List.of(narrowedRepositoryServer);
       case PROJECT ->
@@ -265,9 +282,29 @@ public class AgentLaunchService {
           List.of(
               new ScopedMcp(
                   "repository",
-                  repositoryMcpUrl + "?projectId=" + projectId,
+                  repositoryMcpUrl() + "?projectId=" + projectId,
                   READ_ONLY_REPOSITORY_TOOLS));
     };
+  }
+
+  /**
+   * The {@code actions} MCP base URL: the explicit override if set, else derived from the
+   * container-reachable qits host + port (composed exactly like {@code WorktreeService}'s git URL
+   * and {@code OtelEnvironment}'s OTLP endpoint).
+   */
+  private String actionsMcpUrl() {
+    return actionsMcpUrlOverride.orElseGet(() -> derivedMcpUrl("actions"));
+  }
+
+  /**
+   * The {@code repository} MCP base URL: override if set, else derived like {@link #actionsMcpUrl}.
+   */
+  private String repositoryMcpUrl() {
+    return repositoryMcpUrlOverride.orElseGet(() -> derivedMcpUrl("repository"));
+  }
+
+  private String derivedMcpUrl(String server) {
+    return "http://" + qitsHostResolver.qitsHost() + ":" + qitsPort + "/mcp/" + server;
   }
 
   private String nameFor(AgentMcpScope scope) {

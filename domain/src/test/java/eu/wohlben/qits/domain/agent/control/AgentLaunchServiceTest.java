@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.project.persistence.ProjectRepository;
+import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import io.quarkus.test.junit.QuarkusTest;
@@ -25,6 +26,8 @@ public class AgentLaunchServiceTest {
   @Inject ProjectRepository projectRepository;
 
   @Inject RepositoryRepository repositoryRepository;
+
+  @Inject QitsHostResolver qitsHostResolver;
 
   @Transactional
   void seedRepository(String projectId, String repositoryId) {
@@ -109,6 +112,28 @@ public class AgentLaunchServiceTest {
 
     assertTrue(server.url().contains("/mcp/repository?projectId=" + projectId), server.url());
     assertFalse(server.url().contains("repositoryId="), server.url());
+  }
+
+  @Test
+  public void mcpUrlsUseTheContainerReachableGitHostNotLocalhost() {
+    // Regression: the MCP base URL used to be hardcoded to http://localhost:8080, which from inside
+    // the worktree container is the container's own loopback — not qits. It must derive from the
+    // same QitsHostResolver the git clone uses, so the agent's MCP server is actually reachable.
+    // See docs/issues/resolved/2026-07-05_agent-mcp-unreachable-from-container.md.
+    String projectId = "88888888-8888-8888-8888-888888888888";
+    String repoId = "99999999-9999-9999-9999-999999999999";
+    seedRepository(projectId, repoId);
+
+    String host = qitsHostResolver.qitsHost();
+    List<AgentLaunchService.ScopedMcp> servers =
+        agentLaunchService.serversFor(repoId, "work", AgentMcpScope.ACTIONS);
+
+    for (AgentLaunchService.ScopedMcp server : servers) {
+      assertFalse(server.url().contains("localhost"), server.url());
+      assertTrue(
+          server.url().startsWith("http://" + host + ":8080/mcp/" + server.key() + "?"),
+          server.url());
+    }
   }
 
   @Test

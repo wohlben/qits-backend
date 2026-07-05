@@ -93,7 +93,7 @@ form's checkbox) flows through `DaemonSupervisor.launch` →
 the definition's own environment, so *an explicit user `OTEL_*` var wins*:
 
 - `OTEL_EXPORTER_OTLP_ENDPOINT=http://<git-host>:<qits-port>/api/otel` — composed via
-  `GitHostResolver` + `qits.workspace.qits-port` exactly like the git clone URL, because the
+  `QitsHostResolver` + `qits.workspace.qits-port` exactly like the git clone URL, because the
   process runs in a workspace container where `localhost` would silently miss (the original
   idea's `localhost` was wrong).
 - `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` (normalizes SDKs that still default to gRPC)
@@ -151,4 +151,4 @@ VictoriaMetrics trio rather than building Grafana into qits.
 - Manual E2E (per the idea's sketch): seeded repo, daemon = a Quarkus sample with
   `quarkus-opentelemetry` and `otel` on, hit a throwing endpoint, ask the worktree chat agent to
   investigate — it pulls the exception span through MCP without touching log files. On WSL2 the
-  endpoint host resolves to the distro's eth0 IP (see `GitHostResolver`).
+  endpoint host resolves to the distro's eth0 IP (see `QitsHostResolver`).
