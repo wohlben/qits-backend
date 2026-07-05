@@ -124,9 +124,11 @@ public class AgentLaunchService {
     worktreeService.ensureContainer(repoId, worktreeId);
 
     // The agent can't authenticate until an operator has signed in on the shared credential volume.
-    // When it hasn't, launch an interactive `claude auth login` terminal instead — the caller
-    // redirects to its command page (a real PTY), the operator finishes OAuth there, and the next
-    // chat launch (this worktree or any other, same volume) sees the login and proceeds.
+    // When it hasn't, launch an interactive `claude` REPL terminal instead — the caller redirects
+    // to
+    // its command page (a real PTY), the operator finishes OAuth through the REPL onboarding there,
+    // and the next chat launch (this worktree or any other, same volume) sees the login and
+    // proceeds.
     if (!agentAuthStatus.isLoggedIn(repoId, worktreeId)) {
       return launchLogin(repoId, worktreeId);
     }
@@ -162,11 +164,11 @@ public class AgentLaunchService {
   }
 
   /**
-   * Launches an interactive {@code claude auth login} terminal (a normal PTY command, kind {@code
-   * TERMINAL}) in the worktree's container so an operator can complete the one-time OAuth. Writes
-   * to the shared credential volume (HOME overlay), so it signs in every worktree at once. Returned
-   * by {@link #launchChat} when the agent isn't signed in yet; the caller redirects to its
-   * terminal.
+   * Launches an interactive {@code claude} REPL terminal (a normal PTY command, kind {@code
+   * TERMINAL}) in the worktree's container so an operator can complete the one-time OAuth through
+   * its onboarding paste flow. Writes to the shared credential volume (HOME overlay), so it signs
+   * in every worktree at once. Returned by {@link #launchChat} when the agent isn't signed in yet;
+   * the caller redirects to its terminal.
    */
   public CommandDto launchLogin(String repoId, String worktreeId) {
     LaunchSpec spec = renderLogin();
@@ -180,9 +182,15 @@ public class AgentLaunchService {
     if (claudeMount != null && !claudeMount.isBlank()) {
       env.put("HOME", claudeMount);
     }
-    // `--claudeai` = Claude subscription (the common case); the operator can switch to API billing
-    // by running `claude auth login --console` in the terminal themselves.
-    return new LaunchSpec("exec claude auth login --claudeai", true, env);
+    // Run the `claude` REPL, NOT the `claude auth login` subcommand. The REPL's first-run
+    // onboarding
+    // (theme -> login method -> OAuth) renders a paste-the-code prompt over the PTY and reads it
+    // from
+    // stdin, so an operator can complete sign-in in the terminal. The `auth login` subcommand does
+    // not: in Claude Code v2.1.89 it prints the authorize URL and then blocks on a loopback HTTP
+    // callback the host browser can never reach — no paste prompt, no stdin read — so its terminal
+    // looks dead. See docs/issues/resolved/2026-07-05_claude-auth-login-terminal-no-input.md.
+    return new LaunchSpec("exec claude", true, env);
   }
 
   /**

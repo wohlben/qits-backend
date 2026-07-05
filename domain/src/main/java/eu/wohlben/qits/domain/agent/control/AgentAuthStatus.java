@@ -11,7 +11,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  * {@code claude auth status} inside the worktree container with {@code HOME} pointed at the mounted
  * volume, so it reflects the one-time OAuth login an operator did (see {@code
  * docker/workspace/agent-login.sh}). Used by {@link AgentLaunchService} to redirect a chat launch
- * to an interactive {@code claude auth login} terminal when the agent isn't signed in yet.
+ * to an interactive {@code claude} REPL terminal (its onboarding paste login) when the agent isn't
+ * signed in yet.
  */
 @ApplicationScoped
 public class AgentAuthStatus {
