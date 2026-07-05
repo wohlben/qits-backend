@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cache xmlns="http://maven.apache.org/BUILD-CACHE-CONFIG/1.2.0"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://maven.apache.org/BUILD-CACHE-CONFIG/1.2.0 https://maven.apache.org/xsd/build-cache-config-1.2.0.xsd">
+
+    <!--
+      Conservative, LOCAL-ONLY build cache config (see docs/features for the rollout plan).
+
+      The cache keys each module on the hash of its inputs (sources, resources, POM, dependency
+      coordinates, effective plugin config). On a hit it restores that module's outputs (jar +
+      the attached `quarkus-app` dir) and skips every bound goal — compile, Spotless, Surefire,
+      and the Quinoa pnpm/Angular build. Granularity is the whole module: any input change to a
+      module rebuilds all of it (there is no "recompile Java but skip Quinoa" within one module).
+      The wins are therefore: no-op rebuilds, restoring modules whose inputs are untouched (e.g.
+      `domain`/`cli` while iterating on `service`, or `service` while iterating on `cli`), and
+      cross-checkout reuse.
+    -->
+
+    <configuration>
+        <enabled>true</enabled>
+        <!-- XX: fastest, non-cryptographic. Fine for a local dev cache; no cross-machine trust needed. -->
+        <hashAlgorithm>XX</hashAlgorithm>
+        <validateXml>true</validateXml>
+        <!-- Remote/shared cache is deliberately off for now (see the feature doc's open questions:
+             it needs a hosting + write-trust decision before CI reuse is safe). -->
+        <remote enabled="false"/>
+        <!-- Non-artifact build outputs that a cache restore would otherwise drop:
+
+             - classes: Quarkus resolves reactor SIBLINGS by reading their target/classes DIRECTORY
+               (workspace bootstrap), not their installed jar. Without this, a module REBUILT while
+               `domain` is restored (e.g. changing only `cli`) indexes an empty domain/target/classes
+               and fails ArC with "Unsatisfied dependency" for every domain bean. This also carries the
+               compiled MapStruct *MapperImpl classes, so it directly rules out the stale-generated-code
+               gotcha the feature doc flagged. Restoring target/classes is REQUIRED for correctness here.
+             - quarkus-app: fast-jar packaging (service, cli) writes target/quarkus-app/, not a Maven
+               artifact — needed so a restore yields a runnable app (runner + bundled Angular UI). -->
+        <attachedOutputs>
+            <dirNames>
+                <dirName>classes</dirName>
+                <dirName>quarkus-app</dirName>
+            </dirNames>
+        </attachedOutputs>
+        <local>
+            <maxBuildsCached>5</maxBuildsCached>
+        </local>
+    </configuration>
+
+    <input>
+        <global>
+            <!-- Default glob is "*" (all file types), so Angular sources (.ts/.html/.scss/.json)
+                 are hashed once webui/ is on the scan list below — no glob narrowing that could
+                 silently drop a frontend file type and produce a false cache hit. -->
+            <includes>
+                <!-- The Angular app lives outside the default src/main/{java,resources} scan roots,
+                     so a webui-only change would be a FALSE HIT unless we add it explicitly. Its
+                     regenerable subdirs are excluded below. -->
+                <include>src/main/webui</include>
+            </includes>
+            <excludes>
+                <!-- Gitignored, regenerable fixture CHECKOUTS beside the committed bare *.git repos
+                     (domain module). One is ~290MB (a full Quarkus+Angular app with its own
+                     node_modules/target) — hashing it would be slow and unstable. The bare *.git
+                     repos themselves ARE the test inputs and stay hashed. -->
+                <exclude>src/test/resources/fixtures/testing-repo</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular</exclude>
+
+                <!-- webui/: regenerable build/tooling artifacts, none of which affect the Angular
+                     production build's output. (.pi, public/, src/ ARE tracked inputs — kept.) -->
+                <exclude>src/main/webui/node_modules</exclude>
+                <exclude>src/main/webui/dist</exclude>
+                <exclude>src/main/webui/.angular</exclude>
+                <exclude>src/main/webui/.vitest-attachments</exclude>
+                <exclude>src/main/webui/.vscode</exclude>
+                <exclude>src/main/webui/.claude</exclude>
+            </excludes>
+        </global>
+    </input>
+
+    <executionControl>
+        <runAlways>
+            <plugins>
+                <!-- Integration tests (`-Pextended`, docker-dependent) are environment-sensitive and
+                     self-skipping; never serve them from cache. -->
+                <plugin artifactId="maven-failsafe-plugin"/>
+            </plugins>
+        </runAlways>
+    </executionControl>
+</cache>
