@@ -89,6 +89,8 @@ public class CommandService {
    * What a launch needs regardless of where it came from: an action or a coding agent. {@code
    * actionId} is null for agent launches (they aren't backed by an action). {@code otel} injects
    * the OTLP exporter environment (daemons with the toggle set; see {@link OtelEnvironment}).
+   * {@code publicBase} is the proxied base path a web-viewable daemon must serve under, injected as
+   * {@code QITS_PUBLIC_BASE}; null for everything else.
    */
   private record LaunchDescriptor(
       String actionId,
@@ -97,7 +99,8 @@ public class CommandService {
       boolean interactive,
       Map<String, String> environment,
       CommandKind kind,
-      boolean otel) {
+      boolean otel,
+      String publicBase) {
 
     static LaunchDescriptor of(ResolvedAction action) {
       return new LaunchDescriptor(
@@ -107,7 +110,8 @@ public class CommandService {
           action.interactive(),
           action.environment(),
           CommandKind.TERMINAL,
-          false);
+          false,
+          null);
     }
   }
 
@@ -138,7 +142,7 @@ public class CommandService {
             repoId,
             worktreeId,
             new LaunchDescriptor(
-                null, name, script, interactive, environment, CommandKind.TERMINAL, false));
+                null, name, script, interactive, environment, CommandKind.TERMINAL, false, null));
     registry.spawn(
         p.dto().id(), p.container(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
@@ -159,7 +163,8 @@ public class CommandService {
         prepare(
             repoId,
             worktreeId,
-            new LaunchDescriptor(null, name, script, false, environment, CommandKind.CHAT, false));
+            new LaunchDescriptor(
+                null, name, script, false, environment, CommandKind.CHAT, false, null));
     registry.spawnChat(
         p.dto().id(),
         p.container(),
@@ -188,6 +193,7 @@ public class CommandService {
       String script,
       Map<String, String> environment,
       boolean otel,
+      String publicBase,
       CommandExitListener exitListener,
       CommandLogWriter logWriterTap,
       CommandOutputSink... observerSinks) {
@@ -195,7 +201,8 @@ public class CommandService {
         prepare(
             repoId,
             worktreeId,
-            new LaunchDescriptor(null, name, script, true, environment, CommandKind.DAEMON, otel));
+            new LaunchDescriptor(
+                null, name, script, true, environment, CommandKind.DAEMON, otel, publicBase));
     CommandExitListener composite =
         (commandId, exitCode, terminatedManually) -> {
           onExit(commandId, exitCode, terminatedManually);
@@ -302,6 +309,12 @@ public class CommandService {
       // The command id exists here (createRunning above) — each (re)launch exports with its own
       // qits.command.id. The definition overlay stays last so an explicit user OTEL_* var wins.
       env.putAll(otelEnvironment.forLaunch(repoId, worktreeId, dto.id(), descriptor.name()));
+    }
+    if (descriptor.publicBase() != null) {
+      // Web-viewable daemons serve under the proxied base path (the startScript passes it to the
+      // dev server, e.g. `vite --base "$QITS_PUBLIC_BASE"`). Before the definition overlay so an
+      // explicit user var wins, like OTEL_* above.
+      env.put("QITS_PUBLIC_BASE", descriptor.publicBase());
     }
     env.putAll(descriptor.environment());
 

@@ -372,6 +372,114 @@ public class DaemonSupervisorTest {
   }
 
   @Test
+  public void webViewableDaemonExposesProxyTargetAndPath() throws Exception {
+    // Definition first: the container (created with the worktree below) publishes the port only
+    // when the daemon already declares it at creation time.
+    String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
+    var project = projectService.create("Proxy Daemon Project", null);
+    var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
+    String daemonId =
+        repositoryDaemonService.create(
+                repo.id,
+                "web",
+                null,
+                "sleep 300",
+                null,
+                "TERM",
+                RestartPolicy.NEVER,
+                0,
+                null,
+                8123,
+                null,
+                null,
+                null)
+            .id;
+    worktreeService.createWorktree(repo.id, "work", "master", "work");
+
+    supervisor.start(repo.id, "work", daemonId);
+    try {
+      DaemonInstanceDto ready = awaitStatus(repo.id, daemonId, DaemonStatus.READY);
+      assertEquals(
+          "/daemon/work/" + daemonId + "/",
+          ready.proxyPath(),
+          "the instance DTO carries the proxied base path");
+
+      var target = supervisor.proxyTarget("work", daemonId);
+      assertTrue(target.isPresent(), "a live web-viewable daemon has a proxy target");
+      assertEquals(DaemonStatus.READY, target.get().status());
+      // FakeContainerRuntime maps published ports 1:1 (fake containers are host processes).
+      assertEquals(8123, target.get().hostPort());
+
+      assertTrue(
+          supervisor.proxyTarget("work", "no-such-daemon").isEmpty(),
+          "unknown daemon id resolves to nothing");
+    } finally {
+      supervisor.stop(repo.id, "work", daemonId);
+      awaitStatus(repo.id, daemonId, DaemonStatus.STOPPED);
+    }
+
+    var stopped = supervisor.proxyTarget("work", daemonId);
+    assertTrue(stopped.isPresent(), "a stopped instance still resolves (the proxy 502s on it)");
+    assertEquals(DaemonStatus.STOPPED, stopped.get().status());
+  }
+
+  @Test
+  public void daemonWithoutHttpPortHasNoProxyTargetOrPath() throws Exception {
+    String repoId = repoWithWorktree();
+    String daemonId = createDaemon(repoId, "plain", "sleep 300", null, RestartPolicy.NEVER, 0);
+
+    supervisor.start(repoId, "work", daemonId);
+    try {
+      DaemonInstanceDto ready = awaitStatus(repoId, daemonId, DaemonStatus.READY);
+      assertEquals(null, ready.proxyPath(), "no httpPort, no proxy path");
+      assertTrue(supervisor.proxyTarget("work", daemonId).isEmpty());
+    } finally {
+      supervisor.stop(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
+    }
+  }
+
+  @Test
+  public void containerPredatingTheHttpPortWarnsAndLeavesTheWebViewUnavailable() throws Exception {
+    // Worktree (and thus container) first, definition second: the container cannot publish the
+    // port, so the daemon runs but the web view stays unavailable until a recreation.
+    String repoId = repoWithWorktree();
+    String daemonId =
+        repositoryDaemonService.create(
+                repoId,
+                "late-port",
+                null,
+                "sleep 300",
+                null,
+                "TERM",
+                RestartPolicy.NEVER,
+                0,
+                null,
+                8124,
+                null,
+                null,
+                null)
+            .id;
+
+    supervisor.start(repoId, "work", daemonId);
+    try {
+      awaitStatus(repoId, daemonId, DaemonStatus.READY);
+      var target = supervisor.proxyTarget("work", daemonId);
+      assertTrue(target.isPresent(), "the instance resolves — with an unpublished port");
+      assertEquals(null, target.get().hostPort(), "no published port on a predating container");
+      awaitEvent(
+          repoId,
+          e ->
+              e.severity() == DaemonEventSeverity.WARNING
+                  && e.summary() != null
+                  && e.summary().contains("recreate the container"));
+    } finally {
+      supervisor.stop(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
+    }
+  }
+
+  @Test
   public void oneRunningInstancePerWorktreeAndDaemon() throws Exception {
     String repoId = repoWithWorktree();
     String daemonId = createDaemon(repoId, "single", "sleep 300", null, RestartPolicy.NEVER, 0);
