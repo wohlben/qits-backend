@@ -172,6 +172,7 @@ public class CommandServiceTest {
             "env",
             Map.of("OTEL_SERVICE_NAME", "user-override"),
             true,
+            null,
             (commandId, exitCode, terminatedManually) -> {},
             null);
 
@@ -204,6 +205,7 @@ public class CommandServiceTest {
             "env",
             Map.of(),
             false,
+            null,
             (commandId, exitCode, terminatedManually) -> {},
             null);
 
@@ -211,6 +213,32 @@ public class CommandServiceTest {
     assertTrue(
         lines.stream().noneMatch(l -> l.content().contains("OTEL_EXPORTER_OTLP_ENDPOINT")),
         "no OTEL env without the toggle: " + lines);
+    assertTrue(
+        lines.stream().noneMatch(l -> l.content().contains("QITS_PUBLIC_BASE")),
+        "no public base without one: " + lines);
+  }
+
+  @Test
+  public void daemonLaunchWithPublicBaseInjectsIt() throws Exception {
+    String repoId = repoWithWorktree();
+
+    CommandDto command =
+        commandService.launchDaemon(
+            repoId,
+            "work",
+            "web daemon",
+            "env",
+            Map.of(),
+            false,
+            "/daemon/work/some-daemon-id/",
+            (commandId, exitCode, terminatedManually) -> {},
+            null);
+
+    List<CommandLogLineDto> lines = awaitStableLog(command.id());
+    assertTrue(
+        lines.stream()
+            .anyMatch(l -> l.content().contains("QITS_PUBLIC_BASE=/daemon/work/some-daemon-id/")),
+        "the proxied base path must be injected: " + lines);
   }
 
   /** Awaits the async log until its size is stable across two polls (the `env` dump is large). */

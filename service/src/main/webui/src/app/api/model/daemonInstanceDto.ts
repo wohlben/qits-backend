@@ -16,6 +16,7 @@ export interface DaemonInstanceDto {
     status?: DaemonStatus;
     restartCount?: number;
     commandId?: string;
+    proxyPath?: string;
 }
 export namespace DaemonInstanceDto {
 }

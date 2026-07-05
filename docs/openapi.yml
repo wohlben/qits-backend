@@ -405,6 +405,8 @@ components:
           format: int32
         commandId:
           type: string
+        proxyPath:
+          type: string
     DaemonStatus:
       type: string
       enum:
