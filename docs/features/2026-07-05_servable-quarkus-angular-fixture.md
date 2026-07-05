@@ -105,17 +105,37 @@ The existing `testing-repo` was a committed **git submodule** — heavier than w
 at `testing-repo.git`), the submodule was removed: `git submodule deinit`, drop the gitlink, delete
 `.gitmodules`, gitignore the dir. A fresh `git clone` of qits no longer needs `--recurse-submodules`.
 
+## Consumed by the `seed-webapp` CLI command
+
+`cli`'s **`seed-webapp`** command (`SeedWebappService`, sibling of the `testing-repo`-based
+`SeedService`) seeds a demo project around this fixture: a project + repository cloned from
+`testing-repo-quarkus-angular.git`, a **web-viewable `quarkus:dev` daemon** (`httpPort=8080`, so the
+web-view button lights up and the supervisor injects `QITS_PUBLIC_BASE`; the start script binds
+`0.0.0.0` and serves under that prefix), and a small branch tree (`mainline` advanced by a `feeder`,
+`behind-ff` fast-forwardable). Run it with `./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp`.
+
+**Idempotent by reset:** unlike `seed` (skip-if-exists), `seed-webapp` *deletes* any prior "Quarkus +
+Angular Demo" project first (a project delete cascades its repos/worktrees/daemons), so every run
+returns to the same known-good state — the fixture serves both manual UI poking and, via
+`SeedWebappServiceTest`, automated regression tests.
+
+**Storage fix this surfaced:** the committed bare repo initially had all refs packed into
+`packed-refs`, leaving `refs/` empty. Maven's test-resource copy drops empty directories, so the
+copied repo lacked `refs/` and `git clone` rejected it. The fixture now keeps **loose refs**
+(`refs/heads/main`, …) like `testing-repo.git`. Separately, the three modules' poms now **exclude the
+gitignored editing checkouts** from the `fixtures` resource copy (they'd otherwise drag a nested
+`.git`, and a `node_modules` once the fixture is built, into `test-classes`).
+
 ## Not yet wired (follow-ups)
 
-The fixture exists and is servable, but nothing in qits consumes it yet. Deferred, each a small
-additive step:
-
-- **Seed a second project** from `testing-repo-quarkus-angular.git` in `SeedService` (it already
-  supports a `qits.seed.repo-url` override and builds fast-forwardable/diverged worktrees) so the
-  daemon/dev-server and action demos land on a real app. Keep the `testing-repo` project for the pure
-  git-mechanics demos.
-- **Tests** that need a *buildable/servable* worktree (daemon dev-server, action "run"/"test") can opt
-  into the new fixture; the heaviest belong under the docker-dependent **`-Pextended`** profile.
+- **A "diverged/conflict" worktree on this fixture.** `feature/greeting` is a *linear* descendant of
+  `main`, so `seed-webapp` can only demo the fast-forwardable state; a diverged worktree needs a
+  *cleanly-diverging* branch (one that shares an ancestor with `main` but merges without conflict, the
+  way `testing-repo`'s `feature` does). Adding such a branch means re-baking the bare repo. Until
+  then, the `seed` command covers the diverged demo on `testing-repo`.
+- **Servable-worktree tests.** Tests that actually build/run a worktree (a live `quarkus:dev` daemon,
+  action "run"/"test") belong under the docker-dependent **`-Pextended`** profile; `seed-webapp` is
+  the setup they'd reuse.
 - **`testing-repo`'s internal README** still describes itself as a submodule — a cosmetic staleness
   inside the fixture's own history; updating it means a new commit in `testing-repo.git`, deferred to
   avoid churning the committed bare-repo objects.

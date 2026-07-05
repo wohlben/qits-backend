@@ -32,6 +32,8 @@ public class Main {
 
     @Inject SeedService seedService;
 
+    @Inject SeedWebappService seedWebappService;
+
     @Inject GenerateMigrationService generateMigrationService;
 
     @Override
@@ -41,12 +43,16 @@ public class Main {
         case "seed":
           seedService.seed();
           return 0;
+        case "seed-webapp":
+          seedWebappService.seed();
+          return 0;
         case "generate-migration":
           generateMigrationService.generate();
           return 0;
         default:
           LOG.errorf(
-              "Usage: <command>. Known commands: seed, generate-migration. (got: '%s')", command);
+              "Usage: <command>. Known commands: seed, seed-webapp, generate-migration. (got: '%s')",
+              command);
           return 1;
       }
     }

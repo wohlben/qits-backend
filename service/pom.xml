@@ -116,10 +116,15 @@
             <testResource>
                 <directory>src/test/resources</directory>
             </testResource>
-            <!-- Share the git test fixture that lives in the domain module. -->
+            <!-- Share the git test fixtures that live in the domain module — only the committed
+                 bare *.git repos, not the gitignored editing checkouts beside them. -->
             <testResource>
                 <directory>${project.basedir}/../domain/src/test/resources/fixtures</directory>
                 <targetPath>fixtures</targetPath>
+                <excludes>
+                    <exclude>testing-repo/**</exclude>
+                    <exclude>testing-repo-quarkus-angular/**</exclude>
+                </excludes>
             </testResource>
         </testResources>
         <plugins>
