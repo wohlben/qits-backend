@@ -28,6 +28,7 @@ RUN apt-get update \
         procps \
         python3 \
         python3-venv \
+        tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # JDK 25 (Temurin, via the Adoptium apt repo). The projects this image builds — the Quarkus+Angular

@@ -224,6 +224,75 @@ public class CommandService {
     return p.dto();
   }
 
+  /** A prepared daemon run: the persisted RUNNING command row, its container, and resolved env. */
+  public record DaemonRun(CommandDto command, String container, Map<String, String> environment) {}
+
+  /**
+   * Prepare a daemon run without spawning: validate the worktree, snapshot branch/commit, persist a
+   * RUNNING {@code DAEMON} row, and resolve the env overlay (OTEL, {@code QITS_PUBLIC_BASE}, and
+   * the caller's env). The {@link DaemonSupervisor} starts the detached daemon session with the
+   * returned {@code environment}, then attaches a log follower to the returned command id via
+   * {@link #followDaemon}. The row's {@code script} is the daemon's own startScript (meaningful
+   * history), even though the process qits streams is the follower tail.
+   */
+  public DaemonRun beginDaemonRun(
+      String repoId,
+      String worktreeId,
+      String name,
+      String script,
+      Map<String, String> environment,
+      boolean otel,
+      String publicBase) {
+    Prepared p =
+        prepare(
+            repoId,
+            worktreeId,
+            new LaunchDescriptor(
+                null, name, script, true, environment, CommandKind.DAEMON, otel, publicBase));
+    return new DaemonRun(p.dto(), p.container(), p.env());
+  }
+
+  /**
+   * Attach a follower process (the daemon's {@code tail -F} of its mirror log) to an
+   * already-created command id, streaming its output through the same persistence + observer +
+   * replay pipeline as any command — so the ready-pattern, log observers, per-line persistence, and
+   * terminal re-attach all keep working while the daemon itself runs detached in its session. The
+   * follower carries no daemon env (that rode into the session); its own exit does not drive daemon
+   * lifecycle — the supervisor's liveness poll owns that.
+   */
+  public void followDaemon(
+      String commandId,
+      String container,
+      String followScript,
+      CommandExitListener exitListener,
+      CommandLogWriter logWriterTap,
+      CommandOutputSink... observerSinks) {
+    CommandExitListener composite =
+        (id, exitCode, terminatedManually) -> {
+          onExit(id, exitCode, terminatedManually);
+          exitListener.onExit(id, exitCode, terminatedManually);
+        };
+    CommandLogWriter logWriter =
+        logWriterTap == null
+            ? commandLogService
+            : (id, sequence, channel, content, timestamp) -> {
+              commandLogService.append(id, sequence, channel, content, timestamp);
+              try {
+                logWriterTap.append(id, sequence, channel, content, timestamp);
+              } catch (RuntimeException e) {
+                LOG.debugf(e, "Daemon log tap failed for command %s", id);
+              }
+            };
+    registry.spawn(
+        commandId,
+        container,
+        followScript,
+        Map.of("TERM", "xterm-256color"),
+        composite,
+        logWriter,
+        observerSinks);
+  }
+
   /**
    * Launch a non-interactive action and block for its result (the one-off run path). The command is
    * still registered and persisted, so it shows up in the Commands list and survives as history.
