@@ -120,7 +120,7 @@ is captured as its own follow-up: [periodic-checkpoint-push](../feature-ideas/pe
 ## Prerequisites (git-host is auto-resolved)
 
 `ensureContainer` clones over HTTP, so the container must be able to reach this app. That address now
-**auto-resolves** (`qits.workspace.git-host=auto`, the default — see `GitHostResolver`):
+**auto-resolves** (`qits.workspace.git-host=auto`, the default — see `QitsHostResolver`):
 `host.docker.internal` on plain Linux docker (wired via `--add-host=…:host-gateway`), or the WSL2
 distro's **eth0 IP** on WSL2 + Docker Desktop, where `host.docker.internal` isn't container-reachable.
 So it just works on both with no per-machine override; the old gitignored `service/.env` pin is no

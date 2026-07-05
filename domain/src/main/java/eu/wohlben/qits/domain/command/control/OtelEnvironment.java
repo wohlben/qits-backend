@@ -1,6 +1,6 @@
 package eu.wohlben.qits.domain.command.control;
 
-import eu.wohlben.qits.domain.repository.control.GitHostResolver;
+import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.LinkedHashMap;
@@ -15,14 +15,14 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  * by worktree — the correlation backbone of the observability feature.
  *
  * <p>The endpoint host is composed exactly like {@code WorktreeService}'s git URL: the process runs
- * inside a workspace container, so {@code localhost} would miss — {@link GitHostResolver} picks the
- * container-reachable address per environment. SDKs append {@code /v1/<signal>} to the endpoint
+ * inside a workspace container, so {@code localhost} would miss — {@link QitsHostResolver} picks
+ * the container-reachable address per environment. SDKs append {@code /v1/<signal>} to the endpoint
  * themselves, including its {@code /api/otel} path prefix.
  */
 @ApplicationScoped
 public class OtelEnvironment {
 
-  @Inject GitHostResolver gitHostResolver;
+  @Inject QitsHostResolver qitsHostResolver;
 
   @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
   int qitsPort;
@@ -37,7 +37,7 @@ public class OtelEnvironment {
     Map<String, String> env = new LinkedHashMap<>();
     env.put(
         "OTEL_EXPORTER_OTLP_ENDPOINT",
-        "http://" + gitHostResolver.gitHost() + ":" + qitsPort + "/api/otel");
+        "http://" + qitsHostResolver.qitsHost() + ":" + qitsPort + "/api/otel");
     env.put("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
     env.put("OTEL_SERVICE_NAME", serviceName);
     env.put(

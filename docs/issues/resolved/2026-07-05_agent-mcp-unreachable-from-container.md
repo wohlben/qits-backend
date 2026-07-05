@@ -1,5 +1,13 @@
 # Agent MCP server unreachable from the container — MCP URL uses `localhost`, not the resolved git host
 
+> **Resolved 2026-07-05.** `AgentLaunchService` no longer defaults the MCP base URLs to
+> `http://localhost:8080`. The `qits.actions-mcp.url` / `qits.repository-mcp.url` config properties
+> are now optional explicit overrides; when unset (the default) the URL is derived from
+> `QitsHostResolver.qitsHost()` + `qits.workspace.qits-port` as
+> `http://<resolved-host>:<port>/mcp/<server>` — the same container-reachable host the git clone and
+> the OTLP endpoint already use (`WorktreeService`, `OtelEnvironment`). Regression test:
+> `AgentLaunchServiceTest#mcpUrlsUseTheContainerReachableGitHostNotLocalhost`.
+
 ## Introduction
 
 Related / dependent plans:
@@ -40,7 +48,7 @@ container cannot reach.
 
 Resolve the MCP URL host the same way the git host is resolved, instead of hardcoding `localhost`:
 
-- Reuse the existing git-host resolution (`GitHostResolver` / whatever backs `qits.workspace.git-host=auto`)
+- Reuse the existing host resolution (`QitsHostResolver` / whatever backs `qits.workspace.git-host=auto`)
   to produce the container-reachable host, and build the MCP URLs from it + `qits-port` rather than
   from a `localhost` default. i.e. the agent's `--mcp-config` URL should be
   `http://<resolved-host>:<port>/mcp/<server>?…`, matching how the container already reaches qits for
