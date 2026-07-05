@@ -17,6 +17,8 @@ import { PromptRefinementControllerService } from '@/api/api/promptRefinementCon
 import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { ZardButtonComponent } from '@/shared/components/button';
+import { PromptContextStore } from '@/shared/state/prompt-context.store';
+import { formatSnippetsForPrompt } from '@/shared/state/snippet-format';
 import { WavRecorder } from './wav-recorder';
 
 /**
@@ -109,6 +111,31 @@ import { WavRecorder } from './wav-recorder';
         }
       </section>
 
+      <!-- Elements picked from a daemon web view; all listed snippets ride along with the launch
+           (remove the ones you don't want). The cache is root-scoped and survives navigation. -->
+      @if (promptContext.count() > 0) {
+        <section class="flex flex-col gap-2">
+          <span class="text-sm font-medium">Picked elements (attached to the prompt)</span>
+          @for (snippet of promptContext.snippets(); track snippet.id) {
+            <div class="flex items-center gap-2 rounded-md border p-2 text-sm">
+              <code class="text-xs text-muted-foreground">&lt;{{ snippet.tag }}&gt;</code>
+              <span class="flex-1 truncate" [title]="snippet.selector">
+                {{ snippet.textPreview || snippet.selector }}
+              </span>
+              <button
+                z-button
+                zType="ghost"
+                type="button"
+                (click)="promptContext.remove(snippet.id)"
+                [attr.aria-label]="'Remove picked element ' + snippet.tag"
+              >
+                Remove
+              </button>
+            </div>
+          }
+        </section>
+      }
+
       @if (refinedPrompt() !== null) {
         <section class="flex flex-col gap-2">
           <label class="flex flex-col gap-1 text-sm">
@@ -153,6 +180,7 @@ export class SpeakToPromptComponent {
   private readonly refinementService = inject(PromptRefinementControllerService);
   private readonly agentService = inject(AgentControllerService);
   private readonly router = inject(Router);
+  protected readonly promptContext = inject(PromptContextStore);
 
   readonly transcript = signal('');
   /** Null until a refinement (or "as-is") produced something — gates the launch section. */
@@ -227,6 +255,8 @@ export class SpeakToPromptComponent {
   launch() {
     const prompt = this.refinedPrompt()?.trim();
     if (!prompt) return;
-    this.launchMutation.mutate(prompt);
+    const snippets = this.promptContext.snippets();
+    const context = snippets.length ? prompt + '\n\n' + formatSnippetsForPrompt(snippets) : prompt;
+    this.launchMutation.mutate(context);
   }
 }

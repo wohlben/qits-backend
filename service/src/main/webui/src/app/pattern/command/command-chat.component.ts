@@ -4,12 +4,15 @@ import {
   OnDestroy,
   OnInit,
   computed,
+  inject,
   input,
   signal,
 } from '@angular/core';
 
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardInputDirective } from '@/shared/components/input';
+import { PickedSnippet, PromptContextStore } from '@/shared/state/prompt-context.store';
+import { formatSnippetsForPrompt } from '@/shared/state/snippet-format';
 import { ChatTranscriptComponent } from './chat-transcript.component';
 import { isTurnEnd, linesToItems } from './chat-stream';
 
@@ -29,6 +32,26 @@ type Status = 'connecting' | 'open' | 'closed';
     <div class="flex flex-col gap-3 rounded-lg border p-4" [class]="heightClass()">
       <!-- The host must grow for the transcript's inner scroller to work and the form to pin. -->
       <app-chat-transcript class="flex min-h-0 flex-1 flex-col" [items]="items()" [waiting]="thinking()" />
+
+      <!-- Elements picked from a daemon web view (root-scoped cache) — click to drop one into
+           the draft as a fenced HTML block. -->
+      @if (promptContext.count() > 0) {
+        <div class="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+          <span>Picked:</span>
+          @for (snippet of promptContext.snippets(); track snippet.id) {
+            <button
+              z-button
+              zType="outline"
+              zSize="sm"
+              type="button"
+              [title]="'Insert ' + snippet.selector + ' into the message'"
+              (click)="insertSnippet(snippet)"
+            >
+              {{ snippet.tag }}
+            </button>
+          }
+        </div>
+      }
 
       <form class="flex items-center gap-2" (submit)="onSubmit($event)">
         <input
@@ -50,6 +73,8 @@ export class CommandChatComponent implements OnInit, OnDestroy {
   readonly commandId = input.required<string>();
   /** Container height; the chat dialog overrides this to fill its full-size body. */
   readonly heightClass = input('h-[70vh]');
+
+  protected readonly promptContext = inject(PromptContextStore);
 
   private readonly lines = signal<string[]>([]);
   readonly items = computed(() => linesToItems(this.lines()));
@@ -99,6 +124,12 @@ export class CommandChatComponent implements OnInit, OnDestroy {
     if (incoming.some(isTurnEnd)) {
       this.thinking.set(false);
     }
+  }
+
+  insertSnippet(snippet: PickedSnippet): void {
+    this.draft.update((draft) =>
+      (draft ? draft + '\n' : '') + formatSnippetsForPrompt([snippet]),
+    );
   }
 
   onSubmit(event: Event): void {
