@@ -39,26 +39,26 @@ export class PromptRefinementControllerService extends BaseService {
 
     /**
      * Refine
-     * @endpoint post /api/repositories/{repoId}/worktrees/{worktreeId}/prompt-refinements
+     * @endpoint post /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-refinements
      * @param repoId 
-     * @param worktreeId 
+     * @param workspaceId 
      * @param refinePromptRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost(repoId: string, worktreeId: string, refinePromptRequest: RefinePromptRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response1>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost(repoId: string, worktreeId: string, refinePromptRequest: RefinePromptRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response1>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost(repoId: string, worktreeId: string, refinePromptRequest: RefinePromptRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response1>>;
-    public apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost(repoId: string, worktreeId: string, refinePromptRequest: RefinePromptRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost(repoId: string, workspaceId: string, refinePromptRequest: RefinePromptRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response1>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost(repoId: string, workspaceId: string, refinePromptRequest: RefinePromptRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response1>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost(repoId: string, workspaceId: string, refinePromptRequest: RefinePromptRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response1>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost(repoId: string, workspaceId: string, refinePromptRequest: RefinePromptRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
-            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost.');
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost.');
         }
-        if (worktreeId === null || worktreeId === undefined) {
-            throw new Error('Required parameter worktreeId was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost.');
+        if (workspaceId === null || workspaceId === undefined) {
+            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost.');
         }
         if (refinePromptRequest === null || refinePromptRequest === undefined) {
-            throw new Error('Required parameter refinePromptRequest was null or undefined when calling apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost.');
+            throw new Error('Required parameter refinePromptRequest was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -95,7 +95,7 @@ export class PromptRefinementControllerService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/worktrees/${this.configuration.encodeParam({name: "worktreeId", value: worktreeId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/prompt-refinements`;
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/prompt-refinements`;
         const { basePath, withCredentials } = this.configuration;
         return this.httpClient.request<Response1>('post', `${basePath}${localVarPath}`,
             {

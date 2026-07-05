@@ -34,7 +34,7 @@ public class OtelEnvironmentTest {
     assertEquals("http/protobuf", env.get("OTEL_EXPORTER_OTLP_PROTOCOL"));
     assertEquals("my dev server", env.get("OTEL_SERVICE_NAME"));
     assertEquals(
-        "qits.worktree.id=wt-1,qits.repository.id=repo-uuid,qits.command.id=cmd-uuid",
+        "qits.workspace.id=wt-1,qits.repository.id=repo-uuid,qits.command.id=cmd-uuid",
         env.get("OTEL_RESOURCE_ATTRIBUTES"));
     assertEquals(4, env.size(), "no stray variables");
   }

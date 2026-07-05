@@ -5,7 +5,7 @@
 > are now optional explicit overrides; when unset (the default) the URL is derived from
 > `QitsHostResolver.qitsHost()` + `qits.workspace.qits-port` as
 > `http://<resolved-host>:<port>/mcp/<server>` — the same container-reachable host the git clone and
-> the OTLP endpoint already use (`WorktreeService`, `OtelEnvironment`). Regression test:
+> the OTLP endpoint already use (`WorkspaceService`, `OtelEnvironment`). Regression test:
 > `AgentLaunchServiceTest#mcpUrlsUseTheContainerReachableGitHostNotLocalhost`.
 
 ## Introduction
@@ -32,9 +32,9 @@ The MCP server URLs are hardcoded to `localhost`:
   `qits.repository-mcp.url` default `http://localhost:8080/mcp/repository` (lines ~83–89), used to
   build the `--mcp-config` the agent connects to.
 
-From **inside the worktree container**, `localhost:8080` is the container's own loopback, not the qits
+From **inside the workspace container**, `localhost:8080` is the container's own loopback, not the qits
 host. Meanwhile git clone/fetch works because it uses `qits.workspace.git-host=auto`, which resolves
-per environment to a container-reachable address. Verified live from a worktree container:
+per environment to a container-reachable address. Verified live from a workspace container:
 
 - git origin URL = `http://192.168.152.4:8080/git/<repoId>` (the WSL2 eth0 IP) — reachable (`/q/health`
   → 200 at that IP).
@@ -58,7 +58,7 @@ Resolve the MCP URL host the same way the git host is resolved, instead of hardc
 
 ## Repro / verification when fixed
 
-Launch an agent chat in a worktree and observe the init event: `mcp_servers[].status` should be
+Launch an agent chat in a workspace and observe the init event: `mcp_servers[].status` should be
 `connected` (not `failed`), and a tool call like `mcp__repository__listBranches` should return data.
 Cross-check reachability from the container:
 `docker exec <wt-container> curl -s -o /dev/null -w '%{http_code}' http://<resolved-host>:8080/mcp/repository`

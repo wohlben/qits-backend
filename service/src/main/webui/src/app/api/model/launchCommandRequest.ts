@@ -11,7 +11,7 @@
 
 export interface LaunchCommandRequest { 
     repoId: string;
-    worktreeId: string;
+    workspaceId: string;
     actionId: string;
 }
 

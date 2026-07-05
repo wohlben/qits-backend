@@ -5,7 +5,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { ProjectControllerService } from '@/api/api/projectController.service';
-import { WorktreeControllerService } from '@/api/api/worktreeController.service';
+import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { RepositoryDto } from '@/api/model/repositoryDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
@@ -48,7 +48,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
           New Feature Flow
         </a>
         <a z-button [routerLink]="['/projects', projectId, 'edit']">Edit</a>
-        <!-- Launches Claude Code in a repository's main worktree with the repository MCP scoped to
+        <!-- Launches Claude Code in a repository's main workspace with the repository MCP scoped to
              the whole project (no single-repository narrowing), so every repository is in reach. -->
         <button
           z-button
@@ -77,7 +77,7 @@ export class ProjectDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectControllerService);
-  private readonly worktreeService = inject(WorktreeControllerService);
+  private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly agentService = inject(AgentControllerService);
   private readonly queryClient = inject(QueryClient);
 
@@ -90,7 +90,7 @@ export class ProjectDetailPage {
   }));
 
   // The project's repositories — same key/shape as app-project-repository-list so they share a
-  // cache entry. Used to pick a main worktree to start the project-scoped Claude session in.
+  // cache entry. Used to pick a main workspace to start the project-scoped Claude session in.
   readonly repositoriesQuery = injectQuery(() => ({
     queryKey: ['project-repositories', this.projectId],
     queryFn: () =>
@@ -117,23 +117,23 @@ export class ProjectDetailPage {
     },
   }));
 
-  // Launch the project-scoped Claude session in a host repository's main worktree (resolving the
-  // worktree from its branch), then open its command terminal. The process is owned by the registry.
+  // Launch the project-scoped Claude session in a host repository's main workspace (resolving the
+  // workspace from its branch), then open its command terminal. The process is owned by the registry.
   readonly agentMutation = injectMutation(() => ({
     mutationFn: async (vars: { repoId: string; branch: string }) => {
-      const worktrees = await lastValueFrom(
-        this.worktreeService.apiRepositoriesRepoIdWorktreesGet(vars.repoId),
+      const workspaces = await lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesGet(vars.repoId),
       );
-      const worktreeId = worktrees.entries
-        ?.map((e) => e.worktree)
-        .find((w) => w?.branch === vars.branch)?.worktreeId;
-      if (!worktreeId) {
-        throw new Error('No worktree backs branch ' + vars.branch);
+      const workspaceId = workspaces.entries
+        ?.map((e) => e.workspace)
+        .find((w) => w?.branch === vars.branch)?.workspaceId;
+      if (!workspaceId) {
+        throw new Error('No workspace backs branch ' + vars.branch);
       }
       return lastValueFrom(
-        this.agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost(
+        this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           vars.repoId,
-          worktreeId,
+          workspaceId,
           { scope: AgentMcpScope.Project },
         ),
       );
@@ -146,7 +146,7 @@ export class ProjectDetailPage {
     },
   }));
 
-  /** Open the project-scoped Claude session in a host repository's main worktree. */
+  /** Open the project-scoped Claude session in a host repository's main workspace. */
   configureWithClaude() {
     const target = this.launchTarget();
     if (!target?.id || !target.mainBranch) return;

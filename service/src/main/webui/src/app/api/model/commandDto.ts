@@ -14,7 +14,7 @@ import { CommandStatus } from './commandStatus';
 export interface CommandDto { 
     id?: string;
     repoId?: string;
-    worktreeId?: string;
+    workspaceId?: string;
     branch?: string;
     commitHash?: string;
     shortCommitHash?: string;

@@ -13,7 +13,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div pageTitle>
         <h1 class="text-2xl font-bold">Daemons</h1>
         <p class="text-sm text-muted-foreground">
-          This repository's managed long-running processes (dev servers, watchers) its worktrees
+          This repository's managed long-running processes (dev servers, watchers) its workspaces
           can run
         </p>
       </div>

@@ -8,8 +8,8 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "jakarta")
 public interface CommandMapper {
 
-  @Mapping(target = "repoId", source = "worktree.repository.id")
-  @Mapping(target = "worktreeId", source = "worktree.worktreeId")
+  @Mapping(target = "repoId", source = "workspace.repository.id")
+  @Mapping(target = "workspaceId", source = "workspace.workspaceId")
   @Mapping(
       target = "shortCommitHash",
       expression =

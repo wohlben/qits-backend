@@ -9,19 +9,19 @@ control buttons. Related: [daemons](../features/2026-07-04_daemons.md).
 
 ## Symptom
 
-Clicking **Start** or **Stop** on a daemon in the worktree daemons panel does nothing — the status
+Clicking **Start** or **Stop** on a daemon in the workspace daemons panel does nothing — the status
 never changes. No error is surfaced (the mutation's `onSettled` just re-invalidates the list). The
 network tab shows the POST returning **404**.
 
 ## Observed repro
 
-With a live daemon (repo `3fe5ccd1…`, worktree `greeting`, daemon `39d2cfec…`), clicking Stop fires:
+With a live daemon (repo `3fe5ccd1…`, workspace `greeting`, daemon `39d2cfec…`), clicking Stop fires:
 
 ```
-POST /api/repositories/greeting/worktrees/39d2cfec-…(daemonId)/daemons/3fe5ccd1-…(repoId)/stop  → 404
+POST /api/repositories/greeting/workspaces/39d2cfec-…(daemonId)/daemons/3fe5ccd1-…(repoId)/stop  → 404
 ```
 
-The three path segments are rotated: `repoId` slot holds the worktreeId, `worktreeId` slot holds the
+The three path segments are rotated: `repoId` slot holds the workspaceId, `workspaceId` slot holds the
 daemonId, `daemonId` slot holds the repoId.
 
 ## Cause
@@ -29,23 +29,23 @@ daemonId, `daemonId` slot holds the repoId.
 The generated typescript-angular client orders path params **alphabetically**, not in path order:
 
 ```ts
-// service/src/main/webui/src/app/api/api/worktreeDaemonController.service.ts
-apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsDaemonIdStartPost(daemonId, repoId, worktreeId, …)
-apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsDaemonIdStopPost(daemonId, repoId, worktreeId, …)
+// service/src/main/webui/src/app/api/api/workspaceDaemonController.service.ts
+apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId, repoId, workspaceId, …)
+apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId, repoId, workspaceId, …)
 ```
 
-But both call sites in `service/src/main/webui/src/app/pattern/daemon/worktree-daemons.component.ts`
+But both call sites in `service/src/main/webui/src/app/pattern/daemon/workspace-daemons.component.ts`
 (`startMutation` ~L227, `stopMutation` ~L239) pass them **positionally in path order**
-`(this.repoId(), this.worktreeId(), daemonId)`, so the values land in the wrong slots and the URL
-404s. The sibling `…DaemonsGet(repoId, worktreeId)` is unaffected because for those two params
+`(this.repoId(), this.workspaceId(), daemonId)`, so the values land in the wrong slots and the URL
+404s. The sibling `…DaemonsGet(repoId, workspaceId)` is unaffected because for those two params
 alphabetical order already equals path order — the mismatch only bites when a param that sorts
 earlier (`daemonId`) appears later in the path.
 
 ## Fix (applied)
 
 Pass the arguments in the order the generated method declares them — `(daemonId, repoId,
-worktreeId)` — at both call sites. Added a regression test
-(`worktree-daemons.component.spec.ts`) asserting Start/Stop invoke the service with the correct
+workspaceId)` — at both call sites. Added a regression test
+(`workspace-daemons.component.spec.ts`) asserting Start/Stop invoke the service with the correct
 argument order.
 
 > **Follow-up worth considering:** this is a latent footgun for every generated multi-path-param

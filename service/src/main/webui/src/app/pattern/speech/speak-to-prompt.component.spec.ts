@@ -16,12 +16,12 @@ describe('SpeakToPromptComponent', () => {
     apiSpeechTranscriptionsPost: vi.fn().mockReturnValue(of({ text: 'spoken words' })),
   };
   const refinementService = {
-    apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost: vi
       .fn()
       .mockReturnValue(of({ prompt: 'refined prompt' })),
   };
   const agentService = {
-    apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost: vi
       .fn()
       .mockReturnValue(of({ command: { id: 'cmd-1' } })),
   };
@@ -44,7 +44,7 @@ describe('SpeakToPromptComponent', () => {
   function createComponent() {
     const fixture = TestBed.createComponent(SpeakToPromptComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
-    fixture.componentRef.setInput('worktreeId', 'wt-1');
+    fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.detectChanges();
     return fixture;
   }
@@ -56,7 +56,7 @@ describe('SpeakToPromptComponent', () => {
     await fixture.whenStable();
 
     expect(
-      refinementService.apiRepositoriesRepoIdWorktreesWorktreeIdPromptRefinementsPost,
+      refinementService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost,
     ).toHaveBeenCalledWith('repo-1', 'wt-1', { transcript: 'umm add a healthcheck' });
     expect(fixture.componentInstance.refinedPrompt()).toBe('refined prompt');
   });
@@ -67,7 +67,7 @@ describe('SpeakToPromptComponent', () => {
     fixture.componentInstance.launch();
     await fixture.whenStable();
 
-    expect(agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost).toHaveBeenCalledWith(
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
       'repo-1',
       'wt-1',
       { scope: AgentMcpScope.Repository, initialContext: 'do the thing' },
@@ -115,7 +115,7 @@ describe('SpeakToPromptComponent', () => {
     await fixture.whenStable();
 
     const [, , body] =
-      agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost.mock.calls[0];
+      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
     expect(body.scope).toBe(AgentMcpScope.Repository);
     expect(body.initialContext).toContain('fix this button');
     expect(body.initialContext).toContain('Picked element <button>');

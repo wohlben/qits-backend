@@ -8,26 +8,26 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@link WorktreeFileAccess} backed by {@code docker exec} into the worktree's container, so the
+ * {@link WorkspaceFileAccess} backed by {@code docker exec} into the workspace's container, so the
  * browser reads the container's actual live working tree ({@code /workspace}), uncommitted changes
- * included. The sibling of {@link WorktreeService}'s {@code containerGit} — it resolves the
+ * included. The sibling of {@link WorkspaceService}'s {@code containerGit} — it resolves the
  * container deterministically via {@link ContainerRuntime#containerName} and runs {@code
  * find}/{@code cat}/ {@code git} inside it.
  *
- * <p>Every command runs with workdir {@code /workspace} and worktree-relative paths, prefixed
+ * <p>Every command runs with workdir {@code /workspace} and workspace-relative paths, prefixed
  * {@code ./} when handed to {@code find} so a leading-dash filename can't be misread as a flag.
  * File content bypasses {@link ContainerRuntime#exec}'s {@code String} result (which line-joins and
  * re-encodes, corrupting binary bytes and trailing newlines) and reads the {@code docker exec}
  * process's raw stdout instead.
  */
 @ApplicationScoped
-public class ContainerFileAccess implements WorktreeFileAccess {
+public class ContainerFileAccess implements WorkspaceFileAccess {
 
   @Inject ContainerRuntime containers;
 
   @Override
-  public String git(String repoId, String worktreeId, String... args) {
-    String container = containers.containerName(worktreeId, repoId);
+  public String git(String repoId, String workspaceId, String... args) {
+    String container = containers.containerName(workspaceId, repoId);
     String[] argv = new String[args.length + 1];
     argv[0] = "git";
     System.arraycopy(args, 0, argv, 1, args.length);
@@ -45,8 +45,8 @@ public class ContainerFileAccess implements WorktreeFileAccess {
   }
 
   @Override
-  public Entry stat(String repoId, String worktreeId, String path) {
-    String container = containers.containerName(worktreeId, repoId);
+  public Entry stat(String repoId, String workspaceId, String path) {
+    String container = containers.containerName(workspaceId, repoId);
     ContainerRuntime.ExecResult result =
         containers.exec(
             container,
@@ -79,8 +79,8 @@ public class ContainerFileAccess implements WorktreeFileAccess {
   }
 
   @Override
-  public List<Entry> list(String repoId, String worktreeId, String dir) {
-    String container = containers.containerName(worktreeId, repoId);
+  public List<Entry> list(String repoId, String workspaceId, String dir) {
+    String container = containers.containerName(workspaceId, repoId);
     ContainerRuntime.ExecResult result =
         containers.exec(
             container,
@@ -101,8 +101,8 @@ public class ContainerFileAccess implements WorktreeFileAccess {
   }
 
   @Override
-  public int childCount(String repoId, String worktreeId, String dir) {
-    String container = containers.containerName(worktreeId, repoId);
+  public int childCount(String repoId, String workspaceId, String dir) {
+    String container = containers.containerName(workspaceId, repoId);
     ContainerRuntime.ExecResult result =
         containers.exec(
             container,
@@ -123,9 +123,9 @@ public class ContainerFileAccess implements WorktreeFileAccess {
   }
 
   @Override
-  public boolean resolvesInsideRoot(String repoId, String worktreeId, String path) {
-    String container = containers.containerName(worktreeId, repoId);
-    // Canonicalize both the worktree root and the target (all symlinks followed, -e requires
+  public boolean resolvesInsideRoot(String repoId, String workspaceId, String path) {
+    String container = containers.containerName(workspaceId, repoId);
+    // Canonicalize both the workspace root and the target (all symlinks followed, -e requires
     // existence) and confirm the target stays under the root. Comparing the resolved root rather
     // than
     // a literal "/workspace" keeps this correct under the test fake, where the container is a host
@@ -146,8 +146,8 @@ public class ContainerFileAccess implements WorktreeFileAccess {
   }
 
   @Override
-  public byte[] read(String repoId, String worktreeId, String path) {
-    String container = containers.containerName(worktreeId, repoId);
+  public byte[] read(String repoId, String workspaceId, String path) {
+    String container = containers.containerName(workspaceId, repoId);
     List<String> argv =
         new ArrayList<>(containers.execArgv(container, false, "/workspace", Map.of()));
     argv.add("cat");
@@ -177,7 +177,7 @@ public class ContainerFileAccess implements WorktreeFileAccess {
    * Parses {@code find <dir> -maxdepth 2 -mindepth 1 -printf '%d\t%y\t%s\t%p\n'} output into the
    * immediate children (depth 1). Each depth-1 directory's {@code childCount} is the number of
    * depth-2 entries nested under it. Leading {@code ./} (from the {@code find ./<dir>} start point)
-   * is stripped so paths are worktree-root-relative. Pure and static so it's unit-testable without
+   * is stripped so paths are workspace-root-relative. Pure and static so it's unit-testable without
    * a container.
    */
   static List<Entry> parseFindListing(String output) {

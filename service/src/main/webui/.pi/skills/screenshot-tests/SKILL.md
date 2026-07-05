@@ -111,4 +111,4 @@ Rules that matter:
 Working examples in this repo:
 
 - `src/app/ui/components/repository/commit-row.browser.spec.ts` → `__screenshots__/commit-row.browser.spec.ts/commit-list-chromium-linux.png`
-- `src/app/ui/components/repository/branch-tree.browser.spec.ts` → `__screenshots__/branch-tree.browser.spec.ts/worktree-tree-chromium-linux.png`
+- `src/app/ui/components/repository/branch-tree.browser.spec.ts` → `__screenshots__/branch-tree.browser.spec.ts/workspace-tree-chromium-linux.png`

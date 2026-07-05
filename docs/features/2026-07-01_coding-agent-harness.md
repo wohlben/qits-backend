@@ -6,7 +6,7 @@ Running a coding agent (today only Claude Code) was not a first-class concept: i
 generic **action** model as an `ActionVariant` enum, its dangerous flag-construction lived in
 `ActionResolutionService.claudeLaunch()`, its MCP-scoped launches were seeded as fake "global
 actions", and one flow (`ResolveConflictService`) hand-wrote its own `claude -p "$(cat …)"` script and
-a per-worktree prompt file. This feature introduces a proper harness abstraction — a `CodingAgent`
+a per-workspace prompt file. This feature introduces a proper harness abstraction — a `CodingAgent`
 builder with a single `ClaudeCodeAgent` implementation — and routes **every** Claude invocation
 through it.
 
@@ -21,7 +21,7 @@ Related / dependent plans:
   `CommandService.launchAgent(...)`.
 - Removes the `variant` concept added by [actions](2026-05-01_actions.md); actions are plain shell
   scripts again.
-- Reworks `repository.control.ResolveConflictService` (from [worktree-history](2026-06-30_worktree-history.md))
+- Reworks `repository.control.ResolveConflictService` (from [workspace-history](2026-06-30_workspace-history.md))
   to launch its autonomous Claude run through the agent path instead of a bespoke action + prompt file.
 
 ## Problem
@@ -71,7 +71,7 @@ LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE)
 (`@ApplicationScoped`) owns the MCP scope→URL construction (read-only allowlists, `?repositoryId=` /
 `?projectId=` query params, UUID validation — moved out of `ActionResolutionService`), builds the
 launch via the factory, and spawns it as a `Command`. It is exposed at
-`POST /api/repositories/{repoId}/worktrees/{worktreeId}/agents` (`AgentController`) with an
+`POST /api/repositories/{repoId}/workspaces/{workspaceId}/agents` (`AgentController`) with an
 `AgentMcpScope` (`ACTIONS` / `REPOSITORY` / `PROJECT`) and an optional `initialContext`. The three
 "Configure … with Claude" UI buttons call this instead of launching a seeded action.
 
@@ -82,7 +82,7 @@ anywhere.
 
 **`ResolveConflictService` migrated.** It no longer hand-writes a `claude` script, writes
 `.qits/resolve-prompt.md`, or creates a reusable "Resolve merge conflict" action. It forks the
-resolution worktree and composes the (injection-fenced) prompt in one committed transaction, then
+resolution workspace and composes the (injection-fenced) prompt in one committed transaction, then
 spawns an autonomous run via `AgentLaunchService.launchAutonomous(...)` and returns the spawned
 `commandId`. The prompt-injection defenses (`composePrompt` / `sanitizeSubject`) are unchanged and now
 travel inside the command line.

@@ -30,7 +30,7 @@ Run each daemon as a **detached `tmux` session inside its container**, mirror it
 qits tails, and **reconcile from the container on boot** instead of trusting lost in-memory state.
 Actions and chats keep the existing PTY `CommandSession` — only daemons change.
 
-Per daemon instance (the container is per-worktree, so `daemonId` is unique within it):
+Per daemon instance (the container is per-workspace, so `daemonId` is unique within it):
 
 - **Session** on a dedicated tmux socket `-L qits-<daemonId>` (a fresh server per daemon: it inherits
   the `docker exec -e` env at first start with no shared-server staleness, and isolates daemons from
@@ -51,7 +51,7 @@ Per daemon instance (the container is per-worktree, so `daemonId` is unique with
 
 ### Boot reconciliation
 
-On startup, for each repo's worktree containers and each daemon definition: if its tmux session is
+On startup, for each repo's workspace containers and each daemon definition: if its tmux session is
 alive, **re-adopt** it as a running instance (resume the logfile `tail -F`; do not mark the command
 INTERRUPTED), otherwise settle STOPPED. This is the piece that makes "restart qits → daemon still
 shows running, with logs" true.
@@ -93,7 +93,7 @@ input/resize — letting you drive e.g. Quarkus dev's `[r]`/`[e]` keys. Concrete
   (`DockerExecutor` → `exec tmux -L qits-<id> attach -t main`; `FakeContainerRuntime` → a
   `tail -f` of the logfile, so unit tests exercise the wiring without tmux; real tmux is covered by
   `WorkspaceContainerIT`).
-- A new `DaemonTerminalSocket` (`/api/terminal/daemons/{repoId}/{worktreeId}/{daemonId}`) spawns an
+- A new `DaemonTerminalSocket` (`/api/terminal/daemons/{repoId}/{workspaceId}/{daemonId}`) spawns an
   **ephemeral, per-connection** registry PTY (`CommandRegistry.spawn`) running that command with
   **no persistence** (no-op exit/log listeners — the follower owns the durable log). `onClose`
   terminates the attach client, which only *detaches* the tmux client; the detached daemon session
@@ -107,7 +107,7 @@ input/resize — letting you drive e.g. Quarkus dev's `[r]`/`[e]` keys. Concrete
 ## Notes
 
 - **screen vs tmux** — tmux chosen (richer scripting: `-L` sockets, `pipe-pane`, `has-session`).
-- **Auto-restart while unviewed** — adoption is lazy (triggered by a UI/API sighting of the worktree).
+- **Auto-restart while unviewed** — adoption is lazy (triggered by a UI/API sighting of the workspace).
   A daemon that crashes after a qits restart *and before anyone looks* won't auto-restart until first
   viewed. A `@Observes StartupEvent` eager reconcile across all repos would close this; deferred to
   keep boot cheap and avoid enumerating every repo's containers on every start.

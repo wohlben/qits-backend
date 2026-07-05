@@ -36,25 +36,25 @@ export const repositoriesRoutes: Routes = [
       import('./commit-detail/commit-detail.page').then((m) => m.CommitDetailPage),
   },
   {
-    path: ':repoId/worktrees/:worktreeId',
+    path: ':repoId/workspaces/:workspaceId',
     loadComponent: () =>
-      import('./worktree-detail/worktree-detail.page').then((m) => m.WorktreeDetailPage),
+      import('./workspace-detail/workspace-detail.page').then((m) => m.WorkspaceDetailPage),
   },
   {
-    path: ':repoId/worktrees/:worktreeId/wip',
+    path: ':repoId/workspaces/:workspaceId/wip',
     loadComponent: () =>
-      import('./worktree-wip/worktree-wip.page').then((m) => m.WorktreeWipPage),
+      import('./workspace-wip/workspace-wip.page').then((m) => m.WorkspaceWipPage),
   },
   {
     path: ':repoId/history',
     loadComponent: () =>
-      import('./worktree-history/worktree-history.page').then((m) => m.WorktreeHistoryPage),
+      import('./workspace-history/workspace-history.page').then((m) => m.WorkspaceHistoryPage),
   },
   {
     path: ':repoId/history/:id',
     loadComponent: () =>
-      import('./worktree-history-detail/worktree-history-detail.page').then(
-        (m) => m.WorktreeHistoryDetailPage,
+      import('./workspace-history-detail/workspace-history-detail.page').then(
+        (m) => m.WorkspaceHistoryDetailPage,
       ),
   },
 ];

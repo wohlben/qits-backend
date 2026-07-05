@@ -1,14 +1,14 @@
-# Speak-to-prompt: a worktree "work in progress" page
+# Speak-to-prompt: a workspace "work in progress" page
 
 ## Introduction
 
-Deciding what to do in a worktree meant typing. Now every worktree-backed branch on the
+Deciding what to do in a workspace meant typing. Now every workspace-backed branch on the
 repository detail page has a **"Work on it"** button that opens a dedicated WIP route
-(`/repositories/:repoId/worktrees/:worktreeId/wip`). There you press **Record** and
+(`/repositories/:repoId/workspaces/:workspaceId/wip`). There you press **Record** and
 describe the work out loud: the browser records a WAV, the backend transcribes it with
 **NVIDIA Parakeet** (ONNX, CPU, fully local), the transcript is editable, a small Claude
 model (**haiku**) rewrites it into a coherent coding-agent prompt, and the refined prompt
-launches the worktree's agent chat.
+launches the workspace's agent chat.
 
 Related plans:
 - Builds on the [coding-agent-harness](2026-07-01_coding-agent-harness.md): the refinement
@@ -57,7 +57,7 @@ launch variant (`start()`/`run()`/`chat()`).
 
 **`PromptRefinementService`** (`agent/control/`): rewrites the raw transcript into a
 coding-agent prompt via `CodingAgentFactory.ofType(CLAUDE).model(refinementModel).run(metaPrompt)`.
-The meta-prompt embeds the worktree's branch and preamble (goal) and instructs the model
+The meta-prompt embeds the workspace's branch and preamble (goal) and instructs the model
 to fix STT artifacts, preserve every technical detail, invent nothing, and output only the
 prompt text. Runs **directly** through **`ProcessExecutor`** (timeout-capable one-shot
 runner, stdout/stderr kept separate — stdout *is* the refined prompt) rather than the
@@ -66,7 +66,7 @@ a neutral cwd so the target repo's CLAUDE.md isn't loaded for a pure text-rewrit
 Model configurable: `qits.refinement.model` (default `haiku`).
 
 **`PromptRefinementController`**:
-`POST /api/repositories/{repoId}/worktrees/{worktreeId}/prompt-refinements`
+`POST /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-refinements`
 `{transcript}` → `{prompt}`. Synchronous; typically 5–20 s.
 
 **`initialContext` on agent chat launches now works** (`AgentLaunchService.launchChat`):
@@ -86,15 +86,15 @@ the browser, no npm deps. Live mic-level signal, gesture-safe AudioContext, chat
 `[speech]` console logging (speech capture has many silent failure modes), and actionable
 `getUserMedia` error messages (denied / no mic / mic busy).
 
-**WIP page** (`pages/repositories/worktree-wip/worktree-wip.page.ts`): shows the worktree
+**WIP page** (`pages/repositories/workspace-wip/workspace-wip.page.ts`): shows the workspace
 (branch, parent, preamble as markdown) above `pattern/speech/speak-to-prompt.component.ts`
 — Record (text pops up at every pause; segment uploads are serialized to keep order;
 Stop flushes the tail) → editable transcript → **Refine into prompt** (or "Use transcript
 as-is") → editable prompt → **Launch agent with this prompt** → navigates to
-`/commands/:id`. The worktrees query shares the key *and shape* of the branch list's
-(`['worktrees', repoId]` → `WorktreeDto[]`).
+`/commands/:id`. The workspaces query shares the key *and shape* of the branch list's
+(`['workspaces', repoId]` → `WorkspaceDto[]`).
 
-**Navigation**: `branch-row` gained an `openWip` output ("Work on it", worktree rows
+**Navigation**: `branch-row` gained an `openWip` output ("Work on it", workspace rows
 only), forwarded through `branch-tree` and handled in `branch-list`.
 
 ## Known limitations
@@ -125,6 +125,6 @@ only), forwarded through `branch-tree` and handled in `branch-list`.
 - `speak-to-prompt.component.spec.ts` — upload posts base64 and appends the transcript;
   refine posts the edited transcript; launch posts `{scope, initialContext}` and
   navigates.
-- `branch-row.component.spec.ts` — "Work on it" only on worktree-backed rows.
+- `branch-row.component.spec.ts` — "Work on it" only on workspace-backed rows.
 - Verified end-to-end with a fake-mic browser fed synthesized speech: word-perfect
   Parakeet transcript → haiku-refined prompt → agent launch.

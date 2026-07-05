@@ -10,7 +10,7 @@ import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.entity.Repository;
-import eu.wohlben.qits.domain.repository.entity.Worktree;
+import eu.wohlben.qits.domain.repository.entity.Workspace;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -52,14 +52,14 @@ public class PromptRefinementServiceTest {
   public void setUp() {
     executor = new FakeProcessExecutor();
     QuarkusMock.installMockForType(executor, ProcessExecutor.class);
-    repoId = seedWorktree();
-    // The refinement provisions the worktree container; pre-create it so ensureContainer no-ops
+    repoId = seedWorkspace();
+    // The refinement provisions the workspace container; pre-create it so ensureContainer no-ops
     // (there is no real origin to clone from in this unit test).
     containers.run(repoId, "wt-feature", "feature-branch", null, java.util.List.of());
   }
 
   @Transactional
-  String seedWorktree() {
+  String seedWorkspace() {
     Project project = new Project();
     project.id = UUID.randomUUID().toString();
     project.name = "test project";
@@ -71,12 +71,12 @@ public class PromptRefinementServiceTest {
     repository.project = project;
     repository.persist();
 
-    Worktree worktree = new Worktree();
-    worktree.worktreeId = "wt-feature";
-    worktree.repository = repository;
-    worktree.branch = "feature-branch";
-    worktree.preamble = "Add a health endpoint";
-    worktree.persist();
+    Workspace workspace = new Workspace();
+    workspace.workspaceId = "wt-feature";
+    workspace.repository = repository;
+    workspace.branch = "feature-branch";
+    workspace.preamble = "Add a health endpoint";
+    workspace.persist();
     return repository.id;
   }
 
@@ -85,7 +85,7 @@ public class PromptRefinementServiceTest {
     String prompt = service.refine(repoId, "wt-feature", "umm add a healthcheck please");
 
     assertEquals("refined prompt", prompt);
-    // The claude run is routed into the worktree container: the command ends with `bash -lc
+    // The claude run is routed into the workspace container: the command ends with `bash -lc
     // <claude script>` behind the container exec prefix.
     int n = executor.lastCommand.size();
     assertEquals(List.of("bash", "-lc"), executor.lastCommand.subList(n - 3, n - 1));
@@ -94,8 +94,8 @@ public class PromptRefinementServiceTest {
     assertTrue(script.contains("--model 'haiku'"), script);
     assertTrue(script.contains("umm add a healthcheck please"), script);
     assertTrue(script.contains("Add a health endpoint"), script);
-    // Branch context comes from the worktree's stored branch column.
-    assertTrue(script.contains("Worktree branch: feature-branch"), script);
+    // Branch context comes from the workspace's stored branch column.
+    assertTrue(script.contains("Workspace branch: feature-branch"), script);
   }
 
   @Test
@@ -111,12 +111,12 @@ public class PromptRefinementServiceTest {
   }
 
   @Test
-  public void invalidWorktreeIdIsRejected() {
+  public void invalidWorkspaceIdIsRejected() {
     assertThrows(BadRequestException.class, () -> service.refine(repoId, "../etc", "hi"));
   }
 
   @Test
-  public void unknownWorktreeIsNotFound() {
+  public void unknownWorkspaceIsNotFound() {
     assertThrows(NotFoundException.class, () -> service.refine(repoId, "no-such-wt", "hi"));
   }
 

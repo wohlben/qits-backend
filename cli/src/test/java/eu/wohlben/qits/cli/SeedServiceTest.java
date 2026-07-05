@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
-import eu.wohlben.qits.domain.repository.dto.WorktreeDto;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
+import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -37,11 +37,11 @@ public class SeedServiceTest {
 
   @Inject SeedService seedService;
   @Inject ProjectService projectService;
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Test
   @TestTransaction
-  public void seedsFastForwardableAndDivergedWorktrees() {
+  public void seedsFastForwardableAndDivergedWorkspaces() {
     // Drives the command via the real services with no JAX-RS request context — a guard for
     // the command-mode wiring (@ActivateRequestContext on seed()).
     assertTrue(seedService.seed(), "first seed should create data");
@@ -55,19 +55,19 @@ public class SeedServiceTest {
     assertNotNull(project, "Demo Project should exist");
 
     String repoId = projectService.getRepositories(project.id).get(0).id;
-    Map<String, WorktreeDto> byId = new java.util.HashMap<>();
-    for (WorktreeDto wt : worktreeService.listWorktrees(repoId)) {
-      byId.put(wt.worktreeId(), wt);
+    Map<String, WorkspaceDto> byId = new java.util.HashMap<>();
+    for (WorkspaceDto wt : workspaceService.listWorkspaces(repoId)) {
+      byId.put(wt.workspaceId(), wt);
     }
 
     // behind-ff: strictly behind its parent, nothing of its own -> fast-forwardable.
-    WorktreeDto behindFf = byId.get("behind-ff");
+    WorkspaceDto behindFf = byId.get("behind-ff");
     assertNotNull(behindFf);
     assertEquals(0, behindFf.ahead());
     assertTrue(behindFf.behind() > 0, "behind-ff should be behind its parent");
 
     // diverged: both ahead of and behind its parent -> warning, not fast-forwardable.
-    WorktreeDto diverged = byId.get("diverged");
+    WorkspaceDto diverged = byId.get("diverged");
     assertNotNull(diverged);
     assertTrue(diverged.ahead() > 0, "diverged should be ahead of its parent");
     assertTrue(diverged.behind() > 0, "diverged should be behind its parent");

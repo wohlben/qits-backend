@@ -19,7 +19,7 @@ Related/dependent plans:
 - Persistence rides the [command audit logs](./2026-06-30_command-audit-logs.md)
   pipeline (`CommandLogWriter` → batched `command_log_line` inserts, CLOB content); this idea
   removes the chat-side truncation that undermines it.
-- The [worktree chat dialog](./2026-07-04_worktree-chat-dialog.md) depends on re-attach being lossless:
+- The [workspace chat dialog](./2026-07-04_workspace-chat-dialog.md) depends on re-attach being lossless:
   its close/reopen cycle is a reconnect, so it inherits full restore for free once this lands.
 - Complements [command restore navigation](./2026-06-30_command-restore-navigation.md)
   (finding your way back to a session) — this covers what you *see* once you're back.

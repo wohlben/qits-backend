@@ -5,7 +5,7 @@
 The security payoff of [workspace containers](2026-07-04_workspace-containers.md) only fully lands
 when the **coding agent** — the single biggest executor of arbitrary commands in qits — runs inside
 the sandbox. Phase 1 already routes *all* command execution (including the stream-json chat) through
-`docker exec` into the per-worktree container and sets the `qits@local` git identity at container
+`docker exec` into the per-workspace container and sets the `qits@local` git identity at container
 init, so the mechanical relocation was already done. This phase adds the two things specific to the
 agent: the CLI in the image, and a credential hand-off that lets the in-container `claude`
 authenticate.
@@ -19,7 +19,7 @@ Related/dependent plans:
 - The [coding-agent harness](2026-07-01_coding-agent-harness.md) and the
   [stream-json chat](2026-07-01_stream-json-chat.md) protocol are what run inside the container; the
   registry still owns stdin/stdout, so [persistent chat sessions](2026-07-04_persistent-chat-sessions.md),
-  the [worktree chat dialog](2026-07-04_worktree-chat-dialog.md), and transcript restore are unchanged.
+  the [workspace chat dialog](2026-07-04_workspace-chat-dialog.md), and transcript restore are unchanged.
 - The [daemons](2026-07-04_daemons.md) agent-notification sink injects events by writing to the
   chat's stdin (`CommandRegistry.chatSend`) — that stdin is a `docker exec -i` pipe, unchanged by
   this phase. Daemon and agent share the same container, so "the dev server the agent just broke" is
@@ -47,7 +47,7 @@ agent's home (`~/.claude` — the login + state):
 
 - `DockerExecutor` creates the volume idempotently at startup (`ensureClaudeVolume`, a `docker volume
   create` on `StartupEvent`) and mounts it read/write at `qits.workspace.claude-mount` (default
-  `/claude-home`) on **every** worktree container (added to the `docker run` argv).
+  `/claude-home`) on **every** workspace container (added to the `docker run` argv).
 - Agent launches (`AgentLaunchService.renderChat` / `renderAutonomous`) set `HOME=<claude-mount>` as
   a `docker exec -e` overlay, so the in-container `claude` reads the login off the volume. The
   overlay rides the existing seam (`CodingAgent.environment` → `LaunchSpec.environment` →
@@ -55,12 +55,12 @@ agent's home (`~/.claude` — the login + state):
   unaffected.
 - The one-time **interactive OAuth login** is done by the operator via `docker/workspace/agent-login.sh`
   (runs `claude auth login` in a throwaway container as the host uid, writing `~/.claude` onto the
-  volume). The login can equally be done from any worktree's terminal in the qits UI — that terminal
+  volume). The login can equally be done from any workspace's terminal in the qits UI — that terminal
   already runs in a container with the shared volume mounted, so `claude auth login` there populates
-  the same volume for every worktree. Nothing about the login is qits' job at runtime.
+  the same volume for every workspace. Nothing about the login is qits' job at runtime.
 
 Git identity (`qits@local`) is already set repo-locally at container init
-(`WorktreeService.createContainerWorktree`), so agent commits just work; pushes go only to the
+(`WorkspaceService.createContainerWorkspace`), so agent commits just work; pushes go only to the
 qits-hosted origin.
 
 ### Sign-in redirect (no CLI needed)
@@ -68,7 +68,7 @@ qits-hosted origin.
 An operator doesn't have to know about `agent-login.sh`. When a chat is launched and the agent isn't
 signed in, qits redirects to the login instead of failing:
 
-- `AgentAuthStatus.isLoggedIn` runs `claude auth status` in the worktree container (HOME → the shared
+- `AgentAuthStatus.isLoggedIn` runs `claude auth status` in the workspace container (HOME → the shared
   volume) and reads the `loggedIn` field.
 - If not signed in, `AgentLaunchService.launchChat` returns an **interactive `claude auth login`
   terminal** (a normal registry PTY command, kind `TERMINAL`, named "Claude sign-in") instead of a
@@ -77,9 +77,9 @@ signed in, qits redirects to the login instead of failing:
   exactly that.
 - The "Configure … with Claude" buttons and the WIP route already `navigate(['/commands', id])`, and
   the command page renders a PTY for a `TERMINAL` command — so the operator lands in a normal
-  terminal, opens the printed URL, pastes the code, and is signed in. The worktree chat *dialog*
+  terminal, opens the printed URL, pastes the code, and is signed in. The workspace chat *dialog*
   (which embeds a chat inline) gets a one-line guard: a non-`CHAT` launch closes the dialog and
-  redirects to the command page. Signing in writes the shared volume, so every worktree is then
+  redirects to the command page. Signing in writes the shared volume, so every workspace is then
   authenticated; re-open the chat to start it.
 
 ### Removed: the seeded bare "Claude Code" action
@@ -95,19 +95,19 @@ The idea doc proposed **per-session `-e` injection** of an API key and explicitl
 `~/.claude`. This implementation does the opposite on purpose (operator's choice): a dedicated shared
 volume holds only the agent's login, populated once interactively, mounted into every container.
 
-**Accepted trade-off, stated:** because the volume is mounted on *every* worktree container (agent
+**Accepted trade-off, stated:** because the volume is mounted on *every* workspace container (agent
 and daemon share one container by design), **any command in any container — including a malicious
 dependency in an action or dev server — can read the login token off the volume.** This widens
 credential exposure versus per-session `-e` and versus the sandbox's original isolation goal. A
 compromised container can spend the credential (and, being shared, poison agent config for all
-worktrees) until the login is revoked. It still cannot reach the host, other credential stores, or
+workspaces) until the login is revoked. It still cannot reach the host, other credential stores, or
 external git remotes. Accepted for the prototype; recorded here as a known limit. Blank
 `qits.workspace.claude-volume` to disable the mount (agent auth then unavailable).
 
 ## Caveats
 
-- **Pre-existing worktree containers must be recreated** to pick up the volume — a mount can't be
-  added to a running container. Discard + recreate the worktree (or `docker rm -f` the container so
+- **Pre-existing workspace containers must be recreated** to pick up the volume — a mount can't be
+  added to a running container. Discard + recreate the workspace (or `docker rm -f` the container so
   reconciliation rebuilds it).
 - **Pre-existing seeded "Claude Code" rows** in an operator's H2 are left in place by the idempotent
   seeder; delete them if unwanted (they'd launch `claude` without the credential overlay).
@@ -131,6 +131,6 @@ external git remotes. Accepted for the prototype; recorded here as a known limit
    `docker run --rm qits/workspace claude --version`.
 2. `bash docker/workspace/agent-login.sh` → complete the OAuth login once; confirm
    `docker run --rm -v qits_shared_dot_claude:/claude-home qits/workspace ls /claude-home/.claude`.
-3. Start the service; create a repo + worktree; click a "Configure … with Claude" button — the chat
+3. Start the service; create a repo + workspace; click a "Configure … with Claude" button — the chat
    authenticates from the shared volume and streams a reply; ask it to write a file, commit, and the
    commit pushes back through the JGit server to the bare origin.

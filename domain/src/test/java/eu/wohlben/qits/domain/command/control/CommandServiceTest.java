@@ -12,7 +12,7 @@ import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -24,7 +24,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the registry-backed command lifecycle against a real cloned-fixture worktree: a
+ * Verifies the registry-backed command lifecycle against a real cloned-fixture workspace: a
  * non-interactive run records its result, a running command survives a detach and stops on
  * terminate, and startup reconciliation marks orphaned RUNNING rows as INTERRUPTED.
  */
@@ -48,7 +48,7 @@ public class CommandServiceTest {
 
   @Inject RepositoryService repositoryService;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject RepositoryActionService repositoryActionService;
 
@@ -58,12 +58,12 @@ public class CommandServiceTest {
 
   @Inject CommandLifecycleService commandLifecycleService;
 
-  /** Clones the fixture and adds a {@code work} worktree (off master) to run commands in. */
-  private String repoWithWorktree() throws Exception {
+  /** Clones the fixture and adds a {@code work} workspace (off master) to run commands in. */
+  private String repoWithWorkspace() throws Exception {
     String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
     var project = projectService.create("Command Project", null);
     var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
-    worktreeService.createWorktree(repo.id, "work", "master", "work");
+    workspaceService.createWorkspace(repo.id, "work", "master", "work");
     return repo.id;
   }
 
@@ -73,7 +73,7 @@ public class CommandServiceTest {
 
   @Test
   public void launchAndAwaitRunsAndRecordsTheCommand() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String actionId = createAction(repoId, "echo", "echo hello-cmd", false);
 
     var outcome = commandService.launchAndAwait(repoId, "work", actionId);
@@ -86,14 +86,14 @@ public class CommandServiceTest {
     CommandDto command = commands.get(0);
     assertEquals(CommandStatus.EXITED, command.status());
     assertEquals(Integer.valueOf(0), command.exitCode());
-    assertEquals("work", command.worktreeId());
+    assertEquals("work", command.workspaceId());
     assertEquals("work", command.branch());
     assertEquals(40, command.commitHash().length(), "full SHA captured: " + command.commitHash());
   }
 
   @Test
   public void capturesTheOutputLog() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String actionId = createAction(repoId, "echo", "echo hello-log", false);
 
     commandService.launchAndAwait(repoId, "work", actionId);
@@ -109,7 +109,7 @@ public class CommandServiceTest {
 
   @Test
   public void launchChatRecordsAChatCommandAndCapturesItsJsonLines() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
 
     // A stand-in stream-json process: emit two event lines and exit (no real claude in the test).
     CommandDto command =
@@ -135,7 +135,7 @@ public class CommandServiceTest {
 
   @Test
   public void chatLogRoundTripsEventsLargerThan64KbUntruncated() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
 
     // A single stream-json event well past the old 64 KB truncation cap, which used to corrupt
     // the stored line into invalid JSON.
@@ -161,7 +161,7 @@ public class CommandServiceTest {
 
   @Test
   public void daemonLaunchWithOtelInjectsExporterEnvAndUserOverridesWin() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
 
     // The daemon's own environment overrides one injected var — the definition overlay must win.
     CommandDto command =
@@ -186,8 +186,8 @@ public class CommandServiceTest {
         env.contains("qits.command.id=" + command.id()),
         "resource attributes must carry the persisted command id: " + env);
     assertTrue(
-        env.contains("qits.worktree.id=work,qits.repository.id=" + repoId),
-        "resource attributes must carry worktree + repository: " + env);
+        env.contains("qits.workspace.id=work,qits.repository.id=" + repoId),
+        "resource attributes must carry workspace + repository: " + env);
     assertTrue(
         env.contains("OTEL_SERVICE_NAME=user-override"),
         "an explicit user OTEL_* var must beat the injected one: " + env);
@@ -195,7 +195,7 @@ public class CommandServiceTest {
 
   @Test
   public void daemonLaunchWithoutOtelInjectsNothing() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
 
     CommandDto command =
         commandService.launchDaemon(
@@ -220,7 +220,7 @@ public class CommandServiceTest {
 
   @Test
   public void daemonLaunchWithPublicBaseInjectsIt() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
 
     CommandDto command =
         commandService.launchDaemon(
@@ -268,7 +268,7 @@ public class CommandServiceTest {
 
   @Test
   public void detachKeepsRunningAndTerminateStops() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String actionId = createAction(repoId, "sleep", "sleep 30", true);
 
     CommandDto launched = commandService.launch(repoId, "work", actionId);
@@ -298,7 +298,7 @@ public class CommandServiceTest {
 
   @Test
   public void startupReconciliationMarksOrphanedRunningAsInterrupted() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String actionId = createAction(repoId, "sleep", "sleep 30", true);
     CommandDto launched = commandService.launch(repoId, "work", actionId);
     assertEquals(CommandStatus.RUNNING, commandService.get(launched.id()).status());

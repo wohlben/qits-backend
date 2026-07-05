@@ -6,7 +6,7 @@ import { newestRunningChat } from './running-chat';
 function chat(overrides: Partial<CommandDto>): CommandDto {
   return {
     id: 'cmd-1',
-    worktreeId: 'wt-1',
+    workspaceId: 'wt-1',
     kind: CommandKind.Chat,
     status: CommandStatus.Running,
     launchedAt: '2026-07-04T10:00:00Z',
@@ -39,13 +39,13 @@ describe('newestRunningChat', () => {
     expect(newestRunningChat([...finished, running], 'wt-1')?.id).toBe('cmd-live');
   });
 
-  it("excludes other worktrees' chats", () => {
-    const other = chat({ id: 'cmd-other', worktreeId: 'wt-2' });
+  it("excludes other workspaces' chats", () => {
+    const other = chat({ id: 'cmd-other', workspaceId: 'wt-2' });
     expect(newestRunningChat([other], 'wt-1')).toBeNull();
     expect(newestRunningChat([other], 'wt-2')?.id).toBe('cmd-other');
   });
 
-  it('excludes terminal commands even when running in the same worktree', () => {
+  it('excludes terminal commands even when running in the same workspace', () => {
     const terminal = chat({ id: 'cmd-term', kind: CommandKind.Terminal });
     expect(newestRunningChat([terminal], 'wt-1')).toBeNull();
   });

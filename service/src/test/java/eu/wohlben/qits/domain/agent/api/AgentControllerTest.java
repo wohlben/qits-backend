@@ -22,7 +22,7 @@ public class AgentControllerTest {
         .contentType(ContentType.JSON)
         .body(body)
         .when()
-        .post("/api/repositories/some-repo/worktrees/wt/agents")
+        .post("/api/repositories/some-repo/workspaces/wt/agents")
         .then()
         .statusCode(anyOf(equalTo(Response.Status.BAD_REQUEST.getStatusCode()), equalTo(422)));
   }
@@ -35,7 +35,7 @@ public class AgentControllerTest {
         .contentType(ContentType.JSON)
         .body(Map.of("scope", "ACTIONS"))
         .when()
-        .post("/api/repositories/not-a-uuid/worktrees/wt/agents")
+        .post("/api/repositories/not-a-uuid/workspaces/wt/agents")
         .then()
         .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
   }

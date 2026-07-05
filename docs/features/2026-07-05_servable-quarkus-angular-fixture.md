@@ -9,21 +9,21 @@ discovery, divergence probes, the JGit git host) and nothing else runs in it.
 
 This feature adds a **second bare fixture** — `testing-repo-quarkus-angular.git`, a genuinely
 **servable, minimal Quarkus 3 + Angular app** shaped like qits itself — so the features that run real
-work inside a worktree have a plausible project to point at, and **fixes a modelling wart** in the
+work inside a workspace have a plausible project to point at, and **fixes a modelling wart** in the
 existing fixture at the same time (its editing checkout is now a gitignored plain clone, not a
 committed submodule).
 
 Related plans it exists to demo:
 
 - **[Workspace containers](2026-07-04_workspace-containers.md)** /
-  **[disposable workspace containers](2026-07-04_disposable-workspace-containers.md)** — a worktree
+  **[disposable workspace containers](2026-07-04_disposable-workspace-containers.md)** — a workspace
   clones a branch into a container and runs things; `hello.txt` runs nothing, this app does.
 - **[Daemons](2026-07-04_daemons.md)** + the **[daemon web-view picker](2026-07-05_daemon-webview-picker.md)**
   — need a long-running dev server serving a real page (`./mvnw quarkus:dev`).
 - **[Actions / feature-flows](2026-05-01_actions.md)** — "build"/"test"/"run" steps need something
   buildable and testable.
 - **[Framework-aware file browser](2026-07-03_framework-aware-file-browser.md)** /
-  **[smart file display](2026-07-03_worktree-smart-file-display.md)** — key off recognizable shapes
+  **[smart file display](2026-07-03_workspace-smart-file-display.md)** — key off recognizable shapes
   (a `pom.xml`, an `angular.json`), which this fixture has and `testing-repo` doesn't.
 - **[Coding agent harness](2026-07-01_coding-agent-harness.md)** — a real agent demo needs a real
   (if tiny) app to modify and re-run.
@@ -89,7 +89,7 @@ are produced inside the workspace container at run time, never committed.
 | `feature/greeting` | adds a welcome note — a clean **fast-forward** over `main`           |
 | `feature/diverged` | rewords the same `<h1>` line — **diverges from / conflicts** with `main` |
 
-(Mirrors the fast-forwardable vs. diverged worktree states the `seed` command already demonstrates
+(Mirrors the fast-forwardable vs. diverged workspace states the `seed` command already demonstrates
 for `testing-repo`.)
 
 ### Editing checkout — gitignored plain clone (and the `testing-repo` fix)
@@ -113,14 +113,14 @@ at `testing-repo.git`), the submodule was removed: `git submodule deinit`, drop 
 (`httpPort=8080` + `otel=true`, so the web-view button lights up and the supervisor injects both
 `QITS_PUBLIC_BASE` and `OTEL_EXPORTER_OTLP_*`; the start script binds `0.0.0.0` and serves under that
 prefix; a `LOG_LEVEL` + `PATTERN` observer and a `FILE` `LogSource` tailing `quarkus.log` are wired for
-log observation), a `greeting` worktree off `feature/greeting`, and a `"Build & Verify"` feature-flow
+log observation), a `greeting` workspace off `feature/greeting`, and a `"Build & Verify"` feature-flow
 configuration (Build / Lint / Test — blueprint only). Run it with
 `./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp`. The full-integration reshape (dropping the old
 `mainline`/`behind-ff`/`feeder` merge tree — that's `testing-repo`'s job) is documented in
 [quarkus-angular-fixture-full-integration](2026-07-05_quarkus-angular-fixture-full-integration.md).
 
 **Idempotent by reset:** unlike `seed` (skip-if-exists), `seed-webapp` *deletes* any prior "Quarkus +
-Angular Demo" project first (a project delete cascades its repos/worktrees/daemons), so every run
+Angular Demo" project first (a project delete cascades its repos/workspaces/daemons), so every run
 returns to the same known-good state — the fixture serves both manual UI poking and, via
 `SeedWebappServiceTest`, automated regression tests.
 
@@ -138,8 +138,8 @@ gitignored editing checkouts** from the `fixtures` resource copy (they'd otherwi
   *dropped* the old `mainline`/`behind-ff`/`feeder` merge tree from `seed-webapp` — this fixture is the
   **stack-specific** substrate, not the merge one. The fixture still ships a conflicting
   `feature/diverged` branch (re-baked onto the shared integration base) for any test that wants a
-  diverged worktree; `seed-webapp` just doesn't manufacture one.
-- **Servable-worktree tests.** Tests that actually build/run a worktree (a live `quarkus:dev` daemon,
+  diverged workspace; `seed-webapp` just doesn't manufacture one.
+- **Servable-workspace tests.** Tests that actually build/run a workspace (a live `quarkus:dev` daemon,
   its web view, OTEL export, log observation) belong under the docker-dependent **`-Pextended`**
   profile; `seed-webapp` is the setup they'd reuse. On a Docker-Desktop/WSL2 host the live web-view
   path can be unreachable (container→git-host), so this coverage is currently manual — see the
@@ -152,7 +152,7 @@ gitignored editing checkouts** from the `fixtures` resource copy (they'd otherwi
 
 - **Clone network-free:** a test cloning `/fixtures/testing-repo-quarkus-angular.git` succeeds offline,
   same as `testing-repo.git`.
-- **Servable in a container:** create a worktree, start a `quarkus:dev` daemon, confirm the web-view
+- **Servable in a container:** create a workspace, start a `quarkus:dev` daemon, confirm the web-view
   picker sees a live page and `POST /api/greetings` returns the JSON.
 - **Divergence demo:** `feature/diverged` shows diverged/conflicting; `feature/greeting` fast-forwards.
 - **Existing-fixture cleanup:** a fresh `git clone` (no `--recurse-submodules`) has no dangling gitlink;

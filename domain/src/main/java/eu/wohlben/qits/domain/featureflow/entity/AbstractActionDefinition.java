@@ -11,7 +11,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * The shared definition of an "action" — a preconfigured process a worktree can run — independent
+ * The shared definition of an "action" — a preconfigured process a workspace can run — independent
  * of where it lives. Concrete subclasses pin the scope: {@link ActionConfiguration} is global,
  * {@link RepositoryAction} is owned by a repository. Each subclass maps these fields into its own
  * table (same column names), and adds its own {@code environment} collection table, so the two
@@ -39,7 +39,7 @@ public abstract class AbstractActionDefinition extends PanacheEntityBase {
   public String checkScript;
 
   /**
-   * Whether this action runs as an interactive process in a worktree terminal (e.g. a shell or
+   * Whether this action runs as an interactive process in a workspace terminal (e.g. a shell or
    * Claude Code). One-off, non-interactive commands (e.g. {@code mvn test}) are false and are not
    * offered by the Run… terminal picker.
    */

@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * The daemon tools of the "repository" MCP server. A daemon is a repository's long-running,
  * non-interactive action (dev server, watch-mode test runner): it is defined <em>on the
- * repository</em> it serves — there is no global daemon scope — and runs supervised in a worktree.
+ * repository</em> it serves — there is no global daemon scope — and runs supervised in a workspace.
  * Because the definition is part of working in that repository (the dev server to test against),
  * both managing daemons and running them live here, unlike actions whose global library is managed
  * on the separate "actions" server.
@@ -102,19 +102,19 @@ public class DaemonMcpTools {
   @Tool(
       description =
           "Define a daemon on a repository, e.g. its dev server. 'startScript' runs verbatim in the"
-              + " worktree and must stay in the foreground. Optional: 'readyPattern' (regex; first"
+              + " workspace and must stay in the foreground. Optional: 'readyPattern' (regex; first"
               + " output match marks the daemon READY), 'stopSignal' (default TERM), 'restartPolicy'"
               + " (NEVER, ON_FAILURE or ALWAYS; default ON_FAILURE) with 'maxRestarts' (default 3),"
               + " 'environment', 'observers' (kind PATTERN needs a regex 'pattern' and a 'severity'"
               + " of INFO/WARNING/ERROR; kind LOG_LEVEL classifies by the level vocabulary in the"
-              + " lines), and 'sources' (worktree-relative files to tail into the observers, in"
+              + " lines), and 'sources' (workspace-relative files to tail into the observers, in"
               + " addition to the process output).")
   @Transactional
   public RepositoryDaemonDto createDaemon(
       @ToolArg(description = "id of a repository in this project") String repoId,
       @ToolArg(description = "display name") String name,
       @ToolArg(required = false, description = "human description") String description,
-      @ToolArg(description = "foreground shell command run in the worktree") String startScript,
+      @ToolArg(description = "foreground shell command run in the workspace") String startScript,
       @ToolArg(required = false, description = "regex marking readiness on the output")
           String readyPattern,
       @ToolArg(required = false, description = "signal for a graceful stop (default TERM)")
@@ -139,7 +139,7 @@ public class DaemonMcpTools {
           Map<String, String> environment,
       @ToolArg(required = false, description = "log observers watching the daemon's output")
           List<ObserverArg> observers,
-      @ToolArg(required = false, description = "worktree-relative log files to tail")
+      @ToolArg(required = false, description = "workspace-relative log files to tail")
           List<SourceArg> sources) {
     scopeGuard.requireRepoInProject(repoId);
     var daemon =
@@ -227,47 +227,47 @@ public class DaemonMcpTools {
     return new DeletedDaemon(daemonId, true);
   }
 
-  // --- Runtime (per worktree) -------------------------------------------------
+  // --- Runtime (per workspace) -------------------------------------------------
 
   @McpServer("repository")
   @Tool(
       description =
-          "List the repository's daemons with their supervised runtime state in one worktree"
+          "List the repository's daemons with their supervised runtime state in one workspace"
               + " (STOPPED/STARTING/READY/DEGRADED/RESTARTING/CRASHED, restart count, and the"
               + " commandId whose log holds the daemon's output).")
-  public List<DaemonInstanceDto> listWorktreeDaemons(
+  public List<DaemonInstanceDto> listWorkspaceDaemons(
       @ToolArg(description = "id of a repository in this project") String repoId,
-      @ToolArg(description = "id of the worktree (see listWorktrees)") String worktreeId) {
+      @ToolArg(description = "id of the workspace (see listWorkspaces)") String workspaceId) {
     scopeGuard.requireRepoInProject(repoId);
-    return daemonSupervisor.effectiveDaemons(repoId, worktreeId);
+    return daemonSupervisor.effectiveDaemons(repoId, workspaceId);
   }
 
   @McpServer("repository")
   @Tool(
       description =
-          "Start a daemon in a worktree under supervision. One running instance per (worktree,"
+          "Start a daemon in a workspace under supervision. One running instance per (workspace,"
               + " daemon) — starting it twice is an error. Readiness, crashes and observer findings"
-              + " surface as daemon events and as messages to the worktree's coding-agent chat.")
+              + " surface as daemon events and as messages to the workspace's coding-agent chat.")
   public DaemonInstanceDto startDaemon(
       @ToolArg(description = "id of a repository in this project") String repoId,
-      @ToolArg(description = "id of the worktree to run in") String worktreeId,
+      @ToolArg(description = "id of the workspace to run in") String workspaceId,
       @ToolArg(description = "id of the daemon to start (see listDaemons)") String daemonId) {
     scopeGuard.requireRepoInProject(repoId);
-    return daemonSupervisor.start(repoId, worktreeId, daemonId);
+    return daemonSupervisor.start(repoId, workspaceId, daemonId);
   }
 
   @McpServer("repository")
   @Tool(
       description =
-          "Gracefully stop a running daemon instance in a worktree: sends the daemon's stop signal,"
+          "Gracefully stop a running daemon instance in a workspace: sends the daemon's stop signal,"
               + " then force-kills after a grace period. An explicit stop always beats the restart"
               + " policy.")
   public DaemonInstanceDto stopDaemon(
       @ToolArg(description = "id of a repository in this project") String repoId,
-      @ToolArg(description = "id of the worktree it runs in") String worktreeId,
+      @ToolArg(description = "id of the workspace it runs in") String workspaceId,
       @ToolArg(description = "id of the daemon to stop") String daemonId) {
     scopeGuard.requireRepoInProject(repoId);
-    return daemonSupervisor.stop(repoId, worktreeId, daemonId);
+    return daemonSupervisor.stop(repoId, workspaceId, daemonId);
   }
 
   // --- Parsing ----------------------------------------------------------------

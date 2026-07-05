@@ -3,7 +3,7 @@
 ## Introduction
 
 The [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) serves every daemon
-through the path-prefix proxy (`/daemon/{worktreeId}/{daemonId}/*`) on the qits origin: the dev
+through the path-prefix proxy (`/daemon/{workspaceId}/{daemonId}/*`) on the qits origin: the dev
 server is launched with `QITS_PUBLIC_BASE` so it natively serves under the prefix, the proxy
 forwards bytes verbatim, the iframe is same-origin, and the picker reaches into
 `iframe.contentDocument` from the qits frontend. That design deliberately assumes a
@@ -24,7 +24,7 @@ Related/dependent plans:
 ## What exists today (the code being changed)
 
 - The Vert.x `HttpProxy` route mounted at `/daemon/*` (`@Observes Router` in `service`), with an
-  `OriginRequestProvider` that resolves `(worktreeId, daemonId)` from the **path** to
+  `OriginRequestProvider` that resolves `(workspaceId, daemonId)` from the **path** to
   `127.0.0.1:{httpPort}` via the registry's runtime state. No interceptors — verbatim
   passthrough, WebSocket upgrades forwarded by default.
 - The picker: an Angular service/directive in the qits frontend that attaches capture-phase
@@ -38,7 +38,7 @@ Related/dependent plans:
 ### 1. Subdomain routing in the existing proxy
 
 Add host-based key extraction next to the path-based one. A daemon in cross-origin mode is
-served at `http://{worktreeId}--{daemonId}.daemon.localhost:{qitsPort}/` — the app lives at `/`
+served at `http://{workspaceId}--{daemonId}.daemon.localhost:{qitsPort}/` — the app lives at `/`
 from its own point of view, so **no base path, no `QITS_PUBLIC_BASE`, no startScript
 convention**; root-absolute assets, HMR, and hand-written fetches all just work, because paths
 are still forwarded verbatim.

@@ -13,7 +13,7 @@ event-surfacing bug — the crash is correctly detected, restarted per policy, a
 
 ## Observed repro
 
-On `.../worktrees/greeting`, start the "Quarkus dev server" daemon. It goes `STARTING → CRASHED`
+On `.../workspaces/greeting`, start the "Quarkus dev server" daemon. It goes `STARTING → CRASHED`
 after 3 immediate restarts. The crashed command's log (and the durable daemon-event excerpt) is:
 
 ```
@@ -24,7 +24,7 @@ If you updated your Maven version, you need to update the specified distribution
 Reproduced directly in the container:
 
 ```bash
-docker exec -w /workspace qits-wt-greeting-<repo8> ./mvnw -v
+docker exec -w /workspace qits-ws-greeting-<repo8> ./mvnw -v
 # → same SHA-256 validation error, exit 1
 ```
 
@@ -64,7 +64,7 @@ Java 25 `quarkus:dev` cannot run under JDK 17.
 
 ## Suggested fix direction
 
-Both are `docker/workspace/Dockerfile` changes (then rebuild + recreate worktree containers):
+Both are `docker/workspace/Dockerfile` changes (then rebuild + recreate workspace containers):
 
 1. **Add `unzip`** to the base apt install so `mvnw` keeps using the `.zip` it has a checksum for.
    (Alternative: drop/relax `distributionSha256Sum` in the fixture, or switch the wrapper to a
@@ -73,14 +73,14 @@ Both are `docker/workspace/Dockerfile` changes (then rebuild + recreate worktree
 2. **Install JDK 25** instead of 17 (e.g. Temurin 25 via the Adoptium apt repo) so Quarkus 3 / Java
    25 projects compile.
 
-Rebuild: `docker build -t qits/workspace docker/workspace`. Existing per-worktree containers keep
+Rebuild: `docker build -t qits/workspace docker/workspace`. Existing per-workspace containers keep
 running the old image until recreated — recreate the `greeting`/`main` containers (or re-run
 `seed-webapp`) to pick it up.
 
 ## Note on error surfacing (not a bug)
 
 The daemon feature surfaces this correctly. The `/api/daemon-events` durable feed carries the
-`STATUS_CHANGED (CRASHED)` and `ERROR_DETECTED` events with the full log excerpt, the worktree
+`STATUS_CHANGED (CRASHED)` and `ERROR_DETECTED` events with the full log excerpt, the workspace
 daemons panel renders them under "Recent events", and the status chip reads "CRASHED (3 restarts)".
 The error is only invisible when the daemon is in `STOPPED` state — i.e. it was never started, or the
 in-memory supervisor state was reset to `STOPPED` by a `quarkus:dev` live-reload (durable events

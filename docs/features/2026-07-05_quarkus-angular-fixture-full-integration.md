@@ -10,15 +10,15 @@ which owns the *git-mechanics* side (clone/pull/branch/**merge**/divergence).
 
 **Scope boundary (why this exists):** `testing-repo` is for merge/divergence flows. This fixture is
 *not* — it should exercise the **stack-specific** logic that `hello.txt` can't: framework detection in
-the worktree detail view, a real dev-server daemon and its web view, observability/OTEL, daemon log
+the workspace detail view, a real dev-server daemon and its web view, observability/OTEL, daemon log
 observation, actions/feature-flows shaped for a Java+node build, and the coding agent against a real
 app. Concretely, this means **dropping the merge branch tree** (`mainline`/`behind-ff`/`feeder` +
-`mergeWorktree`, `SeedWebappService.java:132-139`) that `seed-webapp` currently manufactures — that's
+`mergeWorkspace`, `SeedWebappService.java:132-139`) that `seed-webapp` currently manufactures — that's
 `testing-repo`'s job and adds nothing here.
 
 Related/dependent plans (each is a target this integrates with):
 [framework-aware file browser](../features/2026-07-03_framework-aware-file-browser.md),
-[smart file display](../features/2026-07-03_worktree-smart-file-display.md),
+[smart file display](../features/2026-07-03_workspace-smart-file-display.md),
 [daemons](../features/2026-07-04_daemons.md),
 [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md),
 [daemon log observation](../features/2026-07-04_daemon-log-observation-expansion.md),
@@ -43,7 +43,7 @@ additions on the base:
 - `pom.xml` — `quarkus-opentelemetry` + `quarkus-smallrye-health` (BOM-managed).
 - `application.properties` — `quarkus.otel.logs.enabled` / `quarkus.otel.metrics.enabled` /
   `quarkus.otel.exporter.otlp.protocol=http/protobuf`, plus `quarkus.log.file.*` so a rolling
-  `quarkus.log` is written at the worktree root (the `FILE` `LogSource` target). *(Note:
+  `quarkus.log` is written at the workspace root (the `FILE` `LogSource` target). *(Note:
   `quarkus.log.file.enable` is deprecated in 3.37 but still functional; it only warns when the fixture
   is run standalone, which qits never does.)*
 - `src/main/webui/src/app/greeting.ts` — the fetch is now **base-relative** `api/greetings`.
@@ -55,14 +55,14 @@ The fixture still `./mvnw package`s green (opentelemetry + quinoa + smallrye-hea
 `@QuarkusTest` passes).
 
 **Seed reshape (`SeedWebappService`).** Dropped the `mainline`/`behind-ff`/`feeder` merge tree; added
-a `greeting` worktree off `feature/greeting`; set `otel=true` on the daemon; added a `PATTERN` observer
+a `greeting` workspace off `feature/greeting`; set `otel=true` on the daemon; added a `PATTERN` observer
 (`(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)` → ERROR) alongside the `LOG_LEVEL`
 one and a `FILE` `LogSource` on `quarkus.log`; and seeded a `"Build & Verify"` feature-flow
 configuration (Development → Build [PREREQUISITE] / Lint [two QUALITY_GATE actions sharing
 `parallelGroup:"lint"`] / Test [QUALITY_GATE]).
 
 **Tests.** `SeedWebappServiceTest` now asserts the daemon (`httpPort`, `otel`, `LOG_LEVEL`+`PATTERN`
-observers, the `FILE` source), the `greeting` worktree, and the feature-flow tree, keeping the
+observers, the `FILE` source), the `greeting` workspace, and the feature-flow tree, keeping the
 double-`seed()` idempotency check. Framework detection is covered by `detect-frameworks.spec.ts`.
 
 **Open questions — resolution.** The feature-flow config + observers are **baked into the seed**
@@ -75,9 +75,9 @@ the `qits/workspace` image and a container-reachable git host. On this Docker-De
 container→git-host channel is unreachable (see the workspace-containers notes), so this coverage is
 **manual** for now rather than a fragile `-Pextended` IT; the deterministic coverage is
 `SeedWebappServiceTest` + `detect-frameworks.spec.ts`. Manual steps: run `service` (`quarkus:dev`),
-`seed-webapp`, open a worktree → launch the daemon → confirm the web view renders the SPA and
+`seed-webapp`, open a workspace → launch the daemon → confirm the web view renders the SPA and
 `POST /api/greetings` works through the `/daemon/{…}/{…}/` prefix, and the telemetry view shows spans
-scoped by `qits.worktree.id`.
+scoped by `qits.workspace.id`.
 
 ## The shape of the integration
 
@@ -148,11 +148,11 @@ Extensions to add on top of today's `quarkus-rest-jackson` + `quarkus-quinoa`:
 ## B. The qits seed (`SeedWebappService`) — what to provision
 
 Reshape the seed away from merge demos toward stack demos. Keep: reset-idempotency, the project +
-repo clone, the main worktree (auto at clone). Change:
+repo clone, the main workspace (auto at clone). Change:
 
-- **Drop** the `mainline`/`behind-ff`/`feeder` worktrees and both `mergeWorktree` calls.
-- **Keep one or two plain feature worktrees** off the fixture's branches (e.g. a `greeting` worktree
-  from `feature/greeting`) so the detail view has more than one worktree to browse and run daemons in
+- **Drop** the `mainline`/`behind-ff`/`feeder` workspaces and both `mergeWorkspace` calls.
+- **Keep one or two plain feature workspaces** off the fixture's branches (e.g. a `greeting` workspace
+  from `feature/greeting`) so the detail view has more than one workspace to browse and run daemons in
   — no divergence manufacturing.
 - **The dev-server daemon, fully configured** (§C2/C3/C4): `httpPort=8080`, `otel=true`,
   `readyPattern` matching Quarkus startup, a `LOG_LEVEL` observer, optionally a `FILE` `LogSource`,
@@ -164,23 +164,23 @@ repo clone, the main worktree (auto at clone). Change:
 
 ## C. Per-feature integration & configuration
 
-### C1. Framework detection in the worktree detail view
+### C1. Framework detection in the workspace detail view
 
 **How it works:** detection is pure-frontend (`shared/utils/detect-frameworks.ts`) over the loaded
 path list — `pom.xml` (+ `/quarkus/i` in it) → **`Java / Quarkus`**; `angular.json` → **`TypeScript /
 Angular`**; a `docs/` dir with `*.md` → **`Docs`**. Surfaced as quick-access footer toggles and
-"Dynamic filter" picker entries in `worktree-file-browser.component.ts`, plus test↔code tabs.
+"Dynamic filter" picker entries in `workspace-file-browser.component.ts`, plus test↔code tabs.
 
 **Config needed:** essentially free — the fixture already has root `pom.xml` (quarkus) +
 `src/main/webui/angular.json`. Add the `docs/*.md` and a `*.spec.ts` (§A) to exercise the `Docs` kind
-and the Angular test↔code linking. **Verify:** seed → open a worktree detail → the browser footer
+and the Angular test↔code linking. **Verify:** seed → open a workspace detail → the browser footer
 shows `Quarkus`, `Angular` (and `Docs`); the advanced dialog lists `Java / Quarkus (root)` and
 `TypeScript / Angular (src/main/webui)`; opening `greeting.ts` offers a jump to `greeting.spec.ts`.
 
 ### C2. Dev-server daemon + web view
 
-**How it works:** `RepositoryDaemon` runs `startScript` in the worktree container; `httpPort` (set →
-web-viewable) is published at container creation and proxied at `/daemon/{worktreeId}/{daemonId}/*`;
+**How it works:** `RepositoryDaemon` runs `startScript` in the workspace container; `httpPort` (set →
+web-viewable) is published at container creation and proxied at `/daemon/{workspaceId}/{daemonId}/*`;
 the supervisor injects `QITS_PUBLIC_BASE=/daemon/{…}/{…}/` and the dev server must bind `0.0.0.0` and
 serve under it. `readyPattern` flips STARTING→READY.
 
@@ -188,7 +188,7 @@ serve under it. `readyPattern` flips STARTING→READY.
 `./mvnw quarkus:dev -Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080 -Dquarkus.http.root-path="${QITS_PUBLIC_BASE:-/}"`,
 `readyPattern` `Listening on` (or `Installed features`), `httpPort=8080`; plus the Angular
 base-relative fetch (§A). Because Quinoa serves SPA + `/api` on one origin, one prefix covers both.
-**Verify (docker/`-Pextended`):** launch the daemon in a worktree, open the web view, see the Angular
+**Verify (docker/`-Pextended`):** launch the daemon in a workspace, open the web view, see the Angular
 page render and `POST /api/greetings` succeed *through the proxy prefix*.
 
 ### C3. Observability / OTEL
@@ -196,26 +196,26 @@ page render and `POST /api/greetings` succeed *through the proxy prefix*.
 **How it works:** set `otel=true` on the daemon and the supervisor injects
 `OTEL_EXPORTER_OTLP_ENDPOINT=http://<git-host>:<qits-port>/api/otel`,
 `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, `OTEL_SERVICE_NAME=<daemon name>`, and
-`OTEL_RESOURCE_ATTRIBUTES=qits.worktree.id=…,qits.repository.id=…,qits.command.id=…` (the correlation
+`OTEL_RESOURCE_ATTRIBUTES=qits.workspace.id=…,qits.repository.id=…,qits.command.id=…` (the correlation
 keys the in-process receiver at `POST /api/otel/v1/{traces,logs,metrics}` and `TelemetryStore` bucket
 by). Injected *before* the daemon's own env, so app-set `OTEL_*` wins.
 
 **Config needed:** add `quarkus-opentelemetry` to the fixture (§A) and set **`otel=true`** on the
 seeded daemon (today it's `null`). No app endpoint config — qits pins it via env. **Verify:** hit a
-few `/api/greetings`, then confirm the worktree's telemetry view shows spans/logs/metrics scoped to
-`qits.worktree.id`/`qits.repository.id`; confirm the agent's telemetry MCP tools attach (they do when
-a daemon has `otel` on and the chat session is worktree+repository-scoped).
+few `/api/greetings`, then confirm the workspace's telemetry view shows spans/logs/metrics scoped to
+`qits.workspace.id`/`qits.repository.id`; confirm the agent's telemetry MCP tools attach (they do when
+a daemon has `otel` on and the chat session is workspace+repository-scoped).
 
 ### C4. Daemon log observation
 
 **How it works:** `LogObserverKind.LOG_LEVEL` (zero-config exception/severity classification) and
 `PATTERN` (a regex → `ERROR_DETECTED` at a chosen `severity`); `LogSource` of kind FILE tails a
-worktree-relative file into the same observers. Findings persist as `daemon_event` and inject into the
+workspace-relative file into the same observers. Findings persist as `daemon_event` and inject into the
 newest running CHAT (`[daemon:<name>]`).
 
 **Config needed:** on the dev-server daemon, a `LOG_LEVEL` observer (catches Java stack traces /
 `*Exception` out of the box); optionally a `PATTERN` observer for a Quarkus-specific line; optionally
-a `FILE` `LogSource` if the app writes a logback file under the worktree. **Verify:** trigger an error
+a `FILE` `LogSource` if the app writes a logback file under the workspace. **Verify:** trigger an error
 in the app (or a failing reload), see a `daemon_event` and the `[daemon:Quarkus dev server]` note in a
 running chat.
 
@@ -236,14 +236,14 @@ configuration renders in the project's feature-flow view with phases/steps/actio
 
 ### C6. Coding agent / chat
 
-**How it works:** launched per-worktree (`POST …/worktrees/{id}/agents`), runs `claude` via
+**How it works:** launched per-workspace (`POST …/workspaces/{id}/agents`), runs `claude` via
 `docker exec` in the container; the `claude` CLI + a shared auth volume
 (`qits.workspace.claude-volume` → `qits.workspace.claude-mount`) are global; **repo-specific config is
 whatever `.claude/` + `CLAUDE.md` the clone ships**.
 
 **Config needed:** nothing qits-side beyond the one-time operator `claude auth login`; add a repo-local
 `.claude/`+`CLAUDE.md` to the fixture (§A) so the agent has real context and to exercise the
-repo-ships-its-config path. **Verify:** open a chat in a worktree, agent sees the fixture's CLAUDE.md;
+repo-ships-its-config path. **Verify:** open a chat in a workspace, agent sees the fixture's CLAUDE.md;
 with the dev-server daemon's `otel` on, telemetry MCP tools are available to it.
 
 ### C7. Health checks (bonus)
@@ -256,15 +256,15 @@ surface against a real app.
 
 ## Acceptance checklist
 
-1. **Detection:** worktree detail shows `Quarkus` + `Angular` (+ `Docs`) toggles; test↔code tabs link
+1. **Detection:** workspace detail shows `Quarkus` + `Angular` (+ `Docs`) toggles; test↔code tabs link
    `greeting.ts` ↔ `greeting.spec.ts`.
 2. **Dev server:** the `quarkus:dev` daemon reaches READY; its web view renders the SPA and
    `POST /api/greetings` works *through the proxy prefix*.
-3. **Observability:** `otel=true` → spans/logs/metrics appear in the worktree telemetry view scoped by
+3. **Observability:** `otel=true` → spans/logs/metrics appear in the workspace telemetry view scoped by
    `qits.*` attributes; agent telemetry MCP tools attach.
 4. **Log observation:** an app error produces a `daemon_event` and a chat `[daemon:…]` note.
 5. **Feature-flow:** the seeded build/lint/test configuration renders correctly.
-6. **Agent:** chat in a worktree picks up the repo's `.claude/`/`CLAUDE.md`.
+6. **Agent:** chat in a workspace picks up the repo's `.claude/`/`CLAUDE.md`.
 7. **Reset:** re-running `seed-webapp` returns all of the above to the same known-good state.
 
 Items 2–4 need docker + the `qits/workspace` image, so their automated coverage belongs under the

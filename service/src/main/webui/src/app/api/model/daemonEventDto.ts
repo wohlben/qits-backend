@@ -14,7 +14,7 @@ import { DaemonEventSeverity } from './daemonEventSeverity';
 
 export interface DaemonEventDto { 
     repoId?: string;
-    worktreeId?: string;
+    workspaceId?: string;
     daemonId?: string;
     daemonName?: string;
     kind?: DaemonEventKind;

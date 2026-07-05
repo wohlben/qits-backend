@@ -25,13 +25,14 @@ public class GitignoreLazyDirectoryStrategy implements LazyDirectoryStrategy {
   }
 
   @Override
-  public List<String> lazyDirectories(String repoId, String worktreeId, WorktreeFileAccess access) {
+  public List<String> lazyDirectories(
+      String repoId, String workspaceId, WorkspaceFileAccess access) {
     String output;
     try {
       output =
           access.git(
               repoId,
-              worktreeId,
+              workspaceId,
               "ls-files",
               "--others",
               "--ignored",

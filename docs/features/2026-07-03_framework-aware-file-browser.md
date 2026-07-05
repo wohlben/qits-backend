@@ -2,21 +2,21 @@
 
 ## Introduction
 
-Grows the worktree file browser from "one file, two modes" (the Preview/Code toggle of
-[smart file display](2026-07-03_worktree-smart-file-display.md)) into a browser that *understands
-what kind of project(s)* a worktree contains, and turns that into two payoffs: a **framework filter**
+Grows the workspace file browser from "one file, two modes" (the Preview/Code toggle of
+[smart file display](2026-07-03_workspace-smart-file-display.md)) into a browser that *understands
+what kind of project(s)* a workspace contains, and turns that into two payoffs: a **framework filter**
 in the tree and **test↔code tabs** in the viewer. Both sit on a recursive language/framework
 detection foundation that runs as a pure frontend pass over the already-loaded path list.
 
 Related/dependent plans:
 
 - Builds on the dynamic-filter infrastructure of
-  [ordered rules + ignorelists](2026-07-03_worktree-filter-ordered-rules-and-ignorelists.md) — the
+  [ordered rules + ignorelists](2026-07-03_workspace-filter-ordered-rules-and-ignorelists.md) — the
   framework filter is another dynamic-filter *type* feeding the same `effectiveFilters` pipeline. It
   needed one addition to that model: a `restrict` flag on generated glob whitelists (below).
-- Extends the viewer of [smart file display](2026-07-03_worktree-smart-file-display.md)
+- Extends the viewer of [smart file display](2026-07-03_workspace-smart-file-display.md)
   (`ui/components/file-viewer/`) and the browser
-  (`pattern/worktree/worktree-file-browser.component.ts`). File tabs (which file) are kept orthogonal
+  (`pattern/workspace/workspace-file-browser.component.ts`). File tabs (which file) are kept orthogonal
   to the Preview/Code mode toggle (how to render): **file tabs outer, mode toggle inner**.
 - Composes with [lazy directory exploration](2026-07-03_lazy-directory-exploration.md): detection
   markers (`pom.xml`, `angular.json`) and test files (`src/test`, `*.spec.ts`) are tracked/non-ignored,
@@ -113,11 +113,11 @@ name-searching, so a test is always findable by typing its name.
   Quarkus `refineLabel` upgrade.
 - `filter-file-paths.spec.ts` — a `restrict` glob whitelist flips the default to hidden, unlike a
   plain generated whitelist.
-- `worktree-file-browser.component.spec.ts` — per-root + aggregate-Docs offers, the Quarkus label
+- `workspace-file-browser.component.spec.ts` — per-root + aggregate-Docs offers, the Quarkus label
   peek, the Java filter hiding webui TS, java+angular composing, the Docs union, the quick-access
   footer (one aggregate toggle per kind, restrict/restore/union), and test-tab groups (symmetric
   java, angular, no-counterpart) preserving per-path reference chips.
-- Verified end-to-end in the running app (headless browser) against the qits worktree: the picker
+- Verified end-to-end in the running app (headless browser) against the qits workspace: the picker
   offered `Docs`, four `Java / Quarkus (root|cli|domain|service)` (Maven upgraded to Quarkus via the
   pom peek), and `TypeScript / Angular (service/src/main/webui)`; selecting the Angular filter cut
   637 → 320 files all under `webui`; adding Java (domain) composed to 491 with no stray root files;

@@ -7,8 +7,8 @@ import java.time.Instant;
 /**
  * A command flattened for the Commands UX — what's active and where it came from.
  *
- * @param repoId the repository the worktree belongs to
- * @param worktreeId the worktree the process runs in
+ * @param repoId the repository the workspace belongs to
+ * @param workspaceId the workspace the process runs in
  * @param branch the branch checked out at launch
  * @param commitHash the full commit SHA checked out at launch
  * @param shortCommitHash the abbreviated commit SHA, for display
@@ -21,7 +21,7 @@ import java.time.Instant;
 public record CommandDto(
     String id,
     String repoId,
-    String worktreeId,
+    String workspaceId,
     String branch,
     String commitHash,
     String shortCommitHash,

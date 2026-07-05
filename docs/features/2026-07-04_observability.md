@@ -19,10 +19,10 @@ Related/dependent plans:
   unless it carries the `qits.*` resource attributes).
 - Agent access rides the MCP server from the
   [coding-agent harness](2026-07-01_coding-agent-harness.md): the telemetry tools join the
-  `repository` MCP server behind a new **worktree scope dimension** (`X-QITS-Worktree` /
-  `?worktreeId=`), added by this feature.
+  `repository` MCP server behind a new **workspace scope dimension** (`X-QITS-Workspace` /
+  `?workspaceId=`), added by this feature.
 - Resource attributes stamped at launch reuse the identity model of the
-  [command registry](2026-06-30_command-registry.md) (worktree id, repository id, command id).
+  [command registry](2026-06-30_command-registry.md) (workspace id, repository id, command id).
 - Deferred follow-up: ERROR-severity telemetry flowing into the daemons event/sink pipeline
   (agent notification on exception spikes). Iteration one is pull-only.
 
@@ -61,12 +61,12 @@ injection seam.
    `io.opentelemetry.proto.*`) produces slim records (`dto/StoredSpan`, `StoredLog`,
    `MetricPoint`); span links, dropped counts, flags, trace state, schema URLs, scope
    attrs/version, exemplars and all metric types except Gauge/Sum are discarded.
-   `control/TelemetryStore` is `@ApplicationScoped`, per-worktree buckets keyed
-   `repoId/worktreeId` from the `qits.*` resource attributes (missing → `_unscoped`, bounded but
-   unqueryable), with a trace-id index per bucket. Two-tier bounding: per-worktree count caps and
+   `control/TelemetryStore` is `@ApplicationScoped`, per-workspace buckets keyed
+   `repoId/workspaceId` from the `qits.*` resource attributes (missing → `_unscoped`, bounded but
+   unqueryable), with a trace-id index per bucket. Two-tier bounding: per-workspace count caps and
    a global byte ceiling that evicts oldest-first from the **fattest** bucket, so a chatty daemon
-   pays for its own volume. Config (`qits.telemetry.*`): `max-spans-per-worktree` 5000,
-   `max-logs-per-worktree` 10000, `max-metric-series-per-worktree` 500,
+   pays for its own volume. Config (`qits.telemetry.*`): `max-spans-per-workspace` 5000,
+   `max-logs-per-workspace` 10000, `max-metric-series-per-workspace` 500,
    `max-total-bytes` 64 MiB. All windowing uses `receivedAtMillis` (server clock), never
    exporter timestamps. JVM restart = empty store. **No entity, no migration, no H2 table.**
 3. **Agent query surface** — `mcp/TelemetryMcpTools` on the existing `repository` MCP server
@@ -74,14 +74,14 @@ injection seam.
    `exception` events + ERROR logs ≥ severity 17, grouped by trace), `telemetryTrace(traceId)`
    (flat span list + correlated logs), `telemetrySlowSpans(thresholdMs, sinceMinutes?)`,
    `telemetrySearchLogs(query, sinceMinutes?)`, `telemetryMetrics(name?)` (latest value per
-   series). Identity comes from the connection only: the new `mcp/WorktreeScope`
-   (`X-QITS-Worktree` / `?worktreeId=`) plus the existing repository narrowing;
+   series). Identity comes from the connection only: the new `mcp/WorkspaceScope`
+   (`X-QITS-Workspace` / `?workspaceId=`) plus the existing repository narrowing;
    `mcp/TelemetryToolFilter` hides the tools from any session not scoped to both (fails closed).
-   `AgentLaunchService` appends `&worktreeId=` to the narrowed repository-server URL and
+   `AgentLaunchService` appends `&workspaceId=` to the narrowed repository-server URL and
    pre-approves the five tools as read-only. PROJECT-scoped sessions have no repository
    narrowing, so they intentionally don't see telemetry tools.
-4. **REST twins** — `api/WorktreeTelemetryController` under
-   `/api/repositories/{repoId}/worktrees/{worktreeId}/telemetry/{errors,traces/{id},slow-spans,logs,metrics}`,
+4. **REST twins** — `api/WorkspaceTelemetryController` under
+   `/api/repositories/{repoId}/workspaces/{workspaceId}/telemetry/{errors,traces/{id},slow-spans,logs,metrics}`,
    JSON, sharing `control/TelemetryQueryService` with the MCP tools so humans and agents see the
    same answers.
 
@@ -98,12 +98,12 @@ the definition's own environment, so *an explicit user `OTEL_*` var wins*:
   idea's `localhost` was wrong).
 - `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` (normalizes SDKs that still default to gRPC)
 - `OTEL_SERVICE_NAME=<daemon name>`
-- `OTEL_RESOURCE_ATTRIBUTES=qits.worktree.id=…,qits.repository.id=…,qits.command.id=…`
+- `OTEL_RESOURCE_ATTRIBUTES=qits.workspace.id=…,qits.repository.id=…,qits.command.id=…`
 
 The injection happens inside `prepare()` because the persisted command row already exists there —
 so `qits.command.id` is real, and every supervisor relaunch re-derives the overlay with the fresh
 command id. That last line is the correlation backbone: every span/log/metric arrives pre-tagged
-with the worktree, so MCP scope filtering is an attribute match.
+with the workspace, so MCP scope filtering is an attribute match.
 
 Instrumentation itself stays the target app's business, zero-code per ecosystem (Quarkus:
 `quarkus-opentelemetry` honors the env vars; plain Java: `JAVA_TOOL_OPTIONS=-javaagent:…`; Node:
@@ -112,8 +112,8 @@ Instrumentation itself stays the target app's business, zero-code per ecosystem 
 
 ## UI (deliberately thin)
 
-The agents are the primary consumer. For humans, the worktree detail page gained tabs
-(`Files` / `Telemetry`): `pattern/telemetry/worktree-telemetry.component.ts` polls (5s) a recent
+The agents are the primary consumer. For humans, the workspace detail page gained tabs
+(`Files` / `Telemetry`): `pattern/telemetry/workspace-telemetry.component.ts` polls (5s) a recent
 errors feed (`ui/components/telemetry/telemetry-error-feed`, exception events expanded with stack
 traces), click-through to a flat span list per trace (`telemetry-span-list`, no waterfall), and a
 log tail filterable by service (`telemetry-log-tail`). If the dashboard itch grows, revisit the
@@ -134,21 +134,21 @@ VictoriaMetrics trio rather than building Grafana into qits.
 
 - `TelemetryStoreTest` (plain JUnit): cap eviction + trace-index pruning, byte accounting,
   global ceiling evicting the fattest bucket, span-vs-log oldest-first, metric latest-wins +
-  series cap, worktree bucket isolation, `_unscoped` quarantine.
+  series cap, workspace bucket isolation, `_unscoped` quarantine.
 - `TelemetryDecoderTest`: error span + exception event + resource attrs, observed-time fallback,
   Gauge/Sum decoding + histogram drop, attribute flattening.
 - `OtelReceiverResourceTest` (`@QuarkusTest`, REST Assured, proto-built fixtures from
   `TelemetryFixtures`): 200 + empty protobuf + mirrored content type per signal, gzip by magic
   bytes, garbage → 400, store contents.
-- `TelemetryMcpToolsTest` (`quarkus-mcp-server-test`): trace grouping, correlated logs, worktree
-  isolation, tool filter (hidden without worktree scope).
-- `WorktreeTelemetryControllerTest`: the JSON twins against a seeded store.
+- `TelemetryMcpToolsTest` (`quarkus-mcp-server-test`): trace grouping, correlated logs, workspace
+  isolation, tool filter (hidden without workspace scope).
+- `WorkspaceTelemetryControllerTest`: the JSON twins against a seeded store.
 - `OtelEnvironmentTest` + `CommandServiceTest` daemon-launch tests: exact env composition against
   pinned git-host/port, injected overlay carries the persisted command id, user overrides win,
   no injection without the toggle.
-- `worktree-telemetry.component.spec.ts`: error feed with exception evidence, trace
+- `workspace-telemetry.component.spec.ts`: error feed with exception evidence, trace
   click-through, service filter options.
 - Manual E2E (per the idea's sketch): seeded repo, daemon = a Quarkus sample with
-  `quarkus-opentelemetry` and `otel` on, hit a throwing endpoint, ask the worktree chat agent to
+  `quarkus-opentelemetry` and `otel` on, hit a throwing endpoint, ask the workspace chat agent to
   investigate — it pulls the exception span through MCP without touching log files. On WSL2 the
   endpoint host resolves to the distro's eth0 IP (see `QitsHostResolver`).

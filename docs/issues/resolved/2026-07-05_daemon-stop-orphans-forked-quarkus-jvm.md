@@ -75,4 +75,4 @@ the trigger is at least partly the fast restart cadence.
 ## Impact
 
 Low for normal use (single start/stop works), but it makes rapid iteration on a dev-server daemon
-flaky and can silently wedge a worktree's port. Separate from the OTEL and classifier fixes.
+flaky and can silently wedge a workspace's port. Separate from the OTEL and classifier fixes.

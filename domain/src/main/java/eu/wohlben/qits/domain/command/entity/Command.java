@@ -1,6 +1,6 @@
 package eu.wohlben.qits.domain.command.entity;
 
-import eu.wohlben.qits.domain.repository.entity.Worktree;
+import eu.wohlben.qits.domain.repository.entity.Workspace;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,11 +24,12 @@ import org.hibernate.annotations.CreationTimestamp;
  * show what is currently active and where it came from — and so a terminated run survives a
  * restart.
  *
- * <p>The only real foreign key is to {@link Worktree} (the repository is reachable via {@code
- * worktree.repository}); the branch and the commit hash that was checked out at launch are captured
- * as plain string snapshots, because branches and commits are not entities in this codebase. The
- * resolved action is likewise snapshotted by id/name/script rather than FK'd, since an action can
- * be global or repository-owned (no single entity type) and may be edited or deleted after the run.
+ * <p>The only real foreign key is to {@link Workspace} (the repository is reachable via {@code
+ * workspace.repository}); the branch and the commit hash that was checked out at launch are
+ * captured as plain string snapshots, because branches and commits are not entities in this
+ * codebase. The resolved action is likewise snapshotted by id/name/script rather than FK'd, since
+ * an action can be global or repository-owned (no single entity type) and may be edited or deleted
+ * after the run.
  */
 @Entity
 @Table(name = "command")
@@ -42,10 +43,10 @@ public class Command extends PanacheEntityBase {
   public String id;
 
   @ManyToOne(optional = false)
-  @JoinColumn(name = "worktree_id_fk", nullable = false)
-  public Worktree worktree;
+  @JoinColumn(name = "workspace_id_fk", nullable = false)
+  public Workspace workspace;
 
-  /** The branch checked out in the worktree at launch (a snapshot; branches aren't entities). */
+  /** The branch checked out in the workspace at launch (a snapshot; branches aren't entities). */
   @Column(nullable = false)
   public String branch;
 

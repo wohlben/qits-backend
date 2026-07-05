@@ -108,7 +108,7 @@ export interface DaemonFormData {
       </app-form-field-layout>
 
       <!-- With OTel on, the launch injects OTEL_EXPORTER_* env vars so an instrumented process
-           exports traces/logs/metrics to qits — queryable in the worktree's Telemetry tab and by
+           exports traces/logs/metrics to qits — queryable in the workspace's Telemetry tab and by
            its agent. Instrumentation itself stays the app's business. -->
       <z-checkbox [formField]="form.otel">
         OpenTelemetry export (inject OTEL_* env vars at launch)
@@ -172,7 +172,7 @@ export interface DaemonFormData {
         </div>
       </fieldset>
 
-      <!-- FILE log sources: worktree-relative files tailed alongside the process output; every
+      <!-- FILE log sources: workspace-relative files tailed alongside the process output; every
            observer above watches these too. -->
       <fieldset class="flex flex-col gap-2">
         <legend class="text-sm font-medium">Log sources (tailed files)</legend>
@@ -181,7 +181,7 @@ export interface DaemonFormData {
             <input
               z-input
               class="flex-1"
-              placeholder="worktree-relative path, e.g. logs/app.log"
+              placeholder="workspace-relative path, e.g. logs/app.log"
               autocomplete="off"
               [value]="row.path"
               (input)="updateSource($index, 'path', $any($event.target).value)"

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorktreeDto } from './worktreeDto';
+import { WorkspaceDto } from './workspaceDto';
 
 
 export interface Response66 { 
-    worktree?: WorktreeDto;
+    workspace?: WorkspaceDto;
 }
 

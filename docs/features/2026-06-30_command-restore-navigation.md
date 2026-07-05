@@ -39,7 +39,7 @@ left" (the Phase 1 socket replays scrollback on attach).
 - New top-level lazy route in `app.routes.ts` → `commands.routes.ts`: list at `''`, terminal at
   `:commandId` (the Phase 1 command terminal page).
 - `commands-list.component.ts` (card grid, mirror `project-list.component.ts`): `injectQuery` keyed
-  `['commands']` → `commandController.service.ts`. Each card shows action name, repo/branch/worktree,
+  `['commands']` → `commandController.service.ts`. Each card shows action name, repo/branch/workspace,
   short commit, `launchedAt`, and a status `badge` (running vs terminated). Provide a running/terminated
   filter or two sections.
 - Row click: **running** → `router.navigate(['/commands', id])` → reattaches and replays scrollback.
@@ -49,7 +49,7 @@ left" (the Phase 1 socket replays scrollback on attach).
 ## Verification
 
 1. With a command running (started from a branch terminal), open the **Commands** nav entry → it
-   appears with a "running" badge and the correct origin (repo/branch/worktree/commit/action).
+   appears with a "running" badge and the correct origin (repo/branch/workspace/commit/action).
 2. Click it → lands in the terminal with replayed scrollback, output continuing live.
 3. Terminate it (from the terminal or a list action) → badge flips to "terminated"; the `['commands']`
    query refreshes.

@@ -6,14 +6,14 @@
 >
 > **As-built deltas (what changed during implementation):**
 > - **Proxy target is a published localhost port, not `127.0.0.1:{httpPort}` directly, and not a
->   container bridge IP.** Daemons run inside per-worktree docker containers (the workspace-containers
+>   container bridge IP.** Daemons run inside per-workspace docker containers (the workspace-containers
 >   feature, which landed after this draft), so the dev-server port lives in the container's network
 >   namespace. On this project's Docker Desktop/WSL2 host, container bridge IPs are *not*
 >   host-reachable, but ports published with `docker run -p 127.0.0.1:0:<port>` are. So
 >   `ContainerRuntime.run` publishes every `httpPort` the repo's daemon definitions declare (at
 >   container-creation time — docker can't add ports to a live container), and `ContainerRuntime.hostPort`
 >   resolves the ephemeral host port. The proxy targets `127.0.0.1:{hostPort}`. Because publishing is
->   create-time only, a daemon whose port was declared *after* its worktree container already existed
+>   create-time only, a daemon whose port was declared *after* its workspace container already existed
 >   is not web-viewable until the container is recreated — surfaced as a WARNING daemon event, and
 >   the proxy answers a "recreate the container" 502.
 > - **The daemon definition entity is `RepositoryDaemon`, not `AbstractDaemonDefinition`** (the
@@ -22,14 +22,14 @@
 > - **`DaemonInstanceDto` carries a single nullable `proxyPath` field, not a separate flag + path.**
 >   Its presence *is* the web-viewable flag (set iff `httpPort` is declared); the frontend combines
 >   it with a live `status`.
-> - **The supervisor exposes `proxyTarget(worktreeId, daemonId) → Optional<ProxyTarget{status, hostPort}>`**
+> - **The supervisor exposes `proxyTarget(workspaceId, daemonId) → Optional<ProxyTarget{status, hostPort}>`**
 >   as the proxy's only lookup seam. `DaemonProxyPath` is the shared source of truth for the
->   `/daemon/{worktreeId}/{daemonId}/` shape.
+>   `/daemon/{workspaceId}/{daemonId}/` shape.
 > - **`STARTING`/`RESTARTING` serve an auto-refreshing splash; `STOPPED`/`CRASHED` a branded 502**
 >   (the draft's leaning, now decided).
-> - **Floaty button lives on the worktree-detail page, not `main-layout`.** The layout has no route
->   context (repoId/worktreeId aren't available there) and the feature is only meaningful in a
->   worktree; the root-scoped prompt-context store still keeps picks alive across the dialog and
+> - **Floaty button lives on the workspace-detail page, not `main-layout`.** The layout has no route
+>   context (repoId/workspaceId aren't available there) and the feature is only meaningful in a
+>   workspace; the root-scoped prompt-context store still keeps picks alive across the dialog and
 >   navigation, which was the actual goal.
 > - **The fullscreen dialog uses `zCustomClasses` twMerge overrides, not a new ZardUI variant** —
 >   ZardUI files are CLI-managed; `mergeClasses` (twMerge) lets the custom classes override the
@@ -74,14 +74,14 @@ Related/dependent plans:
 - Hard dependency on [daemons](../features/2026-07-04_daemons.md): the thing being framed is a daemon instance (a
   `CommandKind.DAEMON` registry command). This idea adds one field to the daemon definition
   (`httpPort`), uses the daemon environment-injection slot (the same one observability uses for
-  `OTEL_EXPORTER_OTLP_*`) for `QITS_PUBLIC_BASE`, and leans on the singleton-per-(worktree,
+  `OTEL_EXPORTER_OTLP_*`) for `QITS_PUBLIC_BASE`, and leans on the singleton-per-(workspace,
   daemon) rule — the proxy route key requires that pair to be unambiguous.
 - The captured HTML feeds the agent through the same door the
   [coding-agent harness](../features/2026-07-01_coding-agent-harness.md) and
   [stream-json chat](../features/2026-07-01_stream-json-chat.md) already use: the
   `speak-to-prompt` flow's `initialContext` (launch a new agent) and the command-chat `draft`
   (message a running one). The picker is an *input source* for prompts, not a new agent channel.
-- Complements the [worktree chat dialog](../features/2026-07-04_worktree-chat-dialog.md):
+- Complements the [workspace chat dialog](../features/2026-07-04_workspace-chat-dialog.md):
   "pick this element" and "ask the agent about it" want to sit next to each other.
 - Orthogonal to [observability](../features/2026-07-04_observability.md), but the same shape of idea — qits obtaining a
   view into a running app the source alone can't give. Neither requires the other.
@@ -93,7 +93,7 @@ Related/dependent plans:
 ## Architecture overview
 
 ```
-browser ── qits:8080 /daemon/{worktreeId}/{daemonId}/*  (same origin as the qits UI)
+browser ── qits:8080 /daemon/{workspaceId}/{daemonId}/*  (same origin as the qits UI)
               │  Vert.x HttpProxy (in-process, verbatim passthrough, WS included)
               ▼
           127.0.0.1:{httpPort}   dev server, launched with QITS_PUBLIC_BASE=/daemon/{…}/
@@ -110,7 +110,7 @@ browser ── qits:8080 /daemon/{worktreeId}/{daemonId}/*  (same origin as the 
 
 ## Proxy routing shape: path-prefix + base-aligned passthrough
 
-**Chosen: path-prefix `/daemon/{worktreeId}/{daemonDefinitionId}/*` on the qits origin.** The
+**Chosen: path-prefix `/daemon/{workspaceId}/{daemonDefinitionId}/*` on the qits origin.** The
 same-origin property is what deletes the injection machinery, and a single origin/port works
 unchanged for remote access (LAN, tunnel) — no DNS tricks.
 
@@ -118,7 +118,7 @@ Path-prefix proxying has one classic problem: dev servers emit root-absolute URL
 `/@vite/client`) that escape the prefix. The fix is the **base-path env contract** — the correct
 application of "we control both sides":
 
-- At launch, the daemon supervisor injects **`QITS_PUBLIC_BASE=/daemon/{worktreeId}/{daemonId}/`**
+- At launch, the daemon supervisor injects **`QITS_PUBLIC_BASE=/daemon/{workspaceId}/{daemonId}/`**
   into the process environment (same injection slot daemons.md plans for OTLP vars).
 - The project's `startScript` opts in — a documented convention per stack, not per-framework magic
   in qits:
@@ -153,7 +153,7 @@ Alternatives considered:
   `HttpClient` created from the managed `Vertx`. Deliberately *not* under `/api` — it isn't REST.
   Add `/daemon` to `quarkus.quinoa.ignored-path-prefixes` (currently `/api,/mcp`).
 - **Target resolution:** `HttpProxy.origin(OriginRequestProvider)` resolves the target per
-  request: parse `{worktreeId}/{daemonId}` from the path → look up the running instance in the
+  request: parse `{workspaceId}/{daemonId}` from the path → look up the running instance in the
   registry → `127.0.0.1:{httpPort}`. Unknown key → 404 without connecting anywhere; known but not
   running/`READY` → qits-branded 502.
 - **WebSockets (HMR):** vertx-http-proxy forwards WebSocket upgrades **by default** ("The proxy
@@ -163,15 +163,15 @@ Alternatives considered:
 - **Host header:** rewrite the outbound authority to `127.0.0.1:{port}` on the HTTP leg too, so
   Vite's post-CVE-2025-24010 host checking never sees a foreign hostname even when qits itself is
   accessed remotely.
-- **Niceties:** 302 from `/daemon/{worktreeId}/{daemonId}` to the trailing-slash form so relative
+- **Niceties:** 302 from `/daemon/{workspaceId}/{daemonId}` to the trailing-slash form so relative
   URLs resolve correctly inside the frame.
 
 ## Route key and lifecycle
 
-The route key is **`(worktreeId, daemonDefinitionId)` — not commandId.** The supervisor's restart
+The route key is **`(workspaceId, daemonDefinitionId)` — not commandId.** The supervisor's restart
 loop creates a *new `Command` row per relaunch* (daemons.md), so a commandId-keyed base path would
 change on every crash-restart — invalidating the `QITS_PUBLIC_BASE` baked into the dev server's
-emitted URLs at launch and breaking any open iframe. The (worktree, daemon) pair is stable across
+emitted URLs at launch and breaking any open iframe. The (workspace, daemon) pair is stable across
 restarts, known *before* launch (required — the base must be in the environment at spawn time),
 and is exactly the pair daemons.md already leans toward making a singleton. The proxy strengthens
 that lean: it needs the pair to be unambiguous.
@@ -242,7 +242,7 @@ it lives there (see Explicitly deferred), not in the primary path.
 - The daemon supervisor injects **`QITS_PUBLIC_BASE`** into the environment at spawn and records
   `httpPort` in its runtime state for the proxy's origin resolver.
 - The daemon/command DTO exposes a web-viewable flag and the **proxied base path**
-  (`/daemon/{worktreeId}/{daemonId}/`), gated on the registry showing a running (`READY`)
+  (`/daemon/{workspaceId}/{daemonId}/`), gated on the registry showing a running (`READY`)
   `CommandKind.DAEMON` instance — not a composed localhost URL.
 
 ## Security
@@ -293,9 +293,9 @@ it lives there (see Explicitly deferred), not in the primary path.
   this feature's implemented code in
   [backlog-ideas/daemon-proxy-cross-origin-mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md).
 - **Port collisions** — inherited limitation from the daemons feature; `httpPort` is hardcoded
-  in the definition, so parallel worktrees running the same daemon collide. Planned resolution:
+  in the definition, so parallel workspaces running the same daemon collide. Planned resolution:
   [workspace containers](../features/2026-07-04_workspace-containers.md) — per-container network namespaces make the
-  hardcoded port correct for every worktree, and the proxy's origin resolver (which already
+  hardcoded port correct for every workspace, and the proxy's origin resolver (which already
   resolves through the registry precisely so this lands without touching it) targets the
   container's address instead of `127.0.0.1`.
 - **In-page screenshots** attached to a pick — a CDP-side screenshot is the right later shape.
@@ -304,7 +304,7 @@ it lives there (see Explicitly deferred), not in the primary path.
 
 ## Open questions
 
-- **Key encoding** — raw UUIDs in the path (`/daemon/{worktreeId}/{daemonId}/`) are ugly but
+- **Key encoding** — raw UUIDs in the path (`/daemon/{workspaceId}/{daemonId}/`) are ugly but
   unambiguous; a short slug needs a uniqueness story. Lean: raw IDs first.
 - **`STARTING` behavior** — proxy 502s until `READY`, or serve a qits-branded loading splash that
   auto-refreshes? Lean: splash — dev servers take seconds to boot and a blank 502 in the iframe
@@ -318,7 +318,7 @@ it lives there (see Explicitly deferred), not in the primary path.
 ## Testing sketch
 
 - **Proxy (`@QuarkusTest`):** spin up a trivial local HTTP server on a loopback port, register a
-  fake running daemon instance for a (worktree, daemon) pair → requests to
+  fake running daemon instance for a (workspace, daemon) pair → requests to
   `/daemon/{w}/{d}/whatever` reach it verbatim (path unstripped) and stream back; unknown key →
   404 with no outbound connection; known-but-not-READY → 502; the target is never derivable from
   client input; a WebSocket echo through the proxy round-trips (HMR path).

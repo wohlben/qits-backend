@@ -6,7 +6,7 @@ import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,7 +21,7 @@ import org.jboss.logging.Logger;
 
 /**
  * Seeds a basic, ready-to-poke-at setup by driving the real {@link ProjectService}/{@link
- * WorktreeService} (not raw SQL), so it always matches the current domain model and refactors are
+ * WorkspaceService} (not raw SQL), so it always matches the current domain model and refactors are
  * caught at compile time. Invoked from the {@code seed} command in {@link Main} — see that class
  * for how to run it.
  *
@@ -48,7 +48,7 @@ public class SeedService {
 
   @Inject ProjectService projectService;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject RepositoryDaemonService repositoryDaemonService;
 
@@ -79,13 +79,14 @@ public class SeedService {
 
     // A demo daemon on the repository (daemons only exist at repository scope): a Python static
     // file server with a ready pattern and a LOG_LEVEL observer — enough to watch the whole
-    // supervised lifecycle in any of the worktrees below. Created BEFORE the worktrees: containers
+    // supervised lifecycle in any of the workspaces below. Created BEFORE the workspaces:
+    // containers
     // publish web-view ports (httpPort) only when the definition already declares them at
     // container-creation time, and http.server binds 0.0.0.0 so the published port reaches it.
     repositoryDaemonService.create(
         repo.id,
         "Python HTTP server",
-        "Serves the worktree over HTTP on :8000 — a demo daemon for the supervisor,"
+        "Serves the workspace over HTTP on :8000 — a demo daemon for the supervisor,"
             + " web-viewable through the qits proxy",
         // The web-view base-path contract: the app must serve itself under $QITS_PUBLIC_BASE
         // (the proxy forwards paths verbatim). http.server has no prefix option, so a symlink
@@ -106,16 +107,16 @@ public class SeedService {
         null);
 
     // Build the branch tree.
-    worktreeService.createWorktree(repo.id, "mainline", "master", "mainline");
-    worktreeService.createWorktree(repo.id, "behind-ff", "mainline", "behind-ff");
-    worktreeService.createWorktree(repo.id, "diverged", "mainline", "diverged");
-    worktreeService.createWorktree(repo.id, "feeder", "feature", "feeder");
+    workspaceService.createWorkspace(repo.id, "mainline", "master", "mainline");
+    workspaceService.createWorkspace(repo.id, "behind-ff", "mainline", "behind-ff");
+    workspaceService.createWorkspace(repo.id, "diverged", "mainline", "diverged");
+    workspaceService.createWorkspace(repo.id, "feeder", "feature", "feeder");
 
     // Advance 'mainline' (feeder carries a commit master lacks) so its children fall behind it.
     // 'behind-ff' then has no commits of its own → fast-forwardable. Giving 'diverged' its own
     // independent merge of the same content makes it both ahead of and behind mainline.
-    worktreeService.mergeWorktree(repo.id, "feeder", "mainline");
-    worktreeService.mergeWorktree(repo.id, "feeder", "diverged");
+    workspaceService.mergeWorkspace(repo.id, "feeder", "mainline");
+    workspaceService.mergeWorkspace(repo.id, "feeder", "diverged");
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
     System.out.println(

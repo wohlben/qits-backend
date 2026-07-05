@@ -73,15 +73,15 @@ public class DaemonMcpToolsTest {
         .path("repository.id");
   }
 
-  private String createWorktree(String repoId, String worktreeId) {
+  private String createWorkspace(String repoId, String workspaceId) {
     return given()
         .contentType(ContentType.JSON)
-        .body(Map.of("id", worktreeId, "parent", "master"))
-        .post("/api/repositories/" + repoId + "/worktrees")
+        .body(Map.of("id", workspaceId, "parent", "master"))
+        .post("/api/repositories/" + repoId + "/workspaces")
         .then()
         .statusCode(200)
         .extract()
-        .path("worktree.worktreeId");
+        .path("workspace.workspaceId");
   }
 
   private static String text(ToolResponse response) {
@@ -199,10 +199,10 @@ public class DaemonMcpToolsTest {
   }
 
   @Test
-  public void startsAndStopsADaemonInAWorktree() {
+  public void startsAndStopsADaemonInAWorkspace() {
     String project = createProject("Daemon Run");
     String repoId = createRepository(project);
-    String worktreeId = createWorktree(repoId, "daemon-wt");
+    String workspaceId = createWorkspace(repoId, "daemon-wt");
     var client = client(project);
 
     final String[] daemonId = new String[1];
@@ -231,7 +231,7 @@ public class DaemonMcpToolsTest {
         .when()
         .toolsCall(
             "startDaemon",
-            Map.of("repoId", repoId, "worktreeId", worktreeId, "daemonId", daemonId[0]),
+            Map.of("repoId", repoId, "workspaceId", workspaceId, "daemonId", daemonId[0]),
             response -> {
               assertFalse(response.isError(), "start should succeed: " + text(response));
               assertTrue(text(response).contains("STARTING"), text(response));
@@ -240,8 +240,8 @@ public class DaemonMcpToolsTest {
     client
         .when()
         .toolsCall(
-            "listWorktreeDaemons",
-            Map.of("repoId", repoId, "worktreeId", worktreeId),
+            "listWorkspaceDaemons",
+            Map.of("repoId", repoId, "workspaceId", workspaceId),
             response -> {
               assertFalse(response.isError());
               String text = text(response);
@@ -255,7 +255,7 @@ public class DaemonMcpToolsTest {
         .when()
         .toolsCall(
             "stopDaemon",
-            Map.of("repoId", repoId, "worktreeId", worktreeId, "daemonId", daemonId[0]),
+            Map.of("repoId", repoId, "workspaceId", workspaceId, "daemonId", daemonId[0]),
             response -> assertFalse(response.isError(), "stop should succeed: " + text(response)))
         .thenAssertResults();
   }

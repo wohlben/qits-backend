@@ -3,20 +3,20 @@ import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
 
 /**
- * The chat session that "belongs" to a worktree: the newest (by launch time) still-running
+ * The chat session that "belongs" to a workspace: the newest (by launch time) still-running
  * {@code CHAT} command for it, or null when none is running. The commands registry is the source
  * of truth, so a chat started from anywhere (WIP route, Commands page) is found here too. If
- * several are running for one worktree the newest wins — the Commands page shows all of them.
+ * several are running for one workspace the newest wins — the Commands page shows all of them.
  */
 export function newestRunningChat(
   commands: readonly CommandDto[] | undefined,
-  worktreeId: string,
+  workspaceId: string,
 ): CommandDto | null {
   const chats = (commands ?? []).filter(
     (c) =>
       c.kind === CommandKind.Chat &&
       c.status === CommandStatus.Running &&
-      c.worktreeId === worktreeId,
+      c.workspaceId === workspaceId,
   );
   if (chats.length === 0) return null;
   return chats.reduce((newest, c) => (launchMillis(c) > launchMillis(newest) ? c : newest));

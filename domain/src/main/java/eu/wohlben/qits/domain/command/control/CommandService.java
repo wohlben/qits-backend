@@ -13,8 +13,8 @@ import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService.ResolvedAction;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
-import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
+import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -40,8 +40,8 @@ public class CommandService {
 
   private static final Logger LOG = Logger.getLogger(CommandService.class);
 
-  /** Worktree ids are path segments, so they must be strict slugs (mirrors WorktreeService). */
-  private static final String WORKTREE_ID_PATTERN = "[A-Za-z0-9_-]{1,64}";
+  /** Workspace ids are path segments, so they must be strict slugs (mirrors WorkspaceService). */
+  private static final String WORKSPACE_ID_PATTERN = "[A-Za-z0-9_-]{1,64}";
 
   /**
    * How long {@link #launchAndAwait} blocks before returning a still-running result. The process is
@@ -62,9 +62,9 @@ public class CommandService {
 
   @Inject ActionResolutionService actionResolutionService;
 
-  @Inject WorktreeRepository worktreeRepository;
+  @Inject WorkspaceRepository workspaceRepository;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject ContainerRuntime containers;
 
@@ -116,9 +116,9 @@ public class CommandService {
   }
 
   /** Launch an action as a registry command and return it; a terminal attaches by its id. */
-  public CommandDto launch(String repoId, String worktreeId, String actionId) {
+  public CommandDto launch(String repoId, String workspaceId, String actionId) {
     ResolvedAction action = actionResolutionService.resolveForRepository(repoId, actionId);
-    Prepared p = prepare(repoId, worktreeId, LaunchDescriptor.of(action));
+    Prepared p = prepare(repoId, workspaceId, LaunchDescriptor.of(action));
     registry.spawn(
         p.dto().id(), p.container(), p.script(), p.env(), this::onExit, commandLogService);
     return p.dto();
@@ -132,7 +132,7 @@ public class CommandService {
    */
   public CommandDto launchAgent(
       String repoId,
-      String worktreeId,
+      String workspaceId,
       String name,
       String script,
       boolean interactive,
@@ -140,7 +140,7 @@ public class CommandService {
     Prepared p =
         prepare(
             repoId,
-            worktreeId,
+            workspaceId,
             new LaunchDescriptor(
                 null, name, script, interactive, environment, CommandKind.TERMINAL, false, null));
     registry.spawn(
@@ -155,14 +155,14 @@ public class CommandService {
    */
   public CommandDto launchChat(
       String repoId,
-      String worktreeId,
+      String workspaceId,
       String name,
       String script,
       Map<String, String> environment) {
     Prepared p =
         prepare(
             repoId,
-            worktreeId,
+            workspaceId,
             new LaunchDescriptor(
                 null, name, script, false, environment, CommandKind.CHAT, false, null));
     registry.spawnChat(
@@ -188,7 +188,7 @@ public class CommandService {
    */
   public CommandDto launchDaemon(
       String repoId,
-      String worktreeId,
+      String workspaceId,
       String name,
       String script,
       Map<String, String> environment,
@@ -200,7 +200,7 @@ public class CommandService {
     Prepared p =
         prepare(
             repoId,
-            worktreeId,
+            workspaceId,
             new LaunchDescriptor(
                 null, name, script, true, environment, CommandKind.DAEMON, otel, publicBase));
     CommandExitListener composite =
@@ -228,8 +228,8 @@ public class CommandService {
   public record DaemonRun(CommandDto command, String container, Map<String, String> environment) {}
 
   /**
-   * Prepare a daemon run without spawning: validate the worktree, snapshot branch/commit, persist a
-   * RUNNING {@code DAEMON} row, and resolve the env overlay (OTEL, {@code QITS_PUBLIC_BASE}, and
+   * Prepare a daemon run without spawning: validate the workspace, snapshot branch/commit, persist
+   * a RUNNING {@code DAEMON} row, and resolve the env overlay (OTEL, {@code QITS_PUBLIC_BASE}, and
    * the caller's env). The {@link DaemonSupervisor} starts the detached daemon session with the
    * returned {@code environment}, then attaches a log follower to the returned command id via
    * {@link #followDaemon}. The row's {@code script} is the daemon's own startScript (meaningful
@@ -237,7 +237,7 @@ public class CommandService {
    */
   public DaemonRun beginDaemonRun(
       String repoId,
-      String worktreeId,
+      String workspaceId,
       String name,
       String script,
       Map<String, String> environment,
@@ -246,7 +246,7 @@ public class CommandService {
     Prepared p =
         prepare(
             repoId,
-            worktreeId,
+            workspaceId,
             new LaunchDescriptor(
                 null, name, script, true, environment, CommandKind.DAEMON, otel, publicBase));
     return new DaemonRun(p.dto(), p.container(), p.env());
@@ -297,7 +297,7 @@ public class CommandService {
    * Launch a non-interactive action and block for its result (the one-off run path). The command is
    * still registered and persisted, so it shows up in the Commands list and survives as history.
    */
-  public RunOutcome launchAndAwait(String repoId, String worktreeId, String actionId) {
+  public RunOutcome launchAndAwait(String repoId, String workspaceId, String actionId) {
     ResolvedAction action = actionResolutionService.resolveForRepository(repoId, actionId);
     if (action.interactive()) {
       throw new BadRequestException(
@@ -305,7 +305,7 @@ public class CommandService {
               + action.name()
               + "' is interactive — run it from the terminal, not as a one-off command.");
     }
-    Prepared p = prepare(repoId, worktreeId, LaunchDescriptor.of(action));
+    Prepared p = prepare(repoId, workspaceId, LaunchDescriptor.of(action));
     AccumulatingSink sink = new AccumulatingSink();
     int exitCode =
         registry.spawnAndAwait(
@@ -321,12 +321,13 @@ public class CommandService {
   }
 
   /**
-   * Validate the worktree, snapshot its branch/commit, and persist a RUNNING row — but don't spawn.
+   * Validate the workspace, snapshot its branch/commit, and persist a RUNNING row — but don't
+   * spawn.
    */
-  private Prepared prepare(String repoId, String worktreeId, LaunchDescriptor descriptor) {
-    // Reject path-traversal in worktreeId before it ever reaches a container name or git.
-    if (!worktreeId.matches(WORKTREE_ID_PATTERN)) {
-      throw new BadRequestException("Invalid worktree id: " + worktreeId);
+  private Prepared prepare(String repoId, String workspaceId, LaunchDescriptor descriptor) {
+    // Reject path-traversal in workspaceId before it ever reaches a container name or git.
+    if (!workspaceId.matches(WORKSPACE_ID_PATTERN)) {
+      throw new BadRequestException("Invalid workspace id: " + workspaceId);
     }
 
     // Branch comes from the stored column. Read it in its own transaction: launches also come from
@@ -336,19 +337,19 @@ public class CommandService {
         QuarkusTransaction.requiringNew()
             .call(
                 () ->
-                    worktreeRepository
-                        .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
+                    workspaceRepository
+                        .findActiveByRepositoryAndWorkspaceId(repoId, workspaceId)
                         .map(w -> w.branch)
                         .orElseThrow(
-                            () -> new BadRequestException("Worktree not found: " + worktreeId)));
+                            () -> new BadRequestException("Workspace not found: " + workspaceId)));
 
     // Provision the container on demand: a lost container is a recreatable cache of the durable
-    // branch, not a dead worktree, so re-materialize it instead of failing. ensureContainer is a
+    // branch, not a dead workspace, so re-materialize it instead of failing. ensureContainer is a
     // no-op when it's already running (and never clobbers a live container's unpushed work); it
     // throws a clear error if the branch is gone or provisioning fails (e.g. git-host unreachable),
     // which the caller/UI surfaces rather than the old silent "container is not running" 400.
-    worktreeService.ensureContainer(repoId, worktreeId);
-    String container = containers.containerName(worktreeId, repoId);
+    workspaceService.ensureContainer(repoId, workspaceId);
+    String container = containers.containerName(workspaceId, repoId);
 
     // The commit is read from the container's checkout so unpushed work is captured (the origin
     // ref may lag behind /workspace's HEAD).
@@ -356,12 +357,12 @@ public class CommandService {
         containers.exec(container, "/workspace", Map.of(), "git", "rev-parse", "HEAD");
     String commitHash = head.exitCode() == 0 ? head.output().trim() : null;
 
-    // Persist RUNNING first (this also validates the worktree belongs to the repo). If the spawn
+    // Persist RUNNING first (this also validates the workspace belongs to the repo). If the spawn
     // fails afterwards the registry marks it via the exit listener; the row is never left dangling.
     CommandDto dto =
         lifecycle.createRunning(
             repoId,
-            worktreeId,
+            workspaceId,
             branch,
             commitHash,
             descriptor.actionId(),
@@ -377,7 +378,7 @@ public class CommandService {
     if (descriptor.otel()) {
       // The command id exists here (createRunning above) — each (re)launch exports with its own
       // qits.command.id. The definition overlay stays last so an explicit user OTEL_* var wins.
-      env.putAll(otelEnvironment.forLaunch(repoId, worktreeId, dto.id(), descriptor.name()));
+      env.putAll(otelEnvironment.forLaunch(repoId, workspaceId, dto.id(), descriptor.name()));
     }
     if (descriptor.publicBase() != null) {
       // Web-viewable daemons serve under the proxied base path (the startScript passes it to the

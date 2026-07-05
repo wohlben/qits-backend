@@ -23,7 +23,7 @@ import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -36,9 +36,9 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 /**
- * Drives the supervisor state machine against real processes in a cloned-fixture worktree:
+ * Drives the supervisor state machine against real processes in a cloned-fixture workspace:
  * readiness via pattern and grace, the restart policies (with new Command rows per relaunch),
- * graceful stop, and the singleton-per-(worktree, daemon) rule.
+ * graceful stop, and the singleton-per-(workspace, daemon) rule.
  */
 @QuarkusTest
 @TestProfile(DaemonSupervisorTest.TestProfile.class)
@@ -70,7 +70,7 @@ public class DaemonSupervisorTest {
 
   @Inject RepositoryService repositoryService;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject RepositoryDaemonService repositoryDaemonService;
 
@@ -84,12 +84,12 @@ public class DaemonSupervisorTest {
 
   @Inject ContainerRuntime containers;
 
-  /** Clones the fixture and adds a {@code work} worktree (off master) to run daemons in. */
-  private String repoWithWorktree() throws Exception {
+  /** Clones the fixture and adds a {@code work} workspace (off master) to run daemons in. */
+  private String repoWithWorkspace() throws Exception {
     String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
     var project = projectService.create("Daemon Project", null);
     var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
-    worktreeService.createWorktree(repo.id, "work", "master", "work");
+    workspaceService.createWorkspace(repo.id, "work", "master", "work");
     return repo.id;
   }
 
@@ -167,7 +167,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void readyPatternFlipsStartingToReadyAndStopIsGraceful() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId =
         createDaemon(
             repoId,
@@ -191,7 +191,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void onFailureRelaunchesWithANewCommandThenSettlesCrashed() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId =
         createDaemon(repoId, "flaky", "echo boom; exit 7", null, RestartPolicy.ON_FAILURE, 1);
 
@@ -229,7 +229,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void neverPolicySettlesCrashedWithoutRelaunch() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "oneshot", "exit 3", null, RestartPolicy.NEVER, 3);
 
     supervisor.start(repoId, "work", daemonId);
@@ -245,7 +245,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void cleanExitUnderOnFailureStopsWithoutRestart() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "clean", "echo done", null, RestartPolicy.ON_FAILURE, 3);
 
     supervisor.start(repoId, "work", daemonId);
@@ -255,7 +255,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void stopBeatsAlwaysRestartPolicy() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "stubborn", "sleep 300", null, RestartPolicy.ALWAYS, 5);
 
     supervisor.start(repoId, "work", daemonId);
@@ -276,7 +276,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void fileSourceFindingsCarrySourceAndAnchorAndLateFilesArePickedUp() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     // The daemon stays quiet on stdout and logs into app.log — which doesn't exist until ~1s in,
     // covering the late-appearing-file case (its first line must still be observed as line 1).
     String daemonId =
@@ -313,7 +313,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void outputFindingsAnchorToPersistedLogSequencesAndLinesCarrySeverity() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId =
         createDaemon(
             repoId,
@@ -378,7 +378,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void webViewableDaemonExposesProxyTargetAndPath() throws Exception {
-    // Definition first: the container (created with the worktree below) publishes the port only
+    // Definition first: the container (created with the workspace below) publishes the port only
     // when the daemon already declares it at creation time.
     String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
     var project = projectService.create("Proxy Daemon Project", null);
@@ -399,7 +399,7 @@ public class DaemonSupervisorTest {
                 null,
                 null)
             .id;
-    worktreeService.createWorktree(repo.id, "work", "master", "work");
+    workspaceService.createWorkspace(repo.id, "work", "master", "work");
 
     supervisor.start(repo.id, "work", daemonId);
     try {
@@ -430,7 +430,7 @@ public class DaemonSupervisorTest {
 
   @Test
   public void daemonWithoutHttpPortHasNoProxyTargetOrPath() throws Exception {
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "plain", "sleep 300", null, RestartPolicy.NEVER, 0);
 
     supervisor.start(repoId, "work", daemonId);
@@ -446,9 +446,9 @@ public class DaemonSupervisorTest {
 
   @Test
   public void containerPredatingTheHttpPortWarnsAndLeavesTheWebViewUnavailable() throws Exception {
-    // Worktree (and thus container) first, definition second: the container cannot publish the
+    // Workspace (and thus container) first, definition second: the container cannot publish the
     // port, so the daemon runs but the web view stays unavailable until a recreation.
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String daemonId =
         repositoryDaemonService.create(
                 repoId,
@@ -491,7 +491,7 @@ public class DaemonSupervisorTest {
     // application JVM effectively does relative to `kill -- -pgid`) survives. It keeps binding the
     // http port, so the NEXT start collides and sits in STARTING forever. The launch-time reap must
     // kill it first, by the QITS_DAEMON_ID marker its environ inherited.
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     Path orphanPidFile = Files.createTempFile("qits-orphan-", ".pid");
     Files.deleteIfExists(
         orphanPidFile); // the script (re)creates it; absence means "not written yet"
@@ -554,7 +554,7 @@ public class DaemonSupervisorTest {
     // instance tracking it — exactly the state a fresh JVM sees — then let the first
     // effectiveDaemons
     // probe (via awaitStatus -> instanceOf) find the live session and adopt it as READY.
-    String repoId = repoWithWorktree();
+    String repoId = repoWithWorkspace();
     String script = "while true; do echo alive; sleep 0.3; done";
     String daemonId = createDaemon(repoId, "survivor", script, "alive", RestartPolicy.NEVER, 0);
     String container = containers.containerName("work", repoId);
@@ -574,8 +574,8 @@ public class DaemonSupervisorTest {
   }
 
   @Test
-  public void oneRunningInstancePerWorktreeAndDaemon() throws Exception {
-    String repoId = repoWithWorktree();
+  public void oneRunningInstancePerWorkspaceAndDaemon() throws Exception {
+    String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "single", "sleep 300", null, RestartPolicy.NEVER, 0);
 
     supervisor.start(repoId, "work", daemonId);
@@ -583,7 +583,7 @@ public class DaemonSupervisorTest {
       assertThrows(
           BadRequestException.class,
           () -> supervisor.start(repoId, "work", daemonId),
-          "second start of the same (worktree, daemon) must be rejected");
+          "second start of the same (workspace, daemon) must be rejected");
     } finally {
       supervisor.stop(repoId, "work", daemonId);
       awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);

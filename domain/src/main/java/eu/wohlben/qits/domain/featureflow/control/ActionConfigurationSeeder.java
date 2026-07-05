@@ -10,7 +10,7 @@ import java.util.Map;
 import org.jboss.logging.Logger;
 
 /**
- * Seeds the default "run" actions that the worktree terminal offers out of the box, so a fresh
+ * Seeds the default "run" actions that the workspace terminal offers out of the box, so a fresh
  * install always has at least an interactive shell to run. Idempotent (keyed by name), runs at
  * startup for whichever app (service or cli) boots.
  *
@@ -33,7 +33,7 @@ public class ActionConfigurationSeeder {
 
   @Transactional
   public void seedDefaults() {
-    ensure("Bash", "Interactive login shell in the worktree", "exec bash", Map.of());
+    ensure("Bash", "Interactive login shell in the workspace", "exec bash", Map.of());
     // The coding agent (Claude Code) is launched through the dedicated agent path (the
     // "Configure … with Claude" chat buttons / AgentLaunchService), which points HOME at the shared
     // credential volume so the in-container claude can authenticate — a bare seeded action would

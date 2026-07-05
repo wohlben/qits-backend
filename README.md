@@ -1,6 +1,6 @@
 # qits
 
-A Quarkus-based service for managing Git repositories and worktrees, with an Angular web UI.
+A Quarkus-based service for managing Git repositories and workspaces, with an Angular web UI.
 
 ## Project Structure
 
@@ -92,7 +92,7 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 # Run the web app in dev mode (live-reload for both Java and Angular, UI on :4200)
 ./mvnw -pl service quarkus:dev
 
-# Seed demo data (a project + branch tree, incl. fast-forwardable / diverged worktrees) into the
+# Seed demo data (a project + branch tree, incl. fast-forwardable / diverged workspaces) into the
 # shared local H2 DB so it shows up in the running app. One-step command-mode run, no web server.
 # NOTE: `quarkus:run` executes the packaged CLI app, so build it first (`install`/`package` above);
 # after a `clean` you must repackage or it fails with "Unable to access jarfile …/quarkus-run.jar".
@@ -100,7 +100,7 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 
 # Seed the servable Quarkus + Angular demo: a "Quarkus + Angular Demo" project + a repository cloned
 # from the testing-repo-quarkus-angular fixture, a web-viewable OTEL-enabled `quarkus:dev` daemon
-# (LOG_LEVEL + PATTERN log observers, a FILE log source), a `greeting` worktree, and a "Build &
+# (LOG_LEVEL + PATTERN log observers, a FILE log source), a `greeting` workspace, and a "Build &
 # Verify" feature-flow blueprint. This exercises the stack-specific feature surface (framework
 # detection, the daemon web view, observability, log observation, feature-flows, the coding agent).
 # Idempotent by RESET: each run deletes and recreates the project, always returning to the same

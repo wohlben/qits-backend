@@ -11,7 +11,7 @@ import org.jboss.logging.Logger;
 
 /**
  * Tails one FILE log source of a daemon instance <em>inside its container</em> and feeds its
- * observers. Since a worktree's working tree lives in the container ({@code /workspace}), not on
+ * observers. Since a workspace's working tree lives in the container ({@code /workspace}), not on
  * the host, the tail runs as {@code <runtime> exec … tail -F <path>} (built by {@link
  * eu.wohlben.qits.domain.repository.control.ContainerRuntime#execArgv}) and this class streams the
  * process's stdout, framing it line-by-line for the same {@link ObservedLineListener}s the host

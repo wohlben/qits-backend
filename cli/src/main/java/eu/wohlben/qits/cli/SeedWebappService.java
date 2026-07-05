@@ -18,7 +18,7 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
-import eu.wohlben.qits.domain.repository.control.WorktreeService;
+import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -35,7 +35,7 @@ import org.jboss.logging.Logger;
  * Seeds a demo project around the <b>servable</b> {@code testing-repo-quarkus-angular.git} fixture
  * (a minimal Quarkus 3 + Angular app, see {@code
  * docs/features/2026-07-05_servable-quarkus-angular-fixture.md}), so features that run real work in
- * a worktree — dev-server daemons, the web-view picker, actions, the coding agent — have a
+ * a workspace — dev-server daemons, the web-view picker, actions, the coding agent — have a
  * plausible app to point at. Sibling of {@link SeedService} (which seeds the tiny {@code
  * testing-repo} for pure git-mechanics demos); invoked from the {@code seed-webapp} command in
  * {@link Main}.
@@ -52,8 +52,8 @@ import org.jboss.logging.Logger;
  *     ├─ Repository (testing-repo-quarkus-angular)
  *     │    + a web-viewable "Quarkus dev server" daemon: httpPort 8080, otel=true,
  *     │      LOG_LEVEL + PATTERN observers, a FILE LogSource tailing quarkus.log
- *     │    main       the default worktree (created at clone time)
- *     │    greeting   a plain worktree off feature/greeting (a fast-forward over main)
+ *     │    main       the default workspace (created at clone time)
+ *     │    greeting   a plain workspace off feature/greeting (a fast-forward over main)
  *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only)
  * </pre>
  *
@@ -74,7 +74,7 @@ public class SeedWebappService {
 
   @Inject ProjectService projectService;
 
-  @Inject WorktreeService worktreeService;
+  @Inject WorkspaceService workspaceService;
 
   @Inject RepositoryDaemonService repositoryDaemonService;
 
@@ -105,7 +105,7 @@ public class SeedWebappService {
   @ActivateRequestContext
   public Repository seed() {
     // Idempotent by reset: drop any prior instance so every run yields the same known-good state.
-    // Project deletion cascades to its repositories (containers, worktree branches) and
+    // Project deletion cascades to its repositories (containers, workspace branches) and
     // feature-flow
     // configs, so this fully tears down what a previous run created.
     projectService.list().stream()
@@ -137,7 +137,7 @@ public class SeedWebappService {
     // service
     // name, qits.* resource attributes), so the app the fixture ships (quarkus-opentelemetry)
     // exports
-    // traces/logs/metrics to the in-process receiver, bucketed by worktree/repository.
+    // traces/logs/metrics to the in-process receiver, bucketed by workspace/repository.
     //
     // Log observers: LOG_LEVEL classifies Java stack traces / *Exception out of the box; the
     // PATTERN
@@ -175,12 +175,12 @@ public class SeedWebappService {
                 DaemonEventSeverity.ERROR)),
         List.of(new LogSource("quarkus.log", "Quarkus dev log")));
 
-    // One plain feature worktree so the detail view has more than one worktree to browse and run
+    // One plain feature workspace so the detail view has more than one workspace to browse and run
     // the
     // dev server in — no divergence manufacturing (that's testing-repo's job). feature/greeting is
     // a
     // fast-forward over main.
-    worktreeService.createWorktree(repo.id, "greeting", "feature/greeting", "greeting");
+    workspaceService.createWorkspace(repo.id, "greeting", "feature/greeting", "greeting");
 
     // A feature-flow configuration expressing the stack's build/lint/test actions. Blueprint only —
     // qits does not execute these; the real run happens via daemons/commands.

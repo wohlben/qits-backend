@@ -21,7 +21,7 @@ import java.util.Map;
 public class ActionConfiguration extends AbstractActionDefinition {
 
   /**
-   * Environment variables injected into the process when this action runs in a worktree terminal.
+   * Environment variables injected into the process when this action runs in a workspace terminal.
    * Overlaid over the server's inherited environment (action values win). Empty for actions that
    * only inherit the ambient env.
    */

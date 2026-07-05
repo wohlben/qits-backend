@@ -3,7 +3,7 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-import { WorktreeDaemonControllerService } from '@/api/api/worktreeDaemonController.service';
+import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { DaemonWebviewComponent } from './daemon-webview.component';
@@ -21,7 +21,7 @@ function instance(overrides: Partial<DaemonInstanceDto> = {}): DaemonInstanceDto
 
 describe('DaemonWebviewComponent', () => {
   const daemonService = {
-    apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsGet: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet: vi
       .fn()
       .mockReturnValue(of({ entries: [] })),
   };
@@ -43,16 +43,16 @@ describe('DaemonWebviewComponent', () => {
       imports: [DaemonWebviewComponent],
       providers: [
         provideTanStackQuery(queryClient),
-        { provide: WorktreeDaemonControllerService, useValue: daemonService },
+        { provide: WorkspaceDaemonControllerService, useValue: daemonService },
       ],
     }).compileComponents();
   });
 
   function createComponent(instances: DaemonInstanceDto[]) {
-    queryClient.setQueryData(['worktree-daemons', 'repo-1', 'wt-1'], instances);
+    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], instances);
     const fixture = TestBed.createComponent(DaemonWebviewComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
-    fixture.componentRef.setInput('worktreeId', 'wt-1');
+    fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.detectChanges();
     return fixture;
   }

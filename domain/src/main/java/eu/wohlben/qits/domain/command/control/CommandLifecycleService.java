@@ -7,8 +7,8 @@ import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import eu.wohlben.qits.domain.error.NotFoundException;
-import eu.wohlben.qits.domain.repository.entity.Worktree;
-import eu.wohlben.qits.domain.repository.persistence.WorktreeRepository;
+import eu.wohlben.qits.domain.repository.entity.Workspace;
+import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
@@ -26,20 +26,20 @@ import java.util.List;
 @ApplicationScoped
 public class CommandLifecycleService {
 
-  @Inject WorktreeRepository worktreeRepository;
+  @Inject WorkspaceRepository workspaceRepository;
 
   @Inject CommandRepository commandRepository;
 
   @Inject CommandMapper commandMapper;
 
   /**
-   * Persist a new RUNNING command and return its DTO (built in-tx so the worktree FK resolves).
+   * Persist a new RUNNING command and return its DTO (built in-tx so the workspace FK resolves).
    * {@code actionId} is null for launches not backed by an action (e.g. an agent session).
    */
   @Transactional
   public CommandDto createRunning(
       String repoId,
-      String worktreeId,
+      String workspaceId,
       String branch,
       String commitHash,
       String actionId,
@@ -47,13 +47,13 @@ public class CommandLifecycleService {
       String executeScript,
       boolean interactive,
       CommandKind kind) {
-    Worktree worktree =
-        worktreeRepository
-            .findActiveByRepositoryAndWorktreeId(repoId, worktreeId)
-            .orElseThrow(() -> new NotFoundException("Worktree not found: " + worktreeId));
+    Workspace workspace =
+        workspaceRepository
+            .findActiveByRepositoryAndWorkspaceId(repoId, workspaceId)
+            .orElseThrow(() -> new NotFoundException("Workspace not found: " + workspaceId));
     Command command =
         Command.builder()
-            .worktree(worktree)
+            .workspace(workspace)
             .branch(branch)
             .commitHash(commitHash)
             .actionId(actionId)

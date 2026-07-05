@@ -4,7 +4,7 @@
 
 As a developer, I want to browse the commits of a branch and drill into any commit's changes so that I can understand what a change actually did before deciding to integrate, update, or abandon it.
 
-Commit listings are scoped to what is *unique to the branch* — the commits it added on top of its parent — so reviewing a worktree branch shows exactly the work done there, not the whole repository history.
+Commit listings are scoped to what is *unique to the branch* — the commits it added on top of its parent — so reviewing a workspace branch shows exactly the work done there, not the whole repository history.
 
 ## Builds On
 

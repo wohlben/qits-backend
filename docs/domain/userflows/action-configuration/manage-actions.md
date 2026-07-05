@@ -2,7 +2,7 @@
 
 ## User Story
 
-As a developer, I want to define and manage reusable actions so that my team can enforce consistent prerequisites and quality gates across feature flows, and run standardized interactive tasks in worktrees, without duplicating setup steps.
+As a developer, I want to define and manage reusable actions so that my team can enforce consistent prerequisites and quality gates across feature flows, and run standardized interactive tasks in workspaces, without duplicating setup steps.
 
 ## UI Flow
 

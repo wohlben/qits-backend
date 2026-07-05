@@ -26,7 +26,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * The definition of a "daemon" — a process a worktree runs that is <em>supposed to keep
+ * The definition of a "daemon" — a process a workspace runs that is <em>supposed to keep
  * running</em> (dev server, watch-mode test runner), whose result is a status over time rather than
  * an exit code. A daemon is essentially a long-running, non-interactive action, and like a
  * repository action it is owned by (and only available in) one repository — the dev server of the
@@ -50,7 +50,7 @@ public class RepositoryDaemon extends PanacheEntityBase {
 
   public String description;
 
-  /** Run verbatim in the worktree; must stay in the foreground (the supervisor owns restarts). */
+  /** Run verbatim in the workspace; must stay in the foreground (the supervisor owns restarts). */
   @Column(name = "start_script", nullable = false, length = 4000)
   public String startScript;
 
@@ -75,14 +75,15 @@ public class RepositoryDaemon extends PanacheEntityBase {
 
   /**
    * When set, launches inject the {@code OTEL_EXPORTER_OTLP_*} environment so the process exports
-   * telemetry to qits' in-process OTLP receiver, pre-tagged with worktree/repository/command ids.
+   * telemetry to qits' in-process OTLP receiver, pre-tagged with workspace/repository/command ids.
    */
   @Column(nullable = false)
   public boolean otel;
 
   /**
-   * When set, the daemon serves HTTP on this port inside its worktree container and is web-viewable
-   * through the {@code /daemon/{worktreeId}/{daemonId}/} proxy. Null means not web-viewable.
+   * When set, the daemon serves HTTP on this port inside its workspace container and is
+   * web-viewable through the {@code /daemon/{workspaceId}/{daemonId}/} proxy. Null means not
+   * web-viewable.
    */
   @Column(name = "http_port")
   public Integer httpPort;
