@@ -82,12 +82,27 @@ sighting) re-adopts a session still alive from before a restart. **The live term
 is the `tail -F` follower — a read-only live log view (typing is ignored, since a tail has no
 meaningful stdin).**
 
-**Increment 2 (follow-up): the interactive terminal.** Because `tmux attach` emits a full-screen TUI
-render (cursor moves, redraws), not a line stream, the observers/ready/persistence must stay on the
-logfile tail. So increment 2 *splits* the two paths: a background tail keeps feeding the durable
-pipeline (no terminal), and the browser terminal opens an on-demand `docker exec -it tmux -L qits-<id>
-attach` PTY (rendered by xterm.js) for real input/resize — letting you drive e.g. Quarkus dev's
-`[r]`/`[e]` keys. It reconciles the attach client with the persisted log for scrollback.
+**Increment 2 (built): the interactive terminal.** Because `tmux attach` emits a full-screen TUI
+render (cursor moves, redraws), not a line stream, the observers/ready/persistence stay on the
+logfile tail. So increment 2 *splits* the two paths: the background `tail -F` follower keeps feeding
+the durable pipeline (unchanged — it also stays the read-only-live "Logs" view), and a new
+**on-demand** `docker exec -it tmux -L qits-<id> attach` PTY is opened per browser session for real
+input/resize — letting you drive e.g. Quarkus dev's `[r]`/`[e]` keys. Concretely:
+
+- The attach command is a new `ContainerRuntime.attachDaemonCommand(daemonId)` seam
+  (`DockerExecutor` → `exec tmux -L qits-<id> attach -t main`; `FakeContainerRuntime` → a
+  `tail -f` of the logfile, so unit tests exercise the wiring without tmux; real tmux is covered by
+  `WorkspaceContainerIT`).
+- A new `DaemonTerminalSocket` (`/api/terminal/daemons/{repoId}/{worktreeId}/{daemonId}`) spawns an
+  **ephemeral, per-connection** registry PTY (`CommandRegistry.spawn`) running that command with
+  **no persistence** (no-op exit/log listeners — the follower owns the durable log). `onClose`
+  terminates the attach client, which only *detaches* the tmux client; the detached daemon session
+  keeps running.
+- The frontend reuses `WebTerminalComponent` (now taking an optional `socketPath`); a per-daemon
+  **"Terminal"** button opens it in a fullscreen overlay dialog (`DaemonTerminalComponent`,
+  mirroring the daemon web-view). The existing **"Logs"** link is kept for the persisted,
+  anchor-highlightable read-only-live view. Scrollback beyond the current tmux pane still lives in
+  the persisted follower log ("Logs"), not the attach render.
 
 ## Notes
 

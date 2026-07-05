@@ -11,11 +11,11 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 
 /**
- * Smart component that renders a live registry command (a process running in its worktree, attached
- * to a real PTY server-side). It only opens a WebSocket to the command and renders the stream with
- * xterm.js. The process is owned by the backend `CommandRegistry`, so opening the socket re-attaches
- * to it — replaying the scrollback — and closing it (leaving the route) only detaches; the process
- * keeps running until it exits or is explicitly terminated.
+ * Smart component that renders a live PTY server-side (a process running in its worktree) over a
+ * WebSocket, with xterm.js. By default it attaches to a registry command by `commandId` (opening
+ * the socket re-attaches — replaying scrollback — and closing it only detaches; the process keeps
+ * running). Pass an explicit `socketPath` to point it at a different terminal endpoint — e.g. the
+ * daemon interactive-attach socket, which has no durable `commandId`.
  */
 @Component({
   selector: 'app-web-terminal',
@@ -24,8 +24,14 @@ import { Terminal } from '@xterm/xterm';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WebTerminalComponent implements OnDestroy {
-  /** The registry command id whose PTY this terminal attaches to. */
-  readonly commandId = input.required<string>();
+  /** The registry command id whose PTY this terminal attaches to (unless `socketPath` is set). */
+  readonly commandId = input<string>();
+
+  /**
+   * An explicit WebSocket path (relative to the app origin, no leading slash), overriding the
+   * default `api/terminal/commands/<commandId>`. Used by the daemon interactive terminal.
+   */
+  readonly socketPath = input<string>();
 
   private readonly host = viewChild<ElementRef<HTMLDivElement>>('host');
 
@@ -38,17 +44,27 @@ export class WebTerminalComponent implements OnDestroy {
   constructor() {
     // Connect once the host element has rendered. The `connected` guard keeps this a one-shot.
     effect(() => {
-      const commandId = this.commandId();
+      const path = this.resolvePath();
       const el = this.host()?.nativeElement;
-      if (!commandId || !el || this.connected) {
+      if (!path || !el || this.connected) {
         return;
       }
       this.connected = true;
-      this.connect(commandId, el);
+      this.connect(path, el);
     });
   }
 
-  private connect(commandId: string, el: HTMLElement): void {
+  /** The WS path to open: the explicit `socketPath`, else derived from `commandId`; null if neither. */
+  private resolvePath(): string | null {
+    const explicit = this.socketPath();
+    if (explicit) {
+      return explicit;
+    }
+    const commandId = this.commandId();
+    return commandId ? `api/terminal/commands/${commandId}` : null;
+  }
+
+  private connect(path: string, el: HTMLElement): void {
     const term = new Terminal({
       cursorBlink: true,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -63,9 +79,7 @@ export class WebTerminalComponent implements OnDestroy {
     this.fitAddon = fitAddon;
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(
-      `${proto}://${window.location.host}/api/terminal/commands/${commandId}`,
-    );
+    const ws = new WebSocket(`${proto}://${window.location.host}/${path}`);
     this.ws = ws;
 
     ws.onopen = () => {
