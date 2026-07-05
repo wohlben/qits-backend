@@ -1,9 +1,21 @@
 package eu.wohlben.qits.cli;
 
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
+import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
+import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
+import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
+import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;
+import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
+import eu.wohlben.qits.domain.featureflow.entity.ActionType;
+import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowConfiguration;
+import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
+import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.WorktreeService;
@@ -28,23 +40,26 @@ import org.jboss.logging.Logger;
  * testing-repo} for pure git-mechanics demos); invoked from the {@code seed-webapp} command in
  * {@link Main}.
  *
- * <p>It drives the real {@link ProjectService}/{@link WorktreeService}/{@link
- * RepositoryDaemonService} (not raw SQL), so it always matches the current domain model, and builds
- * this tree:
+ * <p>It drives the real domain services (not raw SQL), so it always matches the current model. This
+ * fixture is the <b>stack-specific</b> substrate (the counterpart to {@code testing-repo}, which
+ * owns git-mechanics/merge/divergence): it exercises the logic {@code hello.txt} can't — framework
+ * detection, a real {@code quarkus:dev} web-view daemon, OTEL observability, daemon log
+ * observation, a Java+node feature-flow blueprint, and the coding agent against a real app. It
+ * builds this tree:
  *
  * <pre>
  *   Quarkus + Angular Demo
- *     └─ Repository (testing-repo-quarkus-angular)   + a "Quarkus dev server" daemon (web-viewable)
- *          main                     the default worktree (created at clone time)
- *          └─ mainline              forked from main, then advanced by merging the feeder
- *               └─ behind-ff        strictly behind mainline → clickable "-N" fast-forward
- *          feeder                   carries feature/greeting's extra commit, advances mainline
+ *     ├─ Repository (testing-repo-quarkus-angular)
+ *     │    + a web-viewable "Quarkus dev server" daemon: httpPort 8080, otel=true,
+ *     │      LOG_LEVEL + PATTERN observers, a FILE LogSource tailing quarkus.log
+ *     │    main       the default worktree (created at clone time)
+ *     │    greeting   a plain worktree off feature/greeting (a fast-forward over main)
+ *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only)
  * </pre>
  *
- * <p>(The tiny fixture's {@code feature/greeting} is a linear descendant of {@code main}, so it can
- * only demo the fast-forwardable state here — a "diverged/conflict" worktree needs a
- * cleanly-diverging branch, which the {@code seed} command already demonstrates on {@code
- * testing-repo}.)
+ * <p>No merge/divergence tree is manufactured here — that is {@code testing-repo}'s job (see the
+ * {@code seed} command). The fixture ships its branches ({@code main}, {@code feature/greeting} FF,
+ * {@code feature/diverged} conflicting) for any test that needs them.
  *
  * <p><b>Idempotent by reset:</b> unlike {@link SeedService} (skip-if-exists), this command
  * <em>deletes</em> any prior {@value #PROJECT_NAME} project first, so every run resets it to the
@@ -62,6 +77,16 @@ public class SeedWebappService {
   @Inject WorktreeService worktreeService;
 
   @Inject RepositoryDaemonService repositoryDaemonService;
+
+  @Inject ActionConfigurationService actionConfigurationService;
+
+  @Inject FeatureFlowConfigurationService featureFlowConfigurationService;
+
+  @Inject FeatureFlowPhaseService featureFlowPhaseService;
+
+  @Inject FeatureFlowPhaseStepService featureFlowPhaseStepService;
+
+  @Inject FeatureFlowPhaseActionService featureFlowPhaseActionService;
 
   /**
    * Override the clone source; defaults to the in-repo testing-repo-quarkus-angular.git fixture.
@@ -105,8 +130,19 @@ public class SeedWebappService {
     // SPA (Quinoa), live-reloaded. httpPort set => the daemon is web-viewable, so the supervisor
     // injects QITS_PUBLIC_BASE and publishes the port. Per the web-view base-path contract
     // (docs/features/2026-07-05_daemon-webview-picker.md) the dev server must bind all interfaces
-    // and
-    // serve under that prefix; Quarkus does both via quarkus.http.host/root-path.
+    // and serve under that prefix; Quarkus does both via quarkus.http.host/root-path, and the SPA
+    // fetches base-relative so it resolves under the proxy prefix (see the fixture's greeting.ts).
+    //
+    // otel=true => the supervisor injects OTEL_EXPORTER_OTLP_* (endpoint, protobuf protocol,
+    // service
+    // name, qits.* resource attributes), so the app the fixture ships (quarkus-opentelemetry)
+    // exports
+    // traces/logs/metrics to the in-process receiver, bucketed by worktree/repository.
+    //
+    // Log observers: LOG_LEVEL classifies Java stack traces / *Exception out of the box; the
+    // PATTERN
+    // observer flags Quarkus dev-mode build/startup failures as ERROR. The FILE LogSource tails the
+    // rolling quarkus.log the fixture writes (quarkus.log.file.*) into those same observers.
     repositoryDaemonService.create(
         repo.id,
         "Quarkus dev server",
@@ -121,22 +157,27 @@ public class SeedWebappService {
         "TERM",
         RestartPolicy.ON_FAILURE,
         3,
-        null,
+        true,
         8080,
         null,
-        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
-        null);
+        List.of(
+            new LogObserver(LogObserverKind.LOG_LEVEL, null, null),
+            new LogObserver(
+                LogObserverKind.PATTERN,
+                "(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)",
+                DaemonEventSeverity.ERROR)),
+        List.of(new LogSource("quarkus.log", "Quarkus dev log")));
 
-    // A small branch tree so worktree states are visible on the real app. feature/greeting carries
-    // one commit main lacks, reused here as the feeder that advances mainline.
-    worktreeService.createWorktree(repo.id, "mainline", "main", "mainline");
-    worktreeService.createWorktree(repo.id, "behind-ff", "mainline", "behind-ff");
-    worktreeService.createWorktree(repo.id, "feeder", "feature/greeting", "feeder");
+    // One plain feature worktree so the detail view has more than one worktree to browse and run
+    // the
+    // dev server in — no divergence manufacturing (that's testing-repo's job). feature/greeting is
+    // a
+    // fast-forward over main.
+    worktreeService.createWorktree(repo.id, "greeting", "feature/greeting", "greeting");
 
-    // Advance 'mainline' (feeder carries a commit it lacks) so 'behind-ff' — forked from mainline
-    // before this merge, with no commits of its own — becomes strictly behind it, i.e.
-    // fast-forwardable.
-    worktreeService.mergeWorktree(repo.id, "feeder", "mainline");
+    // A feature-flow configuration expressing the stack's build/lint/test actions. Blueprint only —
+    // qits does not execute these; the real run happens via daemons/commands.
+    seedFeatureFlow(project.id);
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
     System.out.println(
@@ -146,6 +187,66 @@ public class SeedWebappService {
             + repo.id
             + " to see the branch tree and launch the Quarkus dev server.");
     return repo;
+  }
+
+  /**
+   * Seeds a "Build &amp; Verify" feature-flow configuration under the project: a single
+   * "Development" phase with Build (prerequisite) → Lint (two quality-gate actions sharing a
+   * parallel group) → Test (quality gate). Configurations hang off the <em>project</em> (not the
+   * repository). This is a blueprint — qits never executes these scripts.
+   */
+  private void seedFeatureFlow(String projectId) {
+    ActionConfiguration build =
+        actionConfigurationService.create(
+            "build-project",
+            "Compile and package the app; the Angular bundle is baked into the jar.",
+            "./mvnw package",
+            null,
+            false,
+            null);
+    ActionConfiguration lintBackend =
+        actionConfigurationService.create(
+            "lint-backend",
+            "Check the Java sources' formatting / static analysis.",
+            "./mvnw spotless:check",
+            null,
+            false,
+            null);
+    ActionConfiguration lintFrontend =
+        actionConfigurationService.create(
+            "lint-frontend",
+            "Lint the Angular sources.",
+            "pnpm --dir src/main/webui lint",
+            null,
+            false,
+            null);
+    ActionConfiguration test =
+        actionConfigurationService.create(
+            "run-unit-tests",
+            "Run the @QuarkusTest suite for POST /api/greetings.",
+            "./mvnw test",
+            null,
+            false,
+            null);
+
+    FeatureFlowConfiguration config =
+        featureFlowConfigurationService.createUnderProject(projectId, "Build & Verify");
+    FeatureFlowPhase development =
+        featureFlowPhaseService.create(
+            config.id, "Development", "Build, lint and test the Quarkus + Angular app.", 0, null);
+
+    FeatureFlowPhaseStep buildStep = featureFlowPhaseStepService.create(development.id, "Build", 0);
+    featureFlowPhaseActionService.create(buildStep.id, build.id, ActionType.PREREQUISITE, 0, null);
+
+    // Two actions in one step sharing a parallel group => they may run concurrently.
+    FeatureFlowPhaseStep lintStep = featureFlowPhaseStepService.create(development.id, "Lint", 1);
+    featureFlowPhaseActionService.create(
+        lintStep.id, lintBackend.id, ActionType.QUALITY_GATE, 0, "lint");
+    featureFlowPhaseActionService.create(
+        lintStep.id, lintFrontend.id, ActionType.QUALITY_GATE, 1, "lint");
+
+    FeatureFlowPhaseStep testStep = featureFlowPhaseStepService.create(development.id, "Test", 2);
+    featureFlowPhaseActionService.create(testStep.id, test.id, ActionType.QUALITY_GATE, 0, null);
   }
 
   /**

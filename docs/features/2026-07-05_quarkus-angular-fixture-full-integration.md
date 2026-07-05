@@ -29,6 +29,56 @@ Related/dependent plans (each is a target this integrates with):
 [health checks](../features/2026-05-01_health-checks.md), and the
 [workspace containers](../features/2026-07-04_workspace-containers.md) execution model.
 
+## As built
+
+Implemented on 2026-07-05. The plan below is preserved as the reference; this section records what
+actually shipped and the deltas.
+
+**Fixture rebake (all 3 branches, on a shared base commit).** The bare
+`domain/src/test/resources/fixtures/testing-repo-quarkus-angular.git` was rebuilt so a new shared base
+carries every stack signal, and the branches keep their topology: `main` and `feature/diverged` are
+conflicting siblings off the base, `feature/greeting` is a linear fast-forward over `main`. Shared
+additions on the base:
+
+- `pom.xml` — `quarkus-opentelemetry` + `quarkus-smallrye-health` (BOM-managed).
+- `application.properties` — `quarkus.otel.logs.enabled` / `quarkus.otel.metrics.enabled` /
+  `quarkus.otel.exporter.otlp.protocol=http/protobuf`, plus `quarkus.log.file.*` so a rolling
+  `quarkus.log` is written at the worktree root (the `FILE` `LogSource` target). *(Note:
+  `quarkus.log.file.enable` is deprecated in 3.37 but still functional; it only warns when the fixture
+  is run standalone, which qits never does.)*
+- `src/main/webui/src/app/greeting.ts` — the fetch is now **base-relative** `api/greetings`.
+- `src/main/webui/src/app/greeting.spec.ts` — a minimal spec (not executed) so the file browser's
+  test↔code linking resolves.
+- `docs/README.md` (lights up the `Docs` kind) and a repo-local `.claude/settings.json` + `CLAUDE.md`.
+
+The fixture still `./mvnw package`s green (opentelemetry + quinoa + smallrye-health installed, the
+`@QuarkusTest` passes).
+
+**Seed reshape (`SeedWebappService`).** Dropped the `mainline`/`behind-ff`/`feeder` merge tree; added
+a `greeting` worktree off `feature/greeting`; set `otel=true` on the daemon; added a `PATTERN` observer
+(`(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)` → ERROR) alongside the `LOG_LEVEL`
+one and a `FILE` `LogSource` on `quarkus.log`; and seeded a `"Build & Verify"` feature-flow
+configuration (Development → Build [PREREQUISITE] / Lint [two QUALITY_GATE actions sharing
+`parallelGroup:"lint"`] / Test [QUALITY_GATE]).
+
+**Tests.** `SeedWebappServiceTest` now asserts the daemon (`httpPort`, `otel`, `LOG_LEVEL`+`PATTERN`
+observers, the `FILE` source), the `greeting` worktree, and the feature-flow tree, keeping the
+double-`seed()` idempotency check. Framework detection is covered by `detect-frameworks.spec.ts`.
+
+**Open questions — resolution.** The feature-flow config + observers are **baked into the seed**
+(reset-owned, deterministic) as recommended. Frontend OTEL was left out of this cut (backend traces
+prove the path). The Quinoa `ng serve` base-href question and the first-run-cost question are runtime
+concerns verified only on real docker (see below).
+
+**Not automated here.** Acceptance items 2–4 (web view / OTEL export / log observation) need docker +
+the `qits/workspace` image and a container-reachable git host. On this Docker-Desktop/WSL2 box the
+container→git-host channel is unreachable (see the workspace-containers notes), so this coverage is
+**manual** for now rather than a fragile `-Pextended` IT; the deterministic coverage is
+`SeedWebappServiceTest` + `detect-frameworks.spec.ts`. Manual steps: run `service` (`quarkus:dev`),
+`seed-webapp`, open a worktree → launch the daemon → confirm the web view renders the SPA and
+`POST /api/greetings` works through the `/daemon/{…}/{…}/` prefix, and the telemetry view shows spans
+scoped by `qits.worktree.id`.
+
 ## The shape of the integration
 
 Two sides have to line up: **the fixture app** (what the cloned repo contains and how it's

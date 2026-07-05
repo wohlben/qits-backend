@@ -56,9 +56,12 @@ All Maven commands use the wrapper.
 ./mvnw -pl cli quarkus:run -Dcli.args=seed
 
 # Seed the servable Quarkus+Angular demo: a project + repo cloned from the testing-repo-quarkus-angular
-# fixture, a web-viewable `quarkus:dev` daemon, and a fast-forwardable worktree. Idempotent by RESET —
-# re-running deletes and recreates the project, so it always returns to the same known-good state
-# (use it as the fixture for manual UI poking and automated regression tests).
+# fixture, a web-viewable OTEL-enabled `quarkus:dev` daemon (LOG_LEVEL + PATTERN observers, a FILE log
+# source), a `greeting` worktree, and a "Build & Verify" feature-flow blueprint. Exercises the
+# stack-specific feature surface (framework detection, web view, observability, log observation,
+# feature-flows, the coding agent) — the counterpart to `seed` (which owns git merge/divergence).
+# Idempotent by RESET — re-running deletes and recreates the project, so it always returns to the same
+# known-good state (use it as the fixture for manual UI poking and automated regression tests).
 ./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
 
 # Generate a starter Flyway migration after changing entities (writes PENDING_MIGRATION.sql).
