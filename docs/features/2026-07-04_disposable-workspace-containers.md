@@ -115,7 +115,7 @@ Recreation restores **origin state only**. Commits made in a container but never
 The live-container guard protects the graceful case (`ensureContainer` never re-clones over a running
 container) and `stopContainer` pushes before removing, but an *unexpected* container death (host reboot,
 `docker rm`, a crash) still loses unpushed commits. Bounding that window with a periodic checkpoint-push
-is captured as its own follow-up: [periodic-checkpoint-push](../feature-ideas/periodic-checkpoint-push.md).
+is implemented by [periodic-checkpoint-push](2026-07-05_periodic-checkpoint-push.md).
 
 ## Prerequisites (git-host is auto-resolved)
 
