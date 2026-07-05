@@ -8,6 +8,7 @@ import { AgentControllerService } from '@/api/api/agentController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
 import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
+import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { SpeakToPromptComponent } from './speak-to-prompt.component';
 
 describe('SpeakToPromptComponent', () => {
@@ -97,6 +98,29 @@ describe('SpeakToPromptComponent', () => {
 
     expect(launchedId).toBe('cmd-1');
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('appends picked snippets from the prompt-context store to the initial context', async () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.add({
+      html: '<button class="cta">Go</button>',
+      selector: '#root > button',
+      url: 'http://localhost/daemon/wt/d/',
+      tag: 'button',
+      textPreview: 'Go',
+    });
+    const fixture = createComponent();
+    fixture.componentInstance.refinedPrompt.set('fix this button');
+    fixture.componentInstance.launch();
+    await fixture.whenStable();
+
+    const [, , body] =
+      agentService.apiRepositoriesRepoIdWorktreesWorktreeIdAgentsPost.mock.calls[0];
+    expect(body.scope).toBe(AgentMcpScope.Repository);
+    expect(body.initialContext).toContain('fix this button');
+    expect(body.initialContext).toContain('Picked element <button>');
+    expect(body.initialContext).toContain('<button class="cta">Go</button>');
+    store.clear();
   });
 
   it('uploads the recording and appends the server transcript', async () => {
