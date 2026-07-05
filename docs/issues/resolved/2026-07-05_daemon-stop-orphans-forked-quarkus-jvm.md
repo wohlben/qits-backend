@@ -1,5 +1,28 @@
 # Stopping a Quarkus dev daemon can orphan its forked JVM, which holds the port
 
+## Resolution (2026-07-05)
+
+Fixed in `DaemonSupervisor` by reaping stragglers before **every** (re)launch, so a start can never
+collide with a leftover from a previous run (`reapStragglers`, called at the top of `launch`). Two
+selectors, both self-contained (bash + coreutils + `/proc`, no `ss`/`lsof`/`fuser` — none are in the
+workspace image):
+
+- **By marker** — every daemon process is stamped `QITS_DAEMON_ID=<daemonId>` (an env overlay,
+  inherited by forks), so a child that escaped the launched process group — the forked Quarkus dev
+  JVM — is found via `/proc/<pid>/environ` and killed regardless of its process group. The per-daemon
+  UUID keeps the scan off anything else; the scanning shell carries no marker, so it can't self-kill.
+- **By port** — for a web-viewable daemon, whatever currently listens on `httpPort` (resolved through
+  `/proc/net/tcp{,6}` → socket inode → owning pid) is killed too. This catches a holder the marker
+  can't: one from before this mechanism existed, or a run the supervisor lost track of across a
+  dev-mode hot reload. The container is per-worktree, so only this daemon should ever bind that port.
+
+Verified live: the greeting dev-server daemon, previously wedged in `STARTING` by a markerless forked
+JVM still holding `:8080`, now reaps that holder on start and reaches `READY` (OTEL logs/metrics still
+export, zero failures, web-view proxy 200). Regression tests in `DaemonSupervisorTest`:
+`relaunchReapsAStragglerThatEscapedTheProcessGroup` (marker path — a `setsid` child survives a stop
+then is killed on relaunch) and `startingAWebViewableDaemonFreesItsHttpPortFromAMarkerlessHolder`
+(port path — a markerless listener on `httpPort` is killed when the daemon starts).
+
 ## Introduction
 
 Observed while verifying the OTEL fix for the `seed-webapp` "Quarkus dev server"
