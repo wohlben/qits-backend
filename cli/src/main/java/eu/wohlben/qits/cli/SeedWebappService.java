@@ -148,10 +148,17 @@ public class SeedWebappService {
         "Quarkus dev server",
         "Runs `./mvnw quarkus:dev` — the Quarkus REST API and the Angular SPA (Quinoa),"
             + " live-reloaded and web-viewable through the qits proxy.",
+        // Quarkus does NOT read the generic OTEL_* SDK env vars, so the OTEL_EXPORTER_OTLP_ENDPOINT
+        // qits injects (otel=true) is ignored and export falls back to localhost:4317 → fails.
+        // Bridge
+        // it into the Quarkus config key here at launch. See
+        // docs/issues/resolved/2026-07-05_quarkus-otel-endpoint-not-bridged.md.
         "./mvnw -q quarkus:dev"
             + " -Dquarkus.http.host=0.0.0.0"
             + " -Dquarkus.http.port=8080"
-            + " -Dquarkus.http.root-path=\"${QITS_PUBLIC_BASE:-/}\"",
+            + " -Dquarkus.http.root-path=\"${QITS_PUBLIC_BASE:-/}\""
+            + " -Dquarkus.otel.exporter.otlp.endpoint="
+            + "\"${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}\"",
         // Quarkus logs "Listening on: http://0.0.0.0:8080" once the HTTP server is up.
         "Listening on",
         "TERM",

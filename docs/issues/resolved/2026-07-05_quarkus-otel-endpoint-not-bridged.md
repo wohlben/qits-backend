@@ -1,12 +1,35 @@
-# Quarkus fixture ignores the injected OTLP endpoint — telemetry export fails
+# Quarkus fixture ignores the injected OTLP endpoint — telemetry export fails — RESOLVED
+
+## Resolution (2026-07-05)
+
+Fixed by bridging the injected endpoint into the Quarkus config key **in the seed daemon's
+`startScript`** (`SeedWebappService`), rather than editing the fixture:
+
+```
+… -Dquarkus.otel.exporter.otlp.endpoint="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}"
+```
+
+The shell expands the qits-injected env var at launch inside the container. Chosen over the
+fixture-`application.properties` bridge (below, "preferred") because it is equivalent in effect, needs
+no multi-branch fixture regeneration, and could be applied to the already-running demo (via a daemon
+`PUT`) without a re-seed or a URL change. Verified end-to-end: the greeting daemon reaches **READY and
+holds it** (no DEGRADED), `/telemetry/logs` + `/telemetry/metrics` return real data from the
+`quarkus-angular` service (35 metric points in 3 min), and there are **zero** "Failed to export" lines.
+The fixture's `application.properties` comment ("injected by qits … so only the protocol is pinned")
+is now slightly inaccurate but harmless; the seed startScript compensates. The
+`application.properties` bridge remains a valid future refactor if a second Quarkus daemon is ever
+added for this repo (so it auto-applies without the per-daemon flag).
+
+---
+
 
 ## Introduction
 
 Found while diagnosing the [DEGRADED false-positive](2026-07-05_degraded-false-positive-on-quarkus-dev-output.md)
 on the `seed-webapp` "Quarkus dev server" daemon. Concerns the
-[observability](../features/2026-07-04_observability.md) OTLP injection
+[observability](../../features/2026-07-04_observability.md) OTLP injection
 (`OtelEnvironment`/`QitsHostResolver`) and the
-[Quarkus+Angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md) app config.
+[Quarkus+Angular fixture](../../features/2026-07-05_servable-quarkus-angular-fixture.md) app config.
 
 ## Observed
 
@@ -63,10 +86,4 @@ the fixed app.
 **qits-side alternative (rejected):** having `OtelEnvironment` also emit `QUARKUS_OTEL_*` would leak a
 framework-specific assumption into the deliberately framework-agnostic injector; the standard `OTEL_*`
 names are correct for SDK-based consumers (incl. the coding agent). The Quarkus app is the odd one that
-must opt in — so the bridge belongs in the fixture.
-
-## Not yet done
-
-Only the classifier half (so this failure no longer wedges the daemon into DEGRADED) is fixed. This
-endpoint bridge + re-seed is left as a deliberate follow-up because it touches the multi-branch
-committed fixture and requires regenerating it.
+must opt in — so the bridge belongs in the fixture (or, as shipped, the seed launch command).

@@ -1,14 +1,25 @@
-# Healthy Quarkus dev daemon flips to DEGRADED on a benign telemetry WARNING
+# Healthy Quarkus dev daemon flips to DEGRADED on a benign telemetry WARNING — RESOLVED
+
+## Resolution (2026-07-05)
+
+Resolved on both layers. **Layer 1 (root cause):** the OTLP endpoint is now bridged into Quarkus
+config, so telemetry exports successfully and the "Failed to export" WARNING never fires — see
+[quarkus-otel-endpoint-not-bridged](2026-07-05_quarkus-otel-endpoint-not-bridged.md). **Layer 2
+(hardening):** `LogLevelClassifier` now trusts a line's explicit level token, so a WARNING mentioning
+"error" can no longer be escalated to ERROR. Verified: the greeting daemon reaches **READY and holds
+it**, telemetry flows, and the only findings are genuine WARNINGs (Quinoa deprecation notices), which
+do not degrade. (The classifier change is in the `domain` module; it goes live on the next qits
+dev-server restart — the live fix that stopped the DEGRADED was Layer 1.)
 
 ## Introduction
 
 Found while diagnosing why the `seed-webapp` "Quarkus dev server"
-[daemon](../features/2026-07-04_daemons.md) showed DEGRADED after the
-[workspace-image build fix](2026-07-05_workspace-image-cannot-build-fixture.md). Concerns the
-[daemons](../features/2026-07-04_daemons.md) `LogLevelClassifier` and, upstream of it, the
-[observability](../features/2026-07-04_observability.md) OTLP wiring for the
-[Quarkus+Angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md). See the
-related, still-open [OTEL-endpoint issue](2026-07-05_quarkus-otel-endpoint-not-bridged.md).
+[daemon](../../features/2026-07-04_daemons.md) showed DEGRADED after the
+[workspace-image build fix](../2026-07-05_workspace-image-cannot-build-fixture.md). Concerns the
+[daemons](../../features/2026-07-04_daemons.md) `LogLevelClassifier` and, upstream of it, the
+[observability](../../features/2026-07-04_observability.md) OTLP wiring for the
+[Quarkus+Angular fixture](../../features/2026-07-05_servable-quarkus-angular-fixture.md). See the
+related [OTEL-endpoint issue](2026-07-05_quarkus-otel-endpoint-not-bridged.md).
 
 ## Observed
 
