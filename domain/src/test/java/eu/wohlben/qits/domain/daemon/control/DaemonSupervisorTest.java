@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
@@ -27,6 +28,9 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -477,6 +481,157 @@ public class DaemonSupervisorTest {
       supervisor.stop(repoId, "work", daemonId);
       awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
     }
+  }
+
+  @Test
+  public void relaunchReapsAStragglerThatEscapedTheProcessGroup() throws Exception {
+    // Regression for the orphaned forked-JVM wedge: a stop group-kills the launched process group,
+    // but a child that put itself in a NEW session (setsid — exactly what Quarkus dev mode's forked
+    // application JVM effectively does relative to `kill -- -pgid`) survives. It keeps binding the
+    // http port, so the NEXT start collides and sits in STARTING forever. The launch-time reap must
+    // kill it first, by the QITS_DAEMON_ID marker its environ inherited.
+    String repoId = repoWithWorktree();
+    Path orphanPidFile = Files.createTempFile("qits-orphan-", ".pid");
+    Files.deleteIfExists(
+        orphanPidFile); // the script (re)creates it; absence means "not written yet"
+    // The setsid child inherits the daemon's environment (incl. the marker) and escapes the group.
+    // The leader waits so the daemon is a normal long-runner until stopped.
+    String script =
+        "setsid bash -c 'echo $$ > "
+            + orphanPidFile
+            + "; sleep 30' &"
+            + " until [ -s "
+            + orphanPidFile
+            + " ]; do sleep 0.05; done; echo ready; sleep 300";
+    String daemonId = createDaemon(repoId, "escaper", script, "ready", RestartPolicy.NEVER, 0);
+
+    supervisor.start(repoId, "work", daemonId);
+    awaitStatus(repoId, daemonId, DaemonStatus.READY);
+    supervisor.stop(repoId, "work", daemonId);
+    awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
+
+    long orphanPid = Long.parseLong(Files.readString(orphanPidFile).trim());
+    assertTrue(
+        ProcessHandle.of(orphanPid).map(ProcessHandle::isAlive).orElse(false),
+        "the setsid child survives the group-kill stop (the bug being fixed)");
+
+    try {
+      // Relaunching must reap the straggler before the new run starts.
+      supervisor.start(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, DaemonStatus.READY);
+
+      long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
+      boolean reaped = false;
+      while (System.currentTimeMillis() < deadline) {
+        if (ProcessHandle.of(orphanPid).map(ProcessHandle::isAlive).orElse(false) == false) {
+          reaped = true;
+          break;
+        }
+        Thread.sleep(50);
+      }
+      assertTrue(
+          reaped, "the escaped straggler is killed on relaunch by its QITS_DAEMON_ID marker");
+    } finally {
+      supervisor.stop(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
+      // The second run forked its own setsid child; best-effort reap so the test leaves nothing.
+      try {
+        long second = Long.parseLong(Files.readString(orphanPidFile).trim());
+        ProcessHandle.of(second).ifPresent(ProcessHandle::destroyForcibly);
+      } catch (Exception ignored) {
+        // best effort
+      }
+      Files.deleteIfExists(orphanPidFile);
+    }
+  }
+
+  @Test
+  public void startingAWebViewableDaemonFreesItsHttpPortFromAMarkerlessHolder() throws Exception {
+    // The port selector of the reap, complementing the marker path above: a holder the marker
+    // can't reach — one predating the marker, or a run the supervisor lost track of across a
+    // hot reload — is killed by whatever listens on httpPort. Simulate it with a plain listener
+    // that carries no QITS_DAEMON_ID, and assert starting the web-viewable daemon kills it.
+    assumeTrue(commandExists("python3"), "needs python3 to hold a listening port");
+    int port = freePort();
+    Process holder =
+        new ProcessBuilder(
+                "python3",
+                "-c",
+                "import socket,time;s=socket.socket();"
+                    + "s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);"
+                    + "s.bind(('127.0.0.1',"
+                    + port
+                    + "));s.listen();time.sleep(60)")
+            .start();
+    try {
+      assertTrue(awaitListening(port), "the markerless holder is listening on the port");
+
+      // Definition-before-worktree so the container publishes the port; the script itself need not
+      // bind — we assert the reap killed the holder, which proves the port was freed for it.
+      String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
+      var project = projectService.create("Port Reap Project", null);
+      var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
+      String daemonId =
+          repositoryDaemonService.create(
+                  repo.id,
+                  "web",
+                  null,
+                  "sleep 300",
+                  null,
+                  "TERM",
+                  RestartPolicy.NEVER,
+                  0,
+                  null,
+                  port,
+                  null,
+                  null,
+                  null)
+              .id;
+      worktreeService.createWorktree(repo.id, "work", "master", "work");
+
+      supervisor.start(repo.id, "work", daemonId);
+      try {
+        awaitStatus(repo.id, daemonId, DaemonStatus.READY);
+        assertTrue(
+            awaitProcessExit(holder), "starting the daemon reaps the markerless port holder");
+      } finally {
+        supervisor.stop(repo.id, "work", daemonId);
+        awaitStatus(repo.id, daemonId, DaemonStatus.STOPPED);
+      }
+    } finally {
+      holder.destroyForcibly();
+    }
+  }
+
+  private static boolean commandExists(String command) {
+    try {
+      return new ProcessBuilder("sh", "-c", "command -v " + command).start().waitFor() == 0;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private static int freePort() throws Exception {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    }
+  }
+
+  private static boolean awaitListening(int port) throws InterruptedException {
+    long deadline = System.currentTimeMillis() + 10_000;
+    while (System.currentTimeMillis() < deadline) {
+      try (Socket s = new Socket()) {
+        s.connect(new InetSocketAddress("127.0.0.1", port), 200);
+        return true;
+      } catch (Exception retry) {
+        Thread.sleep(50);
+      }
+    }
+    return false;
+  }
+
+  private static boolean awaitProcessExit(Process process) throws InterruptedException {
+    return process.waitFor(AWAIT_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   @Test
