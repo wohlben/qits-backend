@@ -10,6 +10,7 @@ import { DaemonEventDto } from '@/api/model/daemonEventDto';
 import { DaemonEventSeverity } from '@/api/model/daemonEventSeverity';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
+import { DaemonTerminalComponent } from '@/pattern/daemon/daemon-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-chip.component';
 
@@ -29,7 +30,13 @@ export interface DaemonEventFileAnchor {
  */
 @Component({
   selector: 'app-worktree-daemons',
-  imports: [DatePipe, RouterLink, ZardButtonComponent, DaemonStatusChipComponent],
+  imports: [
+    DatePipe,
+    RouterLink,
+    ZardButtonComponent,
+    DaemonStatusChipComponent,
+    DaemonTerminalComponent,
+  ],
   template: `
     <section class="flex flex-col gap-3" aria-label="Daemons">
       <h2 class="text-lg font-semibold">Daemons</h2>
@@ -71,6 +78,12 @@ export interface DaemonEventFileAnchor {
                   </a>
                 }
                 @if (isLive(instance)) {
+                  <app-daemon-terminal
+                    [repoId]="repoId()"
+                    [worktreeId]="worktreeId()"
+                    [daemonId]="instance.daemon!.id!"
+                    [name]="instance.daemon!.name!"
+                  />
                   <button
                     z-button
                     zType="secondary"
