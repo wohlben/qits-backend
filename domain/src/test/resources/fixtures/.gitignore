@@ -1,1 +1,6 @@
-# Submodule working copy for editing the bare mirror
+# Editing checkouts of the committed bare fixtures — regenerate with:
+#   git clone testing-repo.git testing-repo
+#   git clone testing-repo-quarkus-angular.git testing-repo-quarkus-angular
+# The *.git bare repos are the committed source of truth; these clones are local-only.
+testing-repo/
+testing-repo-quarkus-angular/

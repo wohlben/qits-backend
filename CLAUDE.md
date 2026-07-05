@@ -127,4 +127,7 @@ The Angular app lives in `service/src/main/webui/` — Quinoa's default UI direc
 
 ## Test fixtures
 
-`service/src/test/resources/fixtures/testing-repo.git` is a **bare git repo committed as plain files** (reproducible test data for clone/pull). `testing-repo/` next to it is a **git submodule** pointing at that bare repo, used only to edit fixtures. Clone with `--recurse-submodules` only if you need to modify fixtures; basic builds don't require it.
+`domain/src/test/resources/fixtures/` holds two **bare git repos committed as plain files** (reproducible, network-free clone/pull test data), each with a **gitignored editing checkout** beside it. The bare `*.git` repo is the source of truth; regenerate the checkout with `git clone <name>.git <name>`. The checkouts are plain clones (no longer git submodules), so a fresh `git clone` of qits needs no `--recurse-submodules`.
+
+- **`testing-repo.git`** — a tiny repo (`hello.txt`, branches `master`/`feature`) for pure git mechanics: clone, pull, branch discovery, divergence probes, the JGit git host. Every test/seed reference resolves it via `getClass().getResource("/fixtures/testing-repo.git")`.
+- **`testing-repo-quarkus-angular.git`** — a minimal but **servable** Quarkus 3 + Angular app (`POST /api/greetings` echoing `{name, timestamp}` + an Angular SPA served by Quinoa), shaped like qits itself, for demoing features that run real work in a worktree (dev-server daemons, actions, the coding agent). Branches: `main`, `feature/greeting` (fast-forwardable over `main`), `feature/diverged` (conflicts with `main`). Build/run it with its own committed `./mvnw` (JDK 25 + pnpm); it is **not** part of the qits Maven build. See `docs/features/2026-07-05_servable-quarkus-angular-fixture.md`.
