@@ -76,6 +76,17 @@
                     <version>${compiler-plugin.version}</version>
                     <configuration>
                         <parameters>true</parameters>
+                        <!-- Default incremental compilation can leave a changed source NEWER than its
+                             compiled .class (it sometimes reports "Nothing to compile" and skips the
+                             recompile). A following @QuarkusTest then sees the stale class, triggers
+                             Quarkus's own test-time recompilation, and mis-registers the MapStruct *Impl
+                             mappers and Panache repositories — Arc fails with mass "Unsatisfied
+                             dependency" for every mapper/repository even though the *Impl.class files
+                             exist. Forcing Maven to recompile stale sources keeps .class newer than its
+                             source, so Quarkus never re-derives them inconsistently. The Maven build
+                             cache skips compilation entirely when a module's inputs are unchanged, so
+                             the extra work is paid only on a real change. -->
+                        <useIncrementalCompilation>false</useIncrementalCompilation>
                         <compilerArgs>
                             <arg>-Amapstruct.defaultComponentModel=jakarta</arg>
                         </compilerArgs>

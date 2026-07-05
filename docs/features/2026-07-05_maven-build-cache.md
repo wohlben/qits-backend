@@ -145,6 +145,7 @@ Integration tests (`-Pextended`, docker-dependent, self-skipping) are marked `ru
 
 - **Remote/shared cache** for CI + cross-machine reuse is the larger payoff but needs a hosting choice
   (HTTP vs. object store) and a write-trust model. Local-only first.
-- **Root-cause the pre-existing `mvnw-clean-before-test` fragility.** This work strongly suggests it is
-  the same `target/classes`-vs-Arc-index disagreement; worth a dedicated look now that the mechanism is
-  understood.
+- ~~**Root-cause the pre-existing `mvnw-clean-before-test` fragility.**~~ Done — it was Maven's
+  incremental compiler leaving a changed source newer than its `.class`, which Quarkus's test-time
+  recompilation then mis-registers. Fixed with `useIncrementalCompilation=false`; see
+  `docs/issues/resolved/2026-07-05_mapstruct-unsatisfied-after-incremental-compile.md`.
