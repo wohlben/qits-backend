@@ -1,55 +1,65 @@
-# Healthy Quarkus dev daemon flips to DEGRADED on benign dev-mode output
+# Healthy Quarkus dev daemon flips to DEGRADED on a benign telemetry WARNING
 
 ## Introduction
 
-Secondary finding while diagnosing
-[the workspace-image build failure](2026-07-05_workspace-image-cannot-build-fixture.md). Concerns the
-[daemons](../features/2026-07-04_daemons.md) LOG_LEVEL observer / `LogLevelClassifier` and the
-`seed-webapp` fixture's "Quarkus dev server" daemon config.
+Found while diagnosing why the `seed-webapp` "Quarkus dev server"
+[daemon](../features/2026-07-04_daemons.md) showed DEGRADED after the
+[workspace-image build fix](2026-07-05_workspace-image-cannot-build-fixture.md). Concerns the
+[daemons](../features/2026-07-04_daemons.md) `LogLevelClassifier` and, upstream of it, the
+[observability](../features/2026-07-04_observability.md) OTLP wiring for the
+[Quarkus+Angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md). See the
+related, still-open [OTEL-endpoint issue](2026-07-05_quarkus-otel-endpoint-not-bridged.md).
 
 ## Observed
 
-Once the image was fixed, the `greeting` "Quarkus dev server" daemon started cleanly and reached
-`READY` ("Listening on" matched), then within ~5s went `DEGRADED` — while the server stayed alive and
-served HTTP 200 through the qits web-view proxy. The event timeline:
+Once the image was fixed, the `greeting` daemon started cleanly and reached `READY` ("Listening on"
+matched), then within ~5s went `DEGRADED` — while the server stayed alive and served HTTP 200 through
+the qits web-view proxy. Every ~2s an `ERROR_DETECTED` event fired. `DEGRADED` does not auto-recover
+(by design), so a healthy dev server sits permanently DEGRADED — reading as "something is wrong" for
+the flagship demo.
+
+## Root cause (two layers)
+
+**Layer 1 — a real telemetry failure is being logged (a WARNING).** The daemon has `otel=true`, so
+qits injects `OTEL_EXPORTER_OTLP_ENDPOINT=http://<host>:<port>/api/otel`. But Quarkus OpenTelemetry
+does **not** read that generic OTel-SDK env var, so the app exports to its own default
+`http://localhost:4317`, which nothing is listening on inside the container. Quarkus logs, every
+export cycle:
 
 ```
-12:41:07  STATUS_CHANGED   READY      ready (pattern matched)
-12:41:12  ERROR_DETECTED   READY      error-log: 2026-07-05 12:41:08,707 … /usr/lib/jvm/temurin-25-jdk-amd64/bin/java …
-12:41:12  STATUS_CHANGED   DEGRADED   degraded (errors in output; process still alive)
-12:41:13  ERROR_DETECTED   DEGRADED   error-log: Press [e] to edit command line args (currently ''), [r] to resume testing, [o] …
+… WARNING [io.quarkus.opentelemetry.runtime.exporter.otlp.sender.VertxHttpSender] (vert.x-eventloop-thread-8) Failed to export. … Full error message: Connection refused: localhost/127.0.0.1:4317
 ```
 
-Neither flagged batch is an actual error: the first is Quarkus continuous-testing's **forked-JVM
-command line** (the `java …` invocation with its classpath), the second is the dev-mode
-**continuous-testing banner** ("Press [e] to edit…, [r] to resume testing, [o] Toggle test output").
-`DEGRADED` does not auto-recover (by design — reset only by restart/stop), so a perfectly healthy dev
-server sits permanently DEGRADED, which reads as "something is wrong" for the flagship demo.
+That is a genuine (separate) bug — see
+[quarkus-otel-endpoint-not-bridged](2026-07-05_quarkus-otel-endpoint-not-bridged.md). Fixing it makes
+the WARNING disappear entirely.
 
-## Suspected cause
+**Layer 2 — the classifier escalated that WARNING to ERROR.** `LogLevelClassifier.ERROR_SIGNAL`
+matched the case-insensitive word "error" inside the message ("Full **error** message"), classifying a
+line whose own declared level is `WARNING` as `ERROR`. Only `ERROR`-severity findings drive DEGRADED
+(`DaemonSupervisor` — `status == READY && severity == ERROR`), so a benign telemetry warning flipped
+the daemon. (The PTY frame-joining that glued the dev-console banner onto the WARNING line made the
+excerpt even more confusing, but the trigger is the "error" keyword.)
 
-`LogLevelClassifier` (`domain.daemon.control`) word-matches its severity vocabulary
-(`\w+Exception` / `\w+Error`, level tokens, Python traceback opener) over each debounced batch. Quarkus
-continuous-testing output routinely contains error-shaped tokens that aren't failures — a classpath
-jar or class name matching `\w+Error`/`\w+Exception`, and the testing banner. Since the excerpt starts
-at the classifier's `firstLineOffset`, the flagged line shown is the batch head, not necessarily the
-matching token, which makes these findings especially confusing.
+## Fix applied (Layer 2)
 
-## Suggested fix direction
+`LogLevelClassifier` now **trusts an explicit level token**: a line carrying a standalone uppercase
+level field (`WARNING`, `INFO`, `ERROR`, JUL `SEVERE`/`FINE`, syslog `CRITICAL`/`NOTICE`, …) is
+classified by *that* level, and an incidental "error"/exception keyword in the message can no longer
+upgrade a `WARNING`/`INFO` line to `ERROR`. Only lines with **no** explicit level fall back to the
+previous keyword / exception-name / traceback heuristics (so unstructured lowercase `error:` output is
+still caught). Regression tests added in `ObserverSinkTest`
+(`logLevelClassifierReadsTheSeverityVocabularyLogsCarry`): the Quarkus telemetry line → `WARNING`; an
+`INFO …TimeoutException` line → quiet. A `WARNING`-severity finding does not degrade a daemon, so the
+dev server now stays `READY` even while telemetry export is failing.
 
-Options, roughly in order of preference:
+> Deploy note: the classifier is in the `domain` module. The running `quarkus:dev` did **not**
+> hot-reload the change in place — restart the qits dev server to pick it up (kill + `./mvnw install`
+> + restart, per the dev-mode caveat).
 
-1. **Config-level (fixture):** the seeded daemon combines a broad LOG_LEVEL observer *and* a targeted
-   PATTERN observer (`BUILD FAILURE|Failed to start Quarkus|Live reload failed`). For a Quarkus dev
-   server the PATTERN observer already captures the real failures; consider dropping the LOG_LEVEL
-   observer from the `seed-webapp` daemon so routine dev/test chatter doesn't trip it.
-2. **Classifier-level:** make `\w+Error`/`\w+Exception` matching require an accompanying level token or
-   stacktrace shape (so a bare classpath/class name doesn't count), and/or ignore lines that are
-   clearly Quarkus dev-console UI (the `Press [e] …` banner, ANSI cursor-movement-only lines).
-3. **State-level:** let `DEGRADED` auto-recover after a quiet period (explicitly deferred in the
-   daemon feature — "simplest defensible rule; revisit with real usage"; this is the real usage).
+## Follow-up (Layer 1)
 
-## Not a blocker
-
-The dev server is fully functional in DEGRADED — this is a signal-quality bug, not an availability
-one. Distinct from the image issue, which was the actual "won't start".
+Bridging the OTLP endpoint into Quarkus config so telemetry actually exports (and the WARNING never
+fires) is tracked separately in
+[quarkus-otel-endpoint-not-bridged](2026-07-05_quarkus-otel-endpoint-not-bridged.md). With Layer 2
+fixed, that failure is now correctly surfaced as a WARNING rather than wedging the daemon.
