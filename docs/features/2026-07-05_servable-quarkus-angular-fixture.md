@@ -109,10 +109,15 @@ at `testing-repo.git`), the submodule was removed: `git submodule deinit`, drop 
 
 `cli`'s **`seed-webapp`** command (`SeedWebappService`, sibling of the `testing-repo`-based
 `SeedService`) seeds a demo project around this fixture: a project + repository cloned from
-`testing-repo-quarkus-angular.git`, a **web-viewable `quarkus:dev` daemon** (`httpPort=8080`, so the
-web-view button lights up and the supervisor injects `QITS_PUBLIC_BASE`; the start script binds
-`0.0.0.0` and serves under that prefix), and a small branch tree (`mainline` advanced by a `feeder`,
-`behind-ff` fast-forwardable). Run it with `./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp`.
+`testing-repo-quarkus-angular.git`, a **web-viewable OTEL-enabled `quarkus:dev` daemon**
+(`httpPort=8080` + `otel=true`, so the web-view button lights up and the supervisor injects both
+`QITS_PUBLIC_BASE` and `OTEL_EXPORTER_OTLP_*`; the start script binds `0.0.0.0` and serves under that
+prefix; a `LOG_LEVEL` + `PATTERN` observer and a `FILE` `LogSource` tailing `quarkus.log` are wired for
+log observation), a `greeting` worktree off `feature/greeting`, and a `"Build & Verify"` feature-flow
+configuration (Build / Lint / Test — blueprint only). Run it with
+`./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp`. The full-integration reshape (dropping the old
+`mainline`/`behind-ff`/`feeder` merge tree — that's `testing-repo`'s job) is documented in
+[quarkus-angular-fixture-full-integration](2026-07-05_quarkus-angular-fixture-full-integration.md).
 
 **Idempotent by reset:** unlike `seed` (skip-if-exists), `seed-webapp` *deletes* any prior "Quarkus +
 Angular Demo" project first (a project delete cascades its repos/worktrees/daemons), so every run
@@ -128,14 +133,17 @@ gitignored editing checkouts** from the `fixtures` resource copy (they'd otherwi
 
 ## Not yet wired (follow-ups)
 
-- **A "diverged/conflict" worktree on this fixture.** `feature/greeting` is a *linear* descendant of
-  `main`, so `seed-webapp` can only demo the fast-forwardable state; a diverged worktree needs a
-  *cleanly-diverging* branch (one that shares an ancestor with `main` but merges without conflict, the
-  way `testing-repo`'s `feature` does). Adding such a branch means re-baking the bare repo. Until
-  then, the `seed` command covers the diverged demo on `testing-repo`.
+- **Merge/divergence demos stay on `testing-repo`.** The
+  [full-integration reshape](2026-07-05_quarkus-angular-fixture-full-integration.md) deliberately
+  *dropped* the old `mainline`/`behind-ff`/`feeder` merge tree from `seed-webapp` — this fixture is the
+  **stack-specific** substrate, not the merge one. The fixture still ships a conflicting
+  `feature/diverged` branch (re-baked onto the shared integration base) for any test that wants a
+  diverged worktree; `seed-webapp` just doesn't manufacture one.
 - **Servable-worktree tests.** Tests that actually build/run a worktree (a live `quarkus:dev` daemon,
-  action "run"/"test") belong under the docker-dependent **`-Pextended`** profile; `seed-webapp` is
-  the setup they'd reuse.
+  its web view, OTEL export, log observation) belong under the docker-dependent **`-Pextended`**
+  profile; `seed-webapp` is the setup they'd reuse. On a Docker-Desktop/WSL2 host the live web-view
+  path can be unreachable (container→git-host), so this coverage is currently manual — see the
+  full-integration doc's verification section.
 - **`testing-repo`'s internal README** still describes itself as a submodule — a cosmetic staleness
   inside the fixture's own history; updating it means a new commit in `testing-repo.git`, deferred to
   avoid churning the committed bare-repo objects.
