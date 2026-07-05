@@ -6,6 +6,7 @@ import { lastValueFrom } from 'rxjs';
 import { WorktreeControllerService } from '@/api/api/worktreeController.service';
 import { WorktreeDto } from '@/api/model/worktreeDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
+import { DaemonWebviewComponent } from '@/pattern/daemon/webview/daemon-webview.component';
 import { WorktreeDaemonsComponent } from '@/pattern/daemon/worktree-daemons.component';
 import { WorktreeTelemetryComponent } from '@/pattern/telemetry/worktree-telemetry.component';
 import { WorktreeChatComponent } from '@/pattern/worktree/worktree-chat.component';
@@ -20,6 +21,7 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
 @Component({
   selector: 'app-worktree-detail-page',
   imports: [
+    DaemonWebviewComponent,
     PageLayoutComponent,
     WorktreeChatComponent,
     WorktreeDaemonsComponent,
@@ -76,6 +78,10 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
           </z-tab>
         </z-tab-group>
       </div>
+
+      <!-- Floaty web-view button (bottom-right) — renders only while a live web-viewable daemon
+           exists in this worktree. -->
+      <app-daemon-webview [repoId]="repoId" [worktreeId]="worktreeId" />
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
