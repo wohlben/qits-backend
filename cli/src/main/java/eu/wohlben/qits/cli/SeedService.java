@@ -77,6 +77,34 @@ public class SeedService {
     Repository repo =
         projectService.createRepositoryUnderProject(project.id, url, RepositoryArchetype.SERVICE);
 
+    // A demo daemon on the repository (daemons only exist at repository scope): a Python static
+    // file server with a ready pattern and a LOG_LEVEL observer — enough to watch the whole
+    // supervised lifecycle in any of the worktrees below. Created BEFORE the worktrees: containers
+    // publish web-view ports (httpPort) only when the definition already declares them at
+    // container-creation time, and http.server binds 0.0.0.0 so the published port reaches it.
+    repositoryDaemonService.create(
+        repo.id,
+        "Python HTTP server",
+        "Serves the worktree over HTTP on :8000 — a demo daemon for the supervisor,"
+            + " web-viewable through the qits proxy",
+        // The web-view base-path contract: the app must serve itself under $QITS_PUBLIC_BASE
+        // (the proxy forwards paths verbatim). http.server has no prefix option, so a symlink
+        // shim mounts /workspace at the prefix. Real dev servers use their native flag instead,
+        // e.g. `vite --host 0.0.0.0 --base "$QITS_PUBLIC_BASE"`.
+        "ROOT=/tmp/qits-web; rm -rf \"$ROOT\";"
+            + " mkdir -p \"$ROOT$(dirname \"${QITS_PUBLIC_BASE%/}\")\";"
+            + " ln -sfn /workspace \"$ROOT${QITS_PUBLIC_BASE%/}\";"
+            + " python3 -m http.server 8000 --directory \"$ROOT\"",
+        "Serving HTTP",
+        "TERM",
+        RestartPolicy.ON_FAILURE,
+        3,
+        null,
+        8000,
+        null,
+        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
+        null);
+
     // Build the branch tree.
     worktreeService.createWorktree(repo.id, "mainline", "master", "mainline");
     worktreeService.createWorktree(repo.id, "behind-ff", "mainline", "behind-ff");
@@ -88,24 +116,6 @@ public class SeedService {
     // independent merge of the same content makes it both ahead of and behind mainline.
     worktreeService.mergeWorktree(repo.id, "feeder", "mainline");
     worktreeService.mergeWorktree(repo.id, "feeder", "diverged");
-
-    // A demo daemon on the repository (daemons only exist at repository scope): a Python static
-    // file server with a ready pattern and a LOG_LEVEL observer — enough to watch the whole
-    // supervised lifecycle in any of the worktrees above.
-    repositoryDaemonService.create(
-        repo.id,
-        "Python HTTP server",
-        "Serves the worktree over HTTP on :8000 — a demo daemon for the supervisor",
-        "python3 -m http.server 8000",
-        "Serving HTTP",
-        "TERM",
-        RestartPolicy.ON_FAILURE,
-        3,
-        null,
-        8000,
-        null,
-        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
-        null);
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
     System.out.println(
