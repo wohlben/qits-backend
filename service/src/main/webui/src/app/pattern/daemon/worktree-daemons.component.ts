@@ -224,10 +224,12 @@ export class WorktreeDaemonsComponent {
   readonly startMutation = injectMutation(() => ({
     mutationFn: (daemonId: string) =>
       lastValueFrom(
+        // NB: the generated client orders path params alphabetically (daemonId, repoId, worktreeId),
+        // not in path order — pass them in that order or the URL segments get scrambled (404).
         this.daemonService.apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsDaemonIdStartPost(
+          daemonId,
           this.repoId(),
           this.worktreeId(),
-          daemonId,
         ),
       ),
     onSettled: () => this.invalidate(),
@@ -237,9 +239,9 @@ export class WorktreeDaemonsComponent {
     mutationFn: (daemonId: string) =>
       lastValueFrom(
         this.daemonService.apiRepositoriesRepoIdWorktreesWorktreeIdDaemonsDaemonIdStopPost(
+          daemonId,
           this.repoId(),
           this.worktreeId(),
-          daemonId,
         ),
       ),
     onSettled: () => this.invalidate(),
