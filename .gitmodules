@@ -1,3 +1,0 @@
-[submodule "service/src/test/resources/fixtures/testing-repo"]
-	path = domain/src/test/resources/fixtures/testing-repo
-	url = ./domain/src/test/resources/fixtures/testing-repo.git
