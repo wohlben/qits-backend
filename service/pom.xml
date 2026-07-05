@@ -40,6 +40,13 @@
             <artifactId>quarkus-websockets-next</artifactId>
         </dependency>
         <dependency>
+            <!-- In-process reverse proxy for the daemon web view (/daemon/* → published container
+                 ports; DaemonProxyRoute). Managed by the platform BOM; forwards WebSocket upgrades
+                 (dev-server HMR) by default. -->
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-http-proxy</artifactId>
+        </dependency>
+        <dependency>
             <!-- OTLP wire-format bindings for the in-process telemetry receiver (OtelReceiverResource).
                  "alpha" refers to Java API stability only — the OTLP protobuf wire format itself is
                  Stable. Pinned deliberately; don't auto-bump. Pulls protobuf-java transitively. -->
