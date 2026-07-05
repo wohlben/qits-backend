@@ -8,7 +8,7 @@ A Quarkus 3 (Java 25) backend for managing Git repositories, worktrees, and "fea
 
 - **`domain/`** — the shared business core as a plain library jar: entities, services (`control/`), persistence, MapStruct mappers, DTOs, custom validators, framework-free errors (`domain.error`), Flyway migrations. No web/JAX-RS deps. Consumers index its beans via `quarkus.index-dependency.domain.*`.
 - **`service/`** — the Quarkus web app: REST controllers (`<area>.api`), exception mappers (`eu.wohlben.qits.api`), `mutiny`, `health`, and the Angular UI (Quinoa). Depends on `domain`.
-- **`cli/`** — a Quarkus command-mode app (`@QuarkusMain` in `eu.wohlben.qits.cli.Main`) with no web stack. Depends on `domain`. Currently exposes a `seed` command (see `SeedService`).
+- **`cli/`** — a Quarkus command-mode app (`@QuarkusMain` in `eu.wohlben.qits.cli.Main`) with no web stack. Depends on `domain`. Exposes `seed` (`SeedService`, the tiny `testing-repo` demo), `seed-webapp` (`SeedWebappService`, the servable Quarkus+Angular demo — idempotent by reset), and `generate-migration`.
 
 Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docker images use `ubi9/openjdk-25-runtime`; project JDK pinned via `.sdkmanrc`). Spotless (google-java-format) runs automatically on every build via the `process-sources` phase — google-java-format requires JDK 21+, so don't build on JDK 17.
 
@@ -52,8 +52,14 @@ All Maven commands use the wrapper.
 
 # Seed demo data (project + branch tree incl. fast-forwardable/diverged worktrees) into the shared
 # H2 file. One-step command-mode run, no web server (the cli pom binds quarkus:run's program args
-# to the cli.args property). Idempotent.
+# to the cli.args property). Idempotent (skip-if-exists).
 ./mvnw -pl cli quarkus:run -Dcli.args=seed
+
+# Seed the servable Quarkus+Angular demo: a project + repo cloned from the testing-repo-quarkus-angular
+# fixture, a web-viewable `quarkus:dev` daemon, and a fast-forwardable worktree. Idempotent by RESET —
+# re-running deletes and recreates the project, so it always returns to the same known-good state
+# (use it as the fixture for manual UI poking and automated regression tests).
+./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
 
 # Generate a starter Flyway migration after changing entities (writes PENDING_MIGRATION.sql).
 ./mvnw install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=generate-migration

@@ -61,6 +61,19 @@
     </dependencies>
 
     <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+                <!-- The fixtures dir holds the committed bare *.git repos AND local, gitignored
+                     editing checkouts beside them. Copy only the bare repos into test-classes;
+                     never the checkouts (a nested .git, and a node_modules once the servable
+                     fixture is built). -->
+                <excludes>
+                    <exclude>fixtures/testing-repo/**</exclude>
+                    <exclude>fixtures/testing-repo-quarkus-angular/**</exclude>
+                </excludes>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
