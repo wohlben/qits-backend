@@ -1,21 +1,32 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { WorkspaceTelemetryControllerService } from '@/api/api/workspaceTelemetryController.service';
+import { ZardButtonComponent } from '@/shared/components/button';
 import { TelemetryErrorFeedComponent } from '@/ui/components/telemetry/telemetry-error-feed.component';
 import { TelemetryLogTailComponent } from '@/ui/components/telemetry/telemetry-log-tail.component';
+import { TelemetryMetricListComponent } from '@/ui/components/telemetry/telemetry-metric-list.component';
 import { TelemetrySpanListComponent } from '@/ui/components/telemetry/telemetry-span-list.component';
 
 /**
- * The workspace's telemetry tab (iteration one, deliberately thin): a polling recent-errors feed,
- * click-through to a flat span list for the selected trace, and a polling log tail filterable by
- * service. The data is the in-memory OTLP buffer — ephemeral by design, so "live" is a 5s refetch,
- * not a socket.
+ * The workspace's telemetry tab: a polling recent-errors feed, every buffered span (Recent /
+ * Slowest lens, click-through to the flat span list of its trace), the latest point of every
+ * metric series, and a log tail filterable by service — the whole in-memory OTLP buffer, so a
+ * healthy app shows its traffic too, not just failures. Ephemeral by design: "live" is a 5s
+ * refetch, not a socket.
  */
 @Component({
   selector: 'app-workspace-telemetry',
-  imports: [TelemetryErrorFeedComponent, TelemetryLogTailComponent, TelemetrySpanListComponent],
+  imports: [
+    DatePipe,
+    TelemetryErrorFeedComponent,
+    TelemetryLogTailComponent,
+    TelemetryMetricListComponent,
+    TelemetrySpanListComponent,
+    ZardButtonComponent,
+  ],
   template: `
     <div class="flex flex-col gap-6">
       <section class="flex flex-col gap-2" aria-label="Recent errors">
@@ -30,6 +41,67 @@ import { TelemetrySpanListComponent } from '@/ui/components/telemetry/telemetry-
             [selectedTraceId]="selectedTraceId()"
             (traceSelected)="selectedTraceId.set($event)"
           />
+        }
+      </section>
+
+      <section class="flex flex-col gap-2" aria-label="Recent traces">
+        <div class="flex items-center gap-1">
+          <h3 class="flex-1 text-base font-semibold">Traces</h3>
+          <button
+            z-button
+            zSize="sm"
+            [zType]="spanSort() === 'recent' ? 'secondary' : 'ghost'"
+            type="button"
+            [attr.aria-pressed]="spanSort() === 'recent'"
+            (click)="spanSort.set('recent')"
+          >
+            Recent
+          </button>
+          <button
+            z-button
+            zSize="sm"
+            [zType]="spanSort() === 'slowest' ? 'secondary' : 'ghost'"
+            type="button"
+            [attr.aria-pressed]="spanSort() === 'slowest'"
+            (click)="spanSort.set('slowest')"
+          >
+            Slowest
+          </button>
+        </div>
+        @if (spansQuery.isPending()) {
+          <p class="text-sm text-muted-foreground">Loading traces…</p>
+        } @else if (spansQuery.isError()) {
+          <p class="text-sm text-destructive">Failed to load traces</p>
+        } @else {
+          @let spans = spansQuery.data() ?? [];
+          @if (spans.length === 0) {
+            <p class="text-sm text-muted-foreground">
+              No spans captured yet — interact with the app to generate traces.
+            </p>
+          } @else {
+            <ul class="flex flex-col divide-y rounded-md border">
+              @for (span of spans; track span.spanId) {
+                <li>
+                  <button
+                    type="button"
+                    class="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                    [class.ring-2]="span.traceId === selectedTraceId()"
+                    (click)="selectedTraceId.set(span.traceId ?? null)"
+                  >
+                    <span class="text-xs text-muted-foreground">
+                      {{ (span.startEpochNanos ?? 0) / 1000000 | date: 'HH:mm:ss' }}
+                    </span>
+                    <span class="rounded bg-muted px-1.5 py-0.5 text-xs">{{ span.kind }}</span>
+                    <span class="min-w-0 flex-1 truncate font-medium">{{ span.name }}</span>
+                    @if (span.status === 'ERROR') {
+                      <span class="text-xs text-destructive">ERROR</span>
+                    }
+                    <span class="text-xs text-muted-foreground">{{ span.durationMs }} ms</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
         }
       </section>
 
@@ -50,6 +122,17 @@ import { TelemetrySpanListComponent } from '@/ui/components/telemetry/telemetry-
           }
         </section>
       }
+
+      <section class="flex flex-col gap-2" aria-label="Metrics">
+        <h3 class="text-base font-semibold">Metrics</h3>
+        @if (metricsQuery.isPending()) {
+          <p class="text-sm text-muted-foreground">Loading metrics…</p>
+        } @else if (metricsQuery.isError()) {
+          <p class="text-sm text-destructive">Failed to load metrics</p>
+        } @else {
+          <app-telemetry-metric-list [metrics]="metricsQuery.data() ?? []" />
+        }
+      </section>
 
       <section class="flex flex-col gap-2" aria-label="Log tail">
         <h3 class="text-base font-semibold">Logs</h3>
@@ -76,6 +159,8 @@ export class WorkspaceTelemetryComponent {
 
   readonly selectedTraceId = signal<string | null>(null);
   readonly serviceFilter = signal<string | null>(null);
+  /** The traces lens: chronological ("what did I just do") or by duration ("what's slow"). */
+  readonly spanSort = signal<'recent' | 'slowest'>('recent');
 
   readonly errorsQuery = injectQuery(() => ({
     queryKey: ['telemetry-errors', this.repoId(), this.workspaceId()],
@@ -86,6 +171,22 @@ export class WorkspaceTelemetryComponent {
           this.workspaceId(),
         ),
       ).then((r) => r.groups ?? []),
+    refetchInterval: 5000,
+  }));
+
+  readonly spansQuery = injectQuery(() => ({
+    queryKey: ['telemetry-spans', this.repoId(), this.workspaceId(), this.spanSort()],
+    queryFn: () =>
+      lastValueFrom(
+        // thresholdMs=0: every buffered span qualifies — the toggle only changes the sort.
+        this.telemetryService.apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(
+          this.repoId(),
+          this.workspaceId(),
+          undefined,
+          this.spanSort() === 'slowest' ? 'duration' : 'recent',
+          0,
+        ),
+      ).then((r) => r.spans ?? []),
     refetchInterval: 5000,
   }));
 
@@ -100,6 +201,18 @@ export class WorkspaceTelemetryComponent {
           this.workspaceId(),
         ),
       ).then((r) => r.trace ?? { spans: [], logs: [] }),
+  }));
+
+  readonly metricsQuery = injectQuery(() => ({
+    queryKey: ['telemetry-metrics', this.repoId(), this.workspaceId()],
+    queryFn: () =>
+      lastValueFrom(
+        this.telemetryService.apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetryMetricsGet(
+          this.repoId(),
+          this.workspaceId(),
+        ),
+      ).then((r) => r.metrics ?? []),
+    refetchInterval: 5000,
   }));
 
   readonly logsQuery = injectQuery(() => ({

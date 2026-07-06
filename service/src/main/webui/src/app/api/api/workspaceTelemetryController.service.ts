@@ -288,15 +288,16 @@ export class WorkspaceTelemetryControllerService extends BaseService {
      * @param repoId 
      * @param workspaceId 
      * @param sinceMinutes 
+     * @param sort 
      * @param thresholdMs 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, thresholdMs?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response73>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, thresholdMs?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response73>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, thresholdMs?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response73>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, thresholdMs?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, sort?: string, thresholdMs?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response73>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, sort?: string, thresholdMs?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response73>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, sort?: string, thresholdMs?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response73>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet(repoId: string, workspaceId: string, sinceMinutes?: number, sort?: string, thresholdMs?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdTelemetrySlowSpansGet.');
         }
@@ -310,6 +311,15 @@ export class WorkspaceTelemetryControllerService extends BaseService {
             localVarQueryParameters,
             'sinceMinutes',
             <any>sinceMinutes,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'sort',
+            <any>sort,
             QueryParamStyle.Form,
             true,
         );

@@ -3383,6 +3383,11 @@ paths:
         schema:
           type: integer
           format: int32
+      - name: sort
+        in: query
+        schema:
+          type: string
+          default: duration
       - name: thresholdMs
         in: query
         schema:

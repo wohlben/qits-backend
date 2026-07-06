@@ -4,13 +4,11 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-import { DaemonEventControllerService } from '@/api/api/daemonEventController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
-import { DaemonEventSeverity } from '@/api/model/daemonEventSeverity';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
-import { DaemonEventFileAnchor, WorkspaceDaemonsComponent } from './workspace-daemons.component';
+import { WorkspaceDaemonsComponent } from './workspace-daemons.component';
 
 /** Mutation callbacks land on the next macrotask; flush before asserting. */
 function flush(): Promise<void> {
@@ -38,9 +36,6 @@ describe('WorkspaceDaemonsComponent', () => {
       .fn()
       .mockReturnValue(of({})),
   };
-  const eventService = {
-    apiDaemonEventsGet: vi.fn().mockReturnValue(of({ events: [] })),
-  };
   const workspaceService = {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdStopContainerPost: vi
       .fn()
@@ -65,7 +60,6 @@ describe('WorkspaceDaemonsComponent', () => {
         provideRouter([]),
         provideTanStackQuery(queryClient),
         { provide: WorkspaceDaemonControllerService, useValue: daemonService },
-        { provide: DaemonEventControllerService, useValue: eventService },
         { provide: WorkspaceControllerService, useValue: workspaceService },
       ],
     }).compileComponents();
@@ -175,74 +169,4 @@ describe('WorkspaceDaemonsComponent', () => {
     ).toHaveBeenCalledWith('repo-1', 'wt-1');
   });
 
-  it('renders the events feed severity-colored with expandable excerpts and source badges', () => {
-    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], []);
-    queryClient.setQueryData(
-      ['workspace-daemon-events', 'repo-1', 'wt-1'],
-      [
-        {
-          daemonName: 'dev server',
-          severity: DaemonEventSeverity.Error,
-          summary: 'crashed (exit 1)',
-          logExcerpt: 'stacktrace-here',
-          timestamp: '2026-07-04T10:00:00Z',
-        },
-        {
-          daemonName: 'dev server',
-          severity: DaemonEventSeverity.Error,
-          summary: 'NPE in handler',
-          logExcerpt: 'boom',
-          source: 'output',
-          commandId: 'cmd-9',
-          anchorFrom: 12,
-          anchorTo: 14,
-          timestamp: '2026-07-04T10:01:00Z',
-        },
-      ],
-    );
-    const fixture = createComponent();
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(element.textContent).toContain('Recent events');
-    expect(element.textContent).toContain('crashed (exit 1)');
-    expect(element.querySelector('details pre')?.textContent).toContain('stacktrace-here');
-    expect(element.querySelector('.bg-red-500')).not.toBeNull();
-    // The anchored output event carries a source badge and an "open in command log" link with
-    // the anchored sequence range as query params.
-    expect(element.textContent).toContain('output');
-    // The "open in command log" link carries the anchored sequence range as query params.
-    const hrefs = Array.from(element.querySelectorAll('a')).map((a) => a.getAttribute('href'));
-    expect(hrefs).toContain('/commands/cmd-9?seq=12&seqTo=14');
-  });
-
-  it('file events emit an openFile anchor instead of routing', () => {
-    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], []);
-    queryClient.setQueryData(
-      ['workspace-daemon-events', 'repo-1', 'wt-1'],
-      [
-        {
-          daemonName: 'dev server',
-          severity: DaemonEventSeverity.Error,
-          summary: 'kaboom',
-          logExcerpt: 'ERROR: kaboom',
-          source: 'logs/app.log',
-          anchorFrom: 7,
-          anchorTo: 9,
-          timestamp: '2026-07-04T10:02:00Z',
-        },
-      ],
-    );
-    const fixture = createComponent();
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(element.textContent).toContain('logs/app.log:7');
-    const anchors: DaemonEventFileAnchor[] = [];
-    fixture.componentInstance.openFile.subscribe((a) => anchors.push(a));
-    const openButton = Array.from(element.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Open logs/app.log:7'),
-    );
-    expect(openButton).toBeDefined();
-    openButton!.click();
-    expect(anchors).toEqual([{ path: 'logs/app.log', startLine: 7, endLine: 9 }]);
-  });
 });

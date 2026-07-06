@@ -1,17 +1,23 @@
-# Telemetry tab shows nothing for a healthy app, even though spans + metrics are flowing
+# RESOLVED: Telemetry tab shows nothing for a healthy app, even though spans + metrics are flowing
+
+> **Resolution (2026-07-06):** fixed by
+> [workspace observation tabs](../../features/2026-07-06_workspace-observation-tabs.md) — the tab
+> now renders a Recent traces section (slow-spans with `thresholdMs=0` + a new `sort=recent`
+> option, click-through to the trace) and a Metrics section, with explicit healthy empty states
+> (suggested-fix options 1–3; the fixture-side option 4 was not needed).
 
 ## Introduction
 
 Related plans:
 
-- **[observability](../features/2026-07-04_observability.md)** — the feature this is a gap in; the
+- **[observability](../../features/2026-07-04_observability.md)** — the feature this is a gap in; the
   workspace telemetry tab is its UI surface.
-- **[daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md)** — the
+- **[daemon web-view configuration](../../features/2026-07-06_daemon-webview-configuration.md)** — the
   work that surfaced this: opening the `seed-webapp` web view and posting a greeting is the natural
   way to generate telemetry, and the empty tab is what you see afterward. This issue is **not**
   caused by that change (the greeting POST reaches the fixture's Quarkus backend and produces a span
   regardless of which port the frame targets).
-- **[servable quarkus-angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)** —
+- **[servable quarkus-angular fixture](../../features/2026-07-05_servable-quarkus-angular-fixture.md)** —
   the `seed-webapp` fixture whose trivial echo endpoint (never errors, never logs) makes the gap
   maximally visible.
 
