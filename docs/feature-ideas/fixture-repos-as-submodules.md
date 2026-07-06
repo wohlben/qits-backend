@@ -9,7 +9,7 @@ Related / dependent plans:
 - `docs/features/2026-07-05_servable-quarkus-angular-fixture.md` — created the second fixture and the current "bare repo committed as plain files + gitignored editing checkout" layout this idea replaces. Its regeneration workflow section becomes obsolete.
 - `docs/features/2026-07-05_quarkus-angular-fixture-full-integration.md` — the fixture's feature integration is untouched; only where the fixture *lives* changes.
 - `docs/features/2026-07-05_maven-build-cache.md` — the build-cache excludes for the fixture checkouts must be reworked (see Touch points).
-- No open feature-ideas depend on this; it is orthogonal to `spa-observability.md` and `quarkus-angular-integration-guide.md`.
+- No open feature-ideas depend on this; it is orthogonal to [spa-observability](../features/2026-07-06_spa-observability.md) (implemented) and `quarkus-angular-integration-guide.md`.
 
 ## Motivation
 

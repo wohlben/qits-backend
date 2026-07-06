@@ -4,7 +4,7 @@
 
 qits now has a real integration *contract* for a Quarkus/Quinoa/Angular app — dev-server daemon,
 web view under the proxy prefix, log observation, backend OTEL, and (once
-[spa-observability](spa-observability.md) lands) frontend OTEL through the backend gateway. But
+[spa-observability](../features/2026-07-06_spa-observability.md) lands) frontend OTEL through the backend gateway. But
 that contract exists only as the **sum of the fixture's diffs**: scattered across feature docs,
 seed code comments, and resolved-issue write-ups. Someone pointing qits at their *own* app — or a
 coding agent asked to "integrate this repo with qits" — has no single document saying what to
@@ -12,7 +12,7 @@ configure. This idea produces that document: a durable, user-facing guide walkin
 `code.quarkus.io` starter** (REST + Quinoa, Angular in `src/main/webui/`) to a fully integrated
 app, *validated by actually performing that walk*.
 
-**Sequenced after [spa-observability](spa-observability.md)** — the guide should document the
+**Sequenced after [spa-observability](../features/2026-07-06_spa-observability.md)** — the guide should document the
 complete contract in one pass, and the frontend-telemetry decrees (`/api/config.json`, the OTLP
 passthrough) are the last piece of it. Writing the guide first would mean revising it immediately.
 
@@ -29,7 +29,7 @@ Related/dependent plans:
   [daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md),
   [daemon log observation](../features/2026-07-04_daemon-log-observation-expansion.md),
   [observability](../features/2026-07-04_observability.md),
-  [spa-observability](spa-observability.md), and the repo-shape signals of the
+  [spa-observability](../features/2026-07-06_spa-observability.md), and the repo-shape signals of the
   [framework-aware file browser](../features/2026-07-03_framework-aware-file-browser.md) — no code
   change to any of them; where walking the guide reveals friction, that's an issue doc against the
   feature, not a guide workaround (see Method).
