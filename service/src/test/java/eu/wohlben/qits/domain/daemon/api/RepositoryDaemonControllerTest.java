@@ -80,7 +80,7 @@ public class RepositoryDaemonControllerTest {
                 RestartPolicy.ALWAYS,
                 5,
                 true,
-                5173,
+                new WebViewInput(5173, "/greeting/", null),
                 Map.of("PORT", "3000"),
                 List.of(
                     new LogObserverInput(
@@ -97,7 +97,9 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.restartPolicy", equalTo("ALWAYS"))
         .body("daemon.maxRestarts", equalTo(5))
         .body("daemon.otel", equalTo(true))
-        .body("daemon.httpPort", equalTo(5173))
+        .body("daemon.webView.port", equalTo(5173))
+        .body("daemon.webView.entryPath", equalTo("greeting")) // normalized slash-less
+        .body("daemon.webView.basePath", equalTo(null))
         .body("daemon.repositoryId", equalTo(repoId))
         .body("daemon.environment.PORT", equalTo("3000"))
         .body("daemon.observers[0].kind", equalTo("PATTERN"))
@@ -151,7 +153,8 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.name", equalTo("Dev server (renamed)"))
         .body("daemon.startScript", equalTo("npm run dev"))
         .body("daemon.readyPattern", equalTo(null))
-        .body("daemon.httpPort", equalTo(5173)) // null httpPort = keep as-is
+        .body("daemon.webView.port", equalTo(5173)) // null webView = keep as-is
+        .body("daemon.webView.entryPath", equalTo("greeting"))
         .body("daemon.restartPolicy", equalTo("NEVER"))
         .body("daemon.observers.size()", equalTo(1))
         .body("daemon.observers[0].pattern", equalTo("FATAL"))
@@ -167,29 +170,64 @@ public class RepositoryDaemonControllerTest {
   }
 
   @Test
-  public void httpPortClearsWithZeroAndRejectsInvalidValues() {
+  public void webViewClearsWithPortZeroAndRejectsInvalidValues() {
     String repoId = createRepository();
-    String id = create(repoId, "Dev server (http port)");
+    String id = create(repoId, "Dev server (web view)");
 
-    // 0 clears the port — the daemon is no longer web-viewable.
+    // A present block replaces the paths wholesale (port carries over when omitted).
     given()
         .contentType(ContentType.JSON)
-        .body(Map.of("httpPort", 0))
+        .body(Map.of("webView", Map.of("entryPath", "welcome", "basePath", "app")))
         .put("/api/repositories/" + repoId + "/daemons/" + id)
         .then()
         .statusCode(200)
-        .body("daemon.httpPort", equalTo(null));
+        .body("daemon.webView.port", equalTo(5173))
+        .body("daemon.webView.entryPath", equalTo("welcome"))
+        .body("daemon.webView.basePath", equalTo("app"));
 
-    // Out-of-range ports are rejected on create and update.
+    // ... including dropping a previously-set path that the new block omits.
     given()
         .contentType(ContentType.JSON)
-        .body(Map.of("httpPort", 70000))
+        .body(Map.of("webView", Map.of("port", 4200)))
+        .put("/api/repositories/" + repoId + "/daemons/" + id)
+        .then()
+        .statusCode(200)
+        .body("daemon.webView.port", equalTo(4200))
+        .body("daemon.webView.entryPath", equalTo(null))
+        .body("daemon.webView.basePath", equalTo(null));
+
+    // port 0 clears the whole block — the daemon is no longer web-viewable.
+    given()
+        .contentType(ContentType.JSON)
+        .body(Map.of("webView", Map.of("port", 0)))
+        .put("/api/repositories/" + repoId + "/daemons/" + id)
+        .then()
+        .statusCode(200)
+        .body("daemon.webView", equalTo(null));
+
+    // Out-of-range ports and traversal paths are rejected on create and update.
+    given()
+        .contentType(ContentType.JSON)
+        .body(Map.of("webView", Map.of("port", 70000)))
         .put("/api/repositories/" + repoId + "/daemons/" + id)
         .then()
         .statusCode(400);
     given()
         .contentType(ContentType.JSON)
-        .body(Map.of("name", "bad port", "startScript", "run", "httpPort", 70000))
+        .body(Map.of("name", "bad port", "startScript", "run", "webView", Map.of("port", 70000)))
+        .post("/api/repositories/" + repoId + "/daemons")
+        .then()
+        .statusCode(400);
+    given()
+        .contentType(ContentType.JSON)
+        .body(
+            Map.of(
+                "name",
+                "bad entry",
+                "startScript",
+                "run",
+                "webView",
+                Map.of("port", 4200, "entryPath", "../escape")))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
         .statusCode(400);

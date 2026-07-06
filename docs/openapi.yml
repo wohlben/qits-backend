@@ -318,9 +318,8 @@ components:
           format: int32
         otel:
           type: boolean
-        httpPort:
-          type: integer
-          format: int32
+        webView:
+          $ref: "#/components/schemas/WebViewInput"
         environment:
           type: object
           additionalProperties:
@@ -407,6 +406,8 @@ components:
           type: string
         proxyPath:
           type: string
+        needsContainerRecreate:
+          type: boolean
     DaemonStatus:
       type: string
       enum:
@@ -722,9 +723,8 @@ components:
           format: int32
         otel:
           type: boolean
-        httpPort:
-          type: integer
-          format: int32
+        webView:
+          $ref: "#/components/schemas/WebViewDto"
         repositoryId:
           type: string
         environment:
@@ -1454,9 +1454,8 @@ components:
           format: int32
         otel:
           type: boolean
-        httpPort:
-          type: integer
-          format: int32
+        webView:
+          $ref: "#/components/schemas/WebViewInput"
         environment:
           type: object
           additionalProperties:
@@ -1469,6 +1468,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogSourceInput"
+    WebViewDto:
+      type: object
+      properties:
+        port:
+          type: integer
+          format: int32
+        entryPath:
+          type: string
+        basePath:
+          type: string
+    WebViewInput:
+      type: object
+      properties:
+        port:
+          type: integer
+          format: int32
+        entryPath:
+          type: string
+        basePath:
+          type: string
     WorkspaceDto:
       type: object
       properties:

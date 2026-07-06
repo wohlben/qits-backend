@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { DaemonEventControllerService } from '@/api/api/daemonEventController.service';
+import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { DaemonEventSeverity } from '@/api/model/daemonEventSeverity';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
@@ -40,6 +41,14 @@ describe('WorkspaceDaemonsComponent', () => {
   const eventService = {
     apiDaemonEventsGet: vi.fn().mockReturnValue(of({ events: [] })),
   };
+  const workspaceService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdStopContainerPost: vi
+      .fn()
+      .mockReturnValue(of({})),
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdEnsureContainerPost: vi
+      .fn()
+      .mockReturnValue(of({})),
+  };
   let queryClient: QueryClient;
 
   beforeEach(async () => {
@@ -57,6 +66,7 @@ describe('WorkspaceDaemonsComponent', () => {
         provideTanStackQuery(queryClient),
         { provide: WorkspaceDaemonControllerService, useValue: daemonService },
         { provide: DaemonEventControllerService, useValue: eventService },
+        { provide: WorkspaceControllerService, useValue: workspaceService },
       ],
     }).compileComponents();
   });
@@ -130,6 +140,39 @@ describe('WorkspaceDaemonsComponent', () => {
     expect(
       daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost,
     ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
+  });
+
+  it('offers container recreation only when the instance flags an unpublished web-view port', async () => {
+    queryClient.setQueryData(
+      ['workspace-daemons', 'repo-1', 'wt-1'],
+      [
+        instance({
+          daemon: { id: 'daemon-1', name: 'dev server', webView: { port: 4200 } },
+          status: DaemonStatus.Ready,
+          needsContainerRecreate: true,
+        }),
+        instance({ daemon: { id: 'daemon-2', name: 'fine one' }, status: DaemonStatus.Ready }),
+      ],
+    );
+    const fixture = createComponent();
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.textContent).toContain('does not publish port');
+    const recreateButtons = Array.from(element.querySelectorAll('button')).filter((b) =>
+      b.textContent?.includes('Recreate container'),
+    );
+    expect(recreateButtons.length).toBe(1);
+
+    recreateButtons[0].click();
+    await flush();
+    // Recreate = stop (pushes the branch, removes the container) then ensure (reprovisions with
+    // the current daemon ports published).
+    expect(
+      workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdStopContainerPost,
+    ).toHaveBeenCalledWith('repo-1', 'wt-1');
+    expect(
+      workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdEnsureContainerPost,
+    ).toHaveBeenCalledWith('repo-1', 'wt-1');
   });
 
   it('renders the events feed severity-colored with expandable excerpts and source badges', () => {

@@ -124,6 +124,8 @@ public class DaemonSupervisorTest {
             null,
             null,
             null,
+            null,
+            null,
             observers,
             sources)
         .id;
@@ -395,6 +397,8 @@ public class DaemonSupervisorTest {
                 0,
                 null,
                 8123,
+                "greeting",
+                "app",
                 null,
                 null,
                 null)
@@ -405,9 +409,17 @@ public class DaemonSupervisorTest {
     try {
       DaemonInstanceDto ready = awaitStatus(repo.id, daemonId, DaemonStatus.READY);
       assertEquals(
-          "/daemon/work/" + daemonId + "/",
+          "/daemon/work/" + daemonId + "/app/",
           ready.proxyPath(),
-          "the instance DTO carries the proxied base path");
+          "the served base is the proxy prefix plus the basePath (entryPath is not part of it)");
+      assertEquals(
+          "greeting",
+          ready.daemon().webView().entryPath(),
+          "the definition's entry path rides along on the instance DTO");
+      assertEquals(
+          false,
+          ready.needsContainerRecreate(),
+          "the container publishes the port, so no recreation is needed");
 
       var target = supervisor.proxyTarget("work", daemonId);
       assertTrue(target.isPresent(), "a live web-viewable daemon has a proxy target");
@@ -429,14 +441,14 @@ public class DaemonSupervisorTest {
   }
 
   @Test
-  public void daemonWithoutHttpPortHasNoProxyTargetOrPath() throws Exception {
+  public void daemonWithoutWebViewHasNoProxyTargetOrPath() throws Exception {
     String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "plain", "sleep 300", null, RestartPolicy.NEVER, 0);
 
     supervisor.start(repoId, "work", daemonId);
     try {
       DaemonInstanceDto ready = awaitStatus(repoId, daemonId, DaemonStatus.READY);
-      assertEquals(null, ready.proxyPath(), "no httpPort, no proxy path");
+      assertEquals(null, ready.proxyPath(), "no web-view config, no proxy path");
       assertTrue(supervisor.proxyTarget("work", daemonId).isEmpty());
     } finally {
       supervisor.stop(repoId, "work", daemonId);
@@ -445,7 +457,8 @@ public class DaemonSupervisorTest {
   }
 
   @Test
-  public void containerPredatingTheHttpPortWarnsAndLeavesTheWebViewUnavailable() throws Exception {
+  public void containerPredatingTheWebViewPortWarnsAndLeavesTheWebViewUnavailable()
+      throws Exception {
     // Workspace (and thus container) first, definition second: the container cannot publish the
     // port, so the daemon runs but the web view stays unavailable until a recreation.
     String repoId = repoWithWorkspace();
@@ -463,12 +476,18 @@ public class DaemonSupervisorTest {
                 8124,
                 null,
                 null,
+                null,
+                null,
                 null)
             .id;
 
     supervisor.start(repoId, "work", daemonId);
     try {
-      awaitStatus(repoId, daemonId, DaemonStatus.READY);
+      DaemonInstanceDto ready = awaitStatus(repoId, daemonId, DaemonStatus.READY);
+      assertEquals(
+          true,
+          ready.needsContainerRecreate(),
+          "a live web-viewable daemon with an unpublished port flags the recreation");
       var target = supervisor.proxyTarget("work", daemonId);
       assertTrue(target.isPresent(), "the instance resolves — with an unpublished port");
       assertEquals(null, target.get().hostPort(), "no published port on a predating container");

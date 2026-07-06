@@ -15,7 +15,7 @@ public record RepositoryDaemonDto(
     RestartPolicy restartPolicy,
     int maxRestarts,
     boolean otel,
-    Integer httpPort,
+    WebViewDto webView,
     String repositoryId,
     Map<String, String> environment,
     List<LogObserverDto> observers,

@@ -47,11 +47,13 @@ Related/dependent plans:
   exec`) so `127.0.0.1:<port>` means the daemon's own loopback — the address the app reaches
   itself on — with **no port publishing required** and no host/WSL2 network reachability caveats
   (see [WSL2 git-host unreachable](../../CLAUDE.md) / the webview picker's Docker-Desktop notes).
-- **Generalises the webview picker's `httpPort`**
-  ([daemon-webview-picker](../features/2026-07-05_daemon-webview-picker.md)). That feature added a
-  single nullable `httpPort` to declare "this daemon is web-viewable through the proxy." A
+- **Generalises the webview picker's web-view port**
+  ([daemon-webview-picker](../features/2026-07-05_daemon-webview-picker.md); the bare `httpPort`
+  has since become the structured `webView {port, entryPath, basePath}` block —
+  [daemon-webview-configuration](../features/2026-07-06_daemon-webview-configuration.md)). That
+  config still declares a *single* framed port ("this daemon is web-viewable through the proxy"). A
   healthcheck is a richer, plural version of the same "the daemon serves HTTP here" fact — the two
-  ports of the mvn+quinoa case are precisely why one `httpPort` isn't enough. A natural
+  ports of the mvn+quinoa case are precisely why one `webView.port` isn't enough. A natural
   convergence (Open questions): the web-view button could light up per-port off healthchecks.
 - **Fixes the auto-recovery gap in `DEGRADED`.** `daemons.md` notes DEGRADED "does *not*
   auto-recover — reset only by restart or stop (simplest defensible rule; revisit with real
@@ -258,8 +260,8 @@ goes green, then Angular flips green. `seed` (the tiny testing-repo Python daemo
   auto-recycle.
 - **Feature-flow phase gate** on "all daemons healthy" — the concrete predicate for the deferred
   `daemons.md` feature-flow integration; it would read the live cache, no persistence needed.
-- **Per-port web-view.** Converging `httpPort` and healthchecks so the webview picker offers one
-  frame per healthy HTTP check (Quarkus vs Angular), instead of a single `httpPort`.
+- **Per-port web-view.** Converging the web-view config (`webView.port`) and healthchecks so the webview picker offers one
+  frame per healthy HTTP check (Quarkus vs Angular), instead of the single `webView.port`.
 - **Dependency (log-pattern) healthchecks** — "unhealthy if this log line appears" overlaps the
   existing observers; keep the two mechanisms separate for now.
 - **History / uptime %** — health is deliberately live-only (latest slot per check). A durable
@@ -281,7 +283,7 @@ goes green, then Angular flips green. `seed` (the tiny testing-repo Python daemo
   Recommendation: **in-container `docker exec`** as the primary channel — it decouples check ports
   from the create-time publish set (add a check without recreating the container), covers `TCP` and
   `COMMAND` too, and probes the app's own loopback. Keep the proxy's host-side Vert.x client as an
-  optional fast path for checks whose port is already published (the `httpPort` case), if the extra
+  optional fast path for checks whose port is already published (the `webView.port` case), if the extra
   `docker exec` per tick ever measures as too costly.
 - **`UNKNOWN` vs `UNHEALTHY` display.** A probe that errors (exec failed, curl missing) vs a probe
   that ran and got a bad answer — both are "not green," but one is "we couldn't tell." Lean: keep

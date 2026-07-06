@@ -189,6 +189,8 @@ model/updateFeatureFlowPhaseStepRequest.ts
 model/updateHistoryRequest.ts
 model/updateProjectRequest.ts
 model/updateRepositoryDaemonRequest.ts
+model/webViewDto.ts
+model/webViewInput.ts
 model/workspaceDto.ts
 model/workspaceEventDto.ts
 model/workspaceEventType.ts

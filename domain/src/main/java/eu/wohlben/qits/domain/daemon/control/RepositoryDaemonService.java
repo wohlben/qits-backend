@@ -5,6 +5,7 @@ import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
+import eu.wohlben.qits.domain.daemon.entity.WebView;
 import eu.wohlben.qits.domain.daemon.mapper.RepositoryDaemonMapper;
 import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
@@ -43,7 +44,9 @@ public class RepositoryDaemonService {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Boolean otel,
-      Integer httpPort,
+      Integer webViewPort,
+      String webViewEntryPath,
+      String webViewBasePath,
       Map<String, String> environment,
       List<LogObserver> observers,
       List<LogSource> sources) {
@@ -54,7 +57,9 @@ public class RepositoryDaemonService {
       throw new BadRequestException("startScript is required");
     }
     DaemonDefinitionValidator.requireValidRegex(readyPattern, "readyPattern");
-    DaemonDefinitionValidator.requireValidHttpPort(httpPort);
+    WebView webView =
+        DaemonDefinitionValidator.requireValidWebView(
+            webViewPort, webViewEntryPath, webViewBasePath);
     DaemonDefinitionValidator.requireValidObservers(observers);
     DaemonDefinitionValidator.requireValidSources(sources);
 
@@ -73,7 +78,7 @@ public class RepositoryDaemonService {
     daemon.restartPolicy = restartPolicy != null ? restartPolicy : RestartPolicy.ON_FAILURE;
     daemon.maxRestarts = maxRestarts != null ? maxRestarts : 3;
     daemon.otel = otel != null && otel;
-    daemon.httpPort = httpPort;
+    daemon.webView = webView;
     daemon.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
     daemon.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
@@ -122,7 +127,9 @@ public class RepositoryDaemonService {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Boolean otel,
-      Integer httpPort,
+      Integer webViewPort,
+      String webViewEntryPath,
+      String webViewBasePath,
       Map<String, String> environment,
       List<LogObserver> observers,
       List<LogSource> sources) {
@@ -153,14 +160,21 @@ public class RepositoryDaemonService {
     if (otel != null) {
       daemon.otel = otel;
     }
-    if (httpPort != null) {
-      // 0 (or any non-positive value) clears the port — records the daemon as not web-viewable.
-      if (httpPort <= 0) {
-        daemon.httpPort = null;
-      } else {
-        DaemonDefinitionValidator.requireValidHttpPort(httpPort);
-        daemon.httpPort = httpPort;
-      }
+    if (webViewPort != null && webViewPort <= 0) {
+      // 0 (or any non-positive port) clears the whole block — the daemon is not web-viewable.
+      daemon.webView = null;
+    } else if (webViewPort != null || webViewEntryPath != null || webViewBasePath != null) {
+      // Per-field merge onto the existing block; a blank/"/" path arg clears that field (the
+      // validator normalizes it to null). A port must exist by the end — arg or carried over.
+      WebView existing = daemon.webView;
+      Integer port = webViewPort != null ? webViewPort : existing != null ? existing.port : null;
+      String entryPath =
+          webViewEntryPath != null
+              ? webViewEntryPath
+              : existing != null ? existing.entryPath : null;
+      String basePath =
+          webViewBasePath != null ? webViewBasePath : existing != null ? existing.basePath : null;
+      daemon.webView = DaemonDefinitionValidator.requireValidWebView(port, entryPath, basePath);
     }
     if (environment != null) {
       daemon.environment = new HashMap<>(environment);

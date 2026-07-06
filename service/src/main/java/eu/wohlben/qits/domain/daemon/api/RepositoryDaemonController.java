@@ -39,7 +39,7 @@ public class RepositoryDaemonController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Boolean otel,
-      Integer httpPort,
+      @Valid WebViewInput webView,
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
       List<@Valid LogSourceInput> sources) {
@@ -50,6 +50,7 @@ public class RepositoryDaemonController {
   public CreateRepositoryDaemonRequest.Response create(
       @PathParam("repositoryId") String repositoryId,
       @Valid CreateRepositoryDaemonRequest request) {
+    WebViewInput webView = request.webView();
     var daemon =
         repositoryDaemonService.create(
             repositoryId,
@@ -61,7 +62,9 @@ public class RepositoryDaemonController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.otel(),
-            request.httpPort(),
+            webView != null ? webView.port() : null,
+            webView != null ? webView.entryPath() : null,
+            webView != null ? webView.basePath() : null,
             request.environment(),
             LogObserverInput.toEntities(request.observers()),
             LogSourceInput.toEntities(request.sources()));
@@ -108,7 +111,7 @@ public class RepositoryDaemonController {
       RestartPolicy restartPolicy,
       Integer maxRestarts,
       Boolean otel,
-      Integer httpPort,
+      @Valid WebViewInput webView,
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
       List<@Valid LogSourceInput> sources) {
@@ -121,6 +124,9 @@ public class RepositoryDaemonController {
       @PathParam("repositoryId") String repositoryId,
       @PathParam("daemonId") String daemonId,
       @Valid UpdateRepositoryDaemonRequest request) {
+    // A present webView block replaces both paths wholesale (null path ⇒ sent as "" = clear) while
+    // a null port carries the stored one over; an omitted block keeps the stored config.
+    WebViewInput webView = request.webView();
     var daemon =
         repositoryDaemonService.update(
             repositoryId,
@@ -133,7 +139,9 @@ public class RepositoryDaemonController {
             request.restartPolicy(),
             request.maxRestarts(),
             request.otel(),
-            request.httpPort(),
+            webView != null ? webView.port() : null,
+            webView != null ? webView.entryPathOrEmpty() : null,
+            webView != null ? webView.basePathOrEmpty() : null,
             request.environment(),
             LogObserverInput.toEntities(request.observers()),
             LogSourceInput.toEntities(request.sources()));

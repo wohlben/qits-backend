@@ -199,6 +199,68 @@ public class DaemonMcpToolsTest {
   }
 
   @Test
+  public void configuresTheWebViewThroughFlatArgs() {
+    String project = createProject("Daemon WebView");
+    String repoId = createRepository(project);
+    var client = client(project);
+
+    // Define with the flat web-view args: port + entry path (normalized slash-less).
+    client
+        .when()
+        .toolsCall(
+            "createDaemon",
+            Map.of(
+                "repoId", repoId,
+                "name", "Frontend dev server",
+                "startScript", "pnpm start",
+                "webViewPort", 4200,
+                "webViewEntryPath", "/greeting/"),
+            response -> assertFalse(response.isError(), text(response)))
+        .thenAssertResults();
+
+    String daemonId =
+        given()
+            .get("/api/repositories/" + repoId + "/daemons")
+            .then()
+            .statusCode(200)
+            .body("entries[0].daemon.webView.port", org.hamcrest.Matchers.equalTo(4200))
+            .body("entries[0].daemon.webView.entryPath", org.hamcrest.Matchers.equalTo("greeting"))
+            .extract()
+            .path("entries[0].daemon.id");
+
+    // Per-field edit: a new entry path keeps the port.
+    client
+        .when()
+        .toolsCall(
+            "updateDaemon",
+            Map.of("repoId", repoId, "daemonId", daemonId, "webViewEntryPath", "welcome"),
+            response -> {
+              assertFalse(response.isError(), text(response));
+              assertTrue(text(response).contains("welcome"), text(response));
+              assertTrue(text(response).contains("4200"), "port kept: " + text(response));
+            })
+        .thenAssertResults();
+
+    // 0 clears the whole web-view config.
+    client
+        .when()
+        .toolsCall(
+            "updateDaemon",
+            Map.of("repoId", repoId, "daemonId", daemonId, "webViewPort", 0),
+            response -> {
+              assertFalse(response.isError(), text(response));
+              assertFalse(text(response).contains("4200"), "cleared config: " + text(response));
+            })
+        .thenAssertResults();
+
+    given()
+        .get("/api/repositories/" + repoId + "/daemons/" + daemonId)
+        .then()
+        .statusCode(200)
+        .body("daemon.webView", org.hamcrest.Matchers.nullValue());
+  }
+
+  @Test
   public void startsAndStopsADaemonInAWorkspace() {
     String project = createProject("Daemon Run");
     String repoId = createRepository(project);

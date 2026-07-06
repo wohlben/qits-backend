@@ -17,6 +17,7 @@ export interface DaemonInstanceDto {
     restartCount?: number;
     commandId?: string;
     proxyPath?: string;
+    needsContainerRecreate?: boolean;
 }
 export namespace DaemonInstanceDto {
 }

@@ -50,8 +50,9 @@ import org.jboss.logging.Logger;
  * <pre>
  *   Quarkus + Angular Demo
  *     ├─ Repository (testing-repo-quarkus-angular)
- *     │    + a web-viewable "Quarkus dev server" daemon: httpPort 8080, otel=true,
- *     │      LOG_LEVEL + PATTERN observers, a FILE LogSource tailing quarkus.log
+ *     │    + a web-viewable "Quarkus dev server" daemon: web view on :4200 (the Quinoa-spawned
+ *     │      Angular dev server) opening at /greeting, otel=true, LOG_LEVEL + PATTERN observers,
+ *     │      a FILE LogSource tailing quarkus.log
  *     │    main       the default workspace (created at clone time)
  *     │    greeting   a plain workspace off feature/greeting (a fast-forward over main)
  *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only)
@@ -127,11 +128,14 @@ public class SeedWebappService {
         projectService.createRepositoryUnderProject(project.id, url, RepositoryArchetype.SERVICE);
 
     // A web-viewable dev-server daemon: `quarkus:dev` serving the Quarkus REST API plus the Angular
-    // SPA (Quinoa), live-reloaded. httpPort set => the daemon is web-viewable, so the supervisor
-    // injects QITS_PUBLIC_BASE and publishes the port. Per the web-view base-path contract
-    // (docs/features/2026-07-05_daemon-webview-picker.md) the dev server must bind all interfaces
-    // and serve under that prefix; Quarkus does both via quarkus.http.host/root-path, and the SPA
-    // fetches base-relative so it resolves under the proxy prefix (see the fixture's greeting.ts).
+    // SPA (Quinoa), live-reloaded. The web view frames the FRONTEND dev server (the topology the
+    // web-view config recommends): Quinoa spawns `ng serve` on :4200, whose start script (the
+    // fixture's package.json) binds 0.0.0.0, serves under $QITS_PUBLIC_BASE (--serve-path) and
+    // dev-proxies the app's API calls to Quarkus (proxy.conf.js) — so assets, HMR and api/greetings
+    // all stay inside the proxy prefix. Quarkus itself also serves under the base (root-path),
+    // which
+    // lets the dev proxy forward the based API path verbatim. entryPath "greeting" lands the frame
+    // straight on the greeting screen.
     //
     // otel=true => the supervisor injects OTEL_EXPORTER_OTLP_* (endpoint, protobuf protocol,
     // service
@@ -159,13 +163,16 @@ public class SeedWebappService {
             + " -Dquarkus.http.root-path=\"${QITS_PUBLIC_BASE:-/}\""
             + " -Dquarkus.otel.exporter.otlp.endpoint="
             + "\"${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}\"",
-        // Quarkus logs "Listening on: http://0.0.0.0:8080" once the HTTP server is up.
-        "Listening on",
+        // The frame targets :4200, so readiness = the Angular dev server being up (Quinoa logs it
+        // once ng serve answers), not Quarkus' own earlier "Listening on:" line.
+        "(?i)dev server is up|Application bundle generation complete|Local:.*:4200",
         "TERM",
         RestartPolicy.ON_FAILURE,
         3,
         true,
-        8080,
+        4200,
+        "greeting",
+        null,
         null,
         List.of(
             new LogObserver(LogObserverKind.LOG_LEVEL, null, null),

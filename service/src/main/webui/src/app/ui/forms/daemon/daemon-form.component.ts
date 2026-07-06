@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, effect, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { form, required, submit } from '@angular/forms/signals';
 
 import { FormField } from '@angular/forms/signals';
@@ -36,8 +44,12 @@ export interface DaemonFormData {
   /** Kept as text in the form (signal-form fields are string-typed); parsed on submit. */
   maxRestarts: string;
   otel: boolean;
-  /** HTTP port the daemon serves in its container; empty = not web-viewable. Text like maxRestarts. */
-  httpPort: string;
+  /** Container port the web-view proxy frames; empty = not web-viewable. Text like maxRestarts. */
+  webViewPort: string;
+  /** Route the web-view frame opens at below the served base (e.g. "greeting"); empty = app root. */
+  webViewEntryPath: string;
+  /** Advanced: extra sub-path the app pins on top of the proxy prefix; usually empty. */
+  webViewBasePath: string;
   environment: DaemonEnvVarRow[];
   observers: DaemonObserverRow[];
   sources: DaemonSourceRow[];
@@ -97,15 +109,58 @@ export interface DaemonFormData {
         />
       </div>
 
-      <!-- When set, the daemon's app becomes web-viewable in qits through the /daemon proxy;
-           the dev server must listen on 0.0.0.0 and serve under $QITS_PUBLIC_BASE. -->
-      <app-form-field-layout
-        [field]="form.httpPort"
-        id="daemon-http-port"
-        label="HTTP port (optional — makes the daemon web-viewable)"
-      >
-        <input appFormFieldSlot="input" z-input inputmode="numeric" [formField]="form.httpPort" />
-      </app-form-field-layout>
+      <!-- The web-view config: which container port the /daemon proxy frames (point it at the
+           frontend dev server), where in the app the frame opens, and (rarely) an extra base
+           sub-path. Setting the port makes the daemon web-viewable. -->
+      <fieldset class="flex flex-col gap-2">
+        <legend class="text-sm font-medium">Web view</legend>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <app-form-field-layout
+            [field]="form.webViewPort"
+            id="daemon-web-view-port"
+            label="Frontend dev-server port (optional — makes the daemon web-viewable)"
+          >
+            <input
+              appFormFieldSlot="input"
+              z-input
+              inputmode="numeric"
+              [formField]="form.webViewPort"
+            />
+          </app-form-field-layout>
+          <app-form-field-layout
+            [field]="form.webViewEntryPath"
+            id="daemon-web-view-entry-path"
+            label="Entry path (route the frame opens at, e.g. greeting)"
+            autocomplete="off"
+          />
+        </div>
+        <p class="text-xs text-muted-foreground">
+          Point the port at the app's <strong>frontend dev server</strong> — it serves assets and
+          HMR under a base path natively (its API calls need a dev proxy to the backend). A backend
+          origin works only when it serves the whole app under the base itself.
+        </p>
+        <p class="text-xs text-muted-foreground">
+          <strong>Base contract:</strong> the framed server must bind
+          <code class="font-mono">0.0.0.0</code> and serve itself under
+          <code class="font-mono">$QITS_PUBLIC_BASE</code>
+          (injected at launch as
+          <code class="font-mono">/daemon/&#123;workspace&#125;/&#123;daemon-id&#125;/{{
+            basePathSuffix()
+          }}</code
+          >), e.g. ng serve --serve-path "$QITS_PUBLIC_BASE" or vite --base "$QITS_PUBLIC_BASE".
+        </p>
+        <details>
+          <summary class="cursor-pointer text-xs text-muted-foreground">Advanced</summary>
+          <div class="pt-2">
+            <app-form-field-layout
+              [field]="form.webViewBasePath"
+              id="daemon-web-view-base-path"
+              label="Base sub-path (extra path the app pins on top of the proxy prefix; usually empty)"
+              autocomplete="off"
+            />
+          </div>
+        </details>
+      </fieldset>
 
       <!-- With OTel on, the launch injects OTEL_EXPORTER_* env vars so an instrumented process
            exports traces/logs/metrics to qits — queryable in the workspace's Telemetry tab and by
@@ -277,7 +332,9 @@ export class DaemonFormComponent {
     restartPolicy: 'ON_FAILURE',
     maxRestarts: '3',
     otel: false,
-    httpPort: '',
+    webViewPort: '',
+    webViewEntryPath: '',
+    webViewBasePath: '',
     environment: [],
     observers: [],
     sources: [],
@@ -285,6 +342,12 @@ export class DaemonFormComponent {
   readonly form = form(this.model, (schemaPath) => {
     required(schemaPath.name, { message: 'Name is required' });
     required(schemaPath.startScript, { message: 'Start script is required' });
+  });
+
+  /** The base-path tail of the resolved $QITS_PUBLIC_BASE shown in the contract note. */
+  readonly basePathSuffix = computed(() => {
+    const basePath = this.model().webViewBasePath.trim().replace(/^\/+|\/+$/g, '');
+    return basePath ? basePath + '/' : '';
   });
 
   constructor() {
