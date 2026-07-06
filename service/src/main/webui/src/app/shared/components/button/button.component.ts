@@ -43,13 +43,17 @@ import {
     '[attr.data-disabled]': 'isNotInsideOfButtonOrLink() && zDisabled() || null',
     '[attr.aria-disabled]': 'isNotInsideOfButtonOrLink() && zDisabled() || null',
     '[attr.disabled]': 'isNotInsideOfButtonOrLink() && zDisabled() ? "" : null',
-    '[attr.role]': 'isNotInsideOfButtonOrLink() ? "button" : null',
+    '[attr.role]': 'authorRole ?? (isNotInsideOfButtonOrLink() ? "button" : null)',
     '[attr.tabindex]': 'isNotInsideOfButtonOrLink() ? "0" : null',
   },
   exportAs: 'zButton',
 })
 export class ZardButtonComponent implements OnDestroy {
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+
+  // A role the author put on the element (e.g. the tab strip's role="tab") must survive — the
+  // default role="button" host binding would otherwise clobber it after first change detection.
+  protected readonly authorRole: string | null = this.elementRef.nativeElement.getAttribute('role');
 
   readonly zType = input<ZardButtonTypeVariants>('default');
   readonly zSize = input<ZardButtonSizeVariants>('default');

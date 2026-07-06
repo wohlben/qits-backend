@@ -1,9 +1,16 @@
-# Tab buttons lose `role="tab"` to z-button's host `role="button"`
+# RESOLVED: Tab buttons lose `role="tab"` to z-button's host `role="button"`
+
+> **Resolution (2026-07-06):** fixed on the button side, as suggested — `ZardButtonComponent` now
+> captures the author-provided role at construction (`authorRole`) and its host `[attr.role]`
+> binding only falls back to `role="button"` when none was set. Verified live:
+> `document.querySelectorAll('[role="tab"]')` on the workspace detail page returns the three tab
+> buttons. Regression: `workspace-detail.page.spec.ts` asserts the tablist children carry
+> `role="tab"`.
 
 ## Introduction
 
 Found while testing the workspace observation tabs
-([feature](../features/2026-07-06_workspace-observation-tabs.md)): the `z-tab-group` tab strip is
+([feature](../../features/2026-07-06_workspace-observation-tabs.md)): the `z-tab-group` tab strip is
 not exposed as tabs to assistive technology. Related: the zard tabs component
 (`shared/components/tabs/tabs.component.ts`) and button component
 (`shared/components/button/button.component.ts`); the webui convention "Templates must pass

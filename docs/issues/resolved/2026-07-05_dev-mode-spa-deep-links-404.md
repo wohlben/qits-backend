@@ -1,9 +1,21 @@
-# Dev mode: SPA deep links 404 through :8080 (Quinoa forwarding doesn't fall back)
+# RESOLVED: Dev mode: SPA deep links 404 through :8080 (Quinoa forwarding doesn't fall back)
+
+> **Resolution (2026-07-06):** the suspected cause was close but the real culprit is an ordering
+> collision: Quinoa *does* register a dev-mode SPA-routing handler (route order 40000), but this
+> app also carries **quarkus-undertow** (for JGit's `GitServlet`), whose default servlet route sits
+> at order 10000 and answers every unmatched request with the dev 404 page — Quinoa's handler never
+> runs. (The Quinoa dev proxy at order 1100 deliberately declines to forward the Angular dev
+> server's `index.html` fallback for non-root paths, handing SPA routing back to Quarkus.)
+> Fixed by `eu.wohlben.qits.spa.DevModeSpaFallbackRoute` (service module): a dev-mode-only route at
+> order 9000 that reroutes lost HTML navigations (GET, `Accept: text/html`, no file extension,
+> outside `quarkus.quinoa.ignored-path-prefixes` + `/q`) to `/`. Verified: deep links (including
+> `/repositories/{id}/workspaces/{id}`) load the app directly in dev; `/api`, `/q`, `/git`
+> smart-http, assets, non-HTML and non-GET requests are untouched.
 
 ## Introduction
 
 Found while browser-verifying the
-[daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) — the E2E flow needed to
+[daemon web-view picker](../../features/2026-07-05_daemon-webview-picker.md) — the E2E flow needed to
 open `/repositories/{id}/workspaces/{id}` directly. Not caused by that feature: reproduced with the
 `/daemon` route unregistered and `quarkus.quinoa.ignored-path-prefixes` reverted to
 `/api,/mcp,/git`. No other plans depend on this; it only affects dev-mode deep links, and
