@@ -2,14 +2,21 @@
 
 ## Introduction
 
-The [observability](../features/2026-07-04_observability.md) pipeline instruments workspace apps by
+Implemented 2026-07-06 — fixture commits `5b1ec80` (config relay + OTLP passthrough + instrumented
+SPA), `1a4c4ec` (Quinoa ignored-prefix root-path fix — a latent loop this feature surfaced, see
+[the issue doc](../issues/resolved/2026-07-06_quinoa-ignored-prefix-root-path-loop.md)) and
+`35247d4` (passthrough span suppression); `feature/greeting` rebased on top (still fast-forward),
+`feature/diverged` untouched. The **Implementation notes** section records where reality corrected
+this doc's sketch.
+
+The [observability](2026-07-04_observability.md) pipeline instruments workspace apps by
 injecting `OTEL_EXPORTER_OTLP_*` env vars at daemon launch — which reaches exactly the processes
 qits spawns. The **browser half** of a workspace app is invisible: the fixture's Angular SPA runs
 in the user's browser inside the web-view iframe, gets no env vars, and exports nothing. Interact
 with the greeting demo and the Telemetry tab shows the `POST /greetings` **server** span — but no
 document-load, no client-side fetch timing, and, most painfully, **a JS error in the SPA never
 reaches the errors feed or the agent's telemetry MCP tools**. The
-[workspace observation tabs](../features/2026-07-06_workspace-observation-tabs.md) made the flowing
+[workspace observation tabs](2026-07-06_workspace-observation-tabs.md) made the flowing
 telemetry visible, which is exactly how this gap surfaced: the traces that flow are all backend.
 
 The fix is a **convention, not a qits feature**: the workspace app's backend — which *does* hold
@@ -27,16 +34,16 @@ code**; the deliverable is the decree plus the fixture as its reference implemen
 
 Related/dependent plans:
 
-- **Consumes [observability](../features/2026-07-04_observability.md) as-is** — receiver, decoder,
+- **Consumes [observability](2026-07-04_observability.md) as-is** — receiver, decoder,
   store, MCP tools and REST twins are all unchanged. The store's bucketing contract
   (`qits.repository.id` + `qits.workspace.id` resource attrs, else `_unscoped`) is satisfied
   because the browser learns *both ids* from the backend's relayed `OTEL_RESOURCE_ATTRIBUTES`. The
   agent's `telemetryErrors`/`telemetryTrace` tools see browser spans for free.
-- **Feeds [workspace observation tabs](../features/2026-07-06_workspace-observation-tabs.md)** —
+- **Feeds [workspace observation tabs](2026-07-06_workspace-observation-tabs.md)** —
   Recent traces, the errors feed and the log tail render browser telemetry with zero UI change
   (the log tail's service filter already distinguishes services, so `webapp-browser` vs `webapp`
   falls out).
-- **Modifies the [servable quarkus-angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)**
+- **Modifies the [servable quarkus-angular fixture](2026-07-05_servable-quarkus-angular-fixture.md)**
   — the fixture gains the config resource, the OTLP passthrough and the instrumented SPA,
   mirroring how its backend is the reference for the env-var path.
 - **Robust against the [cross-origin proxy mode backlog idea](../backlog-ideas/daemon-proxy-cross-origin-mode.md)**
@@ -45,7 +52,7 @@ Related/dependent plans:
   backlog idea's script-injection machinery also remains the natural home for a future *zero-code*
   RUM variant; this idea keeps the observability feature's stance that instrumentation is the
   target app's business.
-- **Followed by the [Quarkus/Angular integration guide](quarkus-angular-integration-guide.md)** —
+- **Followed by the [Quarkus/Angular integration guide](../feature-ideas/quarkus-angular-integration-guide.md)** —
   once this lands, the full integration contract (daemon config, web view, logs, backend + frontend
   OTEL) gets documented end-to-end as a user-facing guide; it is sequenced after this idea so it
   documents the complete picture in one pass.
@@ -159,27 +166,60 @@ without the env, `502` on forward failure.
   (`http/protobuf` works in the browser, matching the receiver's protobuf-only stance — no JSON
   ingestion needed, keeping that explicitly-deferred item deferred) with
   `@opentelemetry/instrumentation-document-load` and `@opentelemetry/instrumentation-fetch`,
-  exporter URL = base-relative `api/otel` (the SDK appends `/v1/<signal>` itself, same as every
-  other exporter). The passthrough calls must be **excluded from fetch instrumentation**
-  (`ignoreUrls: [/api\/otel/]`) or every export would spawn a span exporting itself.
-  Fetch instrumentation propagates **`traceparent`** on the `api/greetings` call; the dev proxy
-  forwards headers verbatim and `quarkus-opentelemetry` continues the trace — the browser span
-  becomes the *root* and the server span its child. `BatchSpanProcessor` with a
-  flush-on-`visibilitychange` so spans survive tab switches/navigation.
-- **Errors → logs:** `@opentelemetry/sdk-logs` + the proto logs exporter; global `error` /
-  `unhandledrejection` listeners emit ERROR-severity log records (message + stack). Severity ≥ 17
-  means they surface in the **existing errors feed** and `telemetryErrors` MCP tool with no query
-  changes.
+  exporter URLs built as absolute per-signal URLs from `document.baseURI` (see implementation
+  notes — the JS browser exporters use a user-provided `url` verbatim). The passthrough calls are
+  **excluded from fetch instrumentation** (`ignoreUrls: [/\/api\/otel\/v1\//]`) or every export
+  would spawn a span exporting itself. Fetch instrumentation propagates **`traceparent`** on the
+  `api/greetings` call; the dev proxy forwards headers verbatim and `quarkus-opentelemetry`
+  continues the trace — the browser span becomes the *root* and the server span its child.
+  `BatchSpanProcessor`, which auto-flushes on document hide out of the box.
+- **Errors → logs:** `@opentelemetry/sdk-logs` + the proto logs exporter; a custom Angular
+  `TelemetryErrorHandler` emits ERROR-severity log records (message + stack + `exception.*`
+  attributes). Severity ≥ 17 means they surface in the **existing errors feed** and
+  `telemetryErrors` MCP tool with no query changes.
 - **Resource:** the relayed `resourceAttributes` verbatim, plus
   `service.name = <relayed serviceName> + "-browser"` — the distinct name is what makes the
   log-tail service filter useful.
 - Dev-only weight: the OTEL web SDK adds real kilobytes, but the fixture only ever runs `ng serve`;
   acceptable, and it's the honest reference for what a user's own app would do.
 
-Fixture commit lands on `main` with `feature/greeting` rebased on top (still fast-forward),
+The fixture commits landed on `main` with `feature/greeting` rebased on top (still fast-forward),
 `feature/diverged` untouched — same procedure as the web-view-configuration fixture change.
-`seed-webapp` needs no change: the daemon already has `otel` on, which is now the one switch for
+`seed-webapp` needed no change: the daemon already has `otel` on, which is now the one switch for
 both halves.
+
+## Implementation notes
+
+Where the implementation corrected this doc's sketch (all verified end-to-end on 2026-07-06):
+
+- **`withFetch()` was required.** The SPA used Angular `HttpClient` with the default XHR backend —
+  invisible to `FetchInstrumentation`, so no client span and no `traceparent` on `api/greetings`
+  (the whole demo payoff). `app.config.ts` now uses `provideHttpClient(withFetch())`, and because
+  Angular's `FetchBackend` captures `window.fetch` on first use, `initTelemetry()` completes
+  **before** `bootstrapApplication` in `main.ts`.
+- **Exporter URLs are verbatim.** The JS browser exporters (0.220.x) do *not* append
+  `/v1/<signal>` to a user-provided `url` and resolve it against `location.href`, not `<base>` —
+  `telemetry.ts` builds `new URL('api/otel/v1/<signal>', document.baseURI).href` per signal.
+- **Errors funnel through Angular's `ErrorHandler`, not `window` listeners.** Zoneless Angular
+  catches event-handler exceptions before they reach `window`, and
+  `provideBrowserGlobalErrorListeners()` forwards genuinely-global errors/rejections into
+  `ErrorHandler` — a custom `TelemetryErrorHandler` is the single hook that sees everything.
+- **No custom flush wiring.** The browser batch processors auto-flush on document hide by default;
+  the sketched `visibilitychange` listener was unnecessary.
+- **The exporters POST via `fetch()`** (not XHR as sketched), which makes the `ignoreUrls`
+  exclusion strictly mandatory — without it every export instruments itself, recursively.
+- **Two latent config traps surfaced** (both fixed with `${quarkus.http.root-path:/}`-prefixed
+  values, since both properties match *full* request paths): Quinoa's `ignored-path-prefixes=/api`
+  stopped matching under the daemon's root path, looping every API GET between Quinoa's dev proxy
+  and ng's API proxy forever
+  ([issue doc](../issues/resolved/2026-07-06_quinoa-ignored-prefix-root-path-loop.md)); and the
+  backend minted a `POST /otel/v1/…` server span per browser export batch until
+  `quarkus.otel.traces.suppress-application-uris` excluded the passthrough.
+- **Fixture backend tests** (in the fixture repo): `ConfigResourceTest` (dark defaults, unknown
+  signals 404), `OtelProxyResourceTest` + `OtelStubTestResource` (a JDK `HttpServer` stub asserting
+  byte-verbatim forward, content type, status relay in both directions) and
+  `OtelProxyUnreachableTest` (502). `quarkus.otel.sdk.disabled=true` in the fixture's test profile
+  keeps Quarkus's own SDK from spamming the stub (it reads the same `otel.*` keys).
 
 ## The demo payoff
 
@@ -208,36 +248,34 @@ both halves.
 - **XHR instrumentation** — the fixture uses `fetch`; `instrumentation-xml-http-request` only if a
   framed app needs it.
 
-## Open questions
+## Open questions (all resolved at implementation)
 
-- **Zone context manager vs. zoneless.** The fixture is Angular 21; if it bootstraps zoneless,
-  `@opentelemetry/context-zone` is wrong and the default stack-based context manager (fine for
-  fetch/document-load, which don't need cross-async correlation from user code) should do. Confirm
-  against the fixture's actual bootstrap before picking dependencies.
-- **Config shape: relay `qits.command.id`?** The command id churns per daemon relaunch and the
-  browser session may outlive it. Lean: relay whatever the env holds (it's identity the backend
-  half also carries), and accept that a stale frame stamps the previous command id — bucketing only
-  depends on the workspace/repository ids.
-- **Should the passthrough stamp/override resource attrs after all?** A malicious-or-buggy SPA can
-  stamp any workspace's ids (same unauthenticated trust level as the rest of qits, so: fine for
-  now). If the fixture ever grows real protobuf handling, moving the stamp into the proxy would
-  drop `resourceAttributes` from config.json and make the browser config nearly empty — revisit
-  then, not before.
-- **`sendBeacon` vs. XHR on unload.** The proto exporter uses XHR; if flush-on-`visibilitychange`
-  proves lossy for last-interaction spans, revisit (possibly via the JSON exporter's beacon path —
-  which would reopen the JSON-ingestion deferral). Measure first.
+- **Zone context manager vs. zoneless.** The fixture bootstraps **zoneless** (no `zone.js` dep),
+  so the default stack-based context manager is used — no `@opentelemetry/context-zone` (fine for
+  fetch/document-load, which don't need cross-async correlation from user code).
+- **Config shape: relay `qits.command.id`?** Relayed as-is (it's identity the backend half also
+  carries); a stale frame stamping the previous command id is accepted — bucketing only depends on
+  the workspace/repository ids.
+- **Should the passthrough stamp/override resource attrs after all?** No — same unauthenticated
+  trust level as the rest of qits. If the fixture ever grows real protobuf handling, moving the
+  stamp into the proxy would drop `resourceAttributes` from config.json — revisit then, not before.
+- **`sendBeacon` vs. unload loss.** Not needed: the batch processors auto-flush on document hide
+  (the exporters use `fetch(…, {keepalive})`, not XHR as sketched). Revisit only if
+  last-interaction spans prove lossy in practice.
 
-## Testing sketch
+## Testing
 
-- **qits side: nothing to add.** The receiver/store paths a browser exercises are the existing
+- **qits side: nothing added.** The receiver/store paths a browser exercises are the existing
   ones; `OtelReceiverResourceTest`/`TelemetryStoreTest` already cover attr-carrying payloads
-  bucketing correctly and attr-less payloads landing `_unscoped`.
-- **Fixture backend (its own repo, not the qits build):** `ConfigResource` returns the parsed
-  relay when the `OTEL_*` config is present and `telemetry: null` when absent; `OtelProxyResource`
-  forwards bytes + content type verbatim and relays the status, `404`s without the env, `502`s when
-  the upstream is unreachable.
-- **Fixture manual E2E (part of the seed-webapp loop):** the demo-payoff flow above — full-stack
-  trace in Recent traces, a provoked SPA error in the errors feed and via the workspace chat
-  agent; the daemon with `otel` **off** → `config.json` reports null → the SPA sends nothing
-  (network tab clean); fixture standalone likewise; no self-referential export spans (the
-  `ignoreUrls` exclusion holds).
+  bucketing correctly and attr-less payloads landing `_unscoped`. `SeedWebappServiceTest` stayed
+  green untouched.
+- **Fixture backend (its own repo, not the qits build):** the four test classes listed in the
+  implementation notes — parsed relay when `OTEL_*` config is present / `telemetry: null` when
+  absent, byte-verbatim forward + status relay (200 and non-200), `404` without the env, `502`
+  when the upstream is unreachable, unknown signals rejected by the path regex.
+- **Verified E2E (seed-webapp loop, 2026-07-06):** full-stack trace in Recent traces (browser
+  CLIENT `HTTP POST` + Quarkus SERVER `POST /greetings` under one trace id, plus
+  `documentLoad`/`documentFetch`/`resourceFetch`); a provoked uncaught browser error in the errors
+  feed with `exception.*` attributes and stack; standalone run dark (`{"telemetry":null}`,
+  passthrough 404, no export traffic); no self-referential export spans browser-side (`ignoreUrls`)
+  or server-side (suppressed passthrough URIs).
