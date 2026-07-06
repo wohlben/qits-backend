@@ -45,6 +45,10 @@ Related/dependent plans:
   backlog idea's script-injection machinery also remains the natural home for a future *zero-code*
   RUM variant; this idea keeps the observability feature's stance that instrumentation is the
   target app's business.
+- **Followed by the [Quarkus/Angular integration guide](quarkus-angular-integration-guide.md)** —
+  once this lands, the full integration contract (daemon config, web view, logs, backend + frontend
+  OTEL) gets documented end-to-end as a user-facing guide; it is sequenced after this idea so it
+  documents the complete picture in one pass.
 - **Not about qits' own Angular UI.** Self-observability of the qits SPA is a separate idea if
   ever wanted; "SPA" here means the *observed workspace app's* frontend.
 
