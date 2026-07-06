@@ -131,6 +131,10 @@ surfaced the traps the guide must spell out:
 - **Suppress the passthrough from the backend's own traces**
   (`quarkus.otel.traces.suppress-application-uris=${quarkus.http.root-path:/}api/otel/v1/*`, same
   full-path matching as the Quinoa prefix) or every browser export batch mints a noise span.
+- **Flush fast (`scheduledDelayMillis: 1000`)** — closing the web-view floaty *removes the
+  iframe*, which fires no `pagehide`/`visibilitychange`, so spans still in the default 5s batch
+  buffer are silently lost. Symptom: a briefly-opened web view leaves only server spans in the
+  trace feed — looks like the SPA half doesn't work at all.
 
 Verify: one full-stack trace per interaction (browser CLIENT span rooting the Quarkus SERVER
 span), a provoked SPA error in the errors feed, and *no* `POST /otel/v1/…` spans in Recent traces.
