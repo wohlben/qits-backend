@@ -259,9 +259,13 @@ Where the implementation corrected this doc's sketch (all verified end-to-end on
 - **Should the passthrough stamp/override resource attrs after all?** No — same unauthenticated
   trust level as the rest of qits. If the fixture ever grows real protobuf handling, moving the
   stamp into the proxy would drop `resourceAttributes` from config.json — revisit then, not before.
-- **`sendBeacon` vs. unload loss.** Not needed: the batch processors auto-flush on document hide
-  (the exporters use `fetch(…, {keepalive})`, not XHR as sketched). Revisit only if
-  last-interaction spans prove lossy in practice.
+- **`sendBeacon` vs. unload loss.** Mostly not needed: the batch processors auto-flush on document
+  hide (the exporters use `fetch(…, {keepalive})`, not XHR as sketched). But loss **was** observed
+  in practice on day one: closing the web-view floaty *removes the iframe*, which fires no
+  `pagehide`/`visibilitychange`, so a web view closed within the default 5s batch window silently
+  dropped its browser spans (server spans arrived, browser spans didn't — a confusing
+  half-working state). Fixed by flushing every 1s (`scheduledDelayMillis`, fixture commit
+  `700c272`); `sendBeacon` remains unnecessary.
 
 ## Testing
 
