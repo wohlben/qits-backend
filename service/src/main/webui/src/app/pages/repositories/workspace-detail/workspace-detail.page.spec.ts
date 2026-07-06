@@ -53,7 +53,8 @@ describe('WorkspaceDetailPage', () => {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
-    const tabLabels = Array.from(el.querySelectorAll('nav[role="tablist"] button')).map((b) =>
+    // role="tab" (not the z-button default role="button") — regression for the clobbered-role bug.
+    const tabLabels = Array.from(el.querySelectorAll('nav[role="tablist"] [role="tab"]')).map((b) =>
       b.textContent?.trim(),
     );
     expect(tabLabels).toEqual(['Files', 'Events', 'Telemetry']);
@@ -73,7 +74,7 @@ describe('WorkspaceDetailPage', () => {
     const openAtLine = vi.spyOn(fileBrowser, 'openAtLine').mockImplementation(() => undefined);
 
     // Start on the Events tab so the jump back to Files is observable.
-    const eventsTab = Array.from(el.querySelectorAll<HTMLButtonElement>('nav[role="tablist"] button')).find(
+    const eventsTab = Array.from(el.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
       (b) => b.textContent?.trim() === 'Events',
     );
     eventsTab!.click();
@@ -84,7 +85,7 @@ describe('WorkspaceDetailPage', () => {
     fixture.detectChanges();
 
     expect(openAtLine).toHaveBeenCalledWith('src/app.ts', 3, 5);
-    const filesTab = Array.from(el.querySelectorAll('nav[role="tablist"] button')).find(
+    const filesTab = Array.from(el.querySelectorAll('[role="tab"]')).find(
       (b) => b.textContent?.trim() === 'Files',
     );
     expect(filesTab!.getAttribute('aria-selected')).toBe('true');
