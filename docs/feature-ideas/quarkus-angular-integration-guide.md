@@ -74,12 +74,17 @@ agent. A stock starter already has the first two; the rest is additive.
 "Listening on"), and the first-launch cost warning (Maven + pnpm downloads vs. the ready grace
 window). Verify: daemon reaches READY, restart survives.
 
-**Tier 2 — web view.** The base contract from the app's side: `webView {port: 4200, entryPath}`,
-`ng serve --host 0.0.0.0 --serve-path "$QITS_PUBLIC_BASE"` in `package.json`, the `index.html`
-runtime `<base>` rebase (Angular 21's dev server has no `--base-href`), `proxy.conf.js` forwarding
-the based `api/` path to the backend, base-relative fetches in the SPA, and the
-recreate-container rule (ports publish at container creation). Verify: frame opens on `entryPath`,
-assets + HMR live, an API POST succeeds through the prefix.
+**Tier 2 — web view.** The base contract from the app's side, per
+[daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md):
+`webView {port: 4200, entryPath}`, `ng serve --host 0.0.0.0 --serve-path "$QITS_PUBLIC_BASE"` in
+`package.json`, the `index.html` runtime `<base>` rebase (Angular 21's dev server has no
+`--base-href`), `proxy.conf.js` forwarding the based `api/` path to the backend, base-relative
+fetches in the SPA, and the recreate-container rule (ports publish at container creation). This is
+the tier the guide exists most for — historically the trap step, where every base misconfiguration
+presents as the same blank or asset-404'd iframe (the exact failure mode that motivated the
+web-view configuration feature); the guide must spell out each contract piece *and* the symptom of
+getting it wrong. Verify: **the web view actually works** — the frame opens on `entryPath`, assets
++ HMR live, an API POST succeeds through the prefix, and the DOM picker attaches.
 
 **Tier 3 — logs to qits.** `LOG_LEVEL` observer (free Java stack-trace classification), a
 `PATTERN` observer for stack-specific failure lines (`BUILD FAILURE|Failed to start Quarkus|Live
@@ -111,6 +116,11 @@ The guide is written **by performing it**: generate a fresh starter (`code.quark
 it with qits, and walk tier by tier, recording the exact diff each tier required. Then
 cross-check against fixture `main` (`git diff` mentality: anything the fixture has that the guide
 never needed is either fixture-specific or a missed step — resolve which).
+
+The walk's acceptance is deliberately strict on the visible surfaces: it is **not complete until
+the web view renders the starter's SPA through the proxy prefix** (Tier 2's verify block) — a
+guide that gets a fresh app to READY but leaves a blank iframe has failed at the exact step users
+need it for.
 
 Per the repo's documentation workflow, **friction found during the walk is filed, not papered
 over**: anything that needs an undocumented workaround, a magic value, or a qits code change
