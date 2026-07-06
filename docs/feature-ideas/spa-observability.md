@@ -1,4 +1,4 @@
-# SPA observability: the backend relays its OTEL config to the browser via `/api/config.json`
+# SPA observability: the backend proxies browser OTLP and relays identity via `/api/config.json`
 
 ## Introduction
 
@@ -13,14 +13,17 @@ reaches the errors feed or the agent's telemetry MCP tools**. The
 telemetry visible, which is exactly how this gap surfaced: the traces that flow are all backend.
 
 The fix is a **convention, not a qits feature**: the workspace app's backend — which *does* hold
-the full OTEL picture, because qits injected it into its environment — serves a small
-`/api/config.json` relaying the telemetry endpoint and identity to its own frontend. The SPA
-fetches it at bootstrap, self-configures the OTEL web SDK from it, and exports to qits' existing
-receiver. Its telemetry lands in the same per-workspace bucket as the backend's, and — because
-fetch instrumentation propagates `traceparent` — a click in the web view produces **one full-stack
-trace** (browser fetch span → dev-proxy → Quarkus server span) in the Recent traces drill-down.
-**qits ships zero new backend code**; the deliverable is the decree plus the fixture as its
-reference implementation.
+the full OTEL picture, because qits injected it into its environment — acts as its frontend's
+telemetry gateway. Two decrees: it serves a small `/api/config.json` relaying telemetry identity to
+its own SPA, and it **proxies OTLP through** — the SPA posts telemetry to its own backend
+(base-relative, like any other API call), which forwards the bytes to whatever
+`OTEL_EXPORTER_OTLP_ENDPOINT` it was given. This is the standard edge-gateway pattern for browser
+telemetry, and it maps cleanly onto a later production build (same endpoints, values from
+`application.properties`, collector reachable only from the backend). Browser telemetry lands in
+the same per-workspace bucket as the backend's, and — because fetch instrumentation propagates
+`traceparent` — a click in the web view produces **one full-stack trace** (browser fetch span →
+dev-proxy → Quarkus server span) in the Recent traces drill-down. **qits ships zero new backend
+code**; the deliverable is the decree plus the fixture as its reference implementation.
 
 Related/dependent plans:
 
@@ -33,18 +36,15 @@ Related/dependent plans:
   Recent traces, the errors feed and the log tail render browser telemetry with zero UI change
   (the log tail's service filter already distinguishes services, so `webapp-browser` vs `webapp`
   falls out).
-- **Rides the [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) /
-  [web-view configuration](../features/2026-07-06_daemon-webview-configuration.md)** — the
-  same-origin path-prefix proxy is what lets the SPA reach qits' receiver at an origin-relative
-  `/api/otel` with no CORS, from both the packaged app (:8080) and the qits webui dev server
-  (:4200, whose proxy already forwards `/api`).
 - **Modifies the [servable quarkus-angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)**
-  — the fixture gains the config resource and the instrumented SPA, mirroring how its backend is
-  the reference for the env-var path.
-- **Distinct from the [cross-origin proxy mode backlog idea](../backlog-ideas/daemon-proxy-cross-origin-mode.md)**
-  — that idea's script-injection machinery is also the natural home for a future *zero-code* RUM
-  variant (qits injects the instrumentation via the proxy); this idea keeps the observability
-  feature's stance that instrumentation is the target app's business.
+  — the fixture gains the config resource, the OTLP passthrough and the instrumented SPA,
+  mirroring how its backend is the reference for the env-var path.
+- **Robust against the [cross-origin proxy mode backlog idea](../backlog-ideas/daemon-proxy-cross-origin-mode.md)**
+  — because the SPA only ever talks to *its own backend*, browser telemetry survives a frame that
+  is no longer same-origin with qits (where a direct-to-qits exporter would hit CORS). That
+  backlog idea's script-injection machinery also remains the natural home for a future *zero-code*
+  RUM variant; this idea keeps the observability feature's stance that instrumentation is the
+  target app's business.
 - **Not about qits' own Angular UI.** Self-observability of the qits SPA is a separate idea if
   ever wanted; "SPA" here means the *observed workspace app's* frontend.
 
@@ -64,21 +64,23 @@ greeting, open the Telemetry tab:
    (`NODE_OPTIONS`, `-javaagent`) has no browser equivalent.
 
 But the asymmetry is the answer: the **backend half of the same app** holds everything the browser
-lacks. Its environment carries the endpoint (`OTEL_EXPORTER_OTLP_ENDPOINT`), the complete identity
+lacks. Its environment carries the endpoint (`OTEL_EXPORTER_OTLP_ENDPOINT` — a
+*container-reachable* address the browser could not reliably use anyway), the complete identity
 (`OTEL_RESOURCE_ATTRIBUTES=qits.workspace.id=…,qits.repository.id=…,qits.command.id=…` — including
 the repository id, which appears *nowhere* the browser can see), and the service name. The app
-already has a frontend→backend channel. So the backend relays.
+already has a frontend→backend channel. So the backend relays the identity and carries the data.
 
-## The decree: `/api/config.json`
+## The decree
 
-A workspace app that wants browser telemetry exposes a config endpoint to its own frontend
-(`/api/config.json` — in the fixture a tiny JAX-RS resource, not a static file; the name is the
-contract, the implementation is the app's business):
+A workspace app that wants browser telemetry exposes two things to its own frontend. Both are the
+app's business to implement (in the fixture: two small JAX-RS resources); the *shape* is the
+convention.
+
+**1. `GET /api/config.json` — identity relay.**
 
 ```json
 {
   "telemetry": {
-    "otlpPath": "/api/otel",
     "resourceAttributes": {
       "qits.workspace.id": "…",
       "qits.repository.id": "…",
@@ -89,42 +91,61 @@ contract, the implementation is the app's business):
 }
 ```
 
-- Built from the backend's own runtime config: in dev under qits, that is the injected `OTEL_*`
-  environment (Quarkus reads env through MicroProfile Config for free); **in a production build the
-  same endpoint serves values from `application.properties`** — the pattern survives the dev/prod
-  boundary, which is the point of decreeing a config endpoint instead of URL-sniffing hacks.
+- Built from the backend's own runtime config: in dev under qits, the injected `OTEL_*` environment
+  (Quarkus reads env through MicroProfile Config for free); **in a production build the same
+  endpoint serves values from `application.properties`** — the pattern survives the dev/prod
+  boundary, which is the point of decreeing config endpoints instead of URL-sniffing hacks.
 - `telemetry` is `null` when the backend has no OTEL config — which doubles as the **gate**: the
   fixture run standalone (no qits, no env) reports no telemetry and the SPA stays dark; a daemon
   with the `otel` toggle off likewise. The daemon's existing toggle thus gates browser export too,
   with no new mechanism.
-- **`otlpPath`, not the endpoint URL verbatim.** `OTEL_EXPORTER_OTLP_ENDPOINT` is the
-  *container-reachable* address (`http://<git-host>:<qits-port>/api/otel` — on WSL2 the distro's
-  eth0 IP). Handing it to the browser verbatim would mean a cross-origin POST to a host the browser
-  may not reach, plus CORS machinery on the receiver. Instead the backend relays the URL's **path**
-  and the SPA composes it against **its own origin** — which is qits' origin, because the frame is
-  served through the same-origin daemon proxy. A production deployment pointing at a real external
-  collector would serve a full URL in its own config; the fixture's contract stays path-based
-  because same-origin is the topology qits guarantees.
-- The SPA must treat the path as **origin-absolute** (`location.origin + otlpPath`), never
-  base-relative: inside the frame, base-relative `api/…` URLs deliberately stay under the proxy
-  prefix and land on the framed app's *dev server* — right for `api/greetings` and for fetching
-  `config.json` itself, wrong for the exporter.
+- The attributes must ride the config relay because the alternative — the backend stamping them
+  into the OTLP payload during the proxy pass — means decoding and re-encoding protobuf in the app.
+  Too heavy for a fixture, and not what a real app would do; the proxy stays a byte-verbatim pipe.
 
-Nothing in qits changes for this. The browser self-stamps the relayed resource attributes, posts
-protobuf to the existing `POST /api/otel/v1/{traces,logs}`, and `TelemetryStore` buckets it exactly
-like the backend's telemetry. (An alternative was considered and dropped: a qits-side
-`/api/otel/browser/{workspaceId}/…` ingest path that stamps identity server-side by resolving the
-workspace. Unnecessary once the backend relays both ids, and it would have put a workspace lookup
+**2. `POST /api/otel/v1/{traces|logs|metrics}` — OTLP passthrough.**
+
+The SPA exports to its **own backend**, base-relative like every other API call; the backend
+forwards the request body verbatim to `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/{signal}` (which *it* can
+reach — it lives in the container the address was composed for) and relays the response status.
+`404` when the endpoint env is unset (the same gate as above; a correctly-gated SPA never calls
+it). Forwarding failures (qits down) return `502` and the browser SDK's normal retry/drop behavior
+applies — telemetry is best-effort by design.
+
+Why proxy-through instead of the SPA posting to qits' receiver directly (the origin-absolute
+`/api/otel` on the frame's origin, which happens to be qits through the same-origin daemon proxy):
+
+- **No addressing subtlety.** Base-relative URLs are the one thing the framed SPA already does
+  correctly everywhere (`<base>` rebase, dev proxy). Direct export would need the SPA to compose
+  an origin-absolute URL and *know* that its frame origin is qits — an invisible coupling.
+- **Topology-proof.** Direct export silently depends on the frame being same-origin with qits: the
+  parked cross-origin proxy mode would break it with CORS, and a production SPA posting straight to
+  a collector needs CORS + an exposed collector anyway. An app-internal call survives all of it —
+  in production the collector stays reachable only from the backend, which is how you want it.
+- **Cost is small and honest:** one passthrough resource (accept `application/x-protobuf` bytes,
+  forward, relay status) and a longer hop chain in dev (frame → daemon proxy → ng dev server → dev
+  proxy → Quarkus → qits receiver) — all local. `TelemetryStore` windows on `receivedAtMillis`
+  (server clock) either way, and the bytes arrive unmodified, so nothing downstream can tell the
+  difference.
+
+Nothing in qits changes. The browser self-stamps the relayed resource attributes, the backend pipes
+the protobuf to the existing `POST /api/otel/v1/*`, and `TelemetryStore` buckets it exactly like
+the backend's own telemetry. (A second alternative was considered and dropped earlier: a qits-side
+`/api/otel/browser/{workspaceId}/…` ingest path stamping identity server-side by resolving the
+workspace — unnecessary once the backend relays both ids, and it would have put a workspace lookup
 in front of the store's deliberately dumb fail-closed contract.)
 
 ## The fixture: reference implementation
 
-Two pieces in `testing-repo-quarkus-angular.git`:
+Three pieces in `testing-repo-quarkus-angular.git`:
 
-**Backend** — a `ConfigResource` (JAX-RS, `GET /api/config.json`) reading
+**Backend** — a `ConfigResource` (`GET /api/config.json`) reading
 `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_RESOURCE_ATTRIBUTES` / `OTEL_SERVICE_NAME` via MicroProfile
-Config (`@ConfigProperty`, all optional): parses the `k=v,k=v` attribute list, extracts the
-endpoint's path, returns `telemetry: null` when the endpoint is unset.
+Config (`@ConfigProperty`, all optional): parses the `k=v,k=v` attribute list, returns
+`telemetry: null` when the endpoint is unset. And an `OtelProxyResource`
+(`POST /api/otel/v1/{signal}`): consumes `application/x-protobuf` as `byte[]`, forwards to
+`${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/{signal}` with the JDK `HttpClient`, relays the status; `404`
+without the env, `502` on forward failure.
 
 **Frontend** — a small `telemetry.ts` bootstrapped from `main.ts`:
 
@@ -133,10 +154,13 @@ endpoint's path, returns `telemetry: null` when the endpoint is unset.
 - **Traces:** `@opentelemetry/sdk-trace-web` + `@opentelemetry/exporter-trace-otlp-proto`
   (`http/protobuf` works in the browser, matching the receiver's protobuf-only stance — no JSON
   ingestion needed, keeping that explicitly-deferred item deferred) with
-  `@opentelemetry/instrumentation-document-load` and `@opentelemetry/instrumentation-fetch`.
-  Fetch instrumentation propagates **`traceparent`** on the same-origin `api/greetings` call; the
-  dev proxy forwards headers verbatim and `quarkus-opentelemetry` continues the trace — the browser
-  span becomes the *root* and the server span its child. `BatchSpanProcessor` with a
+  `@opentelemetry/instrumentation-document-load` and `@opentelemetry/instrumentation-fetch`,
+  exporter URL = base-relative `api/otel` (the SDK appends `/v1/<signal>` itself, same as every
+  other exporter). The passthrough calls must be **excluded from fetch instrumentation**
+  (`ignoreUrls: [/api\/otel/]`) or every export would spawn a span exporting itself.
+  Fetch instrumentation propagates **`traceparent`** on the `api/greetings` call; the dev proxy
+  forwards headers verbatim and `quarkus-opentelemetry` continues the trace — the browser span
+  becomes the *root* and the server span its child. `BatchSpanProcessor` with a
   flush-on-`visibilitychange` so spans survive tab switches/navigation.
 - **Errors → logs:** `@opentelemetry/sdk-logs` + the proto logs exporter; global `error` /
   `unhandledrejection` listeners emit ERROR-severity log records (message + stack). Severity ≥ 17
@@ -170,11 +194,9 @@ both halves.
   response-rewriting machinery that belongs with the
   [cross-origin proxy mode](../backlog-ideas/daemon-proxy-cross-origin-mode.md) injection seam.
   Trigger: wanting browser telemetry from an app whose source qits shouldn't touch.
-- **CORS on the receiver** — only needed if a browser ever has to export cross-origin (a full-URL
-  `telemetry.endpoint` pointing elsewhere than the frame's origin). The same-origin proxy topology
-  makes it unnecessary today.
 - **Web-vitals / browser metrics** — the metrics table exists, but iteration one sends traces +
-  error logs only; LCP/CLS/INP as OTLP metrics is a clean later add.
+  error logs only (the passthrough route accepts `metrics` from day one so the convention is
+  complete); LCP/CLS/INP as OTLP metrics is a clean later add.
 - **Session/user correlation** (a session-id resource attr to group one browser tab's telemetry) —
   wait until multiple simultaneous web-view users are a real scenario.
 - **qits' own UI self-observability** — different feature, different consumer; named here only to
@@ -192,6 +214,11 @@ both halves.
   browser session may outlive it. Lean: relay whatever the env holds (it's identity the backend
   half also carries), and accept that a stale frame stamps the previous command id — bucketing only
   depends on the workspace/repository ids.
+- **Should the passthrough stamp/override resource attrs after all?** A malicious-or-buggy SPA can
+  stamp any workspace's ids (same unauthenticated trust level as the rest of qits, so: fine for
+  now). If the fixture ever grows real protobuf handling, moving the stamp into the proxy would
+  drop `resourceAttributes` from config.json and make the browser config nearly empty — revisit
+  then, not before.
 - **`sendBeacon` vs. XHR on unload.** The proto exporter uses XHR; if flush-on-`visibilitychange`
   proves lossy for last-interaction spans, revisit (possibly via the JSON exporter's beacon path —
   which would reopen the JSON-ingestion deferral). Measure first.
@@ -202,9 +229,11 @@ both halves.
   ones; `OtelReceiverResourceTest`/`TelemetryStoreTest` already cover attr-carrying payloads
   bucketing correctly and attr-less payloads landing `_unscoped`.
 - **Fixture backend (its own repo, not the qits build):** `ConfigResource` returns the parsed
-  relay when the `OTEL_*` config is present and `telemetry: null` when absent; endpoint-path
-  extraction handles the trailing-slash/`/api/otel` shape.
+  relay when the `OTEL_*` config is present and `telemetry: null` when absent; `OtelProxyResource`
+  forwards bytes + content type verbatim and relays the status, `404`s without the env, `502`s when
+  the upstream is unreachable.
 - **Fixture manual E2E (part of the seed-webapp loop):** the demo-payoff flow above — full-stack
   trace in Recent traces, a provoked SPA error in the errors feed and via the workspace chat
   agent; the daemon with `otel` **off** → `config.json` reports null → the SPA sends nothing
-  (network tab clean); fixture standalone likewise.
+  (network tab clean); fixture standalone likewise; no self-referential export spans (the
+  `ignoreUrls` exclusion holds).
