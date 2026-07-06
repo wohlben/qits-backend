@@ -102,6 +102,9 @@ public class SeedService {
         3,
         null,
         8000,
+        // Land the frame straight on the file instead of http.server's directory listing.
+        "hello.txt",
+        null,
         null,
         List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
         null);

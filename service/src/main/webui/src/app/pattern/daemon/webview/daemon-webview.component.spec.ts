@@ -90,4 +90,24 @@ describe('DaemonWebviewComponent', () => {
     fixture.componentInstance.selectedDaemonId.set('d-2');
     expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-2');
   });
+
+  it('opens the frame at proxyPath + entryPath, and at the bare proxyPath without one', () => {
+    const fixture = createComponent([
+      instance({
+        daemon: { id: 'd-1', name: 'dev server', webView: { port: 4200, entryPath: 'greeting' } },
+      }),
+      instance({
+        daemon: { id: 'd-2', name: 'no entry', webView: { port: 8080 } },
+        proxyPath: '/daemon/wt-1/d-2/',
+      }),
+    ]);
+    const frameUrl = () =>
+      String(fixture.componentInstance.frameSrc()).replace(/^SafeValue.*?: (.*)\.?$/, '$1');
+
+    expect(String(fixture.componentInstance.frameSrc())).toContain('/daemon/wt-1/d-1/greeting');
+
+    fixture.componentInstance.selectedDaemonId.set('d-2');
+    expect(frameUrl()).toContain('/daemon/wt-1/d-2/');
+    expect(frameUrl()).not.toContain('greeting');
+  });
 });

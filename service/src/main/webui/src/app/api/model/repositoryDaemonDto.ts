@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { WebViewDto } from './webViewDto';
 import { LogObserverDto } from './logObserverDto';
 import { LogSourceDto } from './logSourceDto';
 import { RestartPolicy } from './restartPolicy';
@@ -22,7 +23,7 @@ export interface RepositoryDaemonDto {
     restartPolicy?: RestartPolicy;
     maxRestarts?: number;
     otel?: boolean;
-    httpPort?: number;
+    webView?: WebViewDto;
     repositoryId?: string;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverDto>;

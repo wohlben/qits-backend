@@ -5,12 +5,14 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { lastValueFrom } from 'rxjs';
 
 import { DaemonEventControllerService } from '@/api/api/daemonEventController.service';
+import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { DaemonEventDto } from '@/api/model/daemonEventDto';
 import { DaemonEventSeverity } from '@/api/model/daemonEventSeverity';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { DaemonTerminalComponent } from '@/pattern/daemon/daemon-terminal.component';
+import { invalidateRepository } from '@/pattern/repository/invalidate-repository';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-chip.component';
 
@@ -105,6 +107,30 @@ export interface DaemonEventFileAnchor {
                     Start
                   </button>
                 }
+                @if (instance.needsContainerRecreate) {
+                  <!-- The container publishes web-view ports only at creation, so a port declared
+                       after it existed needs a recreation — the one live constraint of the
+                       web-view config, surfaced as an action instead of a 502 in the frame. -->
+                  <div
+                    class="flex w-full flex-wrap items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400"
+                  >
+                    <span class="min-w-0 flex-1">
+                      Web view unavailable: this container does not publish port
+                      :{{ instance.daemon?.webView?.port }}. Recreating the container stops all of
+                      this workspace's running processes; start the daemon again afterwards.
+                    </span>
+                    <button
+                      z-button
+                      zType="secondary"
+                      zSize="sm"
+                      type="button"
+                      [zLoading]="recreateContainerMutation.isPending()"
+                      (click)="recreateContainerMutation.mutate()"
+                    >
+                      Recreate container
+                    </button>
+                  </div>
+                }
               </li>
             }
           </ul>
@@ -182,6 +208,7 @@ export class WorkspaceDaemonsComponent {
 
   private readonly daemonService = inject(WorkspaceDaemonControllerService);
   private readonly eventService = inject(DaemonEventControllerService);
+  private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly queryClient = inject(QueryClient);
 
   readonly daemonsQuery = injectQuery(() => ({
@@ -245,6 +272,32 @@ export class WorkspaceDaemonsComponent {
         ),
       ),
     onSettled: () => this.invalidate(),
+  }));
+
+  /**
+   * Remove-and-reprovision the workspace container so it publishes newly-declared web-view ports
+   * (publishing is container-create-time only). Stop pushes the branch first, so no work is lost;
+   * running daemons die with the container and must be started again.
+   */
+  readonly recreateContainerMutation = injectMutation(() => ({
+    mutationFn: async () => {
+      await lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdStopContainerPost(
+          this.repoId(),
+          this.workspaceId(),
+        ),
+      );
+      return lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdEnsureContainerPost(
+          this.repoId(),
+          this.workspaceId(),
+        ),
+      );
+    },
+    onSettled: async () => {
+      this.invalidate();
+      await invalidateRepository(this.queryClient, this.repoId());
+    },
   }));
 
   isLive(instance: DaemonInstanceDto): boolean {

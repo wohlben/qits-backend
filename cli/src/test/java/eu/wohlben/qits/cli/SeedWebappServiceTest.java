@@ -103,7 +103,10 @@ public class SeedWebappServiceTest {
     RepositoryDaemon devServer =
         daemons.stream().filter(d -> "Quarkus dev server".equals(d.name)).findFirst().orElse(null);
     assertNotNull(devServer, "Quarkus dev server daemon should be defined");
-    assertEquals(8080, devServer.httpPort, "dev server daemon should be web-viewable on 8080");
+    assertNotNull(devServer.webView, "dev server daemon should be web-viewable");
+    assertEquals(
+        4200, devServer.webView.port, "the web view frames the Angular dev server (:4200)");
+    assertEquals("greeting", devServer.webView.entryPath, "the frame opens on the greeting screen");
     assertTrue(devServer.otel, "dev server daemon should export OTEL");
 
     assertTrue(

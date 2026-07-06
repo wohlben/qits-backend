@@ -1,8 +1,46 @@
 # Daemon web-view configuration: an explicit, overrideable target + entry path
 
+> **Status: implemented 2026-07-06.** This document was the design draft; the notes below record
+> where the built feature diverged from it. Verified end-to-end against `seed-webapp` (frame opens
+> on the greeting screen, `POST api/greetings` 200 through the dev proxy, recreate affordance
+> round-trip).
+>
+> **As-built deltas (what changed during implementation):**
+> - **`--base-href` does not exist on `@angular/build:dev-server`** (Angular 21's esbuild dev
+>   server; only `servePath` does), so the doc's suggested `ng serve --serve-path … --base-href …`
+>   is impossible as written. The fixture instead ships a tiny **runtime `<base>` rebase** in
+>   `index.html`: a head script matches `location.pathname` against `^/daemon/[^/]+/[^/]+/` and
+>   rewrites `<base href>` before Angular bootstraps — router and base-relative fetches stay inside
+>   the prefix. Verified live (assets, SPA deep-link fallback and the dev proxy all work under
+>   `--serve-path`).
+> - **The doc's "mirrors how `otel` hangs off the entity" was wrong in the letter** — `otel` is a
+>   plain boolean column, not an embeddable. `WebView` is the entity's **first** `@Embeddable`;
+>   the "all-null reads back as absent" semantics work as designed (covered by tests).
+> - **Normalization:** `entryPath`/`basePath` are stored slash-less (`"/greeting/"` → `"greeting"`);
+>   blank or `/` normalizes to null; backslashes, whitespace, empty segments and `..` are rejected
+>   at definition time. The served base is always `DaemonProxyPath.servedBase(w, d, basePath)` =
+>   prefix + `basePath + "/"` — one composition seam for `QITS_PUBLIC_BASE` and `proxyPath`.
+> - **Update semantics:** REST's nested `WebViewInput`, when present, replaces both paths wholesale
+>   (a null path in the block clears) while a null `port` carries the stored one over; an omitted
+>   block keeps everything; `port <= 0` clears the whole config. The MCP flat args merge per-field
+>   (`''` clears a path), as leaned. The DB column was renamed (`http_port` → `web_view_port`,
+>   `V25__daemon_webview_config.sql`), as leaned.
+> - **`DaemonInstanceDto` gained `needsContainerRecreate`** (true iff web-viewable ∧ live ∧ the
+>   container doesn't publish the configured port). The workspace daemons panel renders the amber
+>   "recreate container" affordance off it, wired to the **existing**
+>   `stop-container`/`ensure-container` endpoints — no new backend surface.
+> - **`seed-webapp`'s `readyPattern` changed** from Quarkus' "Listening on" to the Angular dev
+>   server's readiness lines (`dev server is up|Application bundle generation complete|Local:.*:4200`)
+>   — the frame targets :4200, so READY must mean *that* server answers.
+> - The fixture change (new `src/main/webui/proxy.conf.js`, the `start` script flags, the
+>   `index.html` rebase) landed as one commit on fixture `main`; `feature/greeting` was rebased on
+>   top (still a clean fast-forward) and `feature/diverged` left untouched (still conflicts).
+> - `SeedService`'s Python daemon demonstrates `entryPath = "hello.txt"`.
+> - The repository daemon card shows a small `web view :4200 → /greeting` chip.
+
 ## Introduction
 
-The [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) shipped the whole
+The [daemon web-view picker](2026-07-05_daemon-webview-picker.md) shipped the whole
 machine — a Vert.x path-prefix proxy at `/daemon/{workspaceId}/{daemonId}/`, per-workspace port
 publishing, the `QITS_PUBLIC_BASE` base-path contract, a same-origin iframe, and the DOM picker —
 but it exposes exactly **one** knob on the daemon definition: a nullable `Integer httpPort`
@@ -28,21 +66,21 @@ form, REST, and the **repository MCP server** so the coding agent can configure 
 
 Related/dependent plans:
 
-- **Modifies the [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md)**
+- **Modifies the [daemon web-view picker](2026-07-05_daemon-webview-picker.md)**
   directly: its `httpPort` field, its `DaemonInstanceDto.proxyPath`, its `QITS_PUBLIC_BASE`
   injection (`CommandService`), and its iframe `src` in `daemon-webview.component.ts`. That
   feature's own **open questions** — "`httpPath` vs port only," "`STARTING` behavior,"
   Vite host-checking under remote access — are the seams this idea resolves.
-- **Hard dependency on [daemons](../features/2026-07-04_daemons.md)** and
-  [workspace containers](../features/2026-07-04_workspace-containers.md): the target is a container
+- **Hard dependency on [daemons](2026-07-04_daemons.md)** and
+  [workspace containers](2026-07-04_workspace-containers.md): the target is a container
   port published at create time (`WorkspaceService.daemonPorts` → `-p 127.0.0.1:0:<port>`), so the
   create-time-publishing constraint carries over unchanged — see *Recreate-container friction*.
-- **Converges with [daemon-healthchecks](daemon-healthchecks.md).** That idea notes the
+- **Converges with [daemon-healthchecks](../feature-ideas/daemon-healthchecks.md).** That idea notes the
   mvn+Quinoa daemon stands up *two* servers (Quarkus :8080, Angular :4200) and that one `httpPort`
   "isn't enough," with a deferred "per-port web-view" that frames a *healthy* HTTP check. This
   idea is the manual counterpart: an explicit `port` you choose. If both land, the web-view target
   can default to a healthy check's port; kept independent so either can ship first.
-- **Exercised by the [servable quarkus-angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)**
+- **Exercised by the [servable quarkus-angular fixture](2026-07-05_servable-quarkus-angular-fixture.md)**
   and its `seed-webapp` daemon (`SeedWebappService`) — the reference case whose topology (Quarkus +
   Quinoa) is exactly what forces the "which port do we frame?" decision below.
 - **Orthogonal to the [cross-origin backlog idea](../backlog-ideas/daemon-proxy-cross-origin-mode.md).**
@@ -249,7 +287,7 @@ input to the proxy path: `entryPath`/`basePath` are validated definition config,
 
 - **Auto-detecting the frontend port.** qits can't know a daemon spawns `:4200` without being told;
   `port` stays explicitly configured. A future convergence with
-  [daemon-healthchecks](daemon-healthchecks.md) could default the target to a healthy HTTP check's
+  [daemon-healthchecks](../feature-ideas/daemon-healthchecks.md) could default the target to a healthy HTTP check's
   port — noted there as "per-port web-view," kept out of scope here.
 - **Multiple web-views per daemon.** One `WebView` block per daemon (singular). Framing both
   Quarkus and Angular from one daemon is the healthchecks doc's per-port convergence, deferred with

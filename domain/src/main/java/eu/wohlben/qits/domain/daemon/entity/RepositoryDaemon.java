@@ -5,6 +5,7 @@ import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -81,12 +82,11 @@ public class RepositoryDaemon extends PanacheEntityBase {
   public boolean otel;
 
   /**
-   * When set, the daemon serves HTTP on this port inside its workspace container and is
-   * web-viewable through the {@code /daemon/{workspaceId}/{daemonId}/} proxy. Null means not
-   * web-viewable.
+   * When present, the daemon is web-viewable through the {@code /daemon/{workspaceId}/{daemonId}/}
+   * proxy at the configured port/entry path. Hibernate reads an all-null embeddable back as null,
+   * so null means not web-viewable.
    */
-  @Column(name = "http_port")
-  public Integer httpPort;
+  @Embedded public WebView webView;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)

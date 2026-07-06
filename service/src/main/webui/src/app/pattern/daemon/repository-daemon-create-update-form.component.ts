@@ -7,6 +7,7 @@ import { RepositoryDaemonControllerService } from '@/api/api/repositoryDaemonCon
 import { CreateRepositoryDaemonRequest } from '@/api/model/createRepositoryDaemonRequest';
 import { RepositoryDaemonDto } from '@/api/model/repositoryDaemonDto';
 import { UpdateRepositoryDaemonRequest } from '@/api/model/updateRepositoryDaemonRequest';
+import { WebViewInput } from '@/api/model/webViewInput';
 import { ZardButtonComponent } from '@/shared/components/button';
 import {
   DaemonFormComponent,
@@ -63,7 +64,9 @@ export class RepositoryDaemonCreateUpdateFormComponent {
           restartPolicy: d.restartPolicy ?? 'ON_FAILURE',
           maxRestarts: String(d.maxRestarts ?? 3),
           otel: d.otel ?? false,
-          httpPort: d.httpPort != null ? String(d.httpPort) : '',
+          webViewPort: d.webView?.port != null ? String(d.webView.port) : '',
+          webViewEntryPath: d.webView?.entryPath ?? '',
+          webViewBasePath: d.webView?.basePath ?? '',
           environment: Object.entries(d.environment ?? {}).map(([key, value]) => ({ key, value })),
           observers: (d.observers ?? []).map((o) => ({
             kind: o.kind ?? 'PATTERN',
@@ -120,7 +123,7 @@ export class RepositoryDaemonCreateUpdateFormComponent {
       restartPolicy: data.restartPolicy,
       maxRestarts: this.parseMaxRestarts(data.maxRestarts),
       otel: data.otel,
-      httpPort: this.parseHttpPort(data.httpPort),
+      webView: this.toWebView(data),
       environment: this.toEnvMap(data.environment),
       observers: data.observers.map((row) => this.toObserver(row)),
       sources: data.sources
@@ -159,15 +162,20 @@ export class RepositoryDaemonCreateUpdateFormComponent {
   }
 
   /**
-   * Empty means "not web-viewable": on update the backend clears the stored port with 0, on
-   * create it must simply be omitted (0 would be rejected as out of range).
+   * An empty port means "not web-viewable": on update the backend clears the stored config with
+   * port 0, on create the block must simply be omitted (0 would be rejected as out of range).
+   * With a port, the block travels whole — the backend replaces both paths from it ("" clears).
    */
-  private parseHttpPort(value: string): number | undefined {
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) {
-      return this.daemon() ? 0 : undefined;
+  private toWebView(data: DaemonFormData): WebViewInput | undefined {
+    const port = Number.parseInt(data.webViewPort, 10);
+    if (Number.isNaN(port) || port <= 0) {
+      return this.daemon() ? { port: 0 } : undefined;
     }
-    return parsed;
+    return {
+      port,
+      entryPath: data.webViewEntryPath.trim(),
+      basePath: data.webViewBasePath.trim(),
+    };
   }
 
   /** Only the fields of the selected kind travel; LOG_LEVEL needs no configuration. */

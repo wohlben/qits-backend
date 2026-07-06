@@ -160,6 +160,8 @@ export * from './updateFeatureFlowPhaseStepRequest';
 export * from './updateHistoryRequest';
 export * from './updateProjectRequest';
 export * from './updateRepositoryDaemonRequest';
+export * from './webViewDto';
+export * from './webViewInput';
 export * from './workspaceDto';
 export * from './workspaceEventDto';
 export * from './workspaceEventType';

@@ -166,13 +166,20 @@ export class DaemonWebviewComponent {
     return candidates.find((i) => i.daemon?.id === this.selectedDaemonId()) ?? candidates[0] ?? null;
   });
   /**
-   * The relative proxied path straight off the DTO — no daemon origin, no port, no composition.
-   * Trusted as a resource URL: it is backend-provided registry state (never user input), and the
-   * whole point is framing our own origin's /daemon/ path.
+   * The relative proxied path off the DTO plus the definition's entry path — no daemon origin, no
+   * port. proxyPath is trailing-slashed and entryPath is stored slash-less (both validated
+   * backend-side), so the join is a plain concatenation. Trusted as a resource URL: it is
+   * backend-provided registry/definition state (never user input), and the whole point is framing
+   * our own origin's /daemon/ path.
    */
-  readonly frameSrc = computed(() =>
-    this.sanitizer.bypassSecurityTrustResourceUrl(this.selected()?.proxyPath ?? 'about:blank'),
-  );
+  readonly frameSrc = computed(() => {
+    const selected = this.selected();
+    if (!selected?.proxyPath) {
+      return this.sanitizer.bypassSecurityTrustResourceUrl('about:blank');
+    }
+    const entryPath = selected.daemon?.webView?.entryPath?.replace(/^\/+/, '') ?? '';
+    return this.sanitizer.bypassSecurityTrustResourceUrl(selected.proxyPath + entryPath);
+  });
 
   readonly pickMode = signal(false);
   readonly pickerUnavailable = signal(false);

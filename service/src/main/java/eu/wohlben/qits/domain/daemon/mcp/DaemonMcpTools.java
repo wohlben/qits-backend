@@ -132,9 +132,23 @@ public class DaemonMcpTools {
       @ToolArg(
               required = false,
               description =
-                  "HTTP port the daemon serves inside its container; makes it web-viewable through"
-                      + " the qits proxy")
-          Integer httpPort,
+                  "container port the qits web-view proxy frames; makes the daemon web-viewable."
+                      + " Point it at the FRONTEND dev server (e.g. 4200) — it must bind 0.0.0.0"
+                      + " and serve itself under $QITS_PUBLIC_BASE (injected at launch). A"
+                      + " single-origin backend that honours that base itself is the override case")
+          Integer webViewPort,
+      @ToolArg(
+              required = false,
+              description =
+                  "route the web-view frame opens at below the served base, e.g. 'greeting'"
+                      + " (default: the app root)")
+          String webViewEntryPath,
+      @ToolArg(
+              required = false,
+              description =
+                  "advanced: extra sub-path the app pins on top of the proxy prefix; included in"
+                      + " $QITS_PUBLIC_BASE (rarely needed)")
+          String webViewBasePath,
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment,
       @ToolArg(required = false, description = "log observers watching the daemon's output")
@@ -153,7 +167,9 @@ public class DaemonMcpTools {
             parseRestartPolicy(restartPolicy),
             maxRestarts,
             otel,
-            httpPort,
+            webViewPort,
+            webViewEntryPath,
+            webViewBasePath,
             environment,
             ObserverArg.toEntities(observers),
             SourceArg.toEntities(sources));
@@ -188,8 +204,21 @@ public class DaemonMcpTools {
       @ToolArg(
               required = false,
               description =
-                  "new web-view HTTP port; 0 clears it (makes the daemon not web-viewable)")
-          Integer httpPort,
+                  "new web-view port (point it at the FRONTEND dev server, which must bind 0.0.0.0"
+                      + " and serve under $QITS_PUBLIC_BASE); 0 clears the whole web-view config"
+                      + " (makes the daemon not web-viewable)")
+          Integer webViewPort,
+      @ToolArg(
+              required = false,
+              description =
+                  "new route the web-view frame opens at below the served base ('' resets to the"
+                      + " app root)")
+          String webViewEntryPath,
+      @ToolArg(
+              required = false,
+              description =
+                  "new extra sub-path included in $QITS_PUBLIC_BASE ('' clears it; rarely needed)")
+          String webViewBasePath,
       @ToolArg(required = false, description = "replacement environment, as key/value pairs")
           Map<String, String> environment,
       @ToolArg(required = false, description = "replacement log observers")
@@ -209,7 +238,9 @@ public class DaemonMcpTools {
             parseRestartPolicy(restartPolicy),
             maxRestarts,
             otel,
-            httpPort,
+            webViewPort,
+            webViewEntryPath,
+            webViewBasePath,
             environment,
             ObserverArg.toEntities(observers),
             SourceArg.toEntities(sources));

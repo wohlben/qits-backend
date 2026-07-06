@@ -10,6 +10,7 @@
 import { RestartPolicy } from './restartPolicy';
 import { LogObserverInput } from './logObserverInput';
 import { LogSourceInput } from './logSourceInput';
+import { WebViewInput } from './webViewInput';
 
 
 export interface CreateRepositoryDaemonRequest { 
@@ -21,7 +22,7 @@ export interface CreateRepositoryDaemonRequest {
     restartPolicy?: RestartPolicy;
     maxRestarts?: number;
     otel?: boolean;
-    httpPort?: number;
+    webView?: WebViewInput;
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverInput>;
     sources?: Array<LogSourceInput>;
