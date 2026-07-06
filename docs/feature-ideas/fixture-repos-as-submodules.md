@@ -52,10 +52,24 @@ Mitigation: treat the fixture repos as effectively append-only — any branch-ti
 
 ## History rewrite plan
 
+**Tool: [`git-filter-repo`](https://github.com/newren/git-filter-repo)** — the tool the git project itself recommends for history rewriting (`git filter-branch`'s own man page defers to it; filter-branch is slow and has correctness footguns, and BFG Repo-Cleaner can't do path-based deletion with this precision). It is a separate install, not part of core git: `pipx install git-filter-repo` (or `pip install`/distro package — it's a single Python script). By design it **refuses to run on a non-fresh clone** and strips the `origin` remote after rewriting, both deliberate safety rails against pushing a botched rewrite over the only copy.
+
 1. Push the fixture repos (from the current bare dirs) **first**, verify all branches arrived.
-2. `git filter-repo --analyze` to enumerate every historical path of the bare fixtures — they predate the module split (`f827152`), so old locations like `src/test/resources/fixtures/*.git/**` must be covered too. Then `git filter-repo --invert-paths --path-glob '*fixtures/testing-repo.git/*' --path-glob '*fixtures/testing-repo-quarkus-angular.git/*'` (exact globs from the analysis).
-3. Re-add `.gitmodules` + gitlinks and all Touch-point changes in one follow-up commit; force-push `main`.
-4. Consequences to accept: **all commit SHAs from the first fixture commit onward change**; every existing clone/worktree must be re-cloned; any commit hashes quoted in docs/issues become stale (grep `docs/` for 7+-hex strings and fix); local `~/.m2/build-cache` should be reset.
+2. Work in a **fresh clone** (`git clone git@github.com:wohlben/qits-backend.git rewrite && cd rewrite`) — this doubles as the untouched-original backup, since the existing working copy stays as-is.
+3. Enumerate every historical path of the bare fixtures: `git filter-repo --analyze` writes reports to `.git/filter-repo/analysis/` (`path-all-sizes.txt` etc.); the fixtures predate the module split (`f827152`), so old locations like `src/test/resources/fixtures/*.git/**` must be covered too.
+4. Rewrite:
+
+   ```bash
+   git filter-repo --invert-paths \
+     --path-glob '*fixtures/testing-repo.git/*' \
+     --path-glob '*fixtures/testing-repo-quarkus-angular.git/*'
+   ```
+
+   (exact globs from step 3's analysis). `filter-repo` rewrites **all refs**, updates commit messages that reference rewritten SHAs, and finishes with its own `reflog expire` + `git gc --prune=now`, so the local clone contains no trace of the old objects afterwards — no manual `git reflog expire --expire=now --all && git gc --prune=now --aggressive` pass is needed (that incantation is the manual equivalent, required only after filter-branch/BFG).
+   Verify locally: `git log --all --oneline -- '*fixtures/testing-repo*.git/*'` is empty and `git count-objects -vH` shrank.
+5. Re-add `.gitmodules` + gitlinks and all Touch-point changes in one follow-up commit; re-add the remote (filter-repo removed it) and `git push --force --all && git push --force --tags`.
+6. **Server side — force-push alone does not delete the old objects from GitHub.** They stay reachable via GitHub's internal refs (PR heads, activity events) and any cached views until GitHub runs gc, which cannot be triggered by the user. For a single-developer prototype the pragmatic, guaranteed route is: after verifying the rewritten repo, **delete the GitHub repo and recreate it, then push the rewritten history** (loses stars/issues/PR metadata — none of consequence here). The alternative for repos that must be preserved is contacting GitHub Support to expire cached views and dislodged objects (the process documented in GitHub's "Removing sensitive data from a repository" guide, which this plan follows generally).
+7. Consequences to accept: **all commit SHAs from the first fixture commit onward change**; every existing clone/worktree must be re-cloned (never pull a rewrite into an old clone — it merges the two histories back together); any commit hashes quoted in docs/issues become stale (grep `docs/` for 7+-hex strings and fix); local `~/.m2/build-cache` should be reset.
 
 ## Touch points
 
