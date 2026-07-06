@@ -13,10 +13,7 @@ import { TelemetryErrorGroupDto } from '@/api/model/telemetryErrorGroupDto';
   imports: [DatePipe],
   template: `
     @if (groups().length === 0) {
-      <p class="text-sm text-muted-foreground">
-        No errors in the buffered telemetry. Only processes launched with the OTel toggle (and
-        instrumented) export here.
-      </p>
+      <p class="text-sm text-muted-foreground">No errors — the app is healthy.</p>
     } @else {
       <ul class="flex flex-col gap-2">
         @for (group of groups(); track group.traceId) {

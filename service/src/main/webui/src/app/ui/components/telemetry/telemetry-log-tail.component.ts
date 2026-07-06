@@ -28,7 +28,7 @@ import { TelemetryLogDto } from '@/api/model/telemetryLogDto';
     </div>
 
     @if (logs().length === 0) {
-      <p class="mt-2 text-sm text-muted-foreground">No log records buffered.</p>
+      <p class="mt-2 text-sm text-muted-foreground">No logs exported yet.</p>
     } @else {
       <ul class="mt-2 flex max-h-96 flex-col gap-0.5 overflow-auto rounded-md border p-2 font-mono text-xs">
         @for (log of logs(); track $index) {

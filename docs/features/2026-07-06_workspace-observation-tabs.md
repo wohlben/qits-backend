@@ -14,18 +14,18 @@ daemon **Recent events** feed out of the daemons panel into its own tab beside T
 
 Related/dependent plans:
 
-- **Fixes [telemetry tab empty for a healthy app](../issues/2026-07-06_telemetry-tab-empty-for-healthy-app.md)**
+- **Fixes [telemetry tab empty for a healthy app](../issues/resolved/2026-07-06_telemetry-tab-empty-for-healthy-app.md)**
   — the issue that motivates Part A. That doc has the live verification proving spans + metrics
   arrive and are correctly workspace-bucketed; the gap is purely UI surfacing.
-- **Modifies [observability](../features/2026-07-04_observability.md)** — its
+- **Modifies [observability](2026-07-04_observability.md)** — its
   `pattern/telemetry/workspace-telemetry.component.ts` ("iteration one, deliberately thin") is the
   component Part A grows. The backend `WorkspaceTelemetryController` endpoints
   (`errors`, `traces/{traceId}`, `slow-spans`, `logs`, `metrics`) are unchanged except for the one
   optional sort addition noted below.
-- **Modifies [daemons](../features/2026-07-04_daemons.md)** — its
+- **Modifies [daemons](2026-07-04_daemons.md)** — its
   `pattern/daemon/workspace-daemons.component.ts` currently hosts both the daemon controls and the
   Recent events feed; Part B splits the feed out.
-- **Complements [daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md)**
+- **Complements [daemon web-view configuration](2026-07-06_daemon-webview-configuration.md)**
   — opening a daemon's web view and interacting with the app is the natural way to generate the
   traces Part A surfaces; it is how the empty-tab gap was found.
 - Follows the repo's **[everything available, hidden by rules](../../CLAUDE.md)** convention (show

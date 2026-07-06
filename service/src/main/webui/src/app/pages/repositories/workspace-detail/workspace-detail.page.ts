@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
@@ -7,6 +7,10 @@ import { WorkspaceControllerService } from '@/api/api/workspaceController.servic
 import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { DaemonWebviewComponent } from '@/pattern/daemon/webview/daemon-webview.component';
+import {
+  DaemonEventFileAnchor,
+  WorkspaceDaemonEventsComponent,
+} from '@/pattern/daemon/workspace-daemon-events.component';
 import { WorkspaceDaemonsComponent } from '@/pattern/daemon/workspace-daemons.component';
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
@@ -24,6 +28,7 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
     DaemonWebviewComponent,
     PageLayoutComponent,
     WorkspaceChatComponent,
+    WorkspaceDaemonEventsComponent,
     WorkspaceDaemonsComponent,
     WorkspaceFileBrowserComponent,
     WorkspaceTelemetryComponent,
@@ -59,18 +64,17 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
       </ng-template>
 
       <div class="flex flex-col gap-6">
-        <app-workspace-daemons
-          [repoId]="repoId"
-          [workspaceId]="workspaceId"
-          (openFile)="fileBrowser.openAtLine($event.path, $event.startLine, $event.endLine)"
-        />
-        <!-- The file browser stays mounted on the hidden tab so openFile anchors keep working. -->
+        <app-workspace-daemons [repoId]="repoId" [workspaceId]="workspaceId" />
+        <!-- The file browser stays mounted on its hidden tab so openFile anchors keep working. -->
         <z-tab-group>
           <z-tab label="Files">
-            <app-workspace-file-browser
-              #fileBrowser
+            <app-workspace-file-browser [repoId]="repoId" [workspaceId]="workspaceId" />
+          </z-tab>
+          <z-tab label="Events">
+            <app-workspace-daemon-events
               [repoId]="repoId"
               [workspaceId]="workspaceId"
+              (openFile)="openFileFromEvent($event)"
             />
           </z-tab>
           <z-tab label="Telemetry">
@@ -105,4 +109,13 @@ export class WorkspaceDetailPage {
   readonly workspace = computed(
     () => (this.workspacesQuery.data() ?? []).find((w) => w.workspaceId === this.workspaceId) ?? null,
   );
+
+  private readonly tabGroup = viewChild(ZardTabGroupComponent);
+  private readonly fileBrowser = viewChild(WorkspaceFileBrowserComponent);
+
+  /** An event's "open in source": make the jump visible by switching to Files, then anchor. */
+  openFileFromEvent(anchor: DaemonEventFileAnchor): void {
+    this.tabGroup()?.selectTabByIndex(0);
+    this.fileBrowser()?.openAtLine(anchor.path, anchor.startLine, anchor.endLine);
+  }
 }
