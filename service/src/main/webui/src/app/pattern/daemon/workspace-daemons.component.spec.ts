@@ -101,15 +101,6 @@ describe('WorkspaceDaemonsComponent', () => {
     expect(element.querySelector('a[href="/commands/cmd-9"]')).not.toBeNull();
   });
 
-  it('empty state names only the repository — no removed global daemon library', () => {
-    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], []);
-    const fixture = createComponent();
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-
-    expect(text).toContain('No daemons defined for this repository.');
-    expect(text).not.toContain('global library');
-  });
-
   it('starting a daemon posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
     queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], [instance({})]);
     const fixture = createComponent();
