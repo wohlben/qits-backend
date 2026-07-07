@@ -52,4 +52,20 @@ argument order.
 > POST/PUT/DELETE (any op where alphabetical param order ≠ path order). A sturdier guard would be an
 > openapi-generator option that preserves declared path order, or an ESLint rule against positional
 > calls to the generated client. Parked; the two daemon call sites are the only ones bitten today.
-</content>
+
+## Resolution (2026-07-07)
+
+Verified fixed and green in `main` — no further code change needed:
+
+- **Call sites** (`pattern/daemon/workspace-daemons.component.ts`, `startMutation` / `stopMutation`)
+  pass `(daemonId, this.repoId(), this.workspaceId())`, matching the generated client's alphabetical
+  parameter order, with an inline NB comment explaining why. The generated
+  `…DaemonsDaemonIdStartPost`/`…StopPost` signatures still declare `(daemonId, repoId, workspaceId)`,
+  so the order lines up.
+- **Regression test** `workspace-daemons.component.spec.ts` asserts both Start and Stop invoke the
+  service `toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1')` (and the sibling `…DaemonsGet` with
+  `('repo-1', 'wt-1')`). `pnpm test --include=…/workspace-daemons.component.spec.ts` → 4/4 pass.
+
+The parked follow-up (a generator option or lint rule to guard every alphabetical-≠-path-order
+generated call) remains open — it's a hardening idea, not a live bug, so it stays a note rather than
+a tracked issue.
