@@ -1,5 +1,5 @@
 # Dev runs against a file-based H2 (see service/src/main/resources/application-dev.properties),
-# so no Docker/Postgres is needed for `./mvnw -pl service quarkus:dev`.
+# so no Docker/Postgres is needed for `./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true`.
 #
 # The Postgres service below is only for running against the prod datasource
 # (quarkus.datasource.db-kind=postgresql in application.properties). It is commented

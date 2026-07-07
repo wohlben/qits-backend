@@ -19,7 +19,7 @@ fixture breaks, this guide is stale too).
 
 ## Prerequisites
 
-- qits running (`./mvnw -pl service quarkus:dev`, UI on `:8080`).
+- qits running (`./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true`, UI on `:8080`).
 - Docker with the workspace image built: `docker build -t qits/workspace docker/workspace`.
 - What the container guarantees your app (from `docker/workspace/Dockerfile`): Debian bookworm,
   **JDK 25** (Temurin), **Node 22 + pnpm** (corepack), git, python3, tmux, the Claude Code CLI.
