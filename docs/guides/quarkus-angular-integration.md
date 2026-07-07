@@ -260,6 +260,7 @@ the recreate is needed.
 | Frame shows 502 "container does not publish the daemon's port" | `webView.port` added after the container existed — recreate it |
 | Frame shows 404 "No web-viewable daemon here." while the API lists a `proxyPath` | a `NEVER`-policy daemon didn't relaunch after the container recreate — start it (auto-relaunch of `ON_FAILURE`/`ALWAYS` now reads the fresh definition) |
 | `ERR_EMPTY_RESPONSE` in the frame | `ng serve` without `--host 0.0.0.0` |
+| Frame shows "This host … is not allowed" | not an app-config gap — qits' proxy rewrites the Host to `localhost` for you ([resolved](../issues/resolved/2026-07-07_web-view-host-not-allowed-after-devcontainer-move.md)); if you still see it, qits predates that fix |
 
 **Verify (the walk's strict acceptance):** open the workspace page → *Web view* floaty → the
 frame renders your SPA on the `entryPath` route; an API POST made by the SPA succeeds (check the
