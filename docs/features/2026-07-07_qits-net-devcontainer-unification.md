@@ -82,7 +82,8 @@ browser → 127.0.0.1:4200 (devcontainer Quinoa, ingress) → localhost:8080 (de
   reload), `/var/run/docker.sock`, and a `qits-data` volume for `~/.qits` (H2 + repos); forwards
   `127.0.0.1:8080` / `127.0.0.1:4200` for the browser (the only host publish — qits' own ingress,
   not a workspace container); sets `QITS_WORKSPACE_GIT_HOST=qits`.
-- Daily dev: open the repo in the devcontainer, then `./mvnw -pl service quarkus:dev` in its terminal
+- Daily dev: open the repo in the devcontainer, then
+  `./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true` in its terminal
   (same command, in-container). The uid the devcontainer runs as is a local tuning point (it runs as
   root by default; repo files it writes are root-owned on the host — fine for VS Code Remote, occasional
   host-side git may need sudo).

@@ -90,7 +90,7 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 ./mvnw install -DskipTests
 
 # Run the web app in dev mode (live-reload for both Java and Angular, UI on :4200)
-./mvnw -pl service quarkus:dev
+./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true
 
 # Seed demo data (a project + branch tree, incl. fast-forwardable / diverged workspaces) into the
 # shared local H2 DB so it shows up in the running app. One-step command-mode run, no web server.

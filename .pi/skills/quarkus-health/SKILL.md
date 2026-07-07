@@ -235,7 +235,7 @@ Optional `application.properties` tweaks:
 ./mvnw -pl service test -Dtest=HealthCheckTest -DfailIfNoTests=false
 
 # Start dev mode and curl health endpoints
-./mvnw -pl service quarkus:dev
+./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true
 curl -s http://localhost:8080/q/health | jq .
 curl -s http://localhost:8080/q/health/ready | jq .
 ```

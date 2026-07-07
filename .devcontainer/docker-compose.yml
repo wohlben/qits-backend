@@ -1,7 +1,8 @@
 # The qits dev stack: one service (qits itself) on the shared qits-net, plus the workspace containers
 # qits creates as siblings via the mounted docker socket — all reachable by DNS name, none binding a
 # host port. Bring it up with `devcontainer up` / VS Code "Reopen in Container", then run
-# `./mvnw -pl service quarkus:dev` (or the cli `seed`/`seed-webapp`) in its terminal.
+# `./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true` (or the cli
+# `seed`/`seed-webapp`) in its terminal.
 services:
   qits:
     build:

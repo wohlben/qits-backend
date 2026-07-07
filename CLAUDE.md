@@ -20,14 +20,15 @@ All Maven commands use the wrapper.
 # First on a fresh checkout, build so the `domain` module is resolvable from the local repo:
 ./mvnw install -DskipTests
 
-# Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200). Quarkus dev mode is
-# workspace-aware, so edits to the `domain` module live-reload too.
+# Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200). `-am` builds the domain
+# dep first (so the standalone `service` resolves it) and `workspace-discovery=true` makes dev mode
+# reactor-aware, so edits to the `domain` module live-reload too.
 #
 # NOTE: to actually exercise workspace containers / the daemon web view, run this INSIDE the
 # `.devcontainer/` (VS Code "Reopen in Container" or `devcontainer up`), so qits sits on the shared
 # `qits-net` and reaches workspace containers by DNS name (no host-port publishing). The command is
 # the same, just in the devcontainer's terminal. See the Workspace containers section.
-./mvnw -pl service quarkus:dev
+./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true
 
 # Full build (all modules, frontend + backend)
 ./mvnw package
