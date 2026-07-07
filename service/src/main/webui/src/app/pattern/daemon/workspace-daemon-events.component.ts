@@ -124,7 +124,6 @@ export class WorkspaceDaemonEventsComponent {
           this.workspaceId(),
         ),
       ).then((r) => r.events ?? []),
-    refetchInterval: 5000,
   }));
 
   readonly recentEvents = computed(() => this.eventsQuery.data() ?? []);

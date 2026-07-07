@@ -9,6 +9,8 @@ import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.entity.Workspace;
 import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
+import eu.wohlben.qits.domain.workspace.control.WorkspaceChangeHint;
+import eu.wohlben.qits.domain.workspace.control.WorkspaceChangePublisher;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
@@ -31,6 +33,8 @@ public class CommandLifecycleService {
   @Inject CommandRepository commandRepository;
 
   @Inject CommandMapper commandMapper;
+
+  @Inject WorkspaceChangePublisher changePublisher;
 
   /**
    * Persist a new RUNNING command and return its DTO (built in-tx so the workspace FK resolves).
@@ -64,6 +68,7 @@ public class CommandLifecycleService {
             .status(CommandStatus.RUNNING)
             .build();
     commandRepository.persist(command);
+    changePublisher.fire(repoId, workspaceId, WorkspaceChangeHint.Topic.COMMANDS);
     return commandMapper.toDto(command);
   }
 
@@ -87,6 +92,10 @@ public class CommandLifecycleService {
     command.status = status;
     command.exitCode = exitCode;
     command.finishedAt = Instant.now();
+    changePublisher.fire(
+        command.workspace.repository.id,
+        command.workspace.workspaceId,
+        WorkspaceChangeHint.Topic.COMMANDS);
   }
 
   /**

@@ -15,6 +15,7 @@ import { WorkspaceDaemonsComponent } from '@/pattern/daemon/workspace-daemons.co
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
+import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
 import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
 
 /**
@@ -35,6 +36,7 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
     ZardTabComponent,
     ZardTabGroupComponent,
   ],
+  providers: [WorkspaceLiveService],
   template: `
     <app-page-layout
       [request]="workspacesQuery"
@@ -93,9 +95,15 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
 export class WorkspaceDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly workspaceService = inject(WorkspaceControllerService);
+  private readonly live = inject(WorkspaceLiveService);
 
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
   readonly workspaceId = this.route.snapshot.paramMap.get('workspaceId')!;
+
+  constructor() {
+    // Push freshness over one SSE channel; the child queries no longer poll (see WorkspaceLiveService).
+    this.live.connect(this.repoId, this.workspaceId);
+  }
 
   // Same key AND shape as the branch list's workspaces query, so both share one cache entry.
   readonly workspacesQuery = injectQuery(() => ({
