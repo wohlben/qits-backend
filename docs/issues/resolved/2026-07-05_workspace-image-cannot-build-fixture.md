@@ -77,6 +77,31 @@ Rebuild: `docker build -t qits/workspace docker/workspace`. Existing per-workspa
 running the old image until recreated — recreate the `greeting`/`main` containers (or re-run
 `seed-webapp`) to pick it up.
 
+## Resolution (2026-07-07)
+
+Both blockers fixed in `docker/workspace/Dockerfile` (commit `d2e8e51`, *"ship unzip + JDK 25 in the
+workspace image so mvnw builds"*) and verified end-to-end:
+
+1. **`unzip`** added to the base `apt-get install` (with an inline NB comment pointing back at this
+   issue), so `mvnw` keeps using the `.zip` distribution it has the pinned checksum for instead of
+   the tar.gz-rewrite path that mismatched.
+2. **JDK 25** (Temurin `temurin-25-jdk` via the Adoptium apt repo) replaces bookworm's default
+   openjdk-17, so `maven.compiler.release=25` projects compile.
+
+Verified by rebuilding the image (`docker build -t qits/workspace docker/workspace`) and re-running
+the original crash repro inside a fresh container against the `testing-repo-quarkus-angular` fixture:
+
+```
+$ docker run --rm -v <fixture>:/workspace:ro qits/workspace bash -lc 'cd /workspace && ./mvnw -v'
+Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)
+Java version: 25.0.3, vendor: Eclipse Adoptium, runtime: /usr/lib/jvm/temurin-25-jdk-amd64
+```
+
+`mvnw` now downloads and SHA-256-validates the `.zip` (no more validation error, exit 0) and runs
+under Java 25.0.3 — the crash loop is gone. `command -v unzip` → `/usr/bin/unzip`; `java -version`
+→ Temurin 25.0.3. Existing per-workspace containers still run the old image until recreated
+(re-run `seed-webapp` or recreate the `greeting`/`main` containers to pick it up).
+
 ## Note on error surfacing (not a bug)
 
 The daemon feature surfaces this correctly. The `/api/daemon-events` durable feed carries the
