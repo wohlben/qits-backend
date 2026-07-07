@@ -38,7 +38,7 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
         @let instances = daemonsQuery.data() ?? [];
         @if (instances.length === 0) {
           <p class="text-sm text-muted-foreground">
-            No daemons defined. Add one in the global library or for this repository.
+            No daemons defined for this repository.
           </p>
         } @else {
           <ul class="flex flex-col divide-y rounded-md border">

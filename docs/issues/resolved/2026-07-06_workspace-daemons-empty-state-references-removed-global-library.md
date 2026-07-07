@@ -1,4 +1,9 @@
-# Workspace daemons empty state references the removed global daemon library
+# RESOLVED: Workspace daemons empty state references the removed global daemon library
+
+> **Resolution (2026-07-07):** reworded the empty-state copy as suggested. The stale template
+> string in `workspace-daemons.component.ts` now reads "No daemons defined for this repository."
+> — no more reference to the nonexistent global library. One-line template change, no backend
+> involvement.
 
 ## Introduction
 
