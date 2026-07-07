@@ -101,12 +101,16 @@ container.
 
 ### 4. Result: seeding is pure host-side data setup
 
-With §1 + §3, `SeedService` (`cli/.../SeedService.java`) and `SeedWebappService` run entirely
-host-side: `createRepositoryUnderProject` → `createMainWorkspace` (branch ref + row), four
-`createWorkspace` (branch refs + rows), two `mergeWorkspace` (host-side worktree merges on origin
-refs). **No docker, no `docker run`, no clone, no git server.** The workspaces come up on first real
-use (opening one in the UI, running an action) via `ensureContainer` — which *then* needs docker + the
-service, exactly when it's actually running.
+With §1 + §3, **both** `SeedService` (`cli/.../SeedService.java`) and `SeedWebappService` run entirely
+host-side: `createRepositoryUnderProject` → `createMainWorkspace` (branch ref + row),
+`createWorkspace` (branch refs + rows), `mergeWorkspace` (host-side worktree merges on origin refs).
+Crucially, the daemons they seed are **definitions only** — `repositoryDaemonService.create` just
+persists a `RepositoryDaemon` row (name, command, ready-pattern, observers); neither seed *launches* a
+daemon. `seed-webapp`'s `quarkus:dev` daemon starts only later, on the user's launch action (→
+`DaemonSupervisor` → `ensureContainer`). So **no docker, no `docker run`, no clone, no git server, no
+daemon process** at seed time. The workspaces and daemons come up on first real use (opening a
+workspace, launching the daemon) via `ensureContainer` — which *then* needs docker + the service,
+exactly when it's actually running.
 
 ### 5. Self-healing (the user's second ask), now uniform
 
@@ -150,11 +154,8 @@ it's just re-materialized.
 - **A use-site that execs without `ensureContainer`.** The explorer's map says all real ones ensure
   first, but the hardened `FakeContainerRuntime` (step 4) is what actually proves it — any miss turns
   from a silent bad rewrite into a test failure. Audit the §3-listed sites in that pass.
-- **`seed-webapp`'s daemon.** It starts an OTEL `quarkus:dev` daemon *inside* a workspace container —
-  that genuinely needs docker + the running service and can't be host-side. So `seed-webapp` is only
-  *partially* decoupled: the project/repo/workspace/flow rows seed host-side, but the running daemon
-  still needs the live stack. Decide whether `seed-webapp` skips daemon launch when the stack is down
-  (seed the daemon *definition* only, let it start on first use) or stays a "service-up" command. Plain
-  `seed` decouples fully.
+- **~~`seed-webapp`'s daemon~~ (non-issue — verified).** Both seeds only *create daemon definitions*
+  (`repositoryDaemonService.create` = persist a row); neither launches a daemon. So `seed-webapp`
+  decouples as fully as `seed` — its `quarkus:dev` daemon already starts on-demand, not at seed time.
 - **Dedicated `NOT_PROVISIONED` status?** Only if the UI wants to distinguish "never started" from
   "stopped". Not required for correctness.
