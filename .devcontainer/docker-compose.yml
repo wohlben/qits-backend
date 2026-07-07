@@ -17,15 +17,18 @@ services:
       # docker-outside-of-docker: qits shells `docker` against the HOST daemon to run workspaces.
       - /var/run/docker.sock:/var/run/docker.sock
       # qits' H2 datastore + cloned repositories, persisted across rebuilds and shared with the cli.
-      - qits-data:/root/.qits
+      - qits-data:/home/dev/.qits
       # Shared coding-agent (Claude Code) login — the SAME volume qits' workspace containers mount at
       # /claude-home (qits.workspace.claude-volume). One OAuth login (docker/workspace/agent-login.sh,
       # run as your host uid) is then shared across the devcontainer and every workspace container.
+      # `dev`'s uid matches the workspace containers', so the credential files stay mutually readable.
       - qits_shared_dot_claude:/claude-home
-      # Persistent, SHARED Maven + pnpm caches on named volumes — NOT the host ~/.m2 / pnpm store, so
-      # builds inside the devcontainer never touch the host and survive container rebuilds.
-      - qits_shared_m2:/root/.m2
-      - qits_shared_pnpm:/root/.local/share/pnpm
+      # SHARED Maven + pnpm caches — the SAME named volumes qits mounts into every workspace container
+      # (at the same /caches paths), so a dependency downloaded by a fixture build, an action, the
+      # agent, or the devcontainer's own build is reused by all. Not the host ~/.m2 / pnpm store;
+      # survives rebuilds. Tools are pointed at them via MAVEN_OPTS / npm_config_store_dir below.
+      - qits_shared_m2:/caches/m2
+      - qits_shared_pnpm:/caches/pnpm
     environment:
       # On qits-net a container reaches qits by this alias — pin it so container->qits (git clone/push,
       # OTLP, MCP) is plain DNS, no eth0/host.docker.internal. Matches the `qits` alias below.
@@ -34,11 +37,13 @@ services:
       # Point the in-devcontainer `claude` at the shared login dir regardless of HOME — mirrors the
       # CLAUDE_CONFIG_DIR the workspace containers set (qits.workspace.claude-mount + /.claude).
       CLAUDE_CONFIG_DIR: /claude-home/.claude
-      # Pin pnpm's content-addressable store onto the shared volume above. Without this pnpm's
-      # "store on the project's drive" heuristic puts it at /workspace/.pnpm-store (the bind-mounted
-      # repo), defeating the shared cache. Cross-FS from node_modules, so pnpm copies instead of
-      # hardlinks — correct, just less space-efficient.
-      npm_config_store_dir: /root/.local/share/pnpm/store
+      # Point Maven + pnpm at the shared cache volumes above — the SAME knobs qits sets on every
+      # workspace container (WorkspaceContainerFactory). Without the pnpm one, pnpm's "store on the
+      # project's drive" heuristic would put the store at /workspace/.pnpm-store (the bind-mounted
+      # repo). Cross-FS from node_modules, so pnpm copies instead of hardlinks — correct, just less
+      # space-efficient.
+      MAVEN_OPTS: -Dmaven.repo.local=/caches/m2
+      npm_config_store_dir: /caches/pnpm/store
     ports:
       # App ingress for the developer's browser (the ONLY host publish — this is qits' own UI, not a
       # workspace container). Quinoa dev server on 4200 proxies /api + /daemon to Quarkus on 8080.
