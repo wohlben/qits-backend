@@ -89,6 +89,14 @@ RUN mkdir -p /opt/jdtls \
 # the empty named volume initializes writable and the arbitrary-uid container can write to it.
 RUN mkdir -p /claude-home && chmod 0777 /claude-home
 
+# Mount points for the shared build caches (qits.workspace.maven-volume / pnpm-volume, default
+# qits_shared_m2 / qits_shared_pnpm). qits mounts these into every workspace container AND its own
+# devcontainer, and points Maven (-Dmaven.repo.local=/caches/m2 via MAVEN_OPTS) and pnpm
+# (npm_config_store_dir=/caches/pnpm/store) at them — so a dependency downloaded by one build is
+# reused by every other. World-writable for the same reason as /claude-home (empty named volume,
+# arbitrary-uid container).
+RUN mkdir -p /caches/m2 /caches/pnpm/store && chmod -R 0777 /caches
+
 # Cloned repositories live here; DockerExecutor execs commands with -w /workspace. The container
 # runs as an arbitrary host uid (--user $(id -u)) with no matching passwd entry, so make /workspace
 # world-writable (the clone happens as that uid) and point HOME at it so git/tools have somewhere to
