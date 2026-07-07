@@ -32,7 +32,17 @@
         <argLine></argLine>
         <spotless-plugin.version>2.44.5</spotless-plugin.version>
         <google-java-format.version>1.28.0</google-java-format.version>
+        <antrun-plugin.version>3.1.0</antrun-plugin.version>
         <skipITs>true</skipITs>
+        <!-- Dev-mode build guard (see the maven-antrun-plugin below): rebuilding the reactor while a
+             `quarkus:dev` is live on this port wedges it with mass "Unsatisfied dependency for domain
+             beans" (dev's file watcher races Maven's recompile of the shared target/classes). The
+             guard fails clean/install/test/package early when the port is held. The quarkus dev/run
+             goals don't fork the Maven lifecycle (verified on 3.34.6), so they — and the cli seed that
+             runs while the service is up — are never blocked. Bypass with -Dqits.dev-guard.skip=true
+             (e.g. CI, or when :8080 is a non-dev process). -->
+        <qits.dev-guard.port>8080</qits.dev-guard.port>
+        <qits.dev-guard.skip>false</qits.dev-guard.skip>
     </properties>
 
     <dependencyManagement>
@@ -144,6 +154,54 @@
                         <phase>process-sources</phase>
                         <goals>
                             <goal>apply</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Refuse to rebuild the reactor while a quarkus:dev holds the dev port: the concurrent
+                 recompile of the shared target/classes wedges dev with mass "Unsatisfied dependency
+                 for domain beans" (see docs/issues/resolved/2026-07-05_mapstruct-unsatisfied-after-
+                 incremental-compile.md and the qits.dev-guard.* properties above). Bound to pre-clean
+                 (so `clean` is stopped BEFORE it deletes target/classes) and validate (to catch
+                 non-clean install/test). A refused connection on the port is instant, so the check is
+                 free when no dev is running. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${antrun-plugin.version}</version>
+                <configuration>
+                    <skip>${qits.dev-guard.skip}</skip>
+                    <target>
+                        <condition property="qits.dev-guard.running">
+                            <socket server="127.0.0.1" port="${qits.dev-guard.port}"/>
+                        </condition>
+                        <fail if="qits.dev-guard.running">
+qits build guard: something is listening on 127.0.0.1:${qits.dev-guard.port} — a `quarkus:dev` is
+likely running. Rebuilding the reactor now can wedge it with mass "Unsatisfied dependency for domain
+beans" (dev's watcher races Maven recompiling the shared target/classes; see
+docs/issues/resolved/2026-07-05_mapstruct-unsatisfied-after-incremental-compile.md).
+
+  Stop dev first:   pkill -f quarkus:dev; pkill -f 'target/.*-dev.jar'
+  (the second kills the forked dev JVM, which is orphaned if the launcher was -9'd)
+  Then re-run your build.
+
+Bypass (CI, or :${qits.dev-guard.port} is not a qits dev server):  -Dqits.dev-guard.skip=true
+                        </fail>
+                    </target>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>guard-dev-mode-preclean</id>
+                        <phase>pre-clean</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>guard-dev-mode-validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>run</goal>
                         </goals>
                     </execution>
                 </executions>
