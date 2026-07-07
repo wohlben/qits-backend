@@ -59,6 +59,30 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 ARG CLAUDE_CODE_VERSION=2.1.89
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
+# Language servers for the coding agent's LSP plugins (jdtls-lsp / typescript-lsp from the
+# claude-plugins-official marketplace — see docs/features/2026-07-07_agent-lsp-plugins.md). The
+# plugins only *wire up* a language server that must already be on PATH; they do not bundle one. The
+# binaries are HOME-independent common toolchain (unlike the plugins themselves, which live on the
+# shared /claude-home volume and are installed at runtime), so they belong in the image next to the
+# JDK/Node they build on.
+#
+# typescript-lsp -> `typescript-language-server` (+ `typescript`) on PATH, installed npm-global like
+# the claude CLI so it lands in /usr/bin for the arbitrary runtime uid.
+RUN npm install -g typescript-language-server typescript
+
+# jdtls-lsp -> `jdtls` on PATH (Eclipse JDT language server; needs a JDK — temurin-25 above). The
+# distribution ships a `bin/jdtls` python launcher; unpack it under /opt and symlink the launcher
+# onto PATH. Pinned to a snapshot tarball via ARG so a build can bump/repin without editing the
+# recipe; `bin/jdtls` presence is asserted so a structure change fails the build loudly rather than
+# at agent runtime.
+ARG JDTLS_URL=https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz
+RUN mkdir -p /opt/jdtls \
+    && curl -fsSL "${JDTLS_URL}" -o /tmp/jdtls.tar.gz \
+    && tar -xz -C /opt/jdtls -f /tmp/jdtls.tar.gz \
+    && rm -f /tmp/jdtls.tar.gz \
+    && test -f /opt/jdtls/bin/jdtls \
+    && ln -s /opt/jdtls/bin/jdtls /usr/local/bin/jdtls
+
 # Mount point for the shared credential volume (qits.workspace.claude-volume, default
 # qits_shared_dot_claude). Agent launches set HOME here so `claude` reads the operator's one-time
 # OAuth login (~/.claude) off the volume — see docker/workspace/agent-login.sh. World-writable so

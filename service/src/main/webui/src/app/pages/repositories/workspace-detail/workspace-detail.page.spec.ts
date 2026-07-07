@@ -5,6 +5,7 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
+import { AgentPluginControllerService } from '@/api/api/agentPluginController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
@@ -18,6 +19,11 @@ describe('WorkspaceDetailPage', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesGet: vi.fn().mockReturnValue(of({ paths: [] })),
   };
   const commandService = { apiCommandsGet: vi.fn().mockReturnValue(of({ entries: [] })) };
+  const pluginService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentPluginsGet: vi
+      .fn()
+      .mockReturnValue(of({ installed: [] })),
+  };
   const dialog = { create: vi.fn().mockReturnValue({ close: vi.fn() }) };
   const route = {
     snapshot: { paramMap: convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1' }) },
@@ -42,13 +48,14 @@ describe('WorkspaceDetailPage', () => {
         { provide: ActivatedRoute, useValue: route },
         { provide: WorkspaceControllerService, useValue: workspaceService },
         { provide: CommandControllerService, useValue: commandService },
+        { provide: AgentPluginControllerService, useValue: pluginService },
         { provide: ZardDialogService, useValue: dialog },
         { provide: ZardDarkMode, useValue: { themeMode: () => EDarkModes.LIGHT } },
       ],
     }).compileComponents();
   });
 
-  it('hosts Files, Events and Telemetry as sibling observation tabs', () => {
+  it('hosts Files, Events, Telemetry and Plugins as sibling observation tabs', () => {
     const fixture = TestBed.createComponent(WorkspaceDetailPage);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -57,7 +64,7 @@ describe('WorkspaceDetailPage', () => {
     const tabLabels = Array.from(el.querySelectorAll('nav[role="tablist"] [role="tab"]')).map((b) =>
       b.textContent?.trim(),
     );
-    expect(tabLabels).toEqual(['Files', 'Events', 'Telemetry']);
+    expect(tabLabels).toEqual(['Files', 'Events', 'Telemetry', 'Plugins']);
     // The events feed lives in its tab, not in the daemons panel.
     expect(el.querySelector('app-workspace-daemon-events')).not.toBeNull();
     expect(el.querySelector('app-workspace-daemons app-workspace-daemon-events')).toBeNull();
