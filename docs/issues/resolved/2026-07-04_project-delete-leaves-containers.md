@@ -47,3 +47,27 @@ Before deleting a repository row (both in `RepositoryService.delete` and in
 
 **Trigger:** next time anyone touches the repository/project delete paths — or the next time a
 stale `qits-ws-*` container shows up in `docker ps`.
+
+## Resolution (2026-07-07)
+
+Implemented essentially as suggested, in `RepositoryService.delete` /
+`ProjectService.delete` (already in `main` at verification time):
+
+- **`RepositoryService.delete(repoId)`** now tears down the whole footprint before deleting the
+  row: it iterates `containerRuntime.listWorkspaceContainers(repoId)` and best-effort `rm`s each
+  (a warn on failure, mirroring `stopContainer`), then `deleteDataDir(repoId)` recursively removes
+  `<data-dir>/<repoId>` (bare origin + merge scratch), then deletes the repository row (DB
+  workspaces/commands/events/daemons cascade off it). Driving teardown off `listWorkspaceContainers`
+  rather than the active-workspace rows is stricter than the original suggestion — it reclaims any
+  container carrying the repo's label, including ones whose workspace row is already gone.
+- **`ProjectService.delete(id)`** delegates each repository to `repositoryService::delete` instead
+  of a raw `repositoryRepository.delete`, so the container + data-dir teardown runs per repository
+  (this also covers the `seed`/`seed-webapp` reset path, which deletes then recreates).
+
+Regression test: `RepositoryServiceTest.deleteRepositoryRemovesContainersAndOnDiskData` — creates a
+project → repository → workspace container, asserts the clone dir and container exist, calls
+`projectService.delete`, then asserts both the on-disk clone dir and the workspace containers are
+gone. Green (`FakeContainerRuntime`, no docker needed).
+
+This clears the startup `RepositoryDiscoveryService` "on disk but has no project association;
+skipping" warnings the leaked origins used to produce.
