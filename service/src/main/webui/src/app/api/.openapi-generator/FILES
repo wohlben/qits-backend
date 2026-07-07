@@ -4,6 +4,7 @@ api.base.service.ts
 api.module.ts
 api/actionConfigurationController.service.ts
 api/agentController.service.ts
+api/agentPluginController.service.ts
 api/api.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
@@ -75,9 +76,11 @@ model/featureFlowConfigurationDto.ts
 model/featureFlowPhaseActionDto.ts
 model/featureFlowPhaseDto.ts
 model/featureFlowPhaseStepDto.ts
+model/installedPluginDto.ts
 model/launchAgentRequest.ts
 model/launchCommandRequest.ts
 model/lazyDirDto.ts
+model/listAgentPluginsResponse.ts
 model/logChannel.ts
 model/logObserverDto.ts
 model/logObserverInput.ts

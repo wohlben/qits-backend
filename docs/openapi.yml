@@ -567,6 +567,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    InstalledPluginDto:
+      type: object
+      properties:
+        pluginId:
+          type: string
+        enabled:
+          type: boolean
     Instant:
       type: string
       format: date-time
@@ -607,6 +614,13 @@ components:
           format: int32
         href:
           type: string
+    ListAgentPluginsResponse:
+      type: object
+      properties:
+        installed:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstalledPluginDto"
     LogChannel:
       type: string
       enum:
@@ -2879,6 +2893,57 @@ paths:
       summary: Create
       tags:
       - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/agent-plugins:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAgentPluginsResponse"
+      summary: List
+      tags:
+      - Agent Plugin Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/agent-plugins/{pluginId}/install:
+    post:
+      parameters:
+      - name: pluginId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAgentPluginsResponse"
+      summary: Install
+      tags:
+      - Agent Plugin Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/agents:
     post:
       parameters:

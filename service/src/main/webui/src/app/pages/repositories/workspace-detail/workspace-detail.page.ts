@@ -16,6 +16,7 @@ import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telem
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
+import { WorkspacePluginsComponent } from '@/pattern/workspace/workspace-plugins.component';
 import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
 
 /**
@@ -32,6 +33,7 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
     WorkspaceDaemonEventsComponent,
     WorkspaceDaemonsComponent,
     WorkspaceFileBrowserComponent,
+    WorkspacePluginsComponent,
     WorkspaceTelemetryComponent,
     ZardTabComponent,
     ZardTabGroupComponent,
@@ -81,6 +83,9 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
           </z-tab>
           <z-tab label="Telemetry">
             <app-workspace-telemetry [repoId]="repoId" [workspaceId]="workspaceId" />
+          </z-tab>
+          <z-tab label="Plugins">
+            <app-workspace-plugins [repoId]="repoId" [workspaceId]="workspaceId" />
           </z-tab>
         </z-tab-group>
       </div>
