@@ -1,10 +1,24 @@
 # Integration guide: from a fresh Quarkus starter to a fully qits-managed Quarkus/Quinoa/Angular app
 
+> **Status (2026-07-07): implemented.** The Method walk was performed in full on a fresh
+> `code.quarkus.io` starter (rest-jackson + quinoa, Angular 21 scaffolded into
+> `src/main/webui/`), registered with qits by local path and driven tier by tier to every
+> tier's Verify step — including the strict Tier 2 acceptance (SPA rendered through the proxy
+> prefix, API POST + GET through the prefix, HMR, DOM picker). The deliverable lives at
+> [`docs/guides/quarkus-angular-integration.md`](../guides/quarkus-angular-integration.md)
+> (first occupant of the new `docs/guides/` category). Cross-check against fixture `main`
+> found no missed steps; fixture-only extras (`quarkus-smallrye-health`, the root-redirect
+> component, gateway unit tests) are noted in the guide as optional. Friction found during the
+> walk was filed, per the Method:
+> [stale daemon definition on relaunch](../issues/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md),
+> [ensure-container no-ops on exited containers](../issues/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md),
+> [daemons empty state references the removed global library](../issues/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md).
+
 ## Introduction
 
 qits now has a real integration *contract* for a Quarkus/Quinoa/Angular app — dev-server daemon,
 web view under the proxy prefix, log observation, backend OTEL, and (since
-[spa-observability](../features/2026-07-06_spa-observability.md) landed on 2026-07-06) frontend
+[spa-observability](2026-07-06_spa-observability.md) landed on 2026-07-06) frontend
 OTEL through the backend gateway. But
 that contract exists only as the **sum of the fixture's diffs**: scattered across feature docs,
 seed code comments, and resolved-issue write-ups. Someone pointing qits at their *own* app — or a
@@ -13,7 +27,7 @@ configure. This idea produces that document: a durable, user-facing guide walkin
 `code.quarkus.io` starter** (REST + Quinoa, Angular in `src/main/webui/`) to a fully integrated
 app, *validated by actually performing that walk*.
 
-**Sequenced after [spa-observability](../features/2026-07-06_spa-observability.md)** — the guide
+**Sequenced after [spa-observability](2026-07-06_spa-observability.md)** — the guide
 should document the complete contract in one pass, and the frontend-telemetry decrees
 (`/api/config.json`, the OTLP passthrough) are the last piece of it. **That prerequisite has now
 landed** (2026-07-06), so this idea is unblocked; the fixture on `main` is the complete,
@@ -21,23 +35,23 @@ E2E-verified reference for every tier below.
 
 Related/dependent plans:
 
-- **Generalizes [fully integrate the Quarkus+Angular fixture](../features/2026-07-05_quarkus-angular-fixture-full-integration.md)**
+- **Generalizes [fully integrate the Quarkus+Angular fixture](2026-07-05_quarkus-angular-fixture-full-integration.md)**
   — that feature made the *fixture* exercise every surface and its §A–§C tables are this guide's
   raw material. But it is fixture-facing (what the fixture and `SeedWebappService` had to become),
-  and it predates the [web-view configuration](../features/2026-07-06_daemon-webview-configuration.md)
+  and it predates the [web-view configuration](2026-07-06_daemon-webview-configuration.md)
   rework (frontend dev server on :4200 as the framed target, `entryPath`, the `index.html`
   `<base>` rebase, `proxy.conf.js`) and spa-observability. The guide is the *user-facing,
   current-state* rewrite.
-- **Documents the contracts of** [daemons](../features/2026-07-04_daemons.md),
-  [daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md),
-  [daemon log observation](../features/2026-07-04_daemon-log-observation-expansion.md),
-  [observability](../features/2026-07-04_observability.md),
-  [spa-observability](../features/2026-07-06_spa-observability.md), and the repo-shape signals of the
-  [framework-aware file browser](../features/2026-07-03_framework-aware-file-browser.md) — no code
+- **Documents the contracts of** [daemons](2026-07-04_daemons.md),
+  [daemon web-view configuration](2026-07-06_daemon-webview-configuration.md),
+  [daemon log observation](2026-07-04_daemon-log-observation-expansion.md),
+  [observability](2026-07-04_observability.md),
+  [spa-observability](2026-07-06_spa-observability.md), and the repo-shape signals of the
+  [framework-aware file browser](2026-07-03_framework-aware-file-browser.md) — no code
   change to any of them; where walking the guide reveals friction, that's an issue doc against the
   feature, not a guide workaround (see Method).
 - **Reference implementation:** the
-  [servable fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md) +
+  [servable fixture](2026-07-05_servable-quarkus-angular-fixture.md) +
   `SeedWebappService` — the guide's end state is "your app behaves like the seeded fixture", and
   every snippet can be checked against fixture `main`.
 - **Distills resolved issues** so their gotchas aren't rediscovered — e.g.
@@ -81,7 +95,7 @@ agent. A stock starter already has the first two; the rest is additive.
 window). Verify: daemon reaches READY, restart survives.
 
 **Tier 2 — web view.** The base contract from the app's side, per
-[daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md):
+[daemon web-view configuration](2026-07-06_daemon-webview-configuration.md):
 `webView {port: 4200, entryPath}`, `ng serve --host 0.0.0.0 --serve-path "$QITS_PUBLIC_BASE"` in
 `package.json`, the `index.html` runtime `<base>` rebase (Angular 21's dev server has no
 `--base-href`), `proxy.conf.js` forwarding the based `api/` path to the backend, base-relative
@@ -115,7 +129,7 @@ telemetry MCP tools attach.
 (`/api/config.json` identity relay), the `OtelProxyResource` (OTLP passthrough), `telemetry.ts` +
 the OTEL web SDK dependencies, the `ignoreUrls` self-export exclusion. The implementation walk of
 the fixture (see the feature doc's
-[implementation notes](../features/2026-07-06_spa-observability.md#implementation-notes)) already
+[implementation notes](2026-07-06_spa-observability.md#implementation-notes)) already
 surfaced the traps the guide must spell out:
 
 - **`provideHttpClient(withFetch())`** — Angular's default XHR backend is invisible to
@@ -172,7 +186,7 @@ the fixture.
   prerequisite; the automation is its own idea once the guide has been exercised manually.
 - **Machine-checking the contract** — a preflight probe ("does the daemon serve under
   `$QITS_PUBLIC_BASE`? does `/api/config.json` answer?") overlaps the
-  [daemon-healthchecks](daemon-healthchecks.md) idea's territory; the guide documents, the probe
+  [daemon-healthchecks](../feature-ideas/daemon-healthchecks.md) idea's territory; the guide documents, the probe
   idea verifies.
 - **A starter template repo** (pre-integrated archetype to clone instead of a guide to follow) —
   attractive, but it rots silently; the guide + fixture pairing keeps the contract reviewable.
