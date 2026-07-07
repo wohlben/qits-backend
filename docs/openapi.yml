@@ -406,8 +406,6 @@ components:
           type: string
         proxyPath:
           type: string
-        needsContainerRecreate:
-          type: boolean
     DaemonStatus:
       type: string
       enum:

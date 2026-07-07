@@ -22,6 +22,11 @@ All Maven commands use the wrapper.
 
 # Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200). Quarkus dev mode is
 # workspace-aware, so edits to the `domain` module live-reload too.
+#
+# NOTE: to actually exercise workspace containers / the daemon web view, run this INSIDE the
+# `.devcontainer/` (VS Code "Reopen in Container" or `devcontainer up`), so qits sits on the shared
+# `qits-net` and reaches workspace containers by DNS name (no host-port publishing). The command is
+# the same, just in the devcontainer's terminal. See the Workspace containers section.
 ./mvnw -pl service quarkus:dev
 
 # Full build (all modules, frontend + backend)
@@ -120,7 +125,8 @@ It applies the committed migrations to a throwaway in-memory H2, diffs the entit
 Every workspace executes inside a **per-workspace Docker container** — the sole execution environment for action scripts, dev servers, daemons, and the coding agent (no host-execution fallback). See `docs/features/2026-07-04_workspace-containers.md`.
 
 - `repository.control.ContainerRuntime` (impl `DockerExecutor`) is the sibling of `GitExecutor`: it shells the `docker` CLI (`docker run`/`exec`/`rm`, configurable via `qits.workspace.container-runtime`). A workspace is a branch ref in the bare origin **plus** a container that `git clone`s that branch into `/workspace` from qits' in-process git server.
-- The in-process git server is JGit's `GitServlet` at `/git/*` (`service` module, `eu.wohlben.qits.githost`) — JGit speaks the smart-HTTP protocol only; `GitExecutor` stays the only mutator. Containers reach it via `http://host.docker.internal:<port>/git/<repoId>`.
+- **One shared Docker network (`qits-net`).** qits and every workspace container join it (`DockerExecutor` adds `--network`, creates the net if absent, config `qits.workspace.network`); qits reaches a container's ports by its **DNS name** with **no host-port publishing** (`ContainerRuntime.resolveTarget` → `ProxyOrigin`, consumed by the daemon web-view proxy `DaemonProxyRoute`). This is why qits itself runs in a container — the **`.devcontainer/`** (extends `docker/workspace` + docker CLI, alias `qits`, mounts the socket + source + `~/.qits`, forwards 8080/4200). See `docs/features/2026-07-07_qits-net-devcontainer-unification.md`. Container→qits (git/OTLP/MCP) uses the alias too: the devcontainer sets `qits.workspace.git-host=qits`.
+- The in-process git server is JGit's `GitServlet` at `/git/*` (`service` module, `eu.wohlben.qits.githost`) — JGit speaks the smart-HTTP protocol only; `GitExecutor` stays the only mutator. Containers reach it via `http://<QitsHostResolver.qitsHost()>:<port>/git/<repoId>` — the `qits` alias on `qits-net` in the devcontainer, else `host.docker.internal`/WSL2 eth0 when qits runs on the host.
 - `Workspace.branch` is a **stored column** (no host checkout to read it from). Workspace-local git verbs (`status`, `fetch`+`merge`) run as `docker exec` in the container; `CommandRegistry`'s two spawn seams prepend a `docker exec` prefix; termination reads a pid file and `kill`s the in-container process group.
 - **Build the fat default image locally** before running the app end-to-end: `docker build -t qits/workspace docker/workspace` (config `qits.workspace.image`). The container runs as your host uid.
 - **Tests** don't need docker: `FakeContainerRuntime` (a Quarkus `@Mock` in each module's `src/test`) emulates a container as a host clone at the old workspace path. Because it runs real host processes, process-group termination works end-to-end. Tests that create branch divergence must **push** (origin-side ahead/behind/conflict probes only see pushed commits).

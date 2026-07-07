@@ -1,0 +1,46 @@
+# The qits dev stack: one service (qits itself) on the shared qits-net, plus the workspace containers
+# qits creates as siblings via the mounted docker socket — all reachable by DNS name, none binding a
+# host port. Bring it up with `devcontainer up` / VS Code "Reopen in Container", then run
+# `./mvnw -pl service quarkus:dev` (or the cli `seed`/`seed-webapp`) in its terminal.
+services:
+  qits:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qits/devcontainer:latest
+    command: sleep infinity
+    working_dir: /workspace
+    volumes:
+      # The repo, live-reloaded by quarkus:dev + Quinoa (WSL-native FS, so inotify works).
+      - ..:/workspace:cached
+      # docker-outside-of-docker: qits shells `docker` against the HOST daemon to run workspaces.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # qits' H2 datastore + cloned repositories, persisted across rebuilds and shared with the cli.
+      - qits-data:/root/.qits
+    environment:
+      # On qits-net a container reaches qits by this alias — pin it so container->qits (git clone/push,
+      # OTLP, MCP) is plain DNS, no eth0/host.docker.internal. Matches the `qits` alias below.
+      # Quarkus maps this env var to the `qits.workspace.git-host` config property.
+      QITS_WORKSPACE_GIT_HOST: qits
+    ports:
+      # App ingress for the developer's browser (the ONLY host publish — this is qits' own UI, not a
+      # workspace container). Quinoa dev server on 4200 proxies /api + /daemon to Quarkus on 8080.
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:4200:4200"
+    networks:
+      qits-net:
+        aliases:
+          - qits
+
+networks:
+  # The shared network workspace containers also join (DockerExecutor attaches them and creates it if
+  # absent). `external` because qits-net is owned outside compose — the devcontainer's
+  # initializeCommand creates it on the host before this stack comes up, and DockerExecutor's
+  # ensure-if-absent also creates it when qits runs outside the devcontainer. That avoids the
+  # "network exists but was not created by compose" clash when a prior run already made it.
+  qits-net:
+    name: qits-net
+    external: true
+
+volumes:
+  qits-data:

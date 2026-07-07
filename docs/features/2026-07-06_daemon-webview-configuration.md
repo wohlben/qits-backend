@@ -248,6 +248,13 @@ keep the backend-origin path a first-class override for single-origin apps.
 
 ### Recreate-container friction (finalize the signal)
 
+> **Superseded 2026-07-07.** This whole constraint is gone — see
+> [qits-net devcontainer unification](2026-07-07_qits-net-devcontainer-unification.md). qits and the
+> workspace container now share a Docker network and the proxy reaches the port by the container's
+> DNS name, so there is no create-time port set: a `webView.port` configured at any time is reachable
+> the moment the daemon runs. The `needsContainerRecreate` flag, the amber banner, the WARNING event
+> and the 502 described below were all removed. The paragraph is kept for history.
+
 Publishing is create-time only (`ContainerRuntime.run` takes the port set at `docker run`; docker
 can't add ports live), so changing `webView.port` — or adding web-view to a daemon — after the
 workspace container exists means the port isn't published until recreation. Today that surfaces

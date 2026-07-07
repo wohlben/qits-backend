@@ -416,16 +416,15 @@ public class DaemonSupervisorTest {
           "greeting",
           ready.daemon().webView().entryPath(),
           "the definition's entry path rides along on the instance DTO");
-      assertEquals(
-          false,
-          ready.needsContainerRecreate(),
-          "the container publishes the port, so no recreation is needed");
 
       var target = supervisor.proxyTarget("work", daemonId);
       assertTrue(target.isPresent(), "a live web-viewable daemon has a proxy target");
       assertEquals(DaemonStatus.READY, target.get().status());
-      // FakeContainerRuntime maps published ports 1:1 (fake containers are host processes).
-      assertEquals(8123, target.get().hostPort());
+      // FakeContainerRuntime resolves the target to 127.0.0.1 + the container port (fake containers
+      // are host processes); the real runtime returns the container's DNS name on the shared net.
+      assertEquals(
+          new eu.wohlben.qits.domain.repository.control.ProxyOrigin("127.0.0.1", 8123),
+          target.get().origin());
 
       assertTrue(
           supervisor.proxyTarget("work", "no-such-daemon").isEmpty(),
@@ -457,10 +456,13 @@ public class DaemonSupervisorTest {
   }
 
   @Test
-  public void containerPredatingTheWebViewPortWarnsAndLeavesTheWebViewUnavailable()
+  public void webViewPortDeclaredAfterTheContainerExistsIsReachableWithNoRecreation()
       throws Exception {
-    // Workspace (and thus container) first, definition second: the container cannot publish the
-    // port, so the daemon runs but the web view stays unavailable until a recreation.
+    // Regression for the frozen-port bug: workspace (and thus container) first, web-view definition
+    // second. Because qits reaches the container's port by its DNS name on the shared network — not
+    // a host port frozen at `docker run` — the web view resolves immediately, with no recreation
+    // and
+    // no "recreate the container" warning.
     String repoId = repoWithWorkspace();
     String daemonId =
         repositoryDaemonService.create(
@@ -483,20 +485,18 @@ public class DaemonSupervisorTest {
 
     supervisor.start(repoId, "work", daemonId);
     try {
-      DaemonInstanceDto ready = awaitStatus(repoId, daemonId, DaemonStatus.READY);
-      assertEquals(
-          true,
-          ready.needsContainerRecreate(),
-          "a live web-viewable daemon with an unpublished port flags the recreation");
+      awaitStatus(repoId, daemonId, DaemonStatus.READY);
       var target = supervisor.proxyTarget("work", daemonId);
-      assertTrue(target.isPresent(), "the instance resolves — with an unpublished port");
-      assertEquals(null, target.get().hostPort(), "no published port on a predating container");
-      awaitEvent(
-          repoId,
-          e ->
-              e.severity() == DaemonEventSeverity.WARNING
-                  && e.summary() != null
-                  && e.summary().contains("recreate the container"));
+      assertTrue(target.isPresent(), "a live web-viewable daemon has a proxy target");
+      assertEquals(
+          new eu.wohlben.qits.domain.repository.control.ProxyOrigin("127.0.0.1", 8124),
+          target.get().origin(),
+          "the port is reachable even though it was declared after the container existed");
+      assertTrue(
+          daemonEventService.query(repoId, "work", null, null, null, 0, 200).stream()
+              .noneMatch(
+                  e -> e.summary() != null && e.summary().contains("recreate the container")),
+          "no recreate-the-container warning is emitted anymore");
     } finally {
       supervisor.stop(repoId, "work", daemonId);
       awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);

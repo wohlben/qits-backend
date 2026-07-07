@@ -55,7 +55,7 @@ public class PromptRefinementServiceTest {
     repoId = seedWorkspace();
     // The refinement provisions the workspace container; pre-create it so ensureContainer no-ops
     // (there is no real origin to clone from in this unit test).
-    containers.run(repoId, "wt-feature", "feature-branch", null, java.util.List.of());
+    containers.run(repoId, "wt-feature", "feature-branch", null);
   }
 
   @Transactional
