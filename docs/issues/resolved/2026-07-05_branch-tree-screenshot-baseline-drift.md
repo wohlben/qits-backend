@@ -41,3 +41,20 @@ the new render is intentional (it accompanied whatever component change landed s
 the baseline (delete the stale PNG and re-run `pnpm test:visual` to regenerate, per
 `.pi/skills/screenshot-tests`). If the extra 80px is unintentional, bisect the component/styles
 first.
+
+## Resolution (2026-07-07)
+
+Confirmed baseline staleness, not a rendering bug, and re-recorded. Inspecting the actual capture
+showed a correct, plausible branch tree (7 rows: `workspace: <id> · forked from <parent>` labels,
+`STOPPED` chips, the Start/Work-on-it/Run/Branch-off/Abandon action rows) — the extra 80px is the
+content that legitimately grew since the baseline. Per `.pi/skills/screenshot-tests`, deleted the
+stale PNG and re-ran `pnpm test:visual` twice; the new baseline is **432×776**.
+
+**Also folded in: the `file-viewer` baselines**, which had gone stale from the *same*
+worktree→workspace rename (commit `61253d2`). Their captures differed from the committed baselines
+by exactly one word — the fixture markdown's `Manages Git repositories, worktrees and …` became
+`… workspaces and …` — a pure text/content drift, no rendering regression. Re-recorded the
+`file-viewer-light` and `file-viewer-dark` baselines the same way.
+
+`pnpm test:visual` now passes **10/10** (all four specs: commit-row, file-viewer, dom-picker,
+branch-tree). Regenerated PNGs are committed alongside this doc.
