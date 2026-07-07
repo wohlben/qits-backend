@@ -593,6 +593,59 @@ public class DaemonSupervisorTest {
   }
 
   @Test
+  public void automaticRelaunchPicksUpADefinitionEditedMidRun() throws Exception {
+    // Regression: a daemon running with no webView is edited to add one, then crash-restarts (the
+    // container-recreate flow the web-view feature prescribes looks like a crash to ON_FAILURE).
+    // The
+    // relaunch must re-read the definition so the proxy — whose only lookup reads the supervisor's
+    // pinned copy — sees the new webView, instead of answering from the stale launch-time snapshot
+    // while the REST list (which prefers the DB definition) reports a proxyPath. See
+    // docs/issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md.
+    String repoId = repoWithWorkspace();
+    String daemonId =
+        createDaemon(
+            repoId,
+            "editme",
+            "while true; do echo up; sleep 0.2; done",
+            "up",
+            RestartPolicy.ON_FAILURE,
+            3);
+
+    supervisor.start(repoId, "work", daemonId);
+    awaitStatus(repoId, daemonId, DaemonStatus.READY);
+    assertTrue(
+        supervisor.proxyTarget("work", daemonId).isEmpty(),
+        "no web view yet: the proxy has no target");
+
+    // Add a webView to the running daemon's definition.
+    repositoryDaemonService.update(
+        repoId, daemonId, null, null, null, null, null, null, null, null, 8125, null, null, null,
+        null, null);
+
+    // Kill the detached session — the liveness poll sees a crash and ON_FAILURE relaunches it. The
+    // relaunch must read the just-added webView.
+    containers.killDaemon(containers.containerName("work", repoId), daemonId);
+
+    try {
+      long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
+      while (System.currentTimeMillis() < deadline) {
+        DaemonInstanceDto i = instanceOf(repoId, daemonId);
+        if (i != null && i.restartCount() >= 1 && i.status() == DaemonStatus.READY) {
+          break;
+        }
+        Thread.sleep(50);
+      }
+      assertTrue(
+          supervisor.proxyTarget("work", daemonId).isPresent(),
+          "after the crash-restart the relaunch reads the edited definition, so the proxy has a"
+              + " target");
+    } finally {
+      supervisor.stop(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
+    }
+  }
+
+  @Test
   public void oneRunningInstancePerWorkspaceAndDaemon() throws Exception {
     String repoId = repoWithWorkspace();
     String daemonId = createDaemon(repoId, "single", "sleep 300", null, RestartPolicy.NEVER, 0);
