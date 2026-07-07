@@ -41,7 +41,15 @@ RUN install -d -m 0755 /etc/apt/keyrings \
         > /etc/apt/sources.list.d/adoptium.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends temurin-25-jdk \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # The Temurin deb installs to an arch-suffixed path (temurin-25-jdk-amd64 / -arm64) and puts
+    # java/javac on PATH via alternatives, but sets no JAVA_HOME. Tools that discover the JDK by
+    # JAVA_HOME rather than PATH — the VS Code Java extension / jdtls, and the jdtls-lsp Claude
+    # plugin — then report "no Java runtime" despite java being installed. Pin a stable, arch-agnostic
+    # symlink and export JAVA_HOME so every consumer (workspace containers + the devcontainer that
+    # extends this image) finds it.
+    && ln -s /usr/lib/jvm/temurin-25-jdk-* /usr/lib/jvm/temurin-25
+ENV JAVA_HOME=/usr/lib/jvm/temurin-25
 
 # Node.js (via NodeSource) + pnpm through corepack.
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
