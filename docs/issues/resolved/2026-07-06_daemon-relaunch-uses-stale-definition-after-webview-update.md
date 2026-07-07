@@ -1,5 +1,13 @@
 # Daemon relaunch after container recreate uses the stale pre-update definition — proxy 404s until a manual stop/start
 
+> **Resolved 2026-07-07.** `DaemonSupervisor.relaunch(instance)` now calls a new
+> `refreshDefinition(instance)` before `launch()`, re-resolving the `RepositoryDaemonDto` from the
+> repository (falling back to the pinned copy if the definition was deleted mid-flight). The proxy's
+> `proxyTarget(...)` now reads the current definition, so it agrees with the REST instance list after
+> an automatic `ON_FAILURE`/`ALWAYS` relaunch. Regression test:
+> `DaemonSupervisorTest#automaticRelaunchPicksUpADefinitionEditedMidRun` (edit a running daemon's
+> webView, kill its session, assert `proxyTarget` sees the new webView after the crash-restart).
+
 ## Introduction
 
 Found while walking a fresh starter through the

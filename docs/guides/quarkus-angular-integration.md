@@ -31,10 +31,13 @@ fixture breaks, this guide is stale too).
 
 Two rules learned the hard way, used throughout:
 
-1. **Daemon definition changes need a manual daemon stop + start.** A crash-triggered relaunch
-   reuses the definition captured at launch time, so an updated `webView`/observer/startScript
-   does not take effect until a fresh start (see the
-   [stale-definition issue](../issues/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)).
+1. **Daemon definition changes take effect on the next (re)launch, not on the running process.**
+   A live daemon keeps running the definition it started with; an updated
+   `webView`/observer/startScript applies when it next launches. Both a manual daemon stop + start
+   and an automatic crash-triggered relaunch re-read the current definition (the relaunch used to
+   reuse a stale launch-time copy — [now fixed](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)),
+   so a container recreate — which the supervisor sees as a crash — already picks up the new
+   definition.
 2. **Port publishing is container-create-time only.** Adding or changing `webView.port` on a
    live workspace needs a container recreate: `POST …/stop-container` then
    `POST …/ensure-container`, then a daemon start. (After a docker/host restart, the same
@@ -241,9 +244,11 @@ curl -s -X POST http://localhost:8080/api/repositories/<repoId>/workspaces/main/
 curl -s -X POST http://localhost:8080/api/repositories/<repoId>/workspaces/main/ensure-container -d '{}' -H 'Content-Type: application/json'
 ```
 
-then **stop + start the daemon** (rule 1 — an auto-relaunch after the container kill would run
-the stale, webView-less definition and the proxy would 404). The instance's
-`needsContainerRecreate` field / the amber badge in the UI tells you when this dance is needed.
+The container kill looks like a crash to the supervisor, so an `ON_FAILURE`/`ALWAYS` daemon
+auto-relaunches and — since [the relaunch now re-reads the definition](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)
+— comes back on the new `webView`; a `NEVER` daemon (or one already stopped) needs a manual
+start. The instance's `needsContainerRecreate` field / the amber badge in the UI tells you when
+the recreate is needed.
 
 ### Symptoms of getting it wrong
 
@@ -253,7 +258,7 @@ the stale, webView-less definition and the proxy would 404). The instance's
 | SPA renders, API calls 404 | fetches hardcode `/api` instead of base-relative `api/…` |
 | SPA renders, API **GET**s hang forever (POSTs fine) | `ignored-path-prefixes` not root-path-aware — the Quinoa↔ng loop |
 | Frame shows 502 "container does not publish the daemon's port" | `webView.port` added after the container existed — recreate it |
-| Frame shows 404 "No web-viewable daemon here." while the API lists a `proxyPath` | daemon relaunched with a stale definition — manual daemon stop + start |
+| Frame shows 404 "No web-viewable daemon here." while the API lists a `proxyPath` | a `NEVER`-policy daemon didn't relaunch after the container recreate — start it (auto-relaunch of `ON_FAILURE`/`ALWAYS` now reads the fresh definition) |
 | `ERR_EMPTY_RESPONSE` in the frame | `ng serve` without `--host 0.0.0.0` |
 
 **Verify (the walk's strict acceptance):** open the workspace page → *Web view* floaty → the
@@ -466,6 +471,6 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
   [OTEL endpoint not bridged in dev mode](../issues/resolved/2026-07-05_quarkus-otel-endpoint-not-bridged.md) ·
   [Quinoa ignored-prefix root-path loop](../issues/resolved/2026-07-06_quinoa-ignored-prefix-root-path-loop.md)
 - Issues found while validating this guide:
-  [stale daemon definition on relaunch](../issues/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md) ·
+  [stale daemon definition on relaunch](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md) ·
   [ensure-container no-ops on exited containers](../issues/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md) ·
   [daemons empty state references removed global library](../issues/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md)

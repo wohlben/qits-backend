@@ -10,7 +10,7 @@
 > found no missed steps; fixture-only extras (`quarkus-smallrye-health`, the root-redirect
 > component, gateway unit tests) are noted in the guide as optional. Friction found during the
 > walk was filed, per the Method:
-> [stale daemon definition on relaunch](../issues/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md),
+> [stale daemon definition on relaunch](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md),
 > [ensure-container no-ops on exited containers](../issues/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md),
 > [daemons empty state references the removed global library](../issues/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md).
 
