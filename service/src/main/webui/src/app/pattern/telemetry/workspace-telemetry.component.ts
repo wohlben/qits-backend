@@ -11,11 +11,12 @@ import { TelemetryMetricListComponent } from '@/ui/components/telemetry/telemetr
 import { TelemetrySpanListComponent } from '@/ui/components/telemetry/telemetry-span-list.component';
 
 /**
- * The workspace's telemetry tab: a polling recent-errors feed, every buffered span (Recent /
+ * The workspace's telemetry tab: a recent-errors feed, every buffered span (Recent /
  * Slowest lens, click-through to the flat span list of its trace), the latest point of every
  * metric series, and a log tail filterable by service — the whole in-memory OTLP buffer, so a
- * healthy app shows its traffic too, not just failures. Ephemeral by design: "live" is a 5s
- * refetch, not a socket.
+ * healthy app shows its traffic too, not just failures. Ephemeral by design. These queries no
+ * longer poll: `WorkspaceLiveService` invalidates them on a `telemetry` SSE hint (debounced
+ * server-side to ≤1/s), so freshness is push-driven and an idle workspace fetches nothing.
  */
 @Component({
   selector: 'app-workspace-telemetry',
@@ -171,7 +172,6 @@ export class WorkspaceTelemetryComponent {
           this.workspaceId(),
         ),
       ).then((r) => r.groups ?? []),
-    refetchInterval: 5000,
   }));
 
   readonly spansQuery = injectQuery(() => ({
@@ -187,7 +187,6 @@ export class WorkspaceTelemetryComponent {
           0,
         ),
       ).then((r) => r.spans ?? []),
-    refetchInterval: 5000,
   }));
 
   readonly traceQuery = injectQuery(() => ({
@@ -212,7 +211,6 @@ export class WorkspaceTelemetryComponent {
           this.workspaceId(),
         ),
       ).then((r) => r.metrics ?? []),
-    refetchInterval: 5000,
   }));
 
   readonly logsQuery = injectQuery(() => ({
@@ -226,7 +224,6 @@ export class WorkspaceTelemetryComponent {
           this.serviceFilter() ?? undefined,
         ),
       ).then((r) => r.logs ?? []),
-    refetchInterval: 5000,
   }));
 
   /** Distinct exporting services seen in the current tail, for the filter dropdown. */

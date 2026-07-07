@@ -1,5 +1,34 @@
 # Workspace SSE live updates: replace the detail route's polling with a push channel
 
+## Status: implemented (2026-07-07)
+
+Shipped as designed below, with these decisions locked in:
+
+- **One `telemetry` topic** (not split per-signal): a single hint invalidates all four telemetry
+  views, keeping one debounce state per workspace. The per-signal split in *Open questions* stays a
+  future optimization — the ≤1/s debounce already bounds the fan-out.
+- **Pure push, no safety-net poll**: all eight `refetchInterval`s are removed; the on-reconnect
+  invalidate-all covers any missed hint. Idle workspace = zero requests.
+- **CDI async event bus**: `WorkspaceChangeHint` + `WorkspaceChangePublisher`
+  (`domain.workspace.control`, `fireAsync`) → `@ObservesAsync` in `WorkspaceEventBroadcaster`
+  (`service`, `domain.workspace.api`) → per-workspace `BroadcastProcessor` → SSE at
+  `GET /api/repositories/{repoId}/workspaces/{workspaceId}/events` (`WorkspaceEventsController`,
+  hidden from OpenAPI). Debounce is leading-edge + trailing, `qits.events.debounce-ms` (default
+  1000). Wire frame is the hyphenated topic name (`daemons`, `daemon-events`, `telemetry`,
+  `commands`); a 25s `ping` heartbeat keeps idle connections alive.
+- **Producers wired at the existing choke-points**: `DaemonSupervisor.transition()` → `DAEMONS`
+  (the single `instance.status` assignment site — resolves the "funnel through one setStatus"
+  open question), `DaemonEventService.publish()` → `DAEMON_EVENTS`, `CommandLifecycleService`
+  create/finish → `COMMANDS`, `TelemetryStore.add{Spans,Logs,Metrics}` → `TELEMETRY` (deduped per
+  batch; unscoped telemetry fires nothing).
+- **Frontend**: `WorkspaceLiveService` (`pattern/workspace/`) provided on the detail page, opens one
+  `EventSource`, maps each topic to `queryClient.invalidateQueries(...)`, invalidates everything on
+  `open`/reconnect, and closes on `DestroyRef`.
+
+Remaining open question deferred as noted: splitting the telemetry topic per-signal. Backpressure
+resolved to `onOverflow().drop()`; `fireAsync` needs no context (the observer only touches in-memory
+maps).
+
 ## Introduction
 
 The workspace detail route (`/repositories/:repoId/workspaces/:workspaceId`,

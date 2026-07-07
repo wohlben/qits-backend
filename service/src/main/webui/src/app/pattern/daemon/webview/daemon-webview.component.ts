@@ -151,7 +151,6 @@ export class DaemonWebviewComponent {
         (r) =>
           r.entries?.map((e) => e.instance).filter((i): i is DaemonInstanceDto => !!i) ?? [],
       ),
-    refetchInterval: 3000,
   }));
 
   readonly webViewable = computed(() =>

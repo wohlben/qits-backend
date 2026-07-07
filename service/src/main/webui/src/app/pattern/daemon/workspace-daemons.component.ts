@@ -149,7 +149,6 @@ export class WorkspaceDaemonsComponent {
             ?.map((e) => e.instance)
             .filter((i): i is DaemonInstanceDto => !!i) ?? [],
       ),
-    refetchInterval: 3000,
   }));
 
   readonly startMutation = injectMutation(() => ({

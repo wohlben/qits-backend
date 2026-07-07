@@ -104,7 +104,6 @@ export class WorkspaceChatComponent {
   // Same key AND shape as the commands list's query, so both share one cache entry.
   readonly commandsQuery = injectQuery(() => ({
     queryKey: ['commands'],
-    refetchInterval: 5000,
     queryFn: () =>
       lastValueFrom(this.commandService.apiCommandsGet()).then(
         (r) => r.entries?.map((e) => e.command!).filter((c): c is CommandDto => !!c) ?? [],
