@@ -82,6 +82,11 @@
                 <!-- Integration tests (`-Pextended`, docker-dependent) are environment-sensitive and
                      self-skipping; never serve them from cache. -->
                 <plugin artifactId="maven-failsafe-plugin"/>
+                <!-- The dev-mode build guard (root pom): a running quarkus:dev on the dev port must be
+                     detected on EVERY build, not skipped when a module is a cache hit — otherwise a
+                     rebuild could still slip through on the first restored module. Its socket check is
+                     effectively free when no dev is running. -->
+                <plugin artifactId="maven-antrun-plugin"/>
             </plugins>
         </runAlways>
     </executionControl>
