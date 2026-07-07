@@ -1,0 +1,21 @@
+{
+  "name": "qits",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "qits",
+  "workspaceFolder": "/workspace",
+  "//": "App ingress so the host browser reaches the qits UI (Quinoa :4200 -> Quarkus :8080). Workspace containers publish nothing; qits reaches them by DNS name on qits-net.",
+  "forwardPorts": [4200, 8080],
+  "//initialize": "Create the external qits-net on the HOST before the stack comes up (idempotent). qits and its sibling workspace containers all join it.",
+  "initializeCommand": "docker network inspect qits-net >/dev/null 2>&1 || docker network create qits-net",
+  "//postCreate": "Build once so the `domain` module is resolvable from the local repo (fresh-checkout step from CLAUDE.md), inside the devcontainer's toolchain.",
+  "postCreateCommand": "./mvnw -q install -DskipTests -Dqits.dev-guard.skip=true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "redhat.java",
+        "vscjava.vscode-java-pack",
+        "Angular.ng-template"
+      ]
+    }
+  }
+}
