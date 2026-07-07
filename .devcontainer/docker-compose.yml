@@ -34,6 +34,13 @@ services:
       # OTLP, MCP) is plain DNS, no eth0/host.docker.internal. Matches the `qits` alias below.
       # Quarkus maps this env var to the `qits.workspace.git-host` config property.
       QITS_WORKSPACE_GIT_HOST: qits
+      # Bind Quarkus on ALL interfaces. `quarkus:dev` binds the HTTP port to `localhost` by default,
+      # which is fine when qits runs on the host but fatal here: qits now runs *inside* a container on
+      # qits-net, so a loopback bind makes qits:8080 unreachable from the sibling workspace containers
+      # — container->qits OTLP (the daemon's dev server forwarding browser + backend spans), git, and
+      # MCP all fail (browser sees 502 from the app's /api/otel proxy). It also lets the published
+      # 127.0.0.1:8080 below actually reach the process. (Prod/`package` runs already bind 0.0.0.0.)
+      QUARKUS_HTTP_HOST: 0.0.0.0
       # Point the in-devcontainer `claude` at the shared login dir regardless of HOME — mirrors the
       # CLAUDE_CONFIG_DIR the workspace containers set (qits.workspace.claude-mount + /.claude).
       CLAUDE_CONFIG_DIR: /claude-home/.claude
