@@ -10,8 +10,8 @@
   "forwardPorts": [4200, 8080],
   "//initialize": "Create the external qits-net + shared volumes on the HOST before the stack comes up (idempotent). qits-net is shared with sibling workspace containers; qits_shared_dot_claude is the shared Claude Code login; m2/pnpm are shared build caches.",
   "initializeCommand": "docker network inspect qits-net >/dev/null 2>&1 || docker network create qits-net; for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do docker volume inspect $v >/dev/null 2>&1 || docker volume create $v; done",
-  "//postCreate": "Build once so the `domain` module is resolvable from the local repo (fresh-checkout step from CLAUDE.md), inside the devcontainer's toolchain.",
-  "postCreateCommand": "./mvnw -q install -DskipTests -Dqits.dev-guard.skip=true",
+  "//postCreate": "Build once so the `domain` module is resolvable (fresh-checkout step from CLAUDE.md), then seed demo data. Seeding needs the service running (it clones workspace containers from the in-process git server), so the script boots the packaged service, waits for readiness, seeds, and stops it — best-effort, so a missing qits/workspace image never fails create. See .devcontainer/postcreate.sh.",
+  "postCreateCommand": "bash .devcontainer/postcreate.sh",
   "customizations": {
     "vscode": {
       "extensions": [
