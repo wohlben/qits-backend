@@ -29,6 +29,9 @@ services:
       # survives rebuilds. Tools are pointed at them via MAVEN_OPTS / npm_config_store_dir below.
       - qits_shared_m2:/caches/m2
       - qits_shared_pnpm:/caches/pnpm
+      # Devcontainer user dotfiles (bash history, etc.) — persists across rebuilds independently of
+      # application data (qits-data) and shared build caches.
+      - devcontainer-dotfiles:/home/dev/.dotfiles
     environment:
       # On qits-net a container reaches qits by this alias — pin it so container->qits (git clone/push,
       # OTLP, MCP) is plain DNS, no eth0/host.docker.internal. Matches the `qits` alias below.
@@ -49,6 +52,10 @@ services:
       # project's drive" heuristic would put the store at /workspace/.pnpm-store (the bind-mounted
       # repo). Cross-FS from node_modules, so pnpm copies instead of hardlinks — correct, just less
       # space-efficient.
+      # Persist shell history across devcontainer rebuilds on a dedicated volume (not qits-data,
+      # which is application state). Without this, HISTFILE defaults to ~/.bash_history on the
+      # ephemeral container layer and is lost on every rebuild.
+      HISTFILE: /home/dev/.dotfiles/.bash_history
       MAVEN_OPTS: -Dmaven.repo.local=/caches/m2
       npm_config_store_dir: /caches/pnpm/store
     ports:
@@ -72,6 +79,8 @@ networks:
     external: true
 
 volumes:
+  # Project-private: devcontainer user state (bash history, etc.).
+  devcontainer-dotfiles:
   # Project-private: qits' H2 + repositories.
   qits-data:
   # Shared, owned outside compose (created by the devcontainer's initializeCommand, and — for the
