@@ -12,6 +12,10 @@ allure-results/
 # IDE
 .vscode/
 .idea/
+.project
+.classpath
+.factorypath
+.settings/
 
 # OS
 .DS_Store

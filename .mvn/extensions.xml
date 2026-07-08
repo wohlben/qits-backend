@@ -4,7 +4,7 @@
             xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.2.0 http://maven.apache.org/xsd/core-extensions-1.2.0.xsd">
     <!-- Maven Build Cache: fingerprints each module's inputs and restores its outputs on a hit
          instead of rebuilding it (compile, Spotless, tests, and the Quinoa pnpm/Angular build).
-         Local disk cache only (~/.m2/build-cache); see .mvn/maven-build-cache-config.xml.
+         Local disk cache only (sibling to the local Maven repo); see .mvn/maven-build-cache-config.xml.
          Supports Maven 3.9+; our wrapper is pinned to 3.9.12. -->
     <extension>
         <groupId>org.apache.maven.extensions</groupId>

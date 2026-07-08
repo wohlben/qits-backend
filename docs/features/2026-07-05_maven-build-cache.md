@@ -131,10 +131,12 @@ Integration tests (`-Pextended`, docker-dependent, self-skipping) are marked `ru
 
 ## Operational notes
 
-- **Local cache only** at `~/.m2/build-cache`; remote/shared cache is deliberately off (needs a
+- **Local cache only**, stored as a sibling to the local Maven repo (i.e.
+  `${maven.repo.local}/../build-cache`); remote/shared cache is deliberately off (needs a
   hosting + write-trust decision before CI reuse — see below).
 - **Disable per-invocation** with `-Dmaven.build.cache.enabled=false` (used above as a control; also
-  the escape hatch if a restore is ever suspected). Deleting `~/.m2/build-cache` fully resets it.
+  the escape hatch if a restore is ever suspected). To fully reset, delete the cache directory:
+  `rm -rf $(./mvnw help:evaluate -Dexpression=settings.localRepository -q -DforceStdout)/../build-cache`.
 - **`quarkus:dev` is orthogonal** — the cache targets `package`/`test`/`install` lifecycle builds;
   dev mode is already incremental and workspace-aware.
 - **Native (`-Dnative`) / extended (`-Pextended`)** — the `native` profile flips plugin config so it
