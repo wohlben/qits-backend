@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings for the devcontainer, existing for ONE reason: point Maven's local repository at the
+  shared `qits_shared_m2` volume (mounted at /caches/m2) so BOTH the CLI build and VS Code's Java
+  Language Server (redhat.java / JDT-LS's embedded m2e resolver) resolve into the same persistent cache.
+
+  Why this is needed on top of MAVEN_OPTS: the terminal `./mvnw` honors
+  `MAVEN_OPTS=-Dmaven.repo.local=/caches/m2` (set in docker-compose.yml), but the Java LS does NOT read
+  MAVEN_OPTS — with no settings.xml it falls back to the default ~/.m2/repository (/home/dev/.m2, on the
+  ephemeral container layer), so every clean devcontainer re-downloads all dependencies from Central.
+  `<localRepository>` here is honored by the LS (via java.configuration.maven.userSettings in
+  devcontainer.json) AND by the CLI, unifying them on the shared volume.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <localRepository>/caches/m2</localRepository>
+</settings>

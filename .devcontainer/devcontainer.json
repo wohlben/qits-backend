@@ -18,7 +18,11 @@
         "redhat.java",
         "vscjava.vscode-java-pack",
         "Angular.ng-template"
-      ]
+      ],
+      "//settings": "Point the Java Language Server (redhat.java / JDT-LS's embedded m2e resolver) at .devcontainer/m2-settings.xml, whose <localRepository> is the shared /caches/m2 volume. Without this the LS ignores the compose MAVEN_OPTS and resolves into the default ~/.m2 on the ephemeral container layer, so every clean devcontainer re-downloads all dependencies from Central. The terminal ./mvnw already uses /caches/m2 via MAVEN_OPTS; this unifies the LS onto the same cache.",
+      "settings": {
+        "java.configuration.maven.userSettings": "/workspace/.devcontainer/m2-settings.xml"
+      }
     }
   }
 }
