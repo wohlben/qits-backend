@@ -51,6 +51,18 @@ RUN install -d -m 0755 /etc/apt/keyrings \
     && ln -s /usr/lib/jvm/temurin-25-jdk-* /usr/lib/jvm/temurin-25
 ENV JAVA_HOME=/usr/lib/jvm/temurin-25
 
+# Opt out of Quarkus build-time analytics non-interactively. Without a stored consent decision the
+# Quarkus Maven plugin prompts "Do you agree to contribute anonymous build time data…" on every
+# build — a blocker on a fresh, ephemeral container that has no ~/.redhat consent file yet. This env
+# var (the config form of quarkus.analytics.disabled) disables it for every Quarkus build in the
+# image: the devcontainer's reactor builds and each workspace container's fixture/agent builds.
+ENV QUARKUS_ANALYTICS_DISABLED=true
+
+# Same treatment for the Angular CLI: without a stored decision (~/.angular-config.json) it prompts
+# "Would you like to share pseudonymous usage data…" on the first ng invocation. NG_CLI_ANALYTICS=false
+# disables it non-interactively for every Angular build (Quinoa's frontend build + fixture builds).
+ENV NG_CLI_ANALYTICS=false
+
 # Node.js (via NodeSource) + pnpm through corepack.
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
