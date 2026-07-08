@@ -72,12 +72,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 
 # The coding agent (Claude Code) runs inside this container — the single biggest executor of
 # arbitrary commands in the sandbox. Bake the CLI in at a pinned version (bump CLAUDE_CODE_VERSION
-# to any published release; the build fails loudly if it doesn't exist). npm-global installs it to
-# /usr/bin/claude, on PATH for the arbitrary runtime uid the container runs as — the now-preferred
-# native installer (claude.ai/install.sh) installs per-user under ~/.local/bin, which doesn't fit a
-# uid-agnostic image, so npm-global is the right trade here.
-ARG CLAUDE_CODE_VERSION=2.1.89
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+# to any published release; the build fails loudly if it doesn't exist). The native installer
+# (claude.ai/install.sh) downloads the standalone binary into ~/.local/bin; we relocate it to
+# /usr/local/bin so it's on PATH for the arbitrary runtime uid the container runs as. Auto-updates
+# are disabled (immutable image — bump the ARG to upgrade).
+ARG CLAUDE_CODE_VERSION=2.1.204
+RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION} \
+    && cp -L /root/.local/bin/claude /usr/local/bin/claude \
+    && rm -rf /root/.local/bin/claude /root/.local/share/claude /root/.claude
+ENV DISABLE_AUTOUPDATER=1
 
 # Language servers for the coding agent's LSP plugins (jdtls-lsp / typescript-lsp from the
 # claude-plugins-official marketplace — see docs/features/2026-07-07_agent-lsp-plugins.md). The
@@ -86,8 +89,8 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 # shared /claude-home volume and are installed at runtime), so they belong in the image next to the
 # JDK/Node they build on.
 #
-# typescript-lsp -> `typescript-language-server` (+ `typescript`) on PATH, installed npm-global like
-# the claude CLI so it lands in /usr/bin for the arbitrary runtime uid.
+# typescript-lsp -> `typescript-language-server` (+ `typescript`) on PATH, installed npm-global so
+# it lands in /usr/bin for the arbitrary runtime uid.
 RUN npm install -g typescript-language-server typescript
 
 # jdtls-lsp -> `jdtls` on PATH (Eclipse JDT language server; needs a JDK — temurin-25 above). The

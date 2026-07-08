@@ -43,7 +43,7 @@ RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
     # writable perms (Docker seeds an empty named volume from the image dir). ~/.qits is dev-owned
     # (project-private); the shared build caches are 0777 like the base image's /caches, since they
     # are shared with workspace containers that run as a different (arbitrary host) uid.
-    && mkdir -p "/home/${USERNAME}/.qits" \
+    && mkdir -p "/home/${USERNAME}/.qits" "/home/${USERNAME}/.dotfiles" \
     && chown -R "${USER_UID}:${USER_GID}" "/home/${USERNAME}" \
     && mkdir -p /caches/m2 /caches/pnpm/store && chmod -R 0777 /caches
 
