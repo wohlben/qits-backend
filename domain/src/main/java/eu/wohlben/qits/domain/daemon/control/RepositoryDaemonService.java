@@ -42,6 +42,7 @@ public class RepositoryDaemonService {
       String readyPattern,
       String stopSignal,
       RestartPolicy restartPolicy,
+      Boolean autoStart,
       Integer maxRestarts,
       Boolean otel,
       Integer webViewPort,
@@ -76,6 +77,7 @@ public class RepositoryDaemonService {
     daemon.readyPattern = blankToNull(readyPattern);
     daemon.stopSignal = DaemonDefinitionValidator.normalizeStopSignal(stopSignal);
     daemon.restartPolicy = restartPolicy != null ? restartPolicy : RestartPolicy.ON_FAILURE;
+    daemon.autoStart = autoStart == null || autoStart;
     daemon.maxRestarts = maxRestarts != null ? maxRestarts : 3;
     daemon.otel = otel != null && otel;
     daemon.webView = webView;
@@ -125,6 +127,7 @@ public class RepositoryDaemonService {
       String readyPattern,
       String stopSignal,
       RestartPolicy restartPolicy,
+      Boolean autoStart,
       Integer maxRestarts,
       Boolean otel,
       Integer webViewPort,
@@ -153,6 +156,9 @@ public class RepositoryDaemonService {
     }
     if (restartPolicy != null) {
       daemon.restartPolicy = restartPolicy;
+    }
+    if (autoStart != null) {
+      daemon.autoStart = autoStart;
     }
     if (maxRestarts != null) {
       daemon.maxRestarts = maxRestarts;

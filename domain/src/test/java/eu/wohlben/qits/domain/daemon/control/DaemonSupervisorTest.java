@@ -125,6 +125,7 @@ public class DaemonSupervisorTest {
             readyPattern,
             "TERM",
             policy,
+            null, // autoStart (default true)
             maxRestarts,
             null,
             null,
@@ -399,6 +400,7 @@ public class DaemonSupervisorTest {
                 null,
                 "TERM",
                 RestartPolicy.NEVER,
+                null, // autoStart (default true)
                 0,
                 null,
                 8123,
@@ -478,6 +480,7 @@ public class DaemonSupervisorTest {
                 null,
                 "TERM",
                 RestartPolicy.NEVER,
+                null, // autoStart (default true)
                 0,
                 null,
                 8124,
@@ -686,8 +689,8 @@ public class DaemonSupervisorTest {
 
     // Add a webView to the running daemon's definition.
     repositoryDaemonService.update(
-        repoId, daemonId, null, null, null, null, null, null, null, null, 8125, null, null, null,
-        null, null);
+        repoId, daemonId, null, null, null, null, null, null, null, null, null, 8125, null, null,
+        null, null, null);
 
     // Kill the detached session — the liveness poll sees a crash and ON_FAILURE relaunches it. The
     // relaunch must read the just-added webView.

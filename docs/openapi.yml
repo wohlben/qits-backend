@@ -313,6 +313,8 @@ components:
           type: string
         restartPolicy:
           $ref: "#/components/schemas/RestartPolicy"
+        autoStart:
+          type: boolean
         maxRestarts:
           type: integer
           format: int32
@@ -730,6 +732,8 @@ components:
           type: string
         restartPolicy:
           $ref: "#/components/schemas/RestartPolicy"
+        autoStart:
+          type: boolean
         maxRestarts:
           type: integer
           format: int32
@@ -1461,6 +1465,8 @@ components:
           type: string
         restartPolicy:
           $ref: "#/components/schemas/RestartPolicy"
+        autoStart:
+          type: boolean
         maxRestarts:
           type: integer
           format: int32

@@ -41,6 +41,8 @@ export interface DaemonFormData {
   readyPattern: string;
   stopSignal: string;
   restartPolicy: 'NEVER' | 'ON_FAILURE' | 'ALWAYS';
+  /** Start with the workspace container (default true); opting out is the marked case. */
+  autoStart: boolean;
   /** Kept as text in the form (signal-form fields are string-typed); parsed on submit. */
   maxRestarts: string;
   otel: boolean;
@@ -161,6 +163,12 @@ export interface DaemonFormData {
           </div>
         </details>
       </fieldset>
+
+      <!-- Auto-start couples the daemon to the workspace container: starting a workspace (or lazily
+           provisioning one) brings this daemon up with it. Off = manual-start only. -->
+      <z-checkbox [formField]="form.autoStart">
+        Auto-start with the workspace container
+      </z-checkbox>
 
       <!-- With OTel on, the launch injects OTEL_EXPORTER_* env vars so an instrumented process
            exports traces/logs/metrics to qits — queryable in the workspace's Telemetry tab and by
@@ -330,6 +338,7 @@ export class DaemonFormComponent {
     readyPattern: '',
     stopSignal: 'TERM',
     restartPolicy: 'ON_FAILURE',
+    autoStart: true,
     maxRestarts: '3',
     otel: false,
     webViewPort: '',

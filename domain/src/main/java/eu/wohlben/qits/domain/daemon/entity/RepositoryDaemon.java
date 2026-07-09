@@ -70,6 +70,14 @@ public class RepositoryDaemon extends PanacheEntityBase {
   @Column(name = "restart_policy", nullable = false)
   public RestartPolicy restartPolicy = RestartPolicy.ON_FAILURE;
 
+  /**
+   * Started automatically whenever a workspace container of this repository comes up (its dev
+   * server is what the workspace exists to run), so opting <em>out</em> is the marked case —
+   * default true.
+   */
+  @Column(name = "auto_start", nullable = false)
+  public boolean autoStart = true;
+
   /** How many relaunches the supervisor attempts before settling in CRASHED. */
   @Column(name = "max_restarts", nullable = false)
   public int maxRestarts = 3;

@@ -78,6 +78,7 @@ public class RepositoryDaemonControllerTest {
                 "Listening on.*:3000",
                 "SIGINT",
                 RestartPolicy.ALWAYS,
+                false, // autoStart — non-default, to prove the flag threads through
                 5,
                 true,
                 new WebViewInput(5173, "/greeting/", null),
@@ -95,6 +96,7 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.readyPattern", equalTo("Listening on.*:3000"))
         .body("daemon.stopSignal", equalTo("INT"))
         .body("daemon.restartPolicy", equalTo("ALWAYS"))
+        .body("daemon.autoStart", equalTo(false))
         .body("daemon.maxRestarts", equalTo(5))
         .body("daemon.otel", equalTo(true))
         .body("daemon.webView.port", equalTo(5173))
@@ -139,6 +141,7 @@ public class RepositoryDaemonControllerTest {
                 "",
                 null,
                 RestartPolicy.NEVER,
+                true, // autoStart — flip it back on to prove update threads the flag
                 null,
                 null,
                 null,
@@ -156,6 +159,7 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.webView.port", equalTo(5173)) // null webView = keep as-is
         .body("daemon.webView.entryPath", equalTo("greeting"))
         .body("daemon.restartPolicy", equalTo("NEVER"))
+        .body("daemon.autoStart", equalTo(true))
         .body("daemon.observers.size()", equalTo(1))
         .body("daemon.observers[0].pattern", equalTo("FATAL"))
         .body("daemon.sources[0].path", equalTo("logs/app.log")); // null sources = keep as-is
@@ -267,6 +271,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
+                null,
                 null))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
@@ -283,6 +288,7 @@ public class RepositoryDaemonControllerTest {
                 "Observer without pattern",
                 null,
                 "npm run dev",
+                null,
                 null,
                 null,
                 null,
@@ -308,6 +314,7 @@ public class RepositoryDaemonControllerTest {
                   "Bad source",
                   null,
                   "npm run dev",
+                  null,
                   null,
                   null,
                   null,

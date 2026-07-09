@@ -121,6 +121,12 @@ public class DaemonMcpTools {
           String stopSignal,
       @ToolArg(required = false, description = "NEVER, ON_FAILURE or ALWAYS (default ON_FAILURE)")
           String restartPolicy,
+      @ToolArg(
+              required = false,
+              description =
+                  "start this daemon automatically whenever the workspace container comes up"
+                      + " (default true)")
+          Boolean autoStart,
       @ToolArg(required = false, description = "relaunch attempts before settling CRASHED")
           Integer maxRestarts,
       @ToolArg(
@@ -165,6 +171,7 @@ public class DaemonMcpTools {
             readyPattern,
             stopSignal,
             parseRestartPolicy(restartPolicy),
+            autoStart,
             maxRestarts,
             otel,
             webViewPort,
@@ -195,6 +202,8 @@ public class DaemonMcpTools {
       @ToolArg(required = false, description = "new stop signal") String stopSignal,
       @ToolArg(required = false, description = "new restart policy (NEVER/ON_FAILURE/ALWAYS)")
           String restartPolicy,
+      @ToolArg(required = false, description = "toggle auto-start with the workspace container")
+          Boolean autoStart,
       @ToolArg(required = false, description = "new relaunch budget") Integer maxRestarts,
       @ToolArg(
               required = false,
@@ -236,6 +245,7 @@ public class DaemonMcpTools {
             readyPattern,
             stopSignal,
             parseRestartPolicy(restartPolicy),
+            autoStart,
             maxRestarts,
             otel,
             webViewPort,

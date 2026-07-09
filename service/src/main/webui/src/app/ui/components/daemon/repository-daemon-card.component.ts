@@ -18,6 +18,13 @@ import { CardLayoutComponent } from '@/layout/card-layout/card-layout.component'
       </a>
 
       <p class="text-sm text-muted-foreground line-clamp-2">{{ daemon().description }}</p>
+      @if (daemon().autoStart) {
+        <span
+          class="mt-1 inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+        >
+          auto-start
+        </span>
+      }
       <p class="mt-1 text-xs text-muted-foreground">
         {{ daemon().restartPolicy }} · {{ daemon().observers?.length ?? 0 }} observer(s)
         @if (daemon().webView?.port; as port) {
