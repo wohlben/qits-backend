@@ -13,8 +13,8 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
 /**
  * The workspace's daemons panel: every effective daemon (running or not — the everything-visible
  * convention) with its supervised status chip, start/stop, and a logs link re-attaching to the
- * instance's registry command. The events feed lives in its own Events tab
- * ({@link WorkspaceDaemonEventsComponent}); this panel's mutations still invalidate its query key.
+ * instance's registry command. The events feed ({@link WorkspaceDaemonEventsComponent}) renders
+ * below this panel in the same Daemons tab; this panel's mutations still invalidate its query key.
  */
 @Component({
   selector: 'app-workspace-daemons',

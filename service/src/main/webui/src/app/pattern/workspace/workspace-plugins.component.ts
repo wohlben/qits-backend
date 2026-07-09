@@ -25,7 +25,7 @@ interface PluginRow {
 }
 
 /**
- * The workspace detail page's Plugins tab: the curated coding-agent LSP plugins
+ * The Plugins section of the workspace detail page's Agents tab: the curated coding-agent LSP plugins
  * ({@link AGENT_PLUGIN_REGISTRY}) joined with their install status on the shared credential volume.
  * The store is global to that volume, so status is identical in every workspace and an install here
  * turns the plugin green everywhere (see `docs/features/2026-07-07_agent-lsp-plugins.md`).
@@ -39,6 +39,7 @@ interface PluginRow {
   imports: [ZardButtonComponent, PluginStatusChipComponent],
   template: `
     <section class="flex flex-col gap-3" aria-label="Agent plugins">
+      <h2 class="text-lg font-semibold">Plugins</h2>
       <p class="text-sm text-muted-foreground">
         Language-server plugins for the coding agent, installed once on the shared agent home and
         available to every workspace.
