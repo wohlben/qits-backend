@@ -58,6 +58,14 @@ services:
       HISTFILE: /home/dev/.dotfiles/.bash_history
       MAVEN_OPTS: -Dmaven.repo.local=/caches/m2
       npm_config_store_dir: /caches/pnpm/store
+      # The HOST's timezone, so wall-clock output in the devcontainer (logs, `date`, commit
+      # timestamps) matches the machine you're sitting at. Interpolated from .devcontainer/.env
+      # (gitignored), which the devcontainer's initializeCommand writes on the host before this
+      # stack comes up. qits passes its own zone on to every workspace container it creates
+      # (WorkspaceContainerFactory sets TZ, config qits.workspace.timezone), so host, devcontainer
+      # and workspace containers all agree. The kernel clock is shared with the host anyway; TZ is
+      # the only part that needs plumbing.
+      TZ: ${TZ:-Etc/UTC}
     ports:
       # App ingress for the developer's browser (the ONLY host publish — this is qits' own UI, not a
       # workspace container). Quinoa dev server on 4200 proxies /api + /daemon to Quarkus on 8080.
