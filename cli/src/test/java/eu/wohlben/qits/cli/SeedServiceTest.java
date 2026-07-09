@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.GitExecutor;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceRuntimeStatus;
@@ -19,6 +20,7 @@ import jakarta.inject.Inject;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
@@ -41,10 +43,14 @@ public class SeedServiceTest {
   @Inject ProjectService projectService;
   @Inject WorkspaceService workspaceService;
   @Inject ContainerRuntime containers;
+  @Inject GitExecutor git;
+
+  @ConfigProperty(name = "qits.repositories.data-dir")
+  String dataDir;
 
   @Test
   @TestTransaction
-  public void seedsFastForwardableAndDivergedWorkspaces() {
+  public void seedsFastForwardableAndDivergedWorkspaces() throws Exception {
     // Drives the command via the real services with no JAX-RS request context — a guard for
     // the command-mode wiring (@ActivateRequestContext on seed()).
     assertTrue(seedService.seed(), "first seed should create data");
@@ -86,5 +92,24 @@ public class SeedServiceTest {
           wt.runtimeStatus(),
           "seeded workspace " + wt.workspaceId() + " starts unprovisioned");
     }
+
+    // Regression (configurable-git-identity): the host-side synthetic merge that advanced
+    // 'mainline' must be attributed to the configured qits identity, never the ambient
+    // ~/.gitconfig — tests run with GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM nulled (root pom), so
+    // without the supplied identity this merge fails "Committer identity unknown" outright.
+    Path origin = Path.of(dataDir, repoId, "origin");
+    String mergeTip =
+        git.exec(
+                origin.toFile(),
+                "git",
+                "log",
+                "-1",
+                "--format=%s|%an <%ae>|%cn <%ce>",
+                "refs/heads/mainline")
+            .trim();
+    assertEquals(
+        "Merge feeder into mainline|qits <qits@local>|qits <qits@local>",
+        mergeTip,
+        "the seeded merge commit carries the configured (default) qits identity");
   }
 }

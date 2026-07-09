@@ -128,6 +128,14 @@
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                             <maven.home>${maven.home}</maven.home>
                         </systemPropertyVariables>
+                        <environmentVariables>
+                            <!-- Tests run with NO ambient git identity (or any other developer
+                                 gitconfig): a commit path that forgets to supply identity (env or
+                                 -c) fails with "Committer identity unknown" on every machine, not
+                                 just CI, and no test can be skewed by ~/.gitconfig oddities. -->
+                            <GIT_CONFIG_GLOBAL>/dev/null</GIT_CONFIG_GLOBAL>
+                            <GIT_CONFIG_SYSTEM>/dev/null</GIT_CONFIG_SYSTEM>
+                        </environmentVariables>
                     </configuration>
                 </plugin>
                 <plugin>

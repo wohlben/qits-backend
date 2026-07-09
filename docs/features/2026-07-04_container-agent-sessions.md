@@ -5,15 +5,17 @@
 The security payoff of [workspace containers](2026-07-04_workspace-containers.md) only fully lands
 when the **coding agent** — the single biggest executor of arbitrary commands in qits — runs inside
 the sandbox. Phase 1 already routes *all* command execution (including the stream-json chat) through
-`docker exec` into the per-workspace container and sets the `qits@local` git identity at container
-init, so the mechanical relocation was already done. This phase adds the two things specific to the
+`docker exec` into the per-workspace container with a git identity supplied per container (today:
+`GIT_*` container env from the configured `qits.git.*` identity, see
+[configurable-git-identity](2026-07-09_configurable-git-identity.md)), so the mechanical relocation
+was already done. This phase adds the two things specific to the
 agent: the CLI in the image, and a credential hand-off that lets the in-container `claude`
 authenticate.
 
 Related/dependent plans:
 
 - **Phase 1 — [workspace-containers](2026-07-04_workspace-containers.md)** (hard dependency): the
-  `docker exec` launch seams, the `qits@local` identity, and `CommandService.prepare`'s
+  `docker exec` launch seams, the per-container git identity, and `CommandService.prepare`'s
   container-only env overlay this builds on. Independent of Phase 2
   ([container-file-access](2026-07-04_container-file-access.md)).
 - The [coding-agent harness](2026-07-01_coding-agent-harness.md) and the
@@ -59,9 +61,9 @@ agent's home (`~/.claude` — the login + state):
   already runs in a container with the shared volume mounted, so `claude auth login` there populates
   the same volume for every workspace. Nothing about the login is qits' job at runtime.
 
-Git identity (`qits@local`) is already set repo-locally at container init
-(`WorkspaceService.createContainerWorkspace`), so agent commits just work; pushes go only to the
-qits-hosted origin.
+Git identity is already delivered as `GIT_AUTHOR_*`/`GIT_COMMITTER_*` container env (the configured
+`qits.git.*` identity, see [configurable-git-identity](2026-07-09_configurable-git-identity.md)), so
+agent commits just work; pushes go only to the qits-hosted origin.
 
 ### Sign-in redirect (no CLI needed)
 
