@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
+import eu.wohlben.qits.domain.repository.entity.WorkspaceRuntimeStatus;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -38,6 +40,7 @@ public class SeedServiceTest {
   @Inject SeedService seedService;
   @Inject ProjectService projectService;
   @Inject WorkspaceService workspaceService;
+  @Inject ContainerRuntime containers;
 
   @Test
   @TestTransaction
@@ -71,5 +74,17 @@ public class SeedServiceTest {
     assertNotNull(diverged);
     assertTrue(diverged.ahead() > 0, "diverged should be ahead of its parent");
     assertTrue(diverged.behind() > 0, "diverged should be behind its parent");
+
+    // Seeding is pure host-side data setup: rows + branch refs + host-side merges, zero
+    // provisioning — no container ran, and every workspace waits STOPPED for its first use.
+    assertTrue(
+        containers.listWorkspaceContainers(repoId).isEmpty(),
+        "seeding must not provision containers");
+    for (WorkspaceDto wt : byId.values()) {
+      assertEquals(
+          WorkspaceRuntimeStatus.STOPPED,
+          wt.runtimeStatus(),
+          "seeded workspace " + wt.workspaceId() + " starts unprovisioned");
+    }
   }
 }

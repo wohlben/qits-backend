@@ -94,10 +94,17 @@ so an in-container commit isn't missed. The actual merge, `mergeIntoTarget` (`:8
 container, no service.
 
 Key invariant: **a workspace with no container has provably nothing unpushed** (nothing has ever run in
-it), so its branch ref in origin is already complete. So swap line 770's throwing `containerGit` for the
-existing best-effort `pushBranch` helper (`:715-725`), which **no-ops when the container is absent**
-(the same helper `stopContainer` already uses). Merge then works with or without a live source
-container.
+it), so its branch ref in origin is already complete. Implemented as an **exists-guarded**
+`containerGit` push (not a swap to the best-effort `pushBranch` helper): the push is skipped only when
+the container is absent, while a *live* container's failed push still throws and aborts the merge — a
+swallowed live-push failure would let a merge silently integrate a stale origin ref. Merge then works
+with or without a live source container.
+
+Companion wrinkle in the same family: `isWorkspaceClean` (feeding `canCleanupBranch`) treated an
+absent container as *not clean*, which would have made a never-provisioned workspace un-cleanable.
+Absent now means clean — the container *is* the working tree, so no container means nothing
+uncommitted can be destroyed, symmetric with `isFullyPushed`'s absent-means-pushed. A failed status
+probe on a live container stays "not clean" (genuinely unknown).
 
 ### 4. Result: seeding is pure host-side data setup
 
