@@ -13,7 +13,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # git + a shell toolchain (setsid/kill come from util-linux/procps, needed for the registry's
 # process-group termination), python, jq (JSON wrangling in scripts — e.g. the Claude Code
-# statusline script on the shared /claude-home volume), and unzip. `unzip` is required by the Maven wrapper: with
+# statusline script on the shared /claude-home volume), and unzip. `openssh-client` gives git an
+# ssh transport for pushing/fetching ssh remotes — qits' own git verbs speak smart-HTTP to the
+# in-process git server, but the devcontainer (which extends this image) pushes qits itself to an
+# ssh origin, and VS Code only forwards the host ssh-agent into a container that has the client
+# installed. `unzip` is required by the Maven wrapper: with
 # `distributionType=only-script` the mvnw script silently falls back from the `.zip` distribution to
 # `.tar.gz` when unzip is absent, which then fails `distributionSha256Sum` validation (the pinned sum
 # is the zip's) — see docs/issues/2026-07-05_workspace-image-cannot-build-fixture.md.
@@ -25,6 +29,7 @@ RUN apt-get update \
         bash \
         gpg \
         jq \
+        openssh-client \
         unzip \
         util-linux \
         procps \
