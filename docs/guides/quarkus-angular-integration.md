@@ -110,6 +110,65 @@ clean: `.m2/`, `.cache/`, `.local/`, `.angular/`, `.redhat/`.
 
 ---
 
+## Tier 0b — isolate the language server from the build (required)
+
+**Why (do not skip this for a Java project):** the workspace runs a **Java language server** — the
+coding agent's bundled **jdtls**, and VS Code's **redhat.java** if you also open the repo in an
+IDE. Both import the project through **m2e**, whose Eclipse *output directory* defaults to the
+**same `target/classes`** that Maven and your **`quarkus:dev` dev-server daemon** (Tier 1) use.
+When the language server's model is briefly incomplete — right after a `mvn clean`, or mid
+re-index — its background compiler writes half-resolved `*.class` stubs into that shared
+`target/classes`. The running `quarkus:dev` then hot-reloads them and dies:
+
+- `java.lang.Error: Unresolved compilation problems` (e.g. a Lombok `@Builder` method "undefined"), or
+- a mass Arc **"Unsatisfied dependency"** for every generated MapStruct/Panache bean (broken/partial
+  `*Impl` classes ArC can't index).
+
+The agent's language server and the dev-server are fighting over the same output. **The fix is
+client-agnostic and lives entirely in the POM**: give the language server its *own* build
+directory so it can never touch `target/`. Add this profile to the **(root/parent) `pom.xml`** — it
+is inherited by every module:
+
+```xml
+<profiles>
+  <!-- IDE/agent-only build isolation. Activates ONLY under m2e — redhat.java AND the coding
+       agent's jdtls both set the `m2e.version` user property on every Maven resolve (m2e-core's
+       MavenExecutionContext), and no `./mvnw` CLI invocation sets it. Relocating the whole build
+       DIRECTORY sends the language server's classes/test-classes/generated-sources to target-ide/,
+       so Maven and the quarkus:dev daemon keep exclusive ownership of target/. Relocate
+       <directory> (a profile's <build> may set it); do NOT try <outputDirectory> — a profile
+       can't set it, and the Quarkus dev mojo can't resolve a property-indirected outputDirectory
+       for reactor hot-reload deps. -->
+  <profile>
+    <id>m2e-separate-output</id>
+    <activation>
+      <property><name>m2e.version</name></property>
+    </activation>
+    <build>
+      <directory>${project.basedir}/target-ide</directory>
+    </build>
+  </profile>
+</profiles>
+```
+
+Then gitignore the IDE build dir (add beside the container-cache dirs from Tier 0):
+
+```gitignore
+target-ide/
+```
+
+`${project.basedir}` resolves per-module, so each module gets its own `target-ide/`. CLI builds
+(`./mvnw …`, and `quarkus:dev`) never activate the profile and keep using `target/` — verified in
+qits itself, where this replaced an earlier, wrong "disable the build cache for the module" patch
+(see [maven-build-cache](../features/2026-07-05_maven-build-cache.md)).
+
+**Verify:** with the `quarkus:dev` daemon running (Tier 1), edit a `.java` file and save. The
+daemon hot-reloads cleanly — no `Unresolved compilation problems`, no mass "Unsatisfied
+dependency". A `target-ide/` appears (the language server's output); `target/classes` stays owned
+by Maven. If the IDE still shows stale red, reload the window so the language server re-imports.
+
+---
+
 ## Tier 1 — the dev-server daemon
 
 Daemons are defined **per repository** and run **per workspace** (see

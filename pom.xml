@@ -222,5 +222,41 @@ Bypass (CI, or :${qits.dev-guard.port} is not a qits dev server):  -Dqits.dev-gu
                 <skipITs>false</skipITs>
             </properties>
         </profile>
+
+        <!-- IDE-only: give the language server its OWN build directory so it never shares
+             target/classes with Maven/quarkus:dev.
+
+             redhat.java/VS Code AND Claude Code's bundled jdtls both import this project through
+             m2e, whose Eclipse output folder is derived from the effective <build> directories —
+             by default the SAME target/ that Maven and `quarkus:dev` use. Whenever a language
+             server's project model is briefly incomplete (e.g. right after a `mvn clean` wipes
+             target/classes + target/generated-sources, or mid re-index) its background compiler
+             writes half-resolved *.class stubs ("java.lang.Error: Unresolved compilation problems",
+             e.g. missing Lombok @Builder methods) into target/classes, which Quarkus then loads,
+             failing to start.
+
+             This profile activates ONLY under m2e (the `m2e.version` user property is set by
+             m2e-core's MavenExecutionContext on every resolve — verified in its bytecode — and is
+             unset for every `./mvnw` CLI invocation). It relocates the WHOLE build directory to
+             target-ide/, so the IDE's classes/test-classes/generated-sources all land under
+             target-ide/ while Maven and `quarkus:dev` keep exclusive ownership of target/.
+
+             We relocate <directory> (allowed in a profile's <build>) rather than <outputDirectory>
+             (which is NOT allowed in a profile's build, and whose property-indirected form the
+             Quarkus dev mojo fails to resolve for reactor hot-reload deps — it looked for a literal
+             `target/${property}`). Client-agnostic: fixes any m2e-based LS with no per-IDE setting,
+             nothing to reload beyond the LS re-importing. Inherited by all modules;
+             ${project.basedir} resolves to each module's own dir. target-ide/ is gitignored. -->
+        <profile>
+            <id>m2e-separate-output</id>
+            <activation>
+                <property>
+                    <name>m2e.version</name>
+                </property>
+            </activation>
+            <build>
+                <directory>${project.basedir}/target-ide</directory>
+            </build>
+        </profile>
     </profiles>
 </project>

@@ -106,5 +106,5 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 # Idempotent by RESET: each run deletes and recreates the project, always returning to the same
 # known-good state — so use it as the fixture for manual UI poking and regression tests.
 # (Same build prerequisite as `seed` above — package the CLI app before `quarkus:run`.)
-./mvnw -pl cli -am install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
+./mvnw -pl cli -am install -DskipTests && ./mvnw -pl cli -am quarkus:run -Dcli.args=seed-webapp
 ```
