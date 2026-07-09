@@ -12,7 +12,8 @@ FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
 # git + a shell toolchain (setsid/kill come from util-linux/procps, needed for the registry's
-# process-group termination), python, and unzip. `unzip` is required by the Maven wrapper: with
+# process-group termination), python, jq (JSON wrangling in scripts — e.g. the Claude Code
+# statusline script on the shared /claude-home volume), and unzip. `unzip` is required by the Maven wrapper: with
 # `distributionType=only-script` the mvnw script silently falls back from the `.zip` distribution to
 # `.tar.gz` when unzip is absent, which then fails `distributionSha256Sum` validation (the pinned sum
 # is the zip's) — see docs/issues/2026-07-05_workspace-image-cannot-build-fixture.md.
@@ -23,6 +24,7 @@ RUN apt-get update \
         curl \
         bash \
         gpg \
+        jq \
         unzip \
         util-linux \
         procps \
