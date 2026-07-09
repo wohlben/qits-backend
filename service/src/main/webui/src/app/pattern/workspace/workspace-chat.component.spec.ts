@@ -8,7 +8,6 @@ import { CommandControllerService } from '@/api/api/commandController.service';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
-import { ZardDialogService } from '@/shared/components/dialog';
 import { WorkspaceChatComponent } from './workspace-chat.component';
 
 /** Cache updates and mutation callbacks land on the next macrotask; flush before asserting. */
@@ -36,12 +35,19 @@ describe('WorkspaceChatComponent', () => {
       .fn()
       .mockImplementation((id: string) => of({ command: chat({ id }) })),
   };
-  const dialog = { create: vi.fn().mockReturnValue({ close: vi.fn() }) };
   const router = { navigate: vi.fn() };
   let queryClient: QueryClient;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // The tab renders app-command-chat inline for a running session; keep its socket out of jsdom.
+    vi.stubGlobal(
+      'WebSocket',
+      class {
+        send() {}
+        close() {}
+      },
+    );
     // Seeded data is the source of truth — never let it go stale and refetch from the mock.
     queryClient = new QueryClient({
       defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false } },
@@ -52,10 +58,13 @@ describe('WorkspaceChatComponent', () => {
       providers: [
         provideTanStackQuery(queryClient),
         { provide: CommandControllerService, useValue: commandService },
-        { provide: ZardDialogService, useValue: dialog },
         { provide: Router, useValue: router },
       ],
     }).compileComponents();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   function createComponent() {
@@ -66,14 +75,11 @@ describe('WorkspaceChatComponent', () => {
     return fixture;
   }
 
-  it('shows the running-session dot only when a chat runs in this workspace', async () => {
+  it('reports a running session only when a chat runs in this workspace', async () => {
     queryClient.setQueryData(['commands'], [chat({})]);
     const fixture = createComponent();
 
     expect(fixture.componentInstance.hasRunningSession()).toBe(true);
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector('[title="A chat session is running"]'),
-    ).not.toBeNull();
 
     // A running chat elsewhere, or a finished one here, does not count.
     queryClient.setQueryData(
@@ -83,18 +89,21 @@ describe('WorkspaceChatComponent', () => {
     await flush();
     fixture.detectChanges();
     expect(fixture.componentInstance.hasRunningSession()).toBe(false);
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector('[title="A chat session is running"]'),
-    ).toBeNull();
   });
 
-  it('opens a full-size dialog that cannot be closed by a backdrop click', () => {
+  it('renders the prompt panel without a session, the re-attached chat with one', async () => {
     const fixture = createComponent();
-    (fixture.nativeElement as HTMLElement).querySelector('button')!.click();
+    const el = fixture.nativeElement as HTMLElement;
 
-    expect(dialog.create).toHaveBeenCalledWith(
-      expect.objectContaining({ zHideFooter: true, zMaskClosable: false }),
-    );
+    expect(el.querySelector('app-workspace-prompt-panel')).not.toBeNull();
+    expect(el.querySelector('app-command-chat')).toBeNull();
+
+    // A session appears (started from anywhere) → the chat attaches in place of the panel.
+    queryClient.setQueryData(['commands'], [chat({})]);
+    await flush();
+    fixture.detectChanges();
+    expect(el.querySelector('app-command-chat')).not.toBeNull();
+    expect(el.querySelector('app-workspace-prompt-panel')).toBeNull();
   });
 
   it('resolves the newest running chat for this workspace as the active session', () => {
@@ -114,21 +123,6 @@ describe('WorkspaceChatComponent', () => {
     expect(fixture.componentInstance.activeChatId()).toBeNull();
   });
 
-  it('keeps the same command id across close and reopen — persistence is re-attach, not restart', () => {
-    queryClient.setQueryData(['commands'], [chat({})]);
-    const fixture = createComponent();
-    const cmp = fixture.componentInstance;
-
-    cmp.open();
-    const idWhileOpen = cmp.activeChatId();
-    dialog.create.mock.results[0].value.close();
-    cmp.open();
-
-    expect(dialog.create).toHaveBeenCalledTimes(2);
-    expect(cmp.activeChatId()).toBe(idWhileOpen);
-    expect(cmp.activeChatId()).toBe('cmd-1');
-  });
-
   it('bridges a just-launched chat until the registry reports it', async () => {
     const fixture = createComponent();
     const cmp = fixture.componentInstance;
@@ -146,7 +140,6 @@ describe('WorkspaceChatComponent', () => {
   it('redirects to the command page when the launch is a login terminal, not a chat', async () => {
     const fixture = createComponent();
     const cmp = fixture.componentInstance;
-    cmp.open(); // establishes the dialog ref so it can be closed on redirect
 
     // Not signed in → the backend returns an interactive `claude` REPL login terminal.
     commandService.apiCommandsCommandIdGet.mockReturnValueOnce(
@@ -185,6 +178,10 @@ describe('WorkspaceChatComponent', () => {
     // Once the registry reflects the termination, the session is gone.
     queryClient.setQueryData(['commands'], [chat({ status: CommandStatus.Terminated })]);
     await flush();
+    fixture.detectChanges();
     expect(cmp.activeChatId()).toBeNull();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('app-workspace-prompt-panel'),
+    ).not.toBeNull();
   });
 });

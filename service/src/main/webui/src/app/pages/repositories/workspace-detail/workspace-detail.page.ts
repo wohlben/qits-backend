@@ -1,11 +1,24 @@
-import { ChangeDetectionStrategy, Component, computed, inject, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
+import { CommandControllerService } from '@/api/api/commandController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
+import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
+import { CommandDto } from '@/api/model/commandDto';
+import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
+import { DaemonStatus } from '@/api/model/daemonStatus';
 import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
+import { newestRunningChat } from '@/pattern/command/running-chat';
 import { DaemonWebviewComponent } from '@/pattern/daemon/webview/daemon-webview.component';
 import {
   DaemonEventFileAnchor,
@@ -17,12 +30,18 @@ import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.compo
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
 import { WorkspacePluginsComponent } from '@/pattern/workspace/workspace-plugins.component';
-import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
+import {
+  ZardTabComponent,
+  ZardTabGroupComponent,
+  type ZardTabIndicator,
+} from '@/shared/components/tabs';
 
 /**
- * The workspace detail page: browse the workspace's files with a tree + syntax-highlighted viewer,
- * and chat with the workspace's agent in a full-size dialog (the header's Chat button). The older
- * speak-to-prompt page stays reachable at `…/wip` (unlinked, kept for prototyping).
+ * The workspace detail page: everything the workspace offers as one tab row — Files, Chat,
+ * Daemons, Web view, Events, Telemetry, Plugins. All panels rely on the tab group keeping hidden
+ * tabs mounted: the file browser's openFile anchors, the chat's WebSocket, and the web view's
+ * iframe survive tab switches. The older speak-to-prompt page stays reachable at `…/wip`
+ * (unlinked, kept for prototyping).
  */
 @Component({
   selector: 'app-workspace-detail-page',
@@ -42,6 +61,7 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
   template: `
     <app-page-layout
       [request]="workspacesQuery"
+      [hasActions]="false"
       pendingText="Loading workspace…"
       errorText="Failed to load workspace"
     >
@@ -59,40 +79,49 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
         </div>
       </ng-template>
 
-      <ng-template #pageActions>
-        <app-workspace-chat
-          [repoId]="repoId"
-          [workspaceId]="workspaceId"
-          [preamble]="workspace()?.preamble ?? null"
-        />
-      </ng-template>
-
-      <div class="flex flex-col gap-6">
-        <app-workspace-daemons [repoId]="repoId" [workspaceId]="workspaceId" />
-        <!-- The file browser stays mounted on its hidden tab so openFile anchors keep working. -->
-        <z-tab-group>
-          <z-tab label="Files">
-            <app-workspace-file-browser [repoId]="repoId" [workspaceId]="workspaceId" />
-          </z-tab>
-          <z-tab label="Events">
-            <app-workspace-daemon-events
-              [repoId]="repoId"
-              [workspaceId]="workspaceId"
-              (openFile)="openFileFromEvent($event)"
-            />
-          </z-tab>
-          <z-tab label="Telemetry">
-            <app-workspace-telemetry [repoId]="repoId" [workspaceId]="workspaceId" />
-          </z-tab>
-          <z-tab label="Plugins">
-            <app-workspace-plugins [repoId]="repoId" [workspaceId]="workspaceId" />
-          </z-tab>
-        </z-tab-group>
-      </div>
-
-      <!-- Floaty web-view button (bottom-right) — renders only while a live web-viewable daemon
-           exists in this workspace. -->
-      <app-daemon-webview [repoId]="repoId" [workspaceId]="workspaceId" />
+      <z-tab-group (zTabChange)="onTabChange($event.label)">
+        <z-tab label="Files">
+          <app-workspace-file-browser [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
+        <z-tab
+          label="Chat"
+          [indicator]="chatIndicator()"
+          indicatorLabel="A chat session is running"
+        >
+          <app-workspace-chat
+            [repoId]="repoId"
+            [workspaceId]="workspaceId"
+            [preamble]="workspace()?.preamble ?? null"
+          />
+        </z-tab>
+        <z-tab
+          label="Daemons"
+          [indicator]="daemonIndicator()"
+          [indicatorLabel]="daemonIndicatorLabel()"
+        >
+          <app-workspace-daemons [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
+        <z-tab label="Web view">
+          <app-daemon-webview
+            [repoId]="repoId"
+            [workspaceId]="workspaceId"
+            [activated]="webviewActivated()"
+          />
+        </z-tab>
+        <z-tab label="Events">
+          <app-workspace-daemon-events
+            [repoId]="repoId"
+            [workspaceId]="workspaceId"
+            (openFile)="openFileFromEvent($event)"
+          />
+        </z-tab>
+        <z-tab label="Telemetry">
+          <app-workspace-telemetry [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
+        <z-tab label="Plugins">
+          <app-workspace-plugins [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
+      </z-tab-group>
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -100,6 +129,8 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
 export class WorkspaceDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly workspaceService = inject(WorkspaceControllerService);
+  private readonly commandService = inject(CommandControllerService);
+  private readonly daemonService = inject(WorkspaceDaemonControllerService);
   private readonly live = inject(WorkspaceLiveService);
 
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
@@ -126,9 +157,68 @@ export class WorkspaceDetailPage {
   private readonly tabGroup = viewChild(ZardTabGroupComponent);
   private readonly fileBrowser = viewChild(WorkspaceFileBrowserComponent);
 
+  // Same key AND shape as the Chat tab's commands query, so both share one cache entry.
+  readonly commandsQuery = injectQuery(() => ({
+    queryKey: ['commands'],
+    queryFn: () =>
+      lastValueFrom(this.commandService.apiCommandsGet()).then(
+        (r) => r.entries?.map((e) => e.command!).filter((c): c is CommandDto => !!c) ?? [],
+      ),
+  }));
+
+  /** The running-session dot, moved from the old header chat button onto the tab label. */
+  readonly chatIndicator = computed<ZardTabIndicator | null>(() =>
+    newestRunningChat(this.commandsQuery.data(), this.workspaceId) ? 'primary' : null,
+  );
+
+  // Same key AND shape as the Daemons/Web view tabs' queries, so all three share one cache entry.
+  readonly daemonsQuery = injectQuery(() => ({
+    queryKey: ['workspace-daemons', this.repoId, this.workspaceId],
+    queryFn: () =>
+      lastValueFrom(
+        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(
+          this.repoId,
+          this.workspaceId,
+        ),
+      ).then(
+        (r) => r.entries?.map((e) => e.instance).filter((i): i is DaemonInstanceDto => !!i) ?? [],
+      ),
+  }));
+
+  /** Aggregate daemon status on the tab label — the glance the always-visible panel used to give. */
+  readonly daemonIndicator = computed<ZardTabIndicator | null>(() => {
+    const instances = this.daemonsQuery.data() ?? [];
+    if (
+      instances.some(
+        (i) => i.status === DaemonStatus.Degraded || i.status === DaemonStatus.Restarting,
+      )
+    ) {
+      return 'warning';
+    }
+    const live = instances.some(
+      (i) => i.status === DaemonStatus.Ready || i.status === DaemonStatus.Starting,
+    );
+    return live ? 'success' : null;
+  });
+
+  readonly daemonIndicatorLabel = computed(() =>
+    this.daemonIndicator() === 'warning'
+      ? 'A daemon is degraded or restarting'
+      : 'A daemon is running',
+  );
+
+  /** Latched on the Web view tab's first selection; gates the iframe (see DaemonWebviewComponent). */
+  readonly webviewActivated = signal(false);
+
+  onTabChange(label: string): void {
+    if (label === 'Web view') {
+      this.webviewActivated.set(true);
+    }
+  }
+
   /** An event's "open in source": make the jump visible by switching to Files, then anchor. */
   openFileFromEvent(anchor: DaemonEventFileAnchor): void {
-    this.tabGroup()?.selectTabByIndex(0);
+    this.tabGroup()?.selectTabByLabel('Files');
     this.fileBrowser()?.openAtLine(anchor.path, anchor.startLine, anchor.endLine);
   }
 }
