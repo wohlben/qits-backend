@@ -6,7 +6,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 
 import eu.wohlben.qits.domain.featureflow.api.ActionConfigurationController.CreateActionConfigurationRequest;
-import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
+import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRepositoryRequest;
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest;
 import io.quarkus.test.junit.QuarkusTest;
@@ -39,7 +39,7 @@ public class RepositoryActionsControllerTest {
 
   // Repository-scoped actions have no REST CRUD (deliberately deferred); create them through the
   // domain service, the same seam the MCP tools use.
-  @Inject RepositoryActionService repositoryActionService;
+  @Inject ActionConfigurationService actionConfigurationService;
 
   private final String fixtureUrl;
 
@@ -89,10 +89,11 @@ public class RepositoryActionsControllerTest {
             .path("actionConfiguration.id");
 
     String ownId =
-        repositoryActionService.create(repoId, "effective-own", null, "echo own", null, true, null)
+        actionConfigurationService.createForRepository(
+                repoId, "effective-own", null, "echo own", null, true, null)
             .id;
     String foreignId =
-        repositoryActionService.create(
+        actionConfigurationService.createForRepository(
                 otherRepoId, "effective-foreign", null, "echo foreign", null, false, null)
             .id;
 

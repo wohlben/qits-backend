@@ -2,10 +2,8 @@ package eu.wohlben.qits.domain.featureflow.mcp;
 
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.ActionResolutionService;
-import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
 import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
 import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
-import eu.wohlben.qits.domain.featureflow.mapper.RepositoryActionMapper;
 import io.quarkiverse.mcp.server.McpServer;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
@@ -44,13 +42,9 @@ public class ActionConfigurationMcpTools {
 
   @Inject ActionConfigurationService actionConfigurationService;
 
-  @Inject RepositoryActionService repositoryActionService;
-
   @Inject ActionResolutionService actionResolutionService;
 
   @Inject ActionConfigurationMapper actionConfigurationMapper;
-
-  @Inject RepositoryActionMapper repositoryActionMapper;
 
   @Inject RepositoryScope repositoryScope;
 
@@ -159,8 +153,8 @@ public class ActionConfigurationMcpTools {
   @Transactional
   public ActionConfigurationDto getRepositoryAction(
       @ToolArg(description = "id of the repository action") String id) {
-    return repositoryActionMapper.toDto(
-        repositoryActionService.get(repositoryScope.requireRepositoryId(), id));
+    return actionConfigurationMapper.toDto(
+        actionConfigurationService.getForRepository(repositoryScope.requireRepositoryId(), id));
   }
 
   @McpServer("actions")
@@ -180,7 +174,7 @@ public class ActionConfigurationMcpTools {
       @ToolArg(required = false, description = "environment variables, as key/value pairs")
           Map<String, String> environment) {
     var action =
-        repositoryActionService.create(
+        actionConfigurationService.createForRepository(
             repositoryScope.requireRepositoryId(),
             name,
             description,
@@ -188,7 +182,7 @@ public class ActionConfigurationMcpTools {
             checkScript,
             interactive != null && interactive,
             environment);
-    return repositoryActionMapper.toDto(action);
+    return actionConfigurationMapper.toDto(action);
   }
 
   @McpServer("actions")
@@ -209,7 +203,7 @@ public class ActionConfigurationMcpTools {
       @ToolArg(required = false, description = "replacement environment, as key/value pairs")
           Map<String, String> environment) {
     var action =
-        repositoryActionService.update(
+        actionConfigurationService.updateForRepository(
             repositoryScope.requireRepositoryId(),
             id,
             name,
@@ -218,7 +212,7 @@ public class ActionConfigurationMcpTools {
             checkScript,
             interactive,
             environment);
-    return repositoryActionMapper.toDto(action);
+    return actionConfigurationMapper.toDto(action);
   }
 
   @McpServer("actions")
@@ -229,7 +223,7 @@ public class ActionConfigurationMcpTools {
   @Transactional
   public DeletedAction deleteRepositoryAction(
       @ToolArg(description = "id of the repository action to delete") String id) {
-    repositoryActionService.delete(repositoryScope.requireRepositoryId(), id);
+    actionConfigurationService.deleteForRepository(repositoryScope.requireRepositoryId(), id);
     return new DeletedAction(id, true);
   }
 }

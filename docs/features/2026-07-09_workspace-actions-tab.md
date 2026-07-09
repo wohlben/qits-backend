@@ -56,6 +56,13 @@ Related/dependent plans:
 
 ## The model: no new entity
 
+> **Update (2026-07-09):** the two tiers are no longer two tables — they were unified into one
+> `ActionConfiguration` table with a nullable `repository_id`
+> ([unified-action-scope](2026-07-09_unified-action-scope.md)), and `seed-webapp`'s build/lint/test
+> actions are now **repository-scoped** (they were global only because flows couldn't bind
+> repo-scoped actions). Everything this section says about the tab, the endpoint and the DTO
+> (`scope` + `repositoryId`) is unchanged.
+
 No schema change and no migration. Actions stay at their two tiers (per
 [actions](2026-05-01_actions.md); `ActionScope` is deliberately open to more tiers
 later, but a *workspace* tier is explicitly not this idea — see Explicitly deferred). The

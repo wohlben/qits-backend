@@ -85,7 +85,8 @@ public class ActionConfigurationServiceTest {
 
   @Test
   public void testList() {
-    long before = actionConfigurationRepository.count();
+    // list() is the global library only, so the baseline is the global count.
+    long before = actionConfigurationRepository.listGlobal().size();
     actionConfigurationService.create("One", null, "echo 1", "echo required", false, null);
     actionConfigurationService.create("Two", null, "echo 2", "echo suggested", false, null);
 

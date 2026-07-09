@@ -4,23 +4,20 @@ import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
 import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.ActionScope;
-import eu.wohlben.qits.domain.featureflow.entity.RepositoryAction;
 import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
-import eu.wohlben.qits.domain.featureflow.mapper.RepositoryActionMapper;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
-import eu.wohlben.qits.domain.featureflow.persistence.RepositoryActionRepository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Resolves the actions <em>available in a repository</em>: the merge of the global library and that
- * repository's own actions. This is the single place that joins the two scopes, so the Run… picker,
- * the {@code runAction} runner and the MCP listing all agree on what a repository can run.
+ * repository's own actions (one query now that both scopes share a table). This is the single place
+ * that defines that merge, so the Run… picker, the {@code runAction} runner and the MCP listing all
+ * agree on what a repository can run.
  *
  * <p>Actions are plain shell scripts — their {@code executeScript} runs verbatim. Launching a
  * coding agent (e.g. Claude Code with an MCP server attached) is no longer modelled as an action
@@ -31,13 +28,9 @@ public class ActionResolutionService {
 
   @Inject ActionConfigurationRepository actionConfigurationRepository;
 
-  @Inject RepositoryActionRepository repositoryActionRepository;
-
   @Inject RepositoryRepository repositoryRepository;
 
   @Inject ActionConfigurationMapper actionConfigurationMapper;
-
-  @Inject RepositoryActionMapper repositoryActionMapper;
 
   /**
    * A resolved action flattened to just what running it needs, regardless of which scope it came
@@ -61,14 +54,9 @@ public class ActionResolutionService {
     repositoryRepository
         .findByIdOptional(repositoryId)
         .orElseThrow(() -> new NotFoundException("Repository not found: " + repositoryId));
-    List<ActionConfigurationDto> actions = new ArrayList<>();
-    actionConfigurationRepository.listAll().stream()
+    return actionConfigurationRepository.listEffective(repositoryId).stream()
         .map(actionConfigurationMapper::toDto)
-        .forEach(actions::add);
-    repositoryActionRepository.findByRepositoryId(repositoryId).stream()
-        .map(repositoryActionMapper::toDto)
-        .forEach(actions::add);
-    return actions;
+        .toList();
   }
 
   /**
@@ -79,35 +67,20 @@ public class ActionResolutionService {
    */
   @Transactional
   public ResolvedAction resolveForRepository(String repositoryId, String actionId) {
-    ActionConfiguration global =
-        actionConfigurationRepository.findByIdOptional(actionId).orElse(null);
-    if (global != null) {
-      return new ResolvedAction(
-          global.id,
-          global.name,
-          global.executeScript,
-          global.interactive,
-          ActionScope.GLOBAL,
-          null,
-          global.environment);
+    ActionConfiguration action =
+        actionConfigurationRepository
+            .findByIdOptional(actionId)
+            .orElseThrow(() -> new NotFoundException("Action not found: " + actionId));
+    if (action.repository != null && !action.repository.id.equals(repositoryId)) {
+      throw new NotFoundException("Action not available in this repository: " + actionId);
     }
-
-    RepositoryAction repoAction =
-        repositoryActionRepository.findByIdOptional(actionId).orElse(null);
-    if (repoAction != null) {
-      if (!repoAction.repository.id.equals(repositoryId)) {
-        throw new NotFoundException("Action not available in this repository: " + actionId);
-      }
-      return new ResolvedAction(
-          repoAction.id,
-          repoAction.name,
-          repoAction.executeScript,
-          repoAction.interactive,
-          ActionScope.REPOSITORY,
-          repoAction.repository.id,
-          repoAction.environment);
-    }
-
-    throw new NotFoundException("Action not found: " + actionId);
+    return new ResolvedAction(
+        action.id,
+        action.name,
+        action.executeScript,
+        action.interactive,
+        action.repository == null ? ActionScope.GLOBAL : ActionScope.REPOSITORY,
+        action.repository == null ? null : action.repository.id,
+        action.environment);
   }
 }

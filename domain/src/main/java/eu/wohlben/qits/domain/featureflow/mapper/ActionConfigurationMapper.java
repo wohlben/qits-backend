@@ -2,13 +2,16 @@ package eu.wohlben.qits.domain.featureflow.mapper;
 
 import eu.wohlben.qits.domain.featureflow.dto.ActionConfigurationDto;
 import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
+import eu.wohlben.qits.domain.featureflow.entity.ActionScope;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper(componentModel = "jakarta")
+@Mapper(componentModel = "jakarta", imports = ActionScope.class)
 public interface ActionConfigurationMapper {
 
-  @Mapping(target = "scope", constant = "GLOBAL")
-  @Mapping(target = "repositoryId", ignore = true)
+  @Mapping(
+      target = "scope",
+      expression = "java(entity.repository == null ? ActionScope.GLOBAL : ActionScope.REPOSITORY)")
+  @Mapping(target = "repositoryId", source = "repository.id")
   ActionConfigurationDto toDto(ActionConfiguration entity);
 }

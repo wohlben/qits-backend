@@ -102,7 +102,7 @@ public class SeedWebappServiceTest {
 
     assertObservableDaemon(repo.id);
     assertGreetingWorkspace(repo.id);
-    assertBuildAndVerifyFeatureFlow(project.id);
+    assertBuildAndVerifyFeatureFlow(project.id, repo.id);
 
     // Seeding is pure host-side data setup — no container ran (the daemon is a definition only;
     // it launches on demand later), and every workspace waits STOPPED for its first use.
@@ -118,19 +118,21 @@ public class SeedWebappServiceTest {
   }
 
   /**
-   * The reset must reconcile the seed-owned <b>global</b> actions instead of leaking four more per
-   * run (regression for docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md):
-   * duplicates are deleted, drift is reset to the seeded definition, and a duplicate some other
-   * project's flow still binds is spared (its FK has no cascade — deleting would break that flow).
+   * The seed's build/lint/test actions are <b>repository-scoped</b> now (their commands are this
+   * stack's — meaningless elsewhere), so the reset must (a) recreate them exactly once on the new
+   * repository, (b) delete the stale <b>global</b> copies earlier seed versions created (incl. the
+   * pre-1529f10 leak, docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md), and (c)
+   * spare a global copy some other project's flow still binds (its FK has no cascade — deleting
+   * would break that flow).
    */
   @Test
-  public void resetReconcilesSeedOwnedGlobalActions() {
+  public void resetRescopesSeedActionsAndCleansStaleGlobals() {
     seedWebappService.seed();
 
-    // Simulate the historical leak: an unbound, drifted duplicate of a seed-owned action...
+    // Simulate what earlier seed versions left behind: a stale, drifted global copy...
     actionConfigurationService.create(
         "build-project", "drifted", "echo drifted", "echo check", true, Map.of("K", "V"));
-    // ...and a duplicate that a non-demo project's flow still binds.
+    // ...and a global copy that a non-demo project's flow still binds.
     ActionConfiguration boundDupe =
         actionConfigurationService.create(
             "run-unit-tests", "user copy", "echo user", null, false, null);
@@ -143,23 +145,33 @@ public class SeedWebappServiceTest {
     featureFlowPhaseActionService.create(
         userStep.id, boundDupe.id, ActionType.QUALITY_GATE, 0, null);
 
-    seedWebappService.seed();
+    Repository repo = seedWebappService.seed();
 
-    // The unbound duplicate is gone; the one survivor is back to the known-good definition.
-    List<ActionConfiguration> builds = globalActionsNamed("build-project");
-    assertEquals(1, builds.size(), "reset should reconcile duplicates instead of leaking more");
-    ActionConfiguration build = builds.get(0);
-    assertEquals("./mvnw package", build.executeScript, "drift resets to the seeded script");
-    assertNull(build.checkScript, "drifted checkScript is cleared");
-    assertFalse(build.interactive, "drifted interactive flag is cleared");
-    assertTrue(build.environment.isEmpty(), "drifted environment is cleared");
-
-    // The flow-bound duplicate survives beside the seed's own definition.
-    List<ActionConfiguration> tests = globalActionsNamed("run-unit-tests");
-    assertEquals(2, tests.size(), "the seed's action plus the user's still-bound copy");
+    // The stale unbound global copy is deleted, not reconciled — the action lives on the
+    // repository now.
     assertTrue(
-        tests.stream().anyMatch(a -> a.id.equals(boundDupe.id)),
-        "a flow-bound duplicate must be spared by the reset");
+        globalActionsNamed("build-project").isEmpty(),
+        "stale global seed actions are cleaned up on reset");
+
+    // Each seed-owned action exists exactly once, owned by the (re-created) repository.
+    List<ActionConfiguration> repoActions = actionConfigurationService.listForRepository(repo.id);
+    for (String name :
+        List.of("build-project", "lint-backend", "lint-frontend", "run-unit-tests", "Stack info")) {
+      assertEquals(
+          1,
+          repoActions.stream().filter(a -> name.equals(a.name)).count(),
+          "'" + name + "' should exist exactly once, repository-scoped");
+    }
+    ActionConfiguration build =
+        repoActions.stream().filter(a -> "build-project".equals(a.name)).findFirst().orElseThrow();
+    assertEquals("./mvnw package", build.executeScript, "the seeded script, not the drifted one");
+    assertNull(build.checkScript);
+    assertFalse(build.interactive);
+
+    // The flow-bound global copy survives (deleting it would break the user's flow).
+    List<ActionConfiguration> tests = globalActionsNamed("run-unit-tests");
+    assertEquals(1, tests.size(), "only the user's still-bound global copy remains");
+    assertEquals(boundDupe.id, tests.get(0).id, "a flow-bound copy must be spared by the reset");
   }
 
   private List<ActionConfiguration> globalActionsNamed(String name) {
@@ -202,7 +214,7 @@ public class SeedWebappServiceTest {
   }
 
   /** The seeded feature-flow renders as Development → Build (prereq) / Lint (parallel) / Test. */
-  private void assertBuildAndVerifyFeatureFlow(String projectId) {
+  private void assertBuildAndVerifyFeatureFlow(String projectId, String repoId) {
     List<FeatureFlowConfiguration> configs =
         featureFlowConfigurationService.listByProject(projectId);
     FeatureFlowConfiguration config =
@@ -232,5 +244,12 @@ public class SeedWebappServiceTest {
     assertTrue(
         lintActions.stream().allMatch(a -> a.actionType == ActionType.QUALITY_GATE),
         "Lint actions are quality gates");
+
+    // The flow binds the repository-scoped actions (the commands are this stack's, not globals).
+    List<String> repoActionIds =
+        actionConfigurationService.listForRepository(repoId).stream().map(a -> a.id).toList();
+    assertTrue(
+        lintActions.stream().allMatch(a -> repoActionIds.contains(a.actionConfiguration.id)),
+        "flow-bound actions belong to the seeded repository");
   }
 }
