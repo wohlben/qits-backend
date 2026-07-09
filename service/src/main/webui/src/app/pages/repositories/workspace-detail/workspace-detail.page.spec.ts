@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 
 import { AgentPluginControllerService } from '@/api/api/agentPluginController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { RepositoryActionsControllerService } from '@/api/api/repositoryActionsController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
@@ -26,6 +27,9 @@ describe('WorkspaceDetailPage', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesGet: vi.fn().mockReturnValue(of({ paths: [] })),
   };
   const commandService = { apiCommandsGet: vi.fn().mockReturnValue(of({ entries: [] })) };
+  const actionsService = {
+    apiRepositoriesRepositoryIdActionsGet: vi.fn().mockReturnValue(of({ entries: [] })),
+  };
   const pluginService = {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentPluginsGet: vi
       .fn()
@@ -64,6 +68,7 @@ describe('WorkspaceDetailPage', () => {
         { provide: ActivatedRoute, useValue: route },
         { provide: WorkspaceControllerService, useValue: workspaceService },
         { provide: CommandControllerService, useValue: commandService },
+        { provide: RepositoryActionsControllerService, useValue: actionsService },
         { provide: AgentPluginControllerService, useValue: pluginService },
         { provide: ZardDarkMode, useValue: { themeMode: () => EDarkModes.LIGHT } },
       ],
@@ -96,6 +101,7 @@ describe('WorkspaceDetailPage', () => {
       'Chat',
       'Files',
       'Daemons',
+      'Actions',
       'Web view',
       'Telemetry',
       'Agents',
@@ -103,6 +109,7 @@ describe('WorkspaceDetailPage', () => {
     // Chat, daemons and web view live in tab panels — not in the header, not floating.
     expect(el.querySelector('[role="tabpanel"] app-workspace-chat')).not.toBeNull();
     expect(el.querySelector('[role="tabpanel"] app-workspace-daemons')).not.toBeNull();
+    expect(el.querySelector('[role="tabpanel"] app-workspace-actions')).not.toBeNull();
     expect(el.querySelector('[role="tabpanel"] app-daemon-webview')).not.toBeNull();
     expect(el.querySelector('header app-workspace-chat')).toBeNull();
     expect(el.querySelector('[aria-label="Open the daemon web view"]')).toBeNull();
@@ -125,7 +132,15 @@ describe('WorkspaceDetailPage', () => {
       b.textContent?.trim(),
     );
     // Persisted labels lead; tabs the saved order doesn't know keep their template order behind.
-    expect(tabLabels).toEqual(['Chat', 'Web view', 'Files', 'Daemons', 'Telemetry', 'Agents']);
+    expect(tabLabels).toEqual([
+      'Chat',
+      'Web view',
+      'Files',
+      'Daemons',
+      'Actions',
+      'Telemetry',
+      'Agents',
+    ]);
     // The first displayed tab is the selected one.
     expect(tabButton(el, 'Chat').getAttribute('aria-selected')).toBe('true');
   });
@@ -177,6 +192,50 @@ describe('WorkspaceDetailPage', () => {
 
     expect(
       tabButton(el, 'Chat').querySelector('[title="A chat session is running"]'),
+    ).not.toBeNull();
+  });
+
+  it('marks the Actions tab while a terminal command runs here — but not for a chat', async () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(tabButton(el, 'Actions').querySelector('[title="A command is running"]')).toBeNull();
+
+    // A running chat lights the Chat dot, not the Actions one.
+    queryClient.setQueryData(
+      ['commands'],
+      [
+        {
+          id: 'cmd-1',
+          workspaceId: 'wt-1',
+          kind: CommandKind.Chat,
+          status: CommandStatus.Running,
+          launchedAt: '2026-07-09T10:00:00Z',
+        },
+      ],
+    );
+    await flush();
+    fixture.detectChanges();
+    expect(tabButton(el, 'Actions').querySelector('[title="A command is running"]')).toBeNull();
+
+    queryClient.setQueryData(
+      ['commands'],
+      [
+        {
+          id: 'cmd-2',
+          workspaceId: 'wt-1',
+          kind: CommandKind.Terminal,
+          status: CommandStatus.Running,
+          actionName: 'build-project',
+          launchedAt: '2026-07-09T10:01:00Z',
+        },
+      ],
+    );
+    await flush();
+    fixture.detectChanges();
+    expect(
+      tabButton(el, 'Actions').querySelector('[title="A command is running"]'),
     ).not.toBeNull();
   });
 

@@ -32,4 +32,10 @@ public class ActionResolutionServiceTest {
         NotFoundException.class,
         () -> actionResolutionService.resolveForRepository("repo-xyz", "does-not-exist"));
   }
+
+  @Test
+  public void effectiveActionsForAnUnknownRepositoryThrows() {
+    assertThrows(
+        NotFoundException.class, () -> actionResolutionService.effectiveActions("does-not-exist"));
+  }
 }

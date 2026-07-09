@@ -9,6 +9,7 @@ import eu.wohlben.qits.domain.featureflow.mapper.ActionConfigurationMapper;
 import eu.wohlben.qits.domain.featureflow.mapper.RepositoryActionMapper;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import eu.wohlben.qits.domain.featureflow.persistence.RepositoryActionRepository;
+import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -32,6 +33,8 @@ public class ActionResolutionService {
 
   @Inject RepositoryActionRepository repositoryActionRepository;
 
+  @Inject RepositoryRepository repositoryRepository;
+
   @Inject ActionConfigurationMapper actionConfigurationMapper;
 
   @Inject RepositoryActionMapper repositoryActionMapper;
@@ -49,9 +52,15 @@ public class ActionResolutionService {
       String repositoryId,
       Map<String, String> environment) {}
 
-  /** Every action available in {@code repositoryId}: global ones plus the repository's own. */
+  /**
+   * Every action available in {@code repositoryId}: global ones plus the repository's own. Throws
+   * {@link NotFoundException} if the repository does not exist.
+   */
   @Transactional
   public List<ActionConfigurationDto> effectiveActions(String repositoryId) {
+    repositoryRepository
+        .findByIdOptional(repositoryId)
+        .orElseThrow(() -> new NotFoundException("Repository not found: " + repositoryId));
     List<ActionConfigurationDto> actions = new ArrayList<>();
     actionConfigurationRepository.listAll().stream()
         .map(actionConfigurationMapper::toDto)

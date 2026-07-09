@@ -14,25 +14,25 @@ workspace — making actions a first-class tab alongside Chat, Files, and Daemon
 
 Related/dependent plans:
 
-- **Hard dependency on [actions](../features/2026-05-01_actions.md)** and the
-  [command registry](../features/2026-06-30_command-registry.md): the tab is a new *surface*
+- **Hard dependency on [actions](2026-05-01_actions.md)** and the
+  [command registry](2026-06-30_command-registry.md): the tab is a new *surface*
   over the existing `ActionResolutionService` + `CommandService.launch` machinery — no new
   execution mechanics.
 - **Extends the
-  [workspace detail tab consolidation](../features/2026-07-09_workspace-detail-tab-consolidation.md)**
-  (+ [draggable tabs](../features/2026-07-09_draggable-workspace-detail-tabs.md)): one more
+  [workspace detail tab consolidation](2026-07-09_workspace-detail-tab-consolidation.md)**
+  (+ [draggable tabs](2026-07-09_draggable-workspace-detail-tabs.md)): one more
   `<z-tab>` in the existing group. The drag-reorder persistence merges unknown labels
   gracefully — a new "Actions" tab simply appends for users with a stored order.
-- **Reuses the [command audit logs](../features/2026-06-30_command-audit-logs.md)** surface
+- **Reuses the [command audit logs](2026-06-30_command-audit-logs.md)** surface
   (`GET /commands`, `/commands/{id}/log`, terminate) for the run-history half of the tab, and
   the terminal socket / command pages from
-  [command restore navigation](../features/2026-06-30_command-restore-navigation.md) for
+  [command restore navigation](2026-06-30_command-restore-navigation.md) for
   interactive runs.
 - **Closes a gap the MCP surface already crossed**: `RepositoryMcpTools.listActions`/`runAction`
   and `ActionConfigurationMcpTools` expose the merged effective set (and repo-action CRUD) to
   the agent, but no REST endpoint does — the UI has been the less-capable client. This idea
   adds the missing effective-actions read endpoint.
-- **Adjacent to [feature-flows](../features/2026-05-01_feature-flows.md)**: phases bind global
+- **Adjacent to [feature-flows](2026-05-01_feature-flows.md)**: phases bind global
   actions as prerequisites/quality gates. The tab shows and runs the same definitions ad hoc;
   flow-driven orchestration stays out of scope.
 
@@ -57,7 +57,7 @@ Related/dependent plans:
 ## The model: no new entity
 
 No schema change and no migration. Actions stay at their two tiers (per
-[actions](../features/2026-05-01_actions.md); `ActionScope` is deliberately open to more tiers
+[actions](2026-05-01_actions.md); `ActionScope` is deliberately open to more tiers
 later, but a *workspace* tier is explicitly not this idea — see Explicitly deferred). The
 feature is a read surface plus UI over existing rows:
 
@@ -102,9 +102,10 @@ two sections in the Daemons-tab mold (controls above, feed below):
 frontend, parallel-grouped in the flow), and Test global actions against the servable
 Quarkus+Angular repo. After seeding, the greeting workspace's Actions tab lists them and "Run"
 on Build produces a completed command with its Maven log — no new seed work beyond eyeballing.
-Adding one repo-scoped `RepositoryAction` to `seed-webapp` (e.g. a `./mvnw quarkus:info`
-"Stack info" action) would demo the scope badge and prove the merged endpoint end-to-end;
-one-line addition via `RepositoryActionService`.
+`seed-webapp` additionally seeds one repo-scoped `RepositoryAction` ("Stack info",
+`./mvnw -q quarkus:info`, via `RepositoryActionService`) so the scope badge and the merged
+endpoint are demoed end-to-end; it cascade-deletes with the repository, so the reset-based
+idempotency holds.
 
 ## Explicitly deferred
 
@@ -125,24 +126,27 @@ one-line addition via `RepositoryActionService`.
   container via the lazy `ensureContainer` path; the tab shows whatever that does through the
   normal command status. No special pre-start UI. Trigger: latency complaints on first run.
 
-## Open questions
+## Decisions (were open questions)
 
-- **Endpoint path.** `GET /repositories/{repoId}/actions` (resolution scope) vs
-  `GET /repositories/{repoId}/workspaces/{workspaceId}/actions` (page symmetry with the
-  daemons endpoint). Lean **repo-nested**: the set is workspace-independent by construction,
-  and a workspace-nested path would imply a per-workspace set this idea deliberately doesn't
-  introduce.
-- **Run history scope.** Only action-launched commands, or *all* commands in the workspace
-  (chat/agent sessions included)? Lean **all, visually distinguished**: the Chat tab already
-  owns chat sessions, but a complete "what ran here" audit view is more honest than a filtered
-  one, and the command rows already carry enough to badge origin.
-- **Where the command push lands.** Polling is off the table (project constraint: an initial
-  fetch is fine, but live freshness must be SSE or socket). The question is only *which*
-  channel: grow the workspace SSE stream (`WorkspaceLiveService`) with a command topic, or
-  reuse/derive from the terminal websocket. Lean **SSE topic** — the page already holds one
-  `live.connect(repoId, workspaceId)` connection that invalidates the sibling tabs' queries,
-  and command start/finish is exactly the kind of coarse state change it exists for; the
-  websocket is per-command and interactive-only.
+- **Endpoint path: repo-nested.** `GET /repositories/{repositoryId}/actions`
+  (`RepositoryActionsController`, delegating to `ActionResolutionService.effectiveActions`,
+  which now 404s on an unknown repository). The set is workspace-independent by construction;
+  a workspace-nested path would have implied a per-workspace set this feature deliberately
+  doesn't introduce.
+- **Run history scope: all commands, visually distinguished.** The tab lists every command in
+  the workspace — chat sessions and daemon runs get an origin badge (`kind`), action runs show
+  their `actionName`. A complete "what ran here" audit view is more honest than a filtered one.
+  Server-side via the new `workspaceId` query param on `GET /commands` (requires `repoId`,
+  since workspace slugs are only unique per repository — 400 otherwise).
+- **Command push: the existing SSE `commands` topic — zero new plumbing.** It turned out the
+  channel was already fully wired: `CommandLifecycleService` fires `Topic.COMMANDS` on create
+  and finish, and `WorkspaceLiveService` maps `commands` → invalidate `['commands']`. The tab's
+  history query key (`['commands', repoId, workspaceId]`) sits under that prefix, so TanStack's
+  prefix-matching invalidation covers it with no `WorkspaceLiveService` change. The tab never
+  polls.
+- **Tab indicator source.** `'primary'` while a `RUNNING` `TERMINAL` command exists in this
+  workspace, computed from the page's existing `['commands']` query (the one `chatIndicator`
+  already reads) — chats and daemons keep their own dots.
 
 ## Testing sketch
 

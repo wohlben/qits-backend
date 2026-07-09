@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDto } from './repositoryDto';
+import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
 
 
-export interface Entry9 { 
-    repository?: RepositoryDto;
+export interface Response77 { 
+    groups?: Array<TelemetryErrorGroupDto>;
 }
 

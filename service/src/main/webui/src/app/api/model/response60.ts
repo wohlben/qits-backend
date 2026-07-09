@@ -10,8 +10,6 @@
 
 
 export interface Response60 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+    output?: string;
 }
 

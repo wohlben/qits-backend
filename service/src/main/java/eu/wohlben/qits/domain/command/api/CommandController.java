@@ -49,9 +49,11 @@ public class CommandController {
 
   @GET
   public ListCommandsRequest.Response list(
-      @QueryParam("repoId") String repoId, @QueryParam("status") CommandStatus status) {
+      @QueryParam("repoId") String repoId,
+      @QueryParam("workspaceId") String workspaceId,
+      @QueryParam("status") CommandStatus status) {
     var entries =
-        commandService.list(repoId, status).stream()
+        commandService.list(repoId, workspaceId, status).stream()
             .map(ListCommandsRequest.Response.Entry::new)
             .toList();
     return new ListCommandsRequest.Response(entries);

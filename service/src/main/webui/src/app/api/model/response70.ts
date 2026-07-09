@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceHistoryDetailDto } from './workspaceHistoryDetailDto';
+import { Entry13 } from './entry13';
 
 
 export interface Response70 { 
-    workspace?: WorkspaceHistoryDetailDto;
+    entries?: Array<Entry13>;
 }
 

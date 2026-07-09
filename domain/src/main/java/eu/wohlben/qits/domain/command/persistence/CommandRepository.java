@@ -24,6 +24,14 @@ public class CommandRepository implements PanacheRepositoryBase<Command, String>
     return list("workspace.repository.id = ?1 order by launchedAt desc", repositoryId);
   }
 
+  /** Commands that ran in a workspace (by repository id + workspace slug), most-recent first. */
+  public List<Command> findByRepositoryAndWorkspace(String repositoryId, String workspaceId) {
+    return list(
+        "workspace.repository.id = ?1 and workspace.workspaceId = ?2 order by launchedAt desc",
+        repositoryId,
+        workspaceId);
+  }
+
   /** Commands that ran in a workspace (by surrogate id), in launch order. */
   public List<Command> findByWorkspace(Long workspaceId) {
     return list("workspace.id = ?1 order by launchedAt", workspaceId);

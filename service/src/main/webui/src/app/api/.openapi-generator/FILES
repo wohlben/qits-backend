@@ -16,6 +16,7 @@ api/featureFlowPhaseStepController.service.ts
 api/projectController.service.ts
 api/promptRefinementController.service.ts
 api/reactiveEchoController.service.ts
+api/repositoryActionsController.service.ts
 api/repositoryController.service.ts
 api/repositoryDaemonController.service.ts
 api/speechController.service.ts
@@ -64,6 +65,7 @@ model/entry1.ts
 model/entry10.ts
 model/entry11.ts
 model/entry12.ts
+model/entry13.ts
 model/entry2.ts
 model/entry3.ts
 model/entry4.ts
@@ -171,6 +173,7 @@ model/response73.ts
 model/response74.ts
 model/response75.ts
 model/response76.ts
+model/response77.ts
 model/response8.ts
 model/response9.ts
 model/restartPolicy.ts

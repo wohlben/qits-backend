@@ -208,7 +208,7 @@ public class DaemonSupervisorTest {
 
     assertEquals(1, crashed.restartCount(), "one relaunch before giving up");
     List<CommandDto> daemonRuns =
-        commandService.list(repoId, null).stream()
+        commandService.list(repoId, null, null).stream()
             .filter(c -> c.kind() == CommandKind.DAEMON)
             .toList();
     assertEquals(2, daemonRuns.size(), "each relaunch is its own command row: " + daemonRuns);
@@ -245,7 +245,7 @@ public class DaemonSupervisorTest {
 
     assertEquals(0, crashed.restartCount());
     long daemonRuns =
-        commandService.list(repoId, null).stream()
+        commandService.list(repoId, null, null).stream()
             .filter(c -> c.kind() == CommandKind.DAEMON)
             .count();
     assertEquals(1, daemonRuns);
@@ -276,7 +276,7 @@ public class DaemonSupervisorTest {
     Thread.sleep(500);
     assertEquals(DaemonStatus.STOPPED, instanceOf(repoId, daemonId).status());
     long daemonRuns =
-        commandService.list(repoId, null).stream()
+        commandService.list(repoId, null, null).stream()
             .filter(c -> c.kind() == CommandKind.DAEMON)
             .count();
     assertEquals(1, daemonRuns, "an explicit stop must not trigger the ALWAYS policy");

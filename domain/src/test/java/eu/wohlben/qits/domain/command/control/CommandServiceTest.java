@@ -81,7 +81,7 @@ public class CommandServiceTest {
     assertEquals(0, outcome.exitCode());
     assertTrue(outcome.output().contains("hello-cmd"), "output: " + outcome.output());
 
-    List<CommandDto> commands = commandService.list(repoId, null);
+    List<CommandDto> commands = commandService.list(repoId, null, null);
     assertEquals(1, commands.size(), "one command should be recorded");
     CommandDto command = commands.get(0);
     assertEquals(CommandStatus.EXITED, command.status());
@@ -97,7 +97,7 @@ public class CommandServiceTest {
     String actionId = createAction(repoId, "echo", "echo hello-log", false);
 
     commandService.launchAndAwait(repoId, "work", actionId);
-    String commandId = commandService.list(repoId, null).get(0).id();
+    String commandId = commandService.list(repoId, null, null).get(0).id();
 
     // The line log is written asynchronously, so poll briefly for it to flush.
     List<CommandLogLineDto> lines = awaitLog(commandId);

@@ -17,9 +17,7 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response72 } from '../model/response72';
-// @ts-ignore
-import { TranscribeRequest } from '../model/transcribeRequest';
+import { Response40 } from '../model/response40';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -31,26 +29,26 @@ import { BaseService } from '../api.base.service';
 @Injectable({
   providedIn: 'root'
 })
-export class SpeechControllerService extends BaseService {
+export class RepositoryActionsControllerService extends BaseService {
 
     constructor(protected httpClient: HttpClient, @Optional() @Inject(BASE_PATH) basePath: string|string[], @Optional() configuration?: Configuration) {
         super(basePath, configuration);
     }
 
     /**
-     * Transcribe
-     * @endpoint post /api/speech/transcriptions
-     * @param transcribeRequest 
+     * List
+     * @endpoint get /api/repositories/{repositoryId}/actions
+     * @param repositoryId 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response72>;
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response72>>;
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response72>>;
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (transcribeRequest === null || transcribeRequest === undefined) {
-            throw new Error('Required parameter transcribeRequest was null or undefined when calling apiSpeechTranscriptionsPost.');
+    public apiRepositoriesRepositoryIdActionsGet(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response40>;
+    public apiRepositoriesRepositoryIdActionsGet(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response40>>;
+    public apiRepositoriesRepositoryIdActionsGet(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response40>>;
+    public apiRepositoriesRepositoryIdActionsGet(repositoryId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (repositoryId === null || repositoryId === undefined) {
+            throw new Error('Required parameter repositoryId was null or undefined when calling apiRepositoriesRepositoryIdActionsGet.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -67,15 +65,6 @@ export class SpeechControllerService extends BaseService {
         const localVarTransferCache: boolean = options?.transferCache ?? true;
 
 
-        // to determine the Content-Type header
-        const consumes: string[] = [
-            'application/json'
-        ];
-        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
-        if (httpContentTypeSelected !== undefined) {
-            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
-        }
-
         let responseType_: 'text' | 'json' | 'blob' = 'json';
         if (localVarHttpHeaderAcceptSelected) {
             if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
@@ -87,12 +76,11 @@ export class SpeechControllerService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/speech/transcriptions`;
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/actions`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response72>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response40>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: transcribeRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,
