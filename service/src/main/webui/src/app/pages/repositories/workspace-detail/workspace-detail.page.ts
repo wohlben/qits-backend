@@ -37,11 +37,14 @@ import {
 } from '@/shared/components/tabs';
 
 /**
- * The workspace detail page: everything the workspace offers as one tab row — Files, Chat,
- * Daemons, Web view, Events, Telemetry, Plugins. All panels rely on the tab group keeping hidden
- * tabs mounted: the file browser's openFile anchors, the chat's WebSocket, and the web view's
- * iframe survive tab switches. The older speak-to-prompt page stays reachable at `…/wip`
- * (unlinked, kept for prototyping).
+ * The workspace detail page: everything the workspace offers as one tab row — Chat, Files,
+ * Daemons (controls + events feed), Web view, Telemetry, Agents (the plugins list). All panels
+ * rely on the tab
+ * group keeping hidden tabs mounted: the file browser's openFile anchors, the chat's WebSocket,
+ * and the web view's
+ * iframe survive tab switches. The tab row is drag-reorderable, persisted per browser under the
+ * `qits.workspace-detail.tab-order` localStorage key. The older speak-to-prompt page stays
+ * reachable at `…/wip` (unlinked, kept for prototyping).
  */
 @Component({
   selector: 'app-workspace-detail-page',
@@ -79,10 +82,8 @@ import {
         </div>
       </ng-template>
 
-      <z-tab-group (zTabChange)="onTabChange($event.label)">
-        <z-tab label="Files">
-          <app-workspace-file-browser [repoId]="repoId" [workspaceId]="workspaceId" />
-        </z-tab>
+      <!-- Tabs are drag-reorderable; the chosen order persists per browser (localStorage). -->
+      <z-tab-group zReorderKey="qits.workspace-detail.tab-order" (zTabChange)="onTabChange($event.label)">
         <z-tab
           label="Chat"
           [indicator]="chatIndicator()"
@@ -94,12 +95,25 @@ import {
             [preamble]="workspace()?.preamble ?? null"
           />
         </z-tab>
+        <z-tab label="Files">
+          <app-workspace-file-browser [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
         <z-tab
           label="Daemons"
           [indicator]="daemonIndicator()"
           [indicatorLabel]="daemonIndicatorLabel()"
         >
-          <app-workspace-daemons [repoId]="repoId" [workspaceId]="workspaceId" />
+          <div class="flex flex-col gap-6">
+            <app-workspace-daemons [repoId]="repoId" [workspaceId]="workspaceId" />
+            <section class="flex flex-col gap-3" aria-label="Daemon events">
+              <h2 class="text-lg font-semibold">Events</h2>
+              <app-workspace-daemon-events
+                [repoId]="repoId"
+                [workspaceId]="workspaceId"
+                (openFile)="openFileFromEvent($event)"
+              />
+            </section>
+          </div>
         </z-tab>
         <z-tab label="Web view">
           <app-daemon-webview
@@ -108,17 +122,10 @@ import {
             [activated]="webviewActivated()"
           />
         </z-tab>
-        <z-tab label="Events">
-          <app-workspace-daemon-events
-            [repoId]="repoId"
-            [workspaceId]="workspaceId"
-            (openFile)="openFileFromEvent($event)"
-          />
-        </z-tab>
         <z-tab label="Telemetry">
           <app-workspace-telemetry [repoId]="repoId" [workspaceId]="workspaceId" />
         </z-tab>
-        <z-tab label="Plugins">
+        <z-tab label="Agents">
           <app-workspace-plugins [repoId]="repoId" [workspaceId]="workspaceId" />
         </z-tab>
       </z-tab-group>

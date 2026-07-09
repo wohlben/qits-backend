@@ -38,6 +38,7 @@ describe('WorkspaceDetailPage', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    localStorage.clear(); // the page persists its tab order under qits.workspace-detail.tab-order
     // A seeded running chat mounts app-command-chat inline; keep its socket out of jsdom.
     vi.stubGlobal(
       'WebSocket',
@@ -71,6 +72,7 @@ describe('WorkspaceDetailPage', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
   function tabButton(el: HTMLElement, label: string): HTMLButtonElement {
@@ -91,13 +93,12 @@ describe('WorkspaceDetailPage', () => {
       b.textContent?.trim(),
     );
     expect(tabLabels).toEqual([
-      'Files',
       'Chat',
+      'Files',
       'Daemons',
       'Web view',
-      'Events',
       'Telemetry',
-      'Plugins',
+      'Agents',
     ]);
     // Chat, daemons and web view live in tab panels — not in the header, not floating.
     expect(el.querySelector('[role="tabpanel"] app-workspace-chat')).not.toBeNull();
@@ -105,11 +106,31 @@ describe('WorkspaceDetailPage', () => {
     expect(el.querySelector('[role="tabpanel"] app-daemon-webview')).not.toBeNull();
     expect(el.querySelector('header app-workspace-chat')).toBeNull();
     expect(el.querySelector('[aria-label="Open the daemon web view"]')).toBeNull();
-    // The events feed lives in its tab, not in the daemons panel.
+    // The events feed shares the Daemons tab panel, rendered beside (not inside) the panel.
+    const daemonsPanel = el.querySelector('app-workspace-daemons')!.closest('[role="tabpanel"]')!;
+    expect(daemonsPanel.querySelector('app-workspace-daemon-events')).not.toBeNull();
     expect(el.querySelector('app-workspace-daemons app-workspace-daemon-events')).toBeNull();
   });
 
-  it('an openFile from the Events tab selects the Files tab and anchors the file browser', () => {
+  it('restores a drag-reordered tab row persisted in localStorage', () => {
+    localStorage.setItem(
+      'qits.workspace-detail.tab-order',
+      JSON.stringify(['Chat', 'Web view', 'Files']),
+    );
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const tabLabels = Array.from(el.querySelectorAll('nav[role="tablist"] [role="tab"]')).map((b) =>
+      b.textContent?.trim(),
+    );
+    // Persisted labels lead; tabs the saved order doesn't know keep their template order behind.
+    expect(tabLabels).toEqual(['Chat', 'Web view', 'Files', 'Daemons', 'Telemetry', 'Agents']);
+    // The first displayed tab is the selected one.
+    expect(tabButton(el, 'Chat').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('an openFile from the events feed selects the Files tab and anchors the file browser', () => {
     const fixture = TestBed.createComponent(WorkspaceDetailPage);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -119,11 +140,11 @@ describe('WorkspaceDetailPage', () => {
     ).componentInstance;
     const openAtLine = vi.spyOn(fileBrowser, 'openAtLine').mockImplementation(() => undefined);
 
-    // Start on the Events tab so the jump back to Files is observable.
-    const eventsTab = tabButton(el, 'Events');
-    eventsTab.click();
+    // Start on the Daemons tab (where the events feed lives) so the jump to Files is observable.
+    const daemonsTab = tabButton(el, 'Daemons');
+    daemonsTab.click();
     fixture.detectChanges();
-    expect(eventsTab.getAttribute('aria-selected')).toBe('true');
+    expect(daemonsTab.getAttribute('aria-selected')).toBe('true');
 
     fixture.componentInstance.openFileFromEvent({ path: 'src/app.ts', startLine: 3, endLine: 5 });
     fixture.detectChanges();

@@ -19,9 +19,9 @@ export interface DaemonEventFileAnchor {
 /**
  * The workspace's daemon events feed, read from the durable store: severity-colored, each
  * expandable to its log excerpt, with "open in source" jumping to the anchored place in the
- * command log or the tailed file. Split out of the daemons panel so it can live as an
- * observation tab beside Telemetry; it shares the `workspace-daemon-events` query key with the
- * daemons panel's start/stop invalidation, so daemon actions still refresh it.
+ * command log or the tailed file. A separate component from the daemons panel (it renders below
+ * it in the Daemons tab); it shares the `workspace-daemon-events` query key with the daemons
+ * panel's start/stop invalidation, so daemon actions still refresh it.
  */
 @Component({
   selector: 'app-workspace-daemon-events',

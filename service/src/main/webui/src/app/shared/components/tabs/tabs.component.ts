@@ -1,3 +1,4 @@
+import { CdkDrag, type CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
 import { NgTemplateOutlet } from '@angular/common';
 import {
   afterNextRender,
@@ -12,6 +13,7 @@ import {
   inject,
   Injector,
   input,
+  linkedSignal,
   output,
   runInInjectionContext,
   signal,
@@ -64,20 +66,25 @@ export class ZardTabComponent {
 
 @Component({
   selector: 'z-tab-group',
-  imports: [NgTemplateOutlet, ZardButtonComponent, NgIcon],
+  imports: [CdkDrag, CdkDropList, NgTemplateOutlet, ZardButtonComponent, NgIcon],
   template: `
     @if (navBeforeContent()) {
       <ng-container [ngTemplateOutlet]="navigationBlock" />
     }
 
+    <!--
+      Panels stay in content order even when the nav is reordered: moving a panel's DOM node
+      would reload iframes and reset scroll state in keep-mounted tabs. Only the nav buttons
+      move; tab/tabpanel pairing goes through the stable content index.
+    -->
     <div class="flex-1">
-      @for (tab of tabs(); track $index; let index = $index) {
+      @for (tab of tabs(); track tab; let index = $index) {
         <div
           role="tabpanel"
           [attr.id]="'tabpanel-' + index"
           [attr.aria-labelledby]="'tab-' + index"
           [attr.tabindex]="0"
-          [hidden]="activeTabIndex() !== index"
+          [hidden]="activeTab() !== tab"
           class="focus-visible:ring-primary/50 outline-none focus-visible:ring-2"
         >
           <ng-container [ngTemplateOutlet]="tab.contentTemplate()" />
@@ -117,27 +124,33 @@ export class ZardTabComponent {
           [class]="navClasses()"
           #tabNav
           role="tablist"
+          cdkDropList
+          [cdkDropListDisabled]="!reorderable()"
+          [cdkDropListOrientation]="horizontal ? 'horizontal' : 'vertical'"
+          (cdkDropListDropped)="onTabDrop($event)"
           [attr.aria-orientation]="horizontal ? 'horizontal' : 'vertical'"
         >
-          @for (tab of tabs(); track $index; let index = $index) {
+          @for (entry of navTabs(); track entry.tab) {
             <button
               type="button"
               z-button
               zType="ghost"
               role="tab"
-              [attr.id]="'tab-' + index"
-              [attr.aria-selected]="activeTabIndex() === index"
-              [attr.tabindex]="activeTabIndex() === index ? 0 : -1"
-              [attr.aria-controls]="'tabpanel-' + index"
-              (click)="setActiveTab(index)"
-              [class]="buttonClassesSignal()[index]"
+              cdkDrag
+              [cdkDragDisabled]="!reorderable()"
+              [attr.id]="'tab-' + entry.contentIndex"
+              [attr.aria-selected]="activeTab() === entry.tab"
+              [attr.tabindex]="activeTab() === entry.tab ? 0 : -1"
+              [attr.aria-controls]="'tabpanel-' + entry.contentIndex"
+              (click)="setActiveTab(entry.tab)"
+              [class]="buttonClassesSignal().get(entry.tab)"
             >
-              {{ tab.label() }}
-              @if (tab.indicator(); as indicator) {
+              {{ entry.tab.label() }}
+              @if (entry.tab.indicator(); as indicator) {
                 <span
                   class="ml-1.5 inline-block size-2 rounded-full"
                   [class]="indicatorClasses[indicator]"
-                  [attr.title]="tab.indicatorLabel() || null"
+                  [attr.title]="entry.tab.indicatorLabel() || null"
                 ></span>
               }
             </button>
@@ -182,6 +195,9 @@ export class ZardTabComponent {
         display: none;
       }
     }
+    nav[role='tablist'] .cdk-drag-placeholder {
+      opacity: 0.4;
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
@@ -203,7 +219,7 @@ export class ZardTabGroupComponent implements AfterViewInit {
   private readonly window = inject(DOCUMENT).defaultView;
 
   protected readonly tabs = computed(() => this.tabComponents());
-  protected readonly activeTabIndex = signal<number>(0);
+  protected readonly activeTab = signal<ZardTabComponent | null>(null);
   protected readonly scrollPresent = signal<boolean>(false);
 
   readonly zTabChange = output<{
@@ -226,6 +242,52 @@ export class ZardTabGroupComponent implements AfterViewInit {
   // Preserve consumer classes on host
   readonly class = input<string>('');
 
+  /**
+   * Opt-in drag-to-reorder of the nav buttons, persisted in localStorage under this key. Like
+   * `indicator`, a deliberate local qits extension to the zard tabs component (not upstream) —
+   * preserve it when regenerating via the zard CLI. The saved order is a label array, so only use
+   * this on groups whose labels are stable; panels keep their content order (see the template
+   * note), only the nav rearranges.
+   */
+  readonly zReorderKey = input<string | null>(null);
+
+  protected readonly reorderable = computed(() => this.zReorderKey() !== null);
+
+  /** The order persisted under `zReorderKey`, or null when unset, absent, or unreadable. */
+  private readonly storedOrder = computed<string[] | null>(() => {
+    const key = this.zReorderKey();
+    if (!key || !this.window) {
+      return null;
+    }
+    try {
+      const parsed: unknown = JSON.parse(this.window.localStorage.getItem(key) ?? 'null');
+      return Array.isArray(parsed) && parsed.every(label => typeof label === 'string') ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+
+  private readonly order = linkedSignal(() => this.storedOrder());
+
+  /** Tabs in display order: saved labels first (unknown ones dropped), unsaved tabs appended. */
+  protected readonly orderedTabs = computed(() => {
+    const tabs = this.tabs();
+    const order = this.order();
+    if (!order) {
+      return [...tabs];
+    }
+    const byLabel = new Map(tabs.map(tab => [tab.label(), tab]));
+    const ordered = order.map(label => byLabel.get(label)).filter((tab): tab is ZardTabComponent => !!tab);
+    const seen = new Set(ordered);
+    return [...ordered, ...tabs.filter(tab => !seen.has(tab))];
+  });
+
+  /** Display-ordered tabs paired with their content index, which pairs `tab-N` to `tabpanel-N`. */
+  protected readonly navTabs = computed(() => {
+    const tabs = this.tabs();
+    return this.orderedTabs().map(tab => ({ tab, contentIndex: tabs.indexOf(tab) }));
+  });
+
   protected readonly showArrow = computed(() => this.zShowArrow() && this.scrollPresent());
 
   /** Dot colors for the local `indicator` extension; keys match {@link ZardTabIndicator}. */
@@ -236,9 +298,10 @@ export class ZardTabGroupComponent implements AfterViewInit {
   };
 
   ngAfterViewInit(): void {
-    // default tab selection
-    if (this.tabs().length) {
-      this.setActiveTab(0);
+    // default tab selection: the first *displayed* tab, honoring a persisted order
+    const first = this.orderedTabs()[0];
+    if (first) {
+      this.setActiveTab(first);
     }
 
     runInInjectionContext(this.injector, () => {
@@ -295,24 +358,39 @@ export class ZardTabGroupComponent implements AfterViewInit {
     return false;
   }
 
-  protected setActiveTab(index: number) {
-    const currentTab = this.tabs()[this.activeTabIndex()];
-    if (index !== this.activeTabIndex()) {
+  /** Emitted indices are positions in the *displayed* (possibly reordered) tab row. */
+  protected setActiveTab(tab: ZardTabComponent) {
+    const previous = this.activeTab();
+    if (previous && previous !== tab) {
       this.zDeselect.emit({
-        index: this.activeTabIndex(),
-        label: currentTab.label(),
-        tab: currentTab,
+        index: this.orderedTabs().indexOf(previous),
+        label: previous.label(),
+        tab: previous,
       });
     }
 
-    this.activeTabIndex.set(index);
-    const activeTabComponent = this.tabs()[index];
-    if (activeTabComponent) {
-      this.zTabChange.emit({
-        index,
-        label: activeTabComponent.label(),
-        tab: activeTabComponent,
-      });
+    this.activeTab.set(tab);
+    this.zTabChange.emit({
+      index: this.orderedTabs().indexOf(tab),
+      label: tab.label(),
+      tab,
+    });
+  }
+
+  protected onTabDrop(event: CdkDragDrop<unknown>) {
+    if (event.previousIndex === event.currentIndex) {
+      return;
+    }
+    const labels = this.orderedTabs().map(tab => tab.label());
+    moveItemInArray(labels, event.previousIndex, event.currentIndex);
+    this.order.set(labels);
+    const key = this.zReorderKey();
+    if (key && this.window) {
+      try {
+        this.window.localStorage.setItem(key, JSON.stringify(labels));
+      } catch {
+        // Persistence is best-effort (quota, private mode); the session keeps the new order.
+      }
     }
   }
 
@@ -343,12 +421,11 @@ export class ZardTabGroupComponent implements AfterViewInit {
   );
 
   protected readonly buttonClassesSignal = computed(() => {
-    const activeIndex = this.activeTabIndex();
+    const active = this.activeTab();
     const position = this.zActivePosition();
-    return this.tabs().map((_, index) => {
-      const isActive = activeIndex === index;
-      return tabButtonVariants({ zActivePosition: position, isActive });
-    });
+    return new Map(
+      this.tabs().map(tab => [tab, tabButtonVariants({ zActivePosition: position, isActive: tab === active })]),
+    );
   });
 
   protected scrollNav(direction: 'left' | 'right' | 'up' | 'down') {
@@ -365,18 +442,20 @@ export class ZardTabGroupComponent implements AfterViewInit {
     }
   }
 
+  /** Selects by position in the displayed (possibly reordered) tab row. */
   selectTabByIndex(index: number): void {
-    if (index >= 0 && index < this.tabs().length) {
-      this.setActiveTab(index);
+    const tab = this.orderedTabs()[index];
+    if (tab) {
+      this.setActiveTab(tab);
     } else {
       console.warn(`Index ${index} outside the range of available tabs.`);
     }
   }
 
   selectTabByLabel(label: string): void {
-    const index = this.tabs().findIndex(tab => tab.label() === label);
-    if (index >= 0) {
-      this.setActiveTab(index);
+    const tab = this.tabs().find(tab => tab.label() === label);
+    if (tab) {
+      this.setActiveTab(tab);
     } else {
       console.warn(`No tab labelled "${label}" among the available tabs.`);
     }
