@@ -1,5 +1,24 @@
 # Daemon auto-start: starting a workspace starts its daemons
 
+## As built (2026-07-09)
+
+Shipped as the **start-side half only** — the sibling
+[daemon-settling-on-workspace-stop](../feature-ideas/daemon-settling-on-workspace-stop.md) remains a
+separate feature-idea. Concretely:
+
+- `RepositoryDaemon.autoStart` (default `true`), migration
+  `V26__repository_daemon_auto_start.sql` (backfills existing rows to `true`). Threaded through the
+  DTO, REST create/update request records, the `createDaemon`/`updateDaemon` MCP args, the daemon
+  form + card, and both seed daemons — exactly like `otel`.
+- `WorkspaceService.ensureContainer` fires the async CDI event
+  `WorkspaceContainerStarted(repoId, workspaceId)` (via `WorkspaceContainerEventPublisher`) on its
+  two cold→RUNNING transitions; the already-running short-circuit does not fire it.
+- The observer is `DaemonAutoStarter` (`daemon.control`), **not** the shared
+  `DaemonLifecycleCoupler` proposed below — that unification waits for the settle half. Kill switch
+  `qits.daemons.autostart-enabled` (default `true`; tests default it off and re-enable per-profile).
+
+The design narrative below is preserved as written.
+
 ## Introduction
 
 Today a workspace container coming up and its daemons coming up are two unrelated, both-manual

@@ -20,6 +20,7 @@ export interface CreateRepositoryDaemonRequest {
     readyPattern?: string;
     stopSignal?: string;
     restartPolicy?: RestartPolicy;
+    autoStart?: boolean;
     maxRestarts?: number;
     otel?: boolean;
     webView?: WebViewInput;

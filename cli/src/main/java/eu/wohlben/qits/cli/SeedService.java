@@ -99,6 +99,7 @@ public class SeedService {
         "Serving HTTP",
         "TERM",
         RestartPolicy.ON_FAILURE,
+        true, // autoStart: comes up with the workspace container
         3,
         null,
         8000,

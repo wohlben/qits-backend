@@ -128,6 +128,8 @@ public class DaemonMcpToolsTest {
                 "Listening on.*:3000",
                 "restartPolicy",
                 "always",
+                "autoStart",
+                false,
                 "environment",
                 Map.of("PORT", "3000"),
                 "observers",
@@ -151,6 +153,7 @@ public class DaemonMcpToolsTest {
             .get("/api/repositories/" + repoId + "/daemons")
             .then()
             .statusCode(200)
+            .body("entries[0].daemon.autoStart", org.hamcrest.Matchers.equalTo(false))
             .extract()
             .path("entries[0].daemon.id");
 
@@ -170,7 +173,15 @@ public class DaemonMcpToolsTest {
         .when()
         .toolsCall(
             "updateDaemon",
-            Map.of("repoId", repoId, "daemonId", daemonId[0], "name", "Dev server (renamed)"),
+            Map.of(
+                "repoId",
+                repoId,
+                "daemonId",
+                daemonId[0],
+                "name",
+                "Dev server (renamed)",
+                "autoStart",
+                true),
             response -> {
               assertFalse(response.isError(), "update should succeed: " + text(response));
               String text = text(response);
@@ -179,6 +190,13 @@ public class DaemonMcpToolsTest {
                   text.contains("npm run dev"), "omitted fields must be kept as-is: " + text);
             })
         .thenAssertResults();
+
+    // The autoStart toggle (false on create -> true on update) round-trips through the tool.
+    given()
+        .get("/api/repositories/" + repoId + "/daemons/" + daemonId[0])
+        .then()
+        .statusCode(200)
+        .body("daemon.autoStart", org.hamcrest.Matchers.equalTo(true));
     client
         .when()
         .toolsCall(

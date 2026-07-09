@@ -13,6 +13,7 @@ public record RepositoryDaemonDto(
     String readyPattern,
     String stopSignal,
     RestartPolicy restartPolicy,
+    boolean autoStart,
     int maxRestarts,
     boolean otel,
     WebViewDto webView,

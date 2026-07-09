@@ -62,6 +62,7 @@ public class RepositoryDaemonServiceTest {
             null,
             null,
             null,
+            null,
             port,
             entryPath,
             basePath,
@@ -119,24 +120,24 @@ public class RepositoryDaemonServiceTest {
 
     // Only the entry path: the port carries over.
     repositoryDaemonService.update(
-        repoId, daemonId, null, null, null, null, null, null, null, null, null, "welcome", null,
-        null, null, null);
+        repoId, daemonId, null, null, null, null, null, null, null, null, null, null, "welcome",
+        null, null, null, null);
     RepositoryDaemonDto dto = repositoryDaemonService.resolve(repoId, daemonId);
     assertEquals(4200, dto.webView().port());
     assertEquals("welcome", dto.webView().entryPath());
 
     // Only the port: the entry path carries over.
     repositoryDaemonService.update(
-        repoId, daemonId, null, null, null, null, null, null, null, null, 8080, null, null, null,
-        null, null);
+        repoId, daemonId, null, null, null, null, null, null, null, null, null, 8080, null, null,
+        null, null, null);
     dto = repositoryDaemonService.resolve(repoId, daemonId);
     assertEquals(8080, dto.webView().port());
     assertEquals("welcome", dto.webView().entryPath());
 
     // A blank path arg clears just that field.
     repositoryDaemonService.update(
-        repoId, daemonId, null, null, null, null, null, null, null, null, null, "", null, null,
-        null, null);
+        repoId, daemonId, null, null, null, null, null, null, null, null, null, null, "", null,
+        null, null, null);
     dto = repositoryDaemonService.resolve(repoId, daemonId);
     assertEquals(8080, dto.webView().port());
     assertNull(dto.webView().entryPath());
@@ -148,8 +149,8 @@ public class RepositoryDaemonServiceTest {
     String daemonId = createWebViewDaemon(repoId, 4200, "greeting", "app");
 
     repositoryDaemonService.update(
-        repoId, daemonId, null, null, null, null, null, null, null, null, 0, null, null, null, null,
-        null);
+        repoId, daemonId, null, null, null, null, null, null, null, null, null, 0, null, null, null,
+        null, null);
 
     assertNull(
         repositoryDaemonService.resolve(repoId, daemonId).webView(),
@@ -163,7 +164,7 @@ public class RepositoryDaemonServiceTest {
 
     repositoryDaemonService.update(
         repoId, daemonId, "renamed", null, null, null, null, null, null, null, null, null, null,
-        null, null, null);
+        null, null, null, null);
 
     RepositoryDaemonDto dto = repositoryDaemonService.resolve(repoId, daemonId);
     assertEquals(4200, dto.webView().port());

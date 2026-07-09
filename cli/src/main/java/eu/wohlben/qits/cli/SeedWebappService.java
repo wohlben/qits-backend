@@ -168,6 +168,7 @@ public class SeedWebappService {
         "(?i)dev server is up|Application bundle generation complete|Local:.*:4200",
         "TERM",
         RestartPolicy.ON_FAILURE,
+        true, // autoStart: the demo — starting the greeting workspace brings this dev server up
         3,
         true,
         4200,
