@@ -43,7 +43,7 @@ public class ActionConfigurationSeeder {
 
   private void ensure(
       String name, String description, String executeScript, Map<String, String> environment) {
-    if (actionConfigurationRepository.findByName(name).isPresent()) {
+    if (actionConfigurationRepository.findGlobalByName(name).isPresent()) {
       return;
     }
     // The seeded defaults are interactive terminal processes (a shell).

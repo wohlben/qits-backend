@@ -53,6 +53,13 @@ public class FeatureFlowPhaseActionService {
                     new NotFoundException(
                         "ActionConfiguration not found: " + actionConfigurationId));
 
+    // A repository-scoped action is only bindable by flows of the repository's own project.
+    if (action.repository != null
+        && !action.repository.project.id.equals(step.phase.featureFlowConfiguration.project.id)) {
+      throw new BadRequestException(
+          "Action belongs to a repository in another project: " + actionConfigurationId);
+    }
+
     boolean alreadyLinked =
         featureFlowPhaseActionRepository
             .find("step.id = ?1 and actionConfiguration.id = ?2", stepId, actionConfigurationId)
@@ -94,6 +101,16 @@ public class FeatureFlowPhaseActionService {
    */
   public boolean isActionBound(String actionConfigurationId) {
     return featureFlowPhaseActionRepository.existsByActionConfigurationId(actionConfigurationId);
+  }
+
+  /**
+   * Unbinds every flow binding of {@code repositoryId}'s own actions. Repository deletion calls
+   * this first: the repository cascade-deletes its actions, but the FK from phase actions has no
+   * cascade, so a still-bound action would fail the delete.
+   */
+  @Transactional
+  public void deleteBindingsForRepository(String repositoryId) {
+    featureFlowPhaseActionRepository.delete("actionConfiguration.repository.id", repositoryId);
   }
 
   @Transactional

@@ -11,7 +11,6 @@ import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationServic
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;
-import eu.wohlben.qits.domain.featureflow.control.RepositoryActionService;
 import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowConfiguration;
@@ -28,7 +27,6 @@ import jakarta.inject.Inject;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -83,8 +81,6 @@ public class SeedWebappService {
 
   @Inject ActionConfigurationService actionConfigurationService;
 
-  @Inject RepositoryActionService repositoryActionService;
-
   @Inject FeatureFlowConfigurationService featureFlowConfigurationService;
 
   @Inject FeatureFlowPhaseService featureFlowPhaseService;
@@ -120,6 +116,10 @@ public class SeedWebappService {
               LOG.infof("Resetting existing project '%s' (%s) ...", p.name, p.id);
               projectService.delete(p.id);
             });
+    // Earlier seed versions created the build/lint/test set (and, before 1529f10, per-run
+    // duplicates of it) as GLOBAL actions; they are repository-scoped now, so clean up what those
+    // versions left behind in long-lived dev databases.
+    cleanupStaleSeedGlobals();
 
     String url = resolveRepoUrl();
     LOG.infof("Seeding '%s' from %s ...", PROJECT_NAME, url);
@@ -194,10 +194,9 @@ public class SeedWebappService {
     // fast-forward over main.
     workspaceService.createWorkspace(repo.id, "greeting", "feature/greeting", "greeting");
 
-    // One repository-scoped action beside the global Build/Lint/Test set, so the workspace
-    // Actions tab demos the scope badge and the merged effective-actions endpoint end-to-end.
-    // Cascade-deleted with the repository, so the reset keeps this idempotent.
-    repositoryActionService.create(
+    // A repository-scoped one-off beside the build/lint/test set below. Cascade-deleted with the
+    // repository, so the reset keeps this idempotent.
+    actionConfigurationService.createForRepository(
         repo.id,
         "Stack info",
         "Show the Quarkus stack of this app (extensions, platform version).",
@@ -208,7 +207,7 @@ public class SeedWebappService {
 
     // A feature-flow configuration expressing the stack's build/lint/test actions. Blueprint only —
     // qits does not execute these; the real run happens via daemons/commands.
-    seedFeatureFlow(project.id);
+    seedFeatureFlow(project.id, repo.id);
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
     System.out.println(
@@ -225,24 +224,37 @@ public class SeedWebappService {
    * "Development" phase with Build (prerequisite) → Lint (two quality-gate actions sharing a
    * parallel group) → Test (quality gate). Configurations hang off the <em>project</em> (not the
    * repository). This is a blueprint — qits never executes these scripts.
+   *
+   * <p>The bound actions are <b>repository-scoped</b>: their commands are this stack's ({@code
+   * ./mvnw}, {@code pnpm}), meaningless in a repository that isn't Quarkus + Angular. They
+   * cascade-delete with the repository, so the project reset keeps this idempotent with no
+   * reconcile bookkeeping.
    */
-  private void seedFeatureFlow(String projectId) {
+  private void seedFeatureFlow(String projectId, String repositoryId) {
     ActionConfiguration build =
-        ensureGlobalAction(
+        repositoryAction(
+            repositoryId,
             "build-project",
             "Compile and package the app; the Angular bundle is baked into the jar.",
             "./mvnw package");
     ActionConfiguration lintBackend =
-        ensureGlobalAction(
+        repositoryAction(
+            repositoryId,
             "lint-backend",
             "Check the Java sources' formatting / static analysis.",
             "./mvnw spotless:check");
     ActionConfiguration lintFrontend =
-        ensureGlobalAction(
-            "lint-frontend", "Lint the Angular sources.", "pnpm --dir src/main/webui lint");
+        repositoryAction(
+            repositoryId,
+            "lint-frontend",
+            "Lint the Angular sources.",
+            "pnpm --dir src/main/webui lint");
     ActionConfiguration test =
-        ensureGlobalAction(
-            "run-unit-tests", "Run the @QuarkusTest suite for POST /api/greetings.", "./mvnw test");
+        repositoryAction(
+            repositoryId,
+            "run-unit-tests",
+            "Run the @QuarkusTest suite for POST /api/greetings.",
+            "./mvnw test");
 
     FeatureFlowConfiguration config =
         featureFlowConfigurationService.createUnderProject(projectId, "Build & Verify");
@@ -264,36 +276,42 @@ public class SeedWebappService {
     featureFlowPhaseActionService.create(testStep.id, test.id, ActionType.QUALITY_GATE, 0, null);
   }
 
-  /**
-   * Resets a seed-owned <b>global</b> action to its known-good definition. The project reset
-   * cascades to everything else this command creates, but global {@link ActionConfiguration}s hang
-   * off nothing — a plain {@code create()} here leaked four more rows per run (see
-   * docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md). So: reuse-by-name — the
-   * first match is updated back to the seeded definition (clearing any drift), surplus same-named
-   * rows are deleted, and any surplus still bound by a non-demo feature flow is spared (the phase
-   * action FK has no cascade; deleting it would both fail and break that flow).
-   */
-  private ActionConfiguration ensureGlobalAction(
-      String name, String description, String executeScript) {
-    List<ActionConfiguration> existing =
-        actionConfigurationService.list().stream().filter(a -> name.equals(a.name)).toList();
-    if (existing.isEmpty()) {
-      return actionConfigurationService.create(name, description, executeScript, null, false, null);
-    }
+  private ActionConfiguration repositoryAction(
+      String repositoryId, String name, String description, String executeScript) {
+    return actionConfigurationService.createForRepository(
+        repositoryId, name, description, executeScript, null, false, null);
+  }
 
-    ActionConfiguration kept = existing.get(0);
-    actionConfigurationService.update(
-        kept.id, name, description, executeScript, "", false, Map.of());
-    for (ActionConfiguration surplus : existing.subList(1, existing.size())) {
-      if (featureFlowPhaseActionService.isActionBound(surplus.id)) {
+  /**
+   * Deletes the <b>global</b> actions earlier seed versions created under the seed-owned names —
+   * they are repository-scoped now, and the leaked pre-1529f10 duplicates (see
+   * docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md) are equally stale. A row
+   * still bound by a feature flow is spared with a warning (the phase-action FK has no cascade;
+   * deleting it would both fail and break that flow) — the demo project's own flow is already gone
+   * when this runs, so only user-made flows can hold one.
+   */
+  private void cleanupStaleSeedGlobals() {
+    List<String> seedOwnedNames =
+        List.of(
+            "build-project",
+            "lint-backend",
+            "lint-frontend",
+            "run-unit-tests",
+            "Stack info",
+            "stackinfo");
+    for (ActionConfiguration stale :
+        actionConfigurationService.list().stream()
+            .filter(a -> seedOwnedNames.contains(a.name))
+            .toList()) {
+      if (featureFlowPhaseActionService.isActionBound(stale.id)) {
         LOG.warnf(
-            "Keeping duplicate global action '%s' (%s): a feature flow still binds it.",
-            name, surplus.id);
+            "Keeping stale global action '%s' (%s): a feature flow still binds it.",
+            stale.name, stale.id);
         continue;
       }
-      actionConfigurationService.delete(surplus.id);
+      LOG.infof("Deleting stale seed-owned global action '%s' (%s).", stale.name, stale.id);
+      actionConfigurationService.delete(stale.id);
     }
-    return kept;
   }
 
   /**
