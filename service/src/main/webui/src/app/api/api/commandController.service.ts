@@ -235,14 +235,15 @@ export class CommandControllerService extends BaseService {
      * @endpoint get /api/commands
      * @param repoId 
      * @param status 
+     * @param workspaceId 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response4>;
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response4>>;
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response4>>;
-    public apiCommandsGet(repoId?: string, status?: CommandStatus, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response4>;
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response4>>;
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response4>>;
+    public apiCommandsGet(repoId?: string, status?: CommandStatus, workspaceId?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
 
@@ -259,6 +260,15 @@ export class CommandControllerService extends BaseService {
             localVarQueryParameters,
             'status',
             <any>status,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'workspaceId',
+            <any>workspaceId,
             QueryParamStyle.Form,
             true,
         );

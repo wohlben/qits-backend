@@ -8,6 +8,7 @@ import { CommandControllerService } from '@/api/api/commandController.service';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandStatus } from '@/api/model/commandStatus';
 import { CardLayoutComponent } from '@/layout/card-layout/card-layout.component';
+import { commandStatusBadgeType, commandStatusLabel } from '@/pattern/command/command-status';
 import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardBadgeTypeVariants } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -154,19 +155,10 @@ export class CommandsListComponent {
   }
 
   badgeType(status: CommandStatus | undefined): ZardBadgeTypeVariants {
-    switch (status) {
-      case CommandStatus.Running:
-        return 'default';
-      case CommandStatus.Terminated:
-        return 'destructive';
-      case CommandStatus.Interrupted:
-        return 'outline';
-      default:
-        return 'secondary';
-    }
+    return commandStatusBadgeType(status);
   }
 
   statusLabel(status: CommandStatus | undefined): string {
-    return status ? status.toLowerCase() : 'unknown';
+    return commandStatusLabel(status);
   }
 }

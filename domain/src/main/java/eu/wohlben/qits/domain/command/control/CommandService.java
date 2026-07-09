@@ -423,9 +423,15 @@ public class CommandService {
   }
 
   @Transactional
-  public List<CommandDto> list(String repoId, CommandStatus status) {
+  public List<CommandDto> list(String repoId, String workspaceId, CommandStatus status) {
     List<Command> commands;
-    if (repoId != null && !repoId.isBlank()) {
+    if (workspaceId != null && !workspaceId.isBlank()) {
+      // Workspace slugs are only unique within a repository, so the filter needs both.
+      if (repoId == null || repoId.isBlank()) {
+        throw new BadRequestException("workspaceId filter requires repoId");
+      }
+      commands = commandRepository.findByRepositoryAndWorkspace(repoId, workspaceId);
+    } else if (repoId != null && !repoId.isBlank()) {
       commands = commandRepository.findByRepository(repoId);
     } else if (status != null) {
       commands = commandRepository.findByStatus(status);

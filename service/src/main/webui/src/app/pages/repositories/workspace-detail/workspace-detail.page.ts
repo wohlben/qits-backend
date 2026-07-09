@@ -14,6 +14,8 @@ import { CommandControllerService } from '@/api/api/commandController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { CommandDto } from '@/api/model/commandDto';
+import { CommandKind } from '@/api/model/commandKind';
+import { CommandStatus } from '@/api/model/commandStatus';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { WorkspaceDto } from '@/api/model/workspaceDto';
@@ -26,6 +28,7 @@ import {
 } from '@/pattern/daemon/workspace-daemon-events.component';
 import { WorkspaceDaemonsComponent } from '@/pattern/daemon/workspace-daemons.component';
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
+import { WorkspaceActionsComponent } from '@/pattern/workspace/workspace-actions.component';
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
@@ -38,7 +41,8 @@ import {
 
 /**
  * The workspace detail page: everything the workspace offers as one tab row — Chat, Files,
- * Daemons (controls + events feed), Web view, Telemetry, Agents (the plugins list). All panels
+ * Daemons (controls + events feed), Actions (effective actions + run history), Web view,
+ * Telemetry, Agents (the plugins list). All panels
  * rely on the tab
  * group keeping hidden tabs mounted: the file browser's openFile anchors, the chat's WebSocket,
  * and the web view's
@@ -51,6 +55,7 @@ import {
   imports: [
     DaemonWebviewComponent,
     PageLayoutComponent,
+    WorkspaceActionsComponent,
     WorkspaceChatComponent,
     WorkspaceDaemonEventsComponent,
     WorkspaceDaemonsComponent,
@@ -115,6 +120,13 @@ import {
             </section>
           </div>
         </z-tab>
+        <z-tab
+          label="Actions"
+          [indicator]="actionsIndicator()"
+          indicatorLabel="A command is running"
+        >
+          <app-workspace-actions [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
         <z-tab label="Web view">
           <app-daemon-webview
             [repoId]="repoId"
@@ -176,6 +188,21 @@ export class WorkspaceDetailPage {
   /** The running-session dot, moved from the old header chat button onto the tab label. */
   readonly chatIndicator = computed<ZardTabIndicator | null>(() =>
     newestRunningChat(this.commandsQuery.data(), this.workspaceId) ? 'primary' : null,
+  );
+
+  /**
+   * "Something is running here" for the Actions tab: a RUNNING TERMINAL command in this workspace
+   * — action-launched runs, not chats (the Chat dot) or daemons (the Daemons dot).
+   */
+  readonly actionsIndicator = computed<ZardTabIndicator | null>(() =>
+    (this.commandsQuery.data() ?? []).some(
+      (c) =>
+        c.kind === CommandKind.Terminal &&
+        c.status === CommandStatus.Running &&
+        c.workspaceId === this.workspaceId,
+    )
+      ? 'primary'
+      : null,
   );
 
   // Same key AND shape as the Daemons/Web view tabs' queries, so all three share one cache entry.

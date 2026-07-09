@@ -187,6 +187,82 @@ public class CommandControllerTest {
   }
 
   @Test
+  public void listFiltersByWorkspaceAndComposesWithStatus() {
+    String repoId = repoWithWorkspace();
+    given()
+        .contentType(ContentType.JSON)
+        .body(new CreateWorkspaceRequest("other-wt", "master", "other-wt", null))
+        .when()
+        .post("/api/repositories/" + repoId + "/workspaces")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode());
+
+    String echoId =
+        given()
+            .contentType(ContentType.JSON)
+            .body(new CommandController.LaunchCommandRequest(repoId, "cmd-wt", createEchoAction()))
+            .when()
+            .post("/api/commands")
+            .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .extract()
+            .path("command.id");
+    String sleepId =
+        given()
+            .contentType(ContentType.JSON)
+            .body(
+                new CommandController.LaunchCommandRequest(repoId, "other-wt", createSleepAction()))
+            .when()
+            .post("/api/commands")
+            .then()
+            .statusCode(Response.Status.OK.getStatusCode())
+            .extract()
+            .path("command.id");
+
+    // The workspace filter only returns that workspace's commands.
+    given()
+        .when()
+        .get("/api/commands?repoId=" + repoId + "&workspaceId=cmd-wt")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("entries.command.id", hasItem(echoId))
+        .body("entries.command.id", not(hasItem(sleepId)))
+        .body("entries.command.workspaceId", everyItem(equalTo("cmd-wt")));
+
+    // It composes with the status filter: the sleeper is RUNNING, so it survives that filter...
+    given()
+        .when()
+        .get("/api/commands?repoId=" + repoId + "&workspaceId=other-wt&status=RUNNING")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("entries.command.id", hasItem(sleepId));
+
+    // ...but not the EXITED one.
+    given()
+        .when()
+        .get("/api/commands?repoId=" + repoId + "&workspaceId=other-wt&status=EXITED")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("entries.command.id", not(hasItem(sleepId)));
+
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .post("/api/commands/" + sleepId + "/terminate")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode());
+  }
+
+  @Test
+  public void workspaceFilterWithoutRepoIs400() {
+    given()
+        .when()
+        .get("/api/commands?workspaceId=cmd-wt")
+        .then()
+        .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
+  }
+
+  @Test
   public void launchRejectsBlankFields() {
     given()
         .contentType(ContentType.JSON)
