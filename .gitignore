@@ -37,3 +37,7 @@ PENDING_MIGRATION.sql
 
 # Local per-machine Quarkus config overrides (e.g. WSL2 git-host); never committed.
 .env
+
+# IDE (m2e/jdtls) build output — kept separate from Maven's target/ so the language server
+# never clobbers target/classes (see the m2e-separate-output profile in pom.xml).
+target-ide/

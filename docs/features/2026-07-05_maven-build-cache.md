@@ -76,6 +76,32 @@ stale-generated-code mode):
 which is not a Maven artifact and would be dropped on a hit — leaving a non-runnable restore (no
 runner; for `service`, no bundled UI). `domain` is a plain jar and simply has no such dir.
 
+#### Follow-up (2026-07-09): the "stale `domain` restore" was a misdiagnosis — the IDE was the culprit
+
+A `quarkus:dev` boot once failed with a mass **"Unsatisfied dependency" for every domain `*Mapper`
+bean** (22 of them), and it was initially blamed on a *partial/stale* cache **restore** of `domain` —
+"fixed" by marking `domain` non-cacheable (`<maven.build.cache.skipCache>true</maven.build.cache.skipCache>`
+in `domain/pom.xml`). **That diagnosis was wrong, and the exclusion has been reverted — `domain`
+caches normally again.**
+
+Root-causing it properly: the cache **restore of `domain` is complete and correct** — a faithful
+reproduction (`mvn clean` → partial `-pl service,cli -am compile` so `domain` restores from cache into
+an empty `target/` → `quarkus:dev`) restores all `*MapperImpl` classes with **zero** stubs and boots
+cleanly (`started in ~10s`, `/q/health` → 200). What actually produced the 22-bean failure was the
+**IDE language server** (redhat.java / Claude Code's jdtls) compiling into the *same* `target/classes`
+with a briefly-incomplete model and leaving broken/partial `*MapperImpl` stubs that Arc couldn't index
+as beans. The very same mechanism produced the on-edit `java.lang.Error: Unresolved compilation
+problems` (missing Lombok `@Builder`). Both are one bug: the LS sharing `target/classes` with
+Maven/Quarkus.
+
+The real fix lives in the **root pom** (`m2e-separate-output` profile) — it gives the language server
+its own `target-ide/` build directory so it can never touch `target/classes`. It activates only under
+m2e (the `m2e.version` user property m2e-core's `MavenExecutionContext` puts on every resolve —
+verified in bytecode — and which no `./mvnw` CLI invocation sets), and relocates `<directory>` (a
+profile *can* set that; it can't set `<outputDirectory>`, and the Quarkus dev mojo can't resolve a
+property-indirected `<outputDirectory>` for reactor hot-reload deps — it looked for a literal
+`target/${property}` and failed). With that in place the build cache needs no `domain` carve-out.
+
 ### 2. `service`'s Angular sources must be an explicit input — or a frontend change is a false hit
 
 The extension scans only `src/main/{java,resources}` (+ test) by default, and the Angular app lives at
