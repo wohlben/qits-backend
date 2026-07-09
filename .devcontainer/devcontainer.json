@@ -8,8 +8,8 @@
   "updateRemoteUserUID": true,
   "//": "App ingress so the host browser reaches the qits UI (Quinoa :4200 -> Quarkus :8080). Workspace containers publish nothing; qits reaches them by DNS name on qits-net.",
   "forwardPorts": [4200, 8080],
-  "//initialize": "Create the external qits-net + shared volumes on the HOST before the stack comes up (idempotent). qits-net is shared with sibling workspace containers; qits_shared_dot_claude is the shared Claude Code login; m2/pnpm are shared build caches.",
-  "initializeCommand": "docker network inspect qits-net >/dev/null 2>&1 || docker network create qits-net; for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do docker volume inspect $v >/dev/null 2>&1 || docker volume create $v; done",
+  "//initialize": "Create the external qits-net + shared volumes on the HOST before the stack comes up (idempotent). qits-net is shared with sibling workspace containers; qits_shared_dot_claude is the shared Claude Code login; m2/pnpm are shared build caches. Also capture the host's timezone into .devcontainer/.env (gitignored) — the compose file interpolates it into the container's TZ so devcontainer wall-clock matches the host (and qits passes its zone on to every workspace container).",
+  "initializeCommand": "docker network inspect qits-net >/dev/null 2>&1 || docker network create qits-net; for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do docker volume inspect $v >/dev/null 2>&1 || docker volume create $v; done; tz=$(cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || true); echo \"TZ=${tz:-Etc/UTC}\" > .devcontainer/.env",
   "//postCreate": "Build once so the `domain` module is resolvable (fresh-checkout step from CLAUDE.md), then seed demo data. Seeding is pure host-side data setup (workspace containers are provisioned lazily on first use), so the seeds run directly — best-effort, so a seed failure never fails create. See .devcontainer/postcreate.sh.",
   "postCreateCommand": "bash .devcontainer/postcreate.sh",
   "customizations": {
