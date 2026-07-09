@@ -16,4 +16,9 @@ public class FeatureFlowPhaseActionRepository
   public List<FeatureFlowPhaseAction> findByPhaseId(String phaseId) {
     return list("step.phase.id", phaseId);
   }
+
+  /** Whether any flow step binds this global action configuration. */
+  public boolean existsByActionConfigurationId(String actionConfigurationId) {
+    return count("actionConfiguration.id", actionConfigurationId) > 0;
+  }
 }

@@ -1,16 +1,20 @@
 package eu.wohlben.qits.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
+import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseStepService;
+import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.ActionType;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowConfiguration;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
@@ -59,6 +63,7 @@ public class SeedWebappServiceTest {
   @Inject FeatureFlowPhaseService featureFlowPhaseService;
   @Inject FeatureFlowPhaseStepService featureFlowPhaseStepService;
   @Inject FeatureFlowPhaseActionService featureFlowPhaseActionService;
+  @Inject ActionConfigurationService actionConfigurationService;
 
   // No @TestTransaction: the reset does delete-then-recreate, which must span separate committed
   // transactions exactly as command mode does (each @Transactional service call commits on its
@@ -110,6 +115,55 @@ public class SeedWebappServiceTest {
           wt.runtimeStatus(),
           "seeded workspace " + wt.workspaceId() + " starts unprovisioned");
     }
+  }
+
+  /**
+   * The reset must reconcile the seed-owned <b>global</b> actions instead of leaking four more per
+   * run (regression for docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md):
+   * duplicates are deleted, drift is reset to the seeded definition, and a duplicate some other
+   * project's flow still binds is spared (its FK has no cascade — deleting would break that flow).
+   */
+  @Test
+  public void resetReconcilesSeedOwnedGlobalActions() {
+    seedWebappService.seed();
+
+    // Simulate the historical leak: an unbound, drifted duplicate of a seed-owned action...
+    actionConfigurationService.create(
+        "build-project", "drifted", "echo drifted", "echo check", true, Map.of("K", "V"));
+    // ...and a duplicate that a non-demo project's flow still binds.
+    ActionConfiguration boundDupe =
+        actionConfigurationService.create(
+            "run-unit-tests", "user copy", "echo user", null, false, null);
+    Project userProject = projectService.create("User Project", null);
+    FeatureFlowConfiguration userFlow =
+        featureFlowConfigurationService.createUnderProject(userProject.id, "User Flow");
+    FeatureFlowPhase userPhase =
+        featureFlowPhaseService.create(userFlow.id, "Phase", null, 0, null);
+    FeatureFlowPhaseStep userStep = featureFlowPhaseStepService.create(userPhase.id, "Step", 0);
+    featureFlowPhaseActionService.create(
+        userStep.id, boundDupe.id, ActionType.QUALITY_GATE, 0, null);
+
+    seedWebappService.seed();
+
+    // The unbound duplicate is gone; the one survivor is back to the known-good definition.
+    List<ActionConfiguration> builds = globalActionsNamed("build-project");
+    assertEquals(1, builds.size(), "reset should reconcile duplicates instead of leaking more");
+    ActionConfiguration build = builds.get(0);
+    assertEquals("./mvnw package", build.executeScript, "drift resets to the seeded script");
+    assertNull(build.checkScript, "drifted checkScript is cleared");
+    assertFalse(build.interactive, "drifted interactive flag is cleared");
+    assertTrue(build.environment.isEmpty(), "drifted environment is cleared");
+
+    // The flow-bound duplicate survives beside the seed's own definition.
+    List<ActionConfiguration> tests = globalActionsNamed("run-unit-tests");
+    assertEquals(2, tests.size(), "the seed's action plus the user's still-bound copy");
+    assertTrue(
+        tests.stream().anyMatch(a -> a.id.equals(boundDupe.id)),
+        "a flow-bound duplicate must be spared by the reset");
+  }
+
+  private List<ActionConfiguration> globalActionsNamed(String name) {
+    return actionConfigurationService.list().stream().filter(a -> name.equals(a.name)).toList();
   }
 
   /** The dev-server daemon is web-viewable, OTEL-enabled, and fully wired for log observation. */

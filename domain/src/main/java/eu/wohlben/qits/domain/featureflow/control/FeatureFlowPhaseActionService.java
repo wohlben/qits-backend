@@ -87,6 +87,15 @@ public class FeatureFlowPhaseActionService {
     return featureFlowPhaseActionRepository.findByStepId(stepId);
   }
 
+  /**
+   * Whether any flow binds {@code actionConfigurationId}. Resets (e.g. the seed-webapp reset) use
+   * this to know which global actions are safe to delete — the FK from phase actions has no
+   * cascade, so deleting a bound one would fail.
+   */
+  public boolean isActionBound(String actionConfigurationId) {
+    return featureFlowPhaseActionRepository.existsByActionConfigurationId(actionConfigurationId);
+  }
+
   @Transactional
   public FeatureFlowPhaseAction update(
       String id, ActionType actionType, Integer sortOrder, String parallelGroup) {
