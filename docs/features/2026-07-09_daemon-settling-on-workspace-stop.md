@@ -1,5 +1,34 @@
 # Daemon settling: stopping a workspace settles its daemons
 
+## As built (2026-07-09)
+
+Shipped as the stop-side half of the coupling, landing alongside its sibling
+[daemon-autostart-on-workspace-start](../features/2026-07-09_daemon-autostart-on-workspace-start.md).
+Concretely:
+
+- **`WorkspaceContainerStopping(repoId, workspaceId, graceful)`** — a new synchronous CDI event
+  (`repository.control`), fired via `WorkspaceContainerEventPublisher.fireStopping(...)` using
+  `Event.fire` (not `fireAsync`), **before** `containers.rm`, so the settle completes while the
+  container and its tmux sessions still exist. `stopContainer` fires it `graceful=true`; `doDiscard`
+  (discard + the INTEGRATED-cleanup path) fires it `graceful=false`.
+- **`DaemonSupervisor.settleForWorkspace(repoId, workspaceId, graceful)`** — a non-throwing batch
+  settle scanning `instances` for the workspace's live entries. Sets `stopRequested` + cancels
+  liveness/pending (so a racing liveness poll and any queued relaunch both take the STOPPED path),
+  settles `RESTARTING` instances immediately, and for live sessions (graceful only) signals
+  `stopSignal` and blocks up to `stop-grace-ms` (`awaitAllDeadOrTimeout`) before terminating the
+  follower; every instance transitions **STOPPED with an INFO event** (no CRASHED, no ERROR, no agent
+  notification). Clears the workspace's `adoptionProbed` keys so a future container re-probes.
+- The observer unified into **`DaemonLifecycleCoupler`** (the renamed `DaemonAutoStarter`), hosting
+  both directions: `onContainerStarted(@ObservesAsync)` (start) and `onContainerStopping(@Observes`,
+  synchronous) (stop). Kill switch `qits.daemons.autostop-enabled` (default `true`; tests default it
+  off and re-enable per-profile, beside `autostart-enabled`).
+- No entity/DTO/REST/MCP/UI/migration/openapi change — purely the missing lifecycle call. Tests:
+  `DaemonLifecycleCouplerSettleTest` (settle, RESTARTING, resurrection regression),
+  `DaemonSettleKillSwitchTest`, a synchronous `WorkspaceContainerStoppingRecorder`, and
+  before-`rm` ordering assertions in `WorkspaceContainerLifecycleServiceTest`.
+
+The design narrative below is preserved as written.
+
 ## Introduction
 
 The `DaemonSupervisor` has no concept of a **deliberate container stop**. Its world model knows

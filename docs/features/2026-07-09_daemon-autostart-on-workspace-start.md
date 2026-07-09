@@ -2,9 +2,9 @@
 
 ## As built (2026-07-09)
 
-Shipped as the **start-side half only** — the sibling
-[daemon-settling-on-workspace-stop](../feature-ideas/daemon-settling-on-workspace-stop.md) remains a
-separate feature-idea. Concretely:
+Shipped first as the **start-side half**; its sibling
+[daemon-settling-on-workspace-stop](2026-07-09_daemon-settling-on-workspace-stop.md) landed the same
+day as the stop-side half. Concretely:
 
 - `RepositoryDaemon.autoStart` (default `true`), migration
   `V26__repository_daemon_auto_start.sql` (backfills existing rows to `true`). Threaded through the
@@ -13,8 +13,9 @@ separate feature-idea. Concretely:
 - `WorkspaceService.ensureContainer` fires the async CDI event
   `WorkspaceContainerStarted(repoId, workspaceId)` (via `WorkspaceContainerEventPublisher`) on its
   two cold→RUNNING transitions; the already-running short-circuit does not fire it.
-- The observer is `DaemonAutoStarter` (`daemon.control`), **not** the shared
-  `DaemonLifecycleCoupler` proposed below — that unification waits for the settle half. Kill switch
+- The observer began as `DaemonAutoStarter` (`daemon.control`) and was unified into the shared
+  `DaemonLifecycleCoupler` proposed below when the settle half landed — it now hosts both directions
+  (`onContainerStarted(@ObservesAsync)` and `onContainerStopping(@Observes)`). Kill switch
   `qits.daemons.autostart-enabled` (default `true`; tests default it off and re-enable per-profile).
 
 The design narrative below is preserved as written.
@@ -41,7 +42,7 @@ Related/dependent plans:
   the hook point is `ensureContainer`'s two cold→RUNNING transitions. Auto-start deliberately
   preserves its core split — *creating* a workspace still writes only rows (nothing docker,
   nothing started); daemons start when the **container** starts, whoever triggers that.
-- **Sibling of [daemon-settling-on-workspace-stop](daemon-settling-on-workspace-stop.md)** — the
+- **Sibling of [daemon-settling-on-workspace-stop](2026-07-09_daemon-settling-on-workspace-stop.md)** — the
   stop-side half of the same coupling: a deliberate `stopContainer` under a live daemon is
   currently indistinguishable from a crash, so the restart policy re-provisions the just-stopped
   container (that doc has the full chain). The two share the CDI-event inversion below and
@@ -77,7 +78,7 @@ stop:
   cannot help when the container itself cycled.)
 - **Deliberate stop** (`stopContainer`, `discardWorkspace`): the supervisor isn't told, its
   liveness poll misreads the disappearance as a crash, and the restart policy resurrects the
-  container — the [sibling settle idea](daemon-settling-on-workspace-stop.md)'s territory.
+  container — the [sibling settle idea](2026-07-09_daemon-settling-on-workspace-stop.md)'s territory.
 
 The invariant this feature establishes (its half of it — the settle half is the sibling's): **a
 running workspace container has its auto-start daemons running; a deliberately stopped one has
@@ -112,7 +113,7 @@ the daemon area:
   (`fireAsync`) after `ensureContainer` stamps `RUNNING` on its two cold paths: the in-place
   `containers.start` of an Exited container and the fresh `provisionContainer`. The
   already-running short-circuit does **not** fire (nothing changed — and this is what terminates
-  the reentrancy loop below). The [sibling settle idea](daemon-settling-on-workspace-stop.md)
+  the reentrancy loop below). The [sibling settle idea](2026-07-09_daemon-settling-on-workspace-stop.md)
   adds the matching `WorkspaceContainerStopping` on the way down.
 
 A new `@ApplicationScoped DaemonAutoStarter` (domain, `daemon.control`; if the sibling lands too,
@@ -151,7 +152,7 @@ opt-out, not by trigger-path special-casing — see Open questions for the count
 
 `seed-webapp`'s "Quarkus dev server" daemon keeps `autoStart=true` (the default) and becomes the
 demo: ensure the greeting workspace's container (any path — the UI start button suffices) and the
-dev server comes up unattended (and, with the [sibling settle idea](daemon-settling-on-workspace-stop.md)
+dev server comes up unattended (and, with the [sibling settle idea](2026-07-09_daemon-settling-on-workspace-stop.md)
 in place, `stop-container` settles it STOPPED instead of CRASHED). `seed`'s tiny daemon likewise.
 
 ## Explicitly deferred
