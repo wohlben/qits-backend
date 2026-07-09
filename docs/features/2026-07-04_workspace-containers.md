@@ -82,8 +82,10 @@ read host secrets but can exfiltrate what it finds inside the container); the do
   `listWorkspaces` uses `wt.branch`.
 - **`createWorkspace`/`createMainWorkspace`**: create the branch ref host-side in the bare origin
   (`git branch <new> <parent>`), `docker run` the container, then `git clone --branch <new>
-  http://<git-host>:<port>/git/<repoId> /workspace` + set the `qits@local` identity
-  (`createContainerWorkspace`, with rollback of the branch + container on failure).
+  http://<git-host>:<port>/git/<repoId> /workspace` (the commit identity arrives as `GIT_*`
+  container env from the configured `qits.git.*` identity — see
+  [configurable-git-identity](2026-07-09_configurable-git-identity.md); with rollback of the
+  branch + container on failure).
 - **`doDiscard`**: `docker rm -f` the container (its clone dies with it), delete the branch ref in
   origin, soft-delete the row. No host checkout to remove.
 - **Workspace-local git verbs are container execs**: `isWorkspaceClean` (`git status --porcelain`);
