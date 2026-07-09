@@ -47,6 +47,15 @@ RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
     && chown -R "${USER_UID}:${USER_GID}" "/home/${USERNAME}" \
     && mkdir -p /caches/m2 /caches/pnpm/store && chmod -R 0777 /caches
 
+# Flush history to $HISTFILE (the devcontainer-dotfiles volume) after EVERY command, not just on a
+# clean shell exit. Bash's default only appends to HISTFILE when the shell exits normally, but VS
+# Code's "Rebuild/Stop Container" kills the container (and every process in it, including the
+# terminal's bash) without giving it a chance to exit cleanly — so up to now, no command ever
+# actually made it to disk, regardless of the volume being persisted correctly.
+RUN echo -e '\n# Persist history immediately (survives the shell being killed, not just exited).\nPROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"' \
+        >> "/home/${USERNAME}/.bashrc" \
+    && chown "${USER_UID}:${USER_GID}" "/home/${USERNAME}/.bashrc"
+
 # qits' shared H2 datastore + cloned repositories live under $HOME/.qits; $HOME is now the dev user's
 # home (a real passwd entry, so Java's user.home resolves here too — no -Duser.home needed).
 ENV HOME=/home/dev

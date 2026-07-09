@@ -3,6 +3,16 @@
 # host port. Bring it up with `devcontainer up` / VS Code "Reopen in Container", then run
 # `./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true` (or the cli
 # `seed`/`seed-webapp`) in its terminal.
+#
+# Pin the Compose project name explicitly. Without this, the effective project name (and therefore
+# the name Compose gives non-external volumes like devcontainer-dotfiles below) depends on HOW the
+# stack is invoked: VS Code's Dev Containers extension / the devcontainer CLI derive one name, a
+# manual `docker compose -f .devcontainer/docker-compose.yml up` from elsewhere derives another. That
+# mismatch silently creates a fresh, empty devcontainer-dotfiles volume under the new name — which is
+# exactly why bash history looked like it wasn't persisting. Pinning it keeps every invocation path
+# pointed at the same volumes.
+name: qits_devcontainer
+
 services:
   qits:
     build:
