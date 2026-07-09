@@ -1,16 +1,15 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  TemplateRef,
   computed,
+  effect,
   inject,
   input,
   signal,
-  viewChild,
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideCrosshair, lucideScan, lucideX } from '@ng-icons/lucide';
+import { lucideCrosshair } from '@ng-icons/lucide';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -18,7 +17,6 @@ import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonContr
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { DomPicker } from './dom-picker';
 
@@ -30,32 +28,24 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
 ];
 
 /**
- * The daemon web view: a floaty button (rendered only while a live web-viewable daemon exists in
- * this workspace) opening a fullscreen dialog that frames the daemon's app through the same-origin
- * `/daemon/{workspaceId}/{daemonId}/` proxy. Pick mode turns on the {@link DomPicker}; picked
- * elements land in the root {@link PromptContextStore}, where speak-to-prompt and command chats
- * pick them up — even after this dialog is closed.
+ * The workspace's Web view tab: frames the daemon's app through the same-origin
+ * `/daemon/{workspaceId}/{daemonId}/` proxy. Always present — without a live web-viewable daemon
+ * it renders an empty state instead of a dead frame. The iframe mounts on the tab's first
+ * activation (the page passes `activated`) and then stays mounted while a live daemon exists, so
+ * the framed app doesn't reload on every tab switch. Pick mode turns on the {@link DomPicker};
+ * picked elements land in the root {@link PromptContextStore}, where the Chat tab's
+ * speak-to-prompt and command chats pick them up.
  */
 @Component({
   selector: 'app-daemon-webview',
   imports: [NgIcon, ZardButtonComponent],
   template: `
-    @if (webViewable().length > 0) {
-      <button
-        z-button
-        zType="secondary"
-        class="fixed bottom-6 right-6 z-40 shadow-lg"
-        (click)="open()"
-        aria-label="Open the daemon web view"
-        title="Open the daemon web view"
-      >
-        <ng-icon name="lucideScan" class="size-4" />
-        Web view
-      </button>
-    }
-
-    <ng-template #webviewTpl>
-      <div class="flex h-full min-h-0 flex-col">
+    @if (webViewable().length === 0) {
+      <p class="py-8 text-center text-sm text-muted-foreground">
+        No web-viewable daemon is running — start one from the Daemons tab.
+      </p>
+    } @else if (activated()) {
+      <div class="flex h-[70vh] min-h-0 flex-col overflow-hidden rounded-md border">
         <div class="flex items-center gap-2 border-b p-2">
           @if (webViewable().length > 1) {
             <select
@@ -97,16 +87,6 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
               Clear
             </button>
           }
-          <button
-            z-button
-            zType="ghost"
-            zSize="sm"
-            type="button"
-            (click)="close()"
-            aria-label="Close the web view"
-          >
-            <ng-icon name="lucideX" class="size-4" />
-          </button>
         </div>
 
         <!-- Same-origin through the proxy; deliberately no sandbox attribute — with
@@ -120,22 +100,24 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
           title="Daemon web view"
         ></iframe>
       </div>
-    </ng-template>
+    }
   `,
-  viewProviders: [provideIcons({ lucideScan, lucideCrosshair, lucideX })],
+  viewProviders: [provideIcons({ lucideCrosshair })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DaemonWebviewComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
+  /**
+   * Set (once) by the page when the Web view tab is first selected. Hidden tab panels stay
+   * mounted, so without this gate the iframe would load the framed app eagerly on page load even
+   * if the tab is never opened.
+   */
+  readonly activated = input(false);
 
   private readonly daemonService = inject(WorkspaceDaemonControllerService);
-  private readonly dialog = inject(ZardDialogService);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly promptContext = inject(PromptContextStore);
-
-  private readonly webviewTpl = viewChild<TemplateRef<unknown>>('webviewTpl');
-  private dialogRef: ZardDialogRef<unknown> | null = null;
 
   // Same key AND result shape as WorkspaceDaemonsComponent's daemonsQuery — they share the cache
   // entry, so the queryFn must stay identical.
@@ -188,30 +170,15 @@ export class DaemonWebviewComponent {
     (available) => this.pickerUnavailable.set(!available),
   );
 
-  open() {
-    const content = this.webviewTpl();
-    if (!content) {
-      return;
-    }
-    this.pickMode.set(false);
-    this.picker.setEnabled(false);
-    this.selectedDaemonId.set(this.selected()?.daemon?.id ?? null);
-    // Backdrop click must not close: losing the frame mid-pick is jarring; the header has an
-    // explicit close. Fullscreen via twMerge'd overrides of the dialog's centering classes.
-    this.dialogRef = this.dialog.create({
-      zContent: content,
-      zHideFooter: true,
-      zMaskClosable: false,
-      zCustomClasses:
-        'left-0 top-0 translate-x-0 translate-y-0 h-dvh w-screen max-w-none rounded-none p-0 gap-0 grid-rows-[minmax(0,1fr)]',
+  constructor() {
+    // When the last live daemon goes away the iframe unmounts with the empty state — drop pick
+    // mode and the picker's stale document with it.
+    effect(() => {
+      if (this.webViewable().length === 0) {
+        this.pickMode.set(false);
+        this.picker.detach();
+      }
     });
-  }
-
-  close() {
-    this.pickMode.set(false);
-    this.picker.detach();
-    this.dialogRef?.close();
-    this.dialogRef = null;
   }
 
   togglePickMode() {

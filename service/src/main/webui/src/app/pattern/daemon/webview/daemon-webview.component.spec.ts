@@ -48,23 +48,35 @@ describe('DaemonWebviewComponent', () => {
     }).compileComponents();
   });
 
-  function createComponent(instances: DaemonInstanceDto[]) {
+  function createComponent(instances: DaemonInstanceDto[], activated = true) {
     queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], instances);
     const fixture = TestBed.createComponent(DaemonWebviewComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
+    fixture.componentRef.setInput('activated', activated);
     fixture.detectChanges();
     return fixture;
   }
 
-  it('shows the floaty button only for live web-viewable daemons', () => {
+  it('frames a live web-viewable daemon once the tab has been activated', () => {
     const fixture = createComponent([instance()]);
 
     expect(fixture.componentInstance.webViewable().length).toBe(1);
-    expect(fixture.nativeElement.querySelector('button')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('iframe')).not.toBeNull();
   });
 
-  it('stays hidden without a proxyPath or without a live status', () => {
+  it('mounts no iframe before the first tab activation — the framed app must not load eagerly', () => {
+    const fixture = createComponent([instance()], false);
+
+    expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
+
+    // First selection of the tab flips the gate; from then on the iframe stays.
+    fixture.componentRef.setInput('activated', true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('iframe')).not.toBeNull();
+  });
+
+  it('shows the empty state without a proxyPath or without a live status', () => {
     const fixture = createComponent([
       instance({ proxyPath: undefined }),
       instance({ daemon: { id: 'd-2', name: 'stopped one' }, status: DaemonStatus.Stopped }),
@@ -72,7 +84,10 @@ describe('DaemonWebviewComponent', () => {
     ]);
 
     expect(fixture.componentInstance.webViewable().length).toBe(0);
-    expect(fixture.nativeElement.querySelector('button')).toBeNull();
+    expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'No web-viewable daemon is running',
+    );
   });
 
   it('selects the first web-viewable daemon and lets a picked id override it', () => {

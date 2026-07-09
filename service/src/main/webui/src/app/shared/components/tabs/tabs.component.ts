@@ -37,6 +37,7 @@ import {
 
 export type zPosition = 'top' | 'bottom' | 'left' | 'right';
 export type zAlign = 'center' | 'start' | 'end';
+export type ZardTabIndicator = 'primary' | 'success' | 'warning';
 
 @Component({
   selector: 'z-tab',
@@ -51,6 +52,13 @@ export type zAlign = 'center' | 'start' | 'end';
 })
 export class ZardTabComponent {
   readonly label = input.required<string>();
+  /**
+   * Optional status dot on the tab's nav button, with `indicatorLabel` as its tooltip. This is a
+   * deliberate local qits extension to the zard tabs component (not upstream) — preserve it when
+   * regenerating the component via the zard CLI.
+   */
+  readonly indicator = input<ZardTabIndicator | null>(null);
+  readonly indicatorLabel = input('');
   readonly contentTemplate = viewChild.required<TemplateRef<unknown>>('content');
 }
 
@@ -125,6 +133,13 @@ export class ZardTabComponent {
               [class]="buttonClassesSignal()[index]"
             >
               {{ tab.label() }}
+              @if (tab.indicator(); as indicator) {
+                <span
+                  class="ml-1.5 inline-block size-2 rounded-full"
+                  [class]="indicatorClasses[indicator]"
+                  [attr.title]="tab.indicatorLabel() || null"
+                ></span>
+              }
             </button>
           }
         </nav>
@@ -191,7 +206,7 @@ export class ZardTabGroupComponent implements AfterViewInit {
   protected readonly activeTabIndex = signal<number>(0);
   protected readonly scrollPresent = signal<boolean>(false);
 
-  protected readonly zTabChange = output<{
+  readonly zTabChange = output<{
     index: number;
     label: string;
     tab: ZardTabComponent;
@@ -212,6 +227,13 @@ export class ZardTabGroupComponent implements AfterViewInit {
   readonly class = input<string>('');
 
   protected readonly showArrow = computed(() => this.zShowArrow() && this.scrollPresent());
+
+  /** Dot colors for the local `indicator` extension; keys match {@link ZardTabIndicator}. */
+  protected readonly indicatorClasses: Record<ZardTabIndicator, string> = {
+    primary: 'bg-primary',
+    success: 'bg-green-500',
+    warning: 'bg-amber-500',
+  };
 
   ngAfterViewInit(): void {
     // default tab selection
@@ -348,6 +370,15 @@ export class ZardTabGroupComponent implements AfterViewInit {
       this.setActiveTab(index);
     } else {
       console.warn(`Index ${index} outside the range of available tabs.`);
+    }
+  }
+
+  selectTabByLabel(label: string): void {
+    const index = this.tabs().findIndex(tab => tab.label() === label);
+    if (index >= 0) {
+      this.setActiveTab(index);
+    } else {
+      console.warn(`No tab labelled "${label}" among the available tabs.`);
     }
   }
 }
