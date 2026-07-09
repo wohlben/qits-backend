@@ -52,7 +52,11 @@ RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
 # Code's "Rebuild/Stop Container" kills the container (and every process in it, including the
 # terminal's bash) without giving it a chance to exit cleanly — so up to now, no command ever
 # actually made it to disk, regardless of the volume being persisted correctly.
-RUN echo -e '\n# Persist history immediately (survives the shell being killed, not just exited).\nPROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"' \
+# NB: use printf, not `echo -e` — Docker's RUN shell is /bin/sh (dash), whose echo prints a literal
+# "-e" and doesn't expand \n. That put a broken `-e \n...` line into .bashrc, so every new terminal
+# greeted you with `bash: -e: command not found` (and the PROMPT_COMMAND never took effect). printf
+# behaves the same in sh and bash.
+RUN printf '\n# Persist history immediately (survives the shell being killed, not just exited).\nPROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"\n' \
         >> "/home/${USERNAME}/.bashrc" \
     && chown "${USER_UID}:${USER_GID}" "/home/${USERNAME}/.bashrc"
 
