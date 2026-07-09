@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
@@ -22,6 +23,7 @@ import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.FakeContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import io.quarkus.test.junit.QuarkusTest;
@@ -90,6 +92,9 @@ public class DaemonSupervisorTest {
     var project = projectService.create("Daemon Project", null);
     var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
     workspaceService.createWorkspace(repo.id, "work", "master", "work");
+    // Creation is lazy; provision the container so out-of-band session starts (which bypass the
+    // supervisor's own ensureContainer) have one to run in.
+    workspaceService.ensureContainer(repo.id, "work");
     return repo.id;
   }
 
@@ -510,6 +515,11 @@ public class DaemonSupervisorTest {
     // application JVM effectively does relative to `kill -- -pgid`) survives. It keeps binding the
     // http port, so the NEXT start collides and sits in STARTING forever. The launch-time reap must
     // kill it first, by the QITS_DAEMON_ID marker its environ inherited.
+    assumeTrue(
+        reapPrimitiveWorks(),
+        "this environment denies the reap primitive (cross-session /proc environ scan + kill) —"
+            + " skipping; see docs/issues/resolved/"
+            + "2026-07-08_daemon-straggler-reap-test-fails-in-sandboxed-env.md");
     String repoId = repoWithWorkspace();
     Path orphanPidFile = Files.createTempFile("qits-orphan-", ".pid");
     Files.deleteIfExists(
@@ -531,8 +541,11 @@ public class DaemonSupervisorTest {
     awaitStatus(repoId, daemonId, DaemonStatus.STOPPED);
 
     long orphanPid = Long.parseLong(Files.readString(orphanPidFile).trim());
+    // processRunning, not raw isAlive: in a sandbox whose PID 1 never reaps, the killed orphan
+    // lingers as a zombie which ProcessHandle counts as alive — but a zombie holds no port, so for
+    // the wedge this guards against it IS reaped.
     assertTrue(
-        ProcessHandle.of(orphanPid).map(ProcessHandle::isAlive).orElse(false),
+        FakeContainerRuntime.processRunning(orphanPid),
         "the setsid child survives the group-kill stop (the bug being fixed)");
 
     try {
@@ -543,7 +556,7 @@ public class DaemonSupervisorTest {
       long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
       boolean reaped = false;
       while (System.currentTimeMillis() < deadline) {
-        if (ProcessHandle.of(orphanPid).map(ProcessHandle::isAlive).orElse(false) == false) {
+        if (!FakeContainerRuntime.processRunning(orphanPid)) {
           reaped = true;
           break;
         }
@@ -562,6 +575,60 @@ public class DaemonSupervisorTest {
         // best effort
       }
       Files.deleteIfExists(orphanPidFile);
+    }
+  }
+
+  /**
+   * Self-probe of the reap primitive the straggler test depends on: spawn a marked out-of-session
+   * child (the shape of the escaped straggler), then scan {@code /proc/<pid>/environ} for the
+   * marker and {@code kill -9} the match — the exact script {@code DaemonSupervisor.reapStragglers}
+   * runs. Sandboxed runners have been observed to deny the cross-session environ read or kill
+   * wholesale; there the regression test can only ever fail for environment reasons, so it
+   * assume-guards on this probe instead (mirroring how the docker ITs self-skip without a docker
+   * backend).
+   */
+  private boolean reapPrimitiveWorks() throws Exception {
+    Path pidFile = Files.createTempFile("qits-reap-probe-", ".pid");
+    Files.deleteIfExists(pidFile);
+    String probeId = "probe-" + java.util.UUID.randomUUID();
+    String marker = "QITS_DAEMON_ID=" + probeId;
+    ProcessBuilder pb =
+        new ProcessBuilder("setsid", "bash", "-c", "echo $$ > " + pidFile + "; sleep 30");
+    pb.environment().put("QITS_DAEMON_ID", probeId);
+    pb.start();
+    Long orphan = null;
+    try {
+      long deadline = System.currentTimeMillis() + 5_000;
+      while (System.currentTimeMillis() < deadline && !Files.exists(pidFile)) {
+        Thread.sleep(20);
+      }
+      if (!Files.exists(pidFile)) {
+        return false; // setsid spawn itself doesn't work here
+      }
+      orphan = Long.parseLong(Files.readString(pidFile).trim());
+      // The same scan/kill script reapStragglers uses (the scanning shell carries no marker).
+      new ProcessBuilder(
+              "bash",
+              "-c",
+              "for p in /proc/[0-9]*; do grep -qzF '"
+                  + marker
+                  + "' \"$p/environ\" 2>/dev/null && kill -9 \"${p#/proc/}\" 2>/dev/null; done;"
+                  + " true")
+          .start()
+          .waitFor();
+      long killDeadline = System.currentTimeMillis() + 5_000;
+      while (System.currentTimeMillis() < killDeadline) {
+        if (!FakeContainerRuntime.processRunning(orphan)) {
+          return true;
+        }
+        Thread.sleep(50);
+      }
+      return false;
+    } finally {
+      if (orphan != null) {
+        ProcessHandle.of(orphan).ifPresent(ProcessHandle::destroyForcibly);
+      }
+      Files.deleteIfExists(pidFile);
     }
   }
 

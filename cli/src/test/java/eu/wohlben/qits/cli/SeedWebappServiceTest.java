@@ -18,9 +18,11 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseAction;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
+import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
+import eu.wohlben.qits.domain.repository.entity.WorkspaceRuntimeStatus;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceStatus;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -51,6 +53,7 @@ public class SeedWebappServiceTest {
   @Inject SeedWebappService seedWebappService;
   @Inject ProjectService projectService;
   @Inject WorkspaceService workspaceService;
+  @Inject ContainerRuntime containers;
   @Inject RepositoryDaemonService repositoryDaemonService;
   @Inject FeatureFlowConfigurationService featureFlowConfigurationService;
   @Inject FeatureFlowPhaseService featureFlowPhaseService;
@@ -95,6 +98,18 @@ public class SeedWebappServiceTest {
     assertObservableDaemon(repo.id);
     assertGreetingWorkspace(repo.id);
     assertBuildAndVerifyFeatureFlow(project.id);
+
+    // Seeding is pure host-side data setup — no container ran (the daemon is a definition only;
+    // it launches on demand later), and every workspace waits STOPPED for its first use.
+    assertTrue(
+        containers.listWorkspaceContainers(repo.id).isEmpty(),
+        "seeding must not provision containers");
+    for (WorkspaceDto wt : workspaceService.listWorkspaces(repo.id)) {
+      assertEquals(
+          WorkspaceRuntimeStatus.STOPPED,
+          wt.runtimeStatus(),
+          "seeded workspace " + wt.workspaceId() + " starts unprovisioned");
+    }
   }
 
   /** The dev-server daemon is web-viewable, OTEL-enabled, and fully wired for log observation. */

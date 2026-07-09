@@ -62,6 +62,7 @@ public class WorkspaceCheckpointServiceTest {
   public void checkpointPushesAnAheadContainerSoOriginAdvances() throws Exception {
     String repoId = clonedRepo();
     workspaceService.createWorkspace(repoId, "feat", "master", "feat", null);
+    workspaceService.ensureContainer(repoId, "feat");
     String container = containers.containerName("feat", repoId);
     String head = commitInContainer(container, "checkpoint.txt");
 
@@ -75,6 +76,7 @@ public class WorkspaceCheckpointServiceTest {
   public void checkpointSkipsALevelContainer() throws Exception {
     String repoId = clonedRepo();
     workspaceService.createWorkspace(repoId, "feat", "master", "feat", null);
+    workspaceService.ensureContainer(repoId, "feat");
     String before = originHead(repoId, "feat");
 
     var summary = checkpointService.checkpointAll();
@@ -90,6 +92,7 @@ public class WorkspaceCheckpointServiceTest {
   public void checkpointBoundsTheLossWindowOnUnexpectedContainerDeath() throws Exception {
     String repoId = clonedRepo();
     workspaceService.createWorkspace(repoId, "feat", "master", "feat", null);
+    workspaceService.ensureContainer(repoId, "feat");
     String container = containers.containerName("feat", repoId);
     String head = commitInContainer(container, "survivor.txt");
 
