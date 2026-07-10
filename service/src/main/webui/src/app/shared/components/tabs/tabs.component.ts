@@ -81,8 +81,8 @@ export class ZardTabComponent {
       @for (tab of tabs(); track tab; let index = $index) {
         <div
           role="tabpanel"
-          [attr.id]="'tabpanel-' + index"
-          [attr.aria-labelledby]="'tab-' + index"
+          [attr.id]="'tabpanel-' + uid + '-' + index"
+          [attr.aria-labelledby]="'tab-' + uid + '-' + index"
           [attr.tabindex]="0"
           [hidden]="activeTab() !== tab"
           class="focus-visible:ring-primary/50 outline-none focus-visible:ring-2"
@@ -138,10 +138,10 @@ export class ZardTabComponent {
               role="tab"
               cdkDrag
               [cdkDragDisabled]="!reorderable()"
-              [attr.id]="'tab-' + entry.contentIndex"
+              [attr.id]="'tab-' + uid + '-' + entry.contentIndex"
               [attr.aria-selected]="activeTab() === entry.tab"
               [attr.tabindex]="activeTab() === entry.tab ? 0 : -1"
-              [attr.aria-controls]="'tabpanel-' + entry.contentIndex"
+              [attr.aria-controls]="'tabpanel-' + uid + '-' + entry.contentIndex"
               (click)="setActiveTab(entry.tab)"
               [class]="buttonClassesSignal().get(entry.tab)"
             >
@@ -221,6 +221,15 @@ export class ZardTabGroupComponent implements AfterViewInit {
   protected readonly tabs = computed(() => this.tabComponents());
   protected readonly activeTab = signal<ZardTabComponent | null>(null);
   protected readonly scrollPresent = signal<boolean>(false);
+
+  private static instanceCounter = 0;
+  /**
+   * Per-instance discriminator for the `tab-*`/`tabpanel-*` DOM ids, so nested or repeated tab
+   * groups on one page don't mint duplicate ids (an ARIA violation — `aria-controls` would become
+   * ambiguous). Like `indicator`, a deliberate local qits extension to the zard tabs component
+   * (not upstream) — preserve it when regenerating via the zard CLI.
+   */
+  protected readonly uid = ZardTabGroupComponent.instanceCounter++;
 
   readonly zTabChange = output<{
     index: number;

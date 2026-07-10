@@ -129,6 +129,26 @@ describe('WorkspaceTelemetryComponent', () => {
     return fixture;
   }
 
+  it('splits the tab into Traces / Logs / Metrics sub-tabs, Traces active first', () => {
+    const fixture = createComponent();
+    fixture.detectChanges(); // settle the tab group's afterViewInit default selection
+    const el = fixture.nativeElement as HTMLElement;
+
+    const tabs = Array.from(el.querySelectorAll('[role="tab"]'));
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Traces', 'Logs', 'Metrics']);
+    expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
+
+    // Panels pair to their tabs via aria-controls: errors + trace list share the Traces panel;
+    // the log tail and metric list sit behind their own tabs, mounted but hidden.
+    const panelFor = (tab: Element) => el.querySelector(`#${tab.getAttribute('aria-controls')}`)!;
+    expect(panelFor(tabs[0]!).querySelector('app-telemetry-error-feed')).not.toBeNull();
+    expect(panelFor(tabs[1]!).querySelector('app-telemetry-log-tail')).not.toBeNull();
+    expect(panelFor(tabs[2]!).querySelector('app-telemetry-metric-list')).not.toBeNull();
+    expect(panelFor(tabs[0]!).hasAttribute('hidden')).toBe(false);
+    expect(panelFor(tabs[1]!).hasAttribute('hidden')).toBe(true);
+    expect(panelFor(tabs[2]!).hasAttribute('hidden')).toBe(true);
+  });
+
   it('renders the error feed with exception evidence and the log tail', () => {
     const fixture = createComponent();
 
