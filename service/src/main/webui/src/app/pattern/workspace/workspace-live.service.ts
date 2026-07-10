@@ -78,7 +78,9 @@ export class WorkspaceLiveService {
         ['telemetry-metrics', repoId, workspaceId],
         ['telemetry-logs', repoId, workspaceId],
       ],
-      commands: [['commands']],
+      // The session tree derives from commands + the post-exit transcript sweep, which both fire
+      // the `commands` hint — so it rides the same topic instead of adding one.
+      commands: [['commands'], ['workspace-agent-sessions', repoId, workspaceId]],
     };
   }
 }

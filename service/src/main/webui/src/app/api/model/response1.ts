@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { AgentSessionNodeDto } from './agentSessionNodeDto';
 
 
 export interface Response1 { 
-    prompt?: string;
+    sessions?: Array<AgentSessionNodeDto>;
 }
 

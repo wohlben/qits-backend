@@ -3,6 +3,8 @@ package eu.wohlben.qits.domain.agent.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import eu.wohlben.qits.domain.agent.entity.AgentSessionStat;
+import eu.wohlben.qits.domain.agent.persistence.AgentSessionStatRepository;
 import eu.wohlben.qits.domain.command.control.CommandLogService;
 import eu.wohlben.qits.domain.command.entity.Command;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
@@ -19,7 +21,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -65,6 +70,8 @@ public class AgentTranscriptService {
   @Inject CommandRepository commandRepository;
 
   @Inject CommandLogService commandLogService;
+
+  @Inject AgentSessionStatRepository statRepository;
 
   @Inject WorkspaceChangePublisher changePublisher;
 
@@ -118,18 +125,34 @@ public class AgentTranscriptService {
 
     ImportBuffer buffer = new ImportBuffer(commandId);
     CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    // Stats aggregate once per session even when the list revisits one (in-TUI switch back).
+    Set<String> visited = new LinkedHashSet<>();
+    List<AgentSessionStat> stats = new ArrayList<>();
     for (SessionInfo session : info.sessions()) {
+      boolean firstVisit = visited.add(session.sessionId());
       Path transcript = resolveTranscript(configDir, agent, session);
+      StatCollector sessionStat = new StatCollector();
       if (transcript == null) {
         LOG.warnf(
             "No transcript found for session %s of command %s", session.sessionId(), commandId);
       } else {
-        importJsonl(buffer, transcript);
+        importJsonl(buffer, transcript, sessionStat);
+        if (firstVisit) {
+          stats.add(sessionStat.toStat(commandId, session.sessionId(), null, null));
+        }
       }
-      importSidechains(
-          buffer, configDir.resolve(agent.subagentsDir(CONTAINER_CWD, session.sessionId())));
+      List<AgentSessionStat> sidechainStats =
+          importSidechains(
+              buffer,
+              configDir.resolve(agent.subagentsDir(CONTAINER_CWD, session.sessionId())),
+              commandId,
+              session.sessionId());
+      if (firstVisit) {
+        stats.addAll(sidechainStats);
+      }
     }
     buffer.flush();
+    replaceStats(stats);
     if (buffer.imported > 0) {
       LOG.infof("Imported %d transcript line(s) for command %s", buffer.imported, commandId);
     }
@@ -209,12 +232,15 @@ public class AgentTranscriptService {
   }
 
   /** Streams one JSONL file into the buffer (no slurp — transcripts can be large). */
-  private void importJsonl(ImportBuffer buffer, Path file) {
+  private void importJsonl(ImportBuffer buffer, Path file, StatCollector stats) {
     try (BufferedReader reader = Files.newBufferedReader(file)) {
       String line;
       while ((line = reader.readLine()) != null) {
         if (!line.isBlank()) {
-          buffer.add(line, lineTimestamp(line));
+          JsonNode node = parseLine(line);
+          Instant timestamp = ownTimestamp(node);
+          buffer.add(line, timestamp != null ? timestamp : Instant.now());
+          stats.observe(node, timestamp);
         }
       }
     } catch (IOException e) {
@@ -227,10 +253,12 @@ public class AgentTranscriptService {
    * determinism) a synthetic {@value #AGENT_META_TYPE} line built from the sibling {@code
    * .meta.json} precedes the sidechain's lines, giving the renderer the group label ({@code
    * agentType: description}) and the {@code toolUseId} anchoring it to the spawning Task call.
+   * Returns one stat row per sidechain, labeled from the same meta.
    */
-  private void importSidechains(ImportBuffer buffer, Path subagentsDir) {
+  private List<AgentSessionStat> importSidechains(
+      ImportBuffer buffer, Path subagentsDir, String commandId, String sessionId) {
     if (!Files.isDirectory(subagentsDir)) {
-      return;
+      return List.of();
     }
     List<Path> sidechains;
     try (Stream<Path> list = Files.list(subagentsDir)) {
@@ -241,40 +269,156 @@ public class AgentTranscriptService {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+    List<AgentSessionStat> stats = new ArrayList<>();
     for (Path sidechain : sidechains) {
       String filename = sidechain.getFileName().toString();
       String agentId = filename.substring("agent-".length(), filename.length() - ".jsonl".length());
-      buffer.add(agentMetaLine(sidechain, agentId), Instant.now());
-      importJsonl(buffer, sidechain);
+      SidechainMeta meta = readSidechainMeta(sidechain, agentId);
+      buffer.add(agentMetaLine(agentId, meta), Instant.now());
+      StatCollector collector = new StatCollector();
+      importJsonl(buffer, sidechain, collector);
+      stats.add(collector.toStat(commandId, sessionId, agentId, meta));
     }
+    return stats;
   }
 
-  private String agentMetaLine(Path sidechain, String agentId) {
-    ObjectNode meta = mapper.createObjectNode();
-    meta.put("type", AGENT_META_TYPE);
-    meta.put("agentId", agentId);
+  /** The sidechain's {@code agentType}/{@code description}/{@code toolUseId} labels. */
+  private record SidechainMeta(String agentType, String description, String toolUseId) {}
+
+  private SidechainMeta readSidechainMeta(Path sidechain, String agentId) {
     Path metaFile = sidechain.resolveSibling("agent-" + agentId + ".meta.json");
     if (Files.isRegularFile(metaFile)) {
       try {
         JsonNode parsed = mapper.readTree(metaFile.toFile());
-        meta.put("agentType", parsed.path("agentType").asText(null));
-        meta.put("description", parsed.path("description").asText(null));
-        meta.put("toolUseId", parsed.path("toolUseId").asText(null));
+        // The labels are agent-produced free text; clamp them to the stat columns' widths.
+        return new SidechainMeta(
+            truncate(parsed.path("agentType").asText(null), 255),
+            truncate(parsed.path("description").asText(null), 1024),
+            parsed.path("toolUseId").asText(null));
       } catch (IOException e) {
         LOG.debugf(e, "Unreadable sidechain meta %s", metaFile);
       }
     }
-    return meta.toString();
+    return new SidechainMeta(null, null, null);
   }
 
-  /** The line's own {@code timestamp} field when present and parseable, else now. */
-  private Instant lineTimestamp(String line) {
+  private static String truncate(String value, int maxLength) {
+    return value != null && value.length() > maxLength ? value.substring(0, maxLength) : value;
+  }
+
+  private String agentMetaLine(String agentId, SidechainMeta meta) {
+    ObjectNode node = mapper.createObjectNode();
+    node.put("type", AGENT_META_TYPE);
+    node.put("agentId", agentId);
+    if (meta.agentType() != null) {
+      node.put("agentType", meta.agentType());
+    }
+    if (meta.description() != null) {
+      node.put("description", meta.description());
+    }
+    if (meta.toolUseId() != null) {
+      node.put("toolUseId", meta.toolUseId());
+    }
+    return node.toString();
+  }
+
+  private JsonNode parseLine(String line) {
     try {
-      JsonNode node = mapper.readTree(line);
-      String timestamp = node.path("timestamp").asText(null);
-      return timestamp != null ? Instant.parse(timestamp) : Instant.now();
+      return mapper.readTree(line);
     } catch (IOException | RuntimeException e) {
-      return Instant.now();
+      return null;
+    }
+  }
+
+  /** The line's own {@code timestamp} field when present and parseable, else null. */
+  private Instant ownTimestamp(JsonNode node) {
+    if (node == null) {
+      return null;
+    }
+    try {
+      String timestamp = node.path("timestamp").asText(null);
+      return timestamp != null ? Instant.parse(timestamp) : null;
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  /**
+   * Whether a transcript line is a conversation turn the operator would count — a {@code user} or
+   * {@code assistant} message actually carrying text, not a tool-result/tool-call carrier, a
+   * thinking-only line, or a meta line.
+   */
+  private static boolean isConversationTurn(JsonNode node) {
+    if (node == null) {
+      return false;
+    }
+    String type = node.path("type").asText("");
+    if (!"user".equals(type) && !"assistant".equals(type)) {
+      return false;
+    }
+    if (node.path("isMeta").asBoolean(false)) {
+      return false;
+    }
+    JsonNode content = node.path("message").path("content");
+    if (content.isTextual()) {
+      return !content.asText().isBlank();
+    }
+    for (JsonNode block : content) {
+      if ("text".equals(block.path("type").asText(""))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Replaces the swept sessions' stat rows with this import's aggregation, in its own transaction
+   * (exit listeners run on registry reader threads). Keyed by session, not command: a later resume
+   * of the same session supersedes the earlier import's counts instead of duplicating them, and a
+   * sweep that found no transcript leaves an earlier import's stats in place.
+   */
+  private void replaceStats(List<AgentSessionStat> stats) {
+    if (stats.isEmpty()) {
+      return;
+    }
+    Set<String> sessionIds = new LinkedHashSet<>();
+    for (AgentSessionStat stat : stats) {
+      sessionIds.add(stat.sessionId);
+    }
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              statRepository.deleteBySessionIds(sessionIds);
+              statRepository.persist(stats);
+            });
+  }
+
+  /** Aggregates one transcript's stat row while its lines stream through the import. */
+  private static class StatCollector {
+    private int messageCount;
+    private Instant firstTimestamp;
+
+    private void observe(JsonNode node, Instant timestamp) {
+      if (firstTimestamp == null && timestamp != null) {
+        firstTimestamp = timestamp;
+      }
+      if (isConversationTurn(node)) {
+        messageCount++;
+      }
+    }
+
+    private AgentSessionStat toStat(
+        String commandId, String sessionId, String agentId, SidechainMeta meta) {
+      return AgentSessionStat.builder()
+          .id(UUID.randomUUID().toString())
+          .commandId(commandId)
+          .sessionId(sessionId)
+          .agentId(agentId)
+          .agentType(meta == null ? null : meta.agentType())
+          .description(meta == null ? null : meta.description())
+          .messageCount(messageCount)
+          .firstTimestamp(firstTimestamp)
+          .build();
     }
   }
 

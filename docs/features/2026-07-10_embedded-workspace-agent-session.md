@@ -2,7 +2,7 @@
 
 ## Introduction
 
-[agent-session-lineage](../features/2026-07-10_agent-session-lineage.md) made agent sessions
+[agent-session-lineage](2026-07-10_agent-session-lineage.md) made agent sessions
 first-class: qits pins the session ID at launch, persists the lineage per command, and can resume
 or fork any session — including the **interactive launch**, the full Claude Code TUI in xterm.js.
 But reaching a session still takes a detour: launch from the chat/prompt panel, or find the old
@@ -15,20 +15,20 @@ conversation continues where it left off, every time.
 
 Related/dependent plans:
 
-- **Hard dependency on [agent-session-lineage](../features/2026-07-10_agent-session-lineage.md)**
+- **Hard dependency on [agent-session-lineage](2026-07-10_agent-session-lineage.md)**
   (landed): the interactive launch mode, `resumeSessionId` on the launch endpoint, and
   `CommandDto.agentSessions` are exactly the surface the embed consumes. The embed itself needs
   **no backend changes**; the session history list (below) adds one read endpoint plus a
   sweep-time aggregation.
-- **Extends the [workspace detail tab row](../features/2026-07-09_workspace-detail-tab-regrouping.md)**:
-  the Agents tab (today only the [LSP plugins list](../features/2026-07-07_agent-lsp-plugins.md))
+- **Extends the [workspace detail tab row](2026-07-09_workspace-detail-tab-regrouping.md)**:
+  the Agents tab (today only the [LSP plugins list](2026-07-07_agent-lsp-plugins.md))
   gains the session as its primary section; Plugins stays below it.
-- **Reuses the [tmux-backed](../features/2026-07-05_tmux-backed-daemons.md) terminal plumbing**:
+- **Reuses the [tmux-backed](2026-07-05_tmux-backed-daemons.md) terminal plumbing**:
   `WebTerminalComponent` attach-by-`commandId` (re-attach replays scrollback, detach keeps the
   process running) is unchanged.
-- **Coexists with [workspace chat](../features/2026-07-04_workspace-chat-dialog.md)**: chat keeps
+- **Coexists with [workspace chat](2026-07-04_workspace-chat-dialog.md)**: chat keeps
   its tab and its stream; the embedded terminal defers while a chat is live (below).
-- **Freshness rides [workspace SSE live updates](../features/2026-07-07_workspace-sse-live-updates.md)**:
+- **Freshness rides [workspace SSE live updates](2026-07-07_workspace-sse-live-updates.md)**:
   the `commands` topic already invalidates the `['commands']` query this tab derives everything
   from — no polling.
 
@@ -137,6 +137,71 @@ with a "live" placeholder count; the terminal above *is* its view meanwhile.
   rule ("action-launched runs, not chats (the Chat dot) or daemons (the Daemons dot)"). Excluding
   commands with a non-empty `agentSessions` list extends that same rule to the new owner tab. The
   run-history *list* keeps showing agent runs (everything-visible convention); only the dot moves.
+
+## Implementation notes (as shipped, 2026-07-10)
+
+**What is shown where — sessions per workspace vs. sessions per command.** The two views this
+feature relies on are met at different layers:
+
+- **Per workspace (this feature's UI):** the Agents tab's session tree is the workspace-level
+  view — every session any of the workspace's commands ever drove, one node per session,
+  assembled by the new endpoint from `command_agent_session` joined through the workspace's
+  commands plus the sweep's `agent_session_stat` counts.
+- **Per command (the command detail route):** each command's ordered session list is
+  `CommandDto.agentSessions` (the lineage feature's data model), and the command detail page now
+  renders it as a session strip (`ui/components/agent/agent-session-refs`) above the
+  terminal/transcript — one row per entry, `source · sessionId · recordedAt`, the fork origin on
+  `FORKED` entries, and a "current" marker on the last entry when the run crossed several
+  sessions (in-TUI `/resume` → `SWITCHED`). Beyond the display, this feature consumes the list
+  everywhere: resolution resumes the newest finished command's *last* entry, the tree collapses
+  resumes by walking each command's list, each tree row's `newestCommandId` links a session back
+  to the command that last drove it, and the indicator/attach logic treats a non-empty list as
+  "agent run".
+
+Together the two surfaces cover both directions of the command↔session **n:m relationship**:
+`command_agent_session` is the association table (ordered, duplicates allowed — the faithful
+order of sessions driven), the command page reads it command→sessions, the workspace tree reads
+it session→commands (collapsing every command that drove a session onto one node).
+
+Where the implementation pins down (or deviates from) the idea above:
+
+- **Stat rows are keyed by session, not command.** `agent_session_stat` (V30) carries a
+  `command_id` (the sweeping command, `on delete cascade`), but the sweep's delete-and-reinsert
+  deletes **by session id**: a later command resuming the same session supersedes the earlier
+  import's counts instead of duplicating them ("latest import wins"), and a sweep that found no
+  transcript leaves an earlier import's stats in place rather than zeroing them. One table serves
+  both row kinds — `agent_id` null marks the session's own row, non-null a subagent sidechain
+  (labels clamped to the column widths; they are agent-produced free text).
+- **`numOfMessages` counts lines actually carrying text**: `user`/`assistant` lines whose content
+  is a string or contains a `text` block. Tool-result carriers (typed `user`), tool-call-only or
+  thinking-only assistant lines, and `isMeta` lines don't count — the operator's notion of
+  conversation length. Aggregation streams inside the existing import loop (each line is parsed
+  once, also serving the timestamp lookup); a session revisited by an in-TUI switch-back
+  aggregates once.
+- **The endpoint returns the nested tree** (`children` on each node), roots newest-first by
+  `firstRecordedAt`, fork children chronological, subagents ordered by first timestamp. A fork
+  edge pointing at a session the workspace never drove lists as a root. `messageCount` is null
+  until the session's first sweep — the frontend renders the "live" placeholder only for the
+  currently-embedded session and an em dash otherwise.
+- **Attach is live-computed; only the launch is latched.** `newestRunningInteractiveAgent`
+  (running `TERMINAL` + non-empty `agentSessions`, newest wins — the sibling of
+  `newestRunningChat`) feeds the embed regardless of activation; the page's `agentsActivated`
+  latch gates only the one-shot resolve-and-launch. The sign-in REPL attaches via the
+  `launchedCommandId` bridge only (its command has no session lineage to re-discover it by), so a
+  page reload while the REPL runs reaches it from the Commands page instead; its exit re-runs
+  resolution automatically, once per REPL (real agent runs never auto-relaunch).
+- **The deferred state's jump link is an output** (`jumpToChat`), handled by the page via
+  `selectTabByLabel('Chat')` — same mechanism as the daemon events' open-in-Files jump.
+- **Row rendering is a presentational component** (`ui/components/agent/agent-session-rows`):
+  the smart tree component owns the query + tree flattening (depth + per-lineage accent class
+  computed once), the dumb component renders rows — required by the visual-test ground rules
+  (screenshot tests render dumb components only). Dates render in UTC so the baseline is
+  machine-independent. The screenshot covers the session tree (roots + fork branch + subagent +
+  live highlight); the embed's terminal/deferred/ended states are asserted by component specs
+  instead (xterm.js in a pixel test buys flake, not coverage).
+- **Tree freshness rides the SSE `commands` hint** as planned: `WorkspaceLiveService` invalidates
+  `['workspace-agent-sessions', repoId, workspaceId]` alongside `['commands']` — the sweep fires
+  a second `commands` hint after import, which refreshes the counts.
 
 ## Open questions
 

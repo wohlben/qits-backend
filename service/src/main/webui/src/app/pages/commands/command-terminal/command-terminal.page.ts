@@ -18,6 +18,7 @@ import { CommandTranscriptComponent } from '@/pattern/command/command-transcript
 import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
+import { AgentSessionRefsComponent } from '@/ui/components/agent/agent-session-refs.component';
 
 /**
  * The view for a single registry command. A running command re-attaches to its live process
@@ -32,6 +33,7 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
 @Component({
   selector: 'app-command-terminal-page',
   imports: [
+    AgentSessionRefsComponent,
     PageLayoutComponent,
     WebTerminalComponent,
     CommandLogComponent,
@@ -84,6 +86,13 @@ import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tab
       </div>
 
       @if (commandQuery.data(); as command) {
+        <!-- The sessions this command drove, in order (its side of the command↔session n:m) —
+             several entries when the operator switched sessions inside the interactive TUI. -->
+        @if (agentSessions().length > 0) {
+          <div class="mb-4">
+            <app-agent-session-refs [sessions]="agentSessions()" />
+          </div>
+        }
         <!-- Tracked by command id so Resume/Fork navigation (same route, new param) recreates the
              children — the terminal/chat sockets connect once per component instance. -->
         @for (cid of [commandId()]; track cid) {
@@ -168,9 +177,9 @@ export class CommandTerminalPage {
       ),
   }));
 
-  readonly hasAgentSessions = computed(
-    () => (this.commandQuery.data()?.agentSessions?.length ?? 0) > 0,
-  );
+  readonly agentSessions = computed(() => this.commandQuery.data()?.agentSessions ?? []);
+
+  readonly hasAgentSessions = computed(() => this.agentSessions().length > 0);
 
   /** Resume/Fork act on the command's current (last) session, once the run has finished. */
   readonly canResume = computed(() => {

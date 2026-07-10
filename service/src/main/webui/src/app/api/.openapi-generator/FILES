@@ -5,6 +5,7 @@ api.module.ts
 api/actionConfigurationController.service.ts
 api/agentController.service.ts
 api/agentPluginController.service.ts
+api/agentSessionController.service.ts
 api/api.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
@@ -33,8 +34,10 @@ model/actionScope.ts
 model/actionType.ts
 model/agentLaunchMode.ts
 model/agentMcpScope.ts
+model/agentSessionNodeDto.ts
 model/agentSessionRefDto.ts
 model/agentSessionSource.ts
+model/agentSubagentDto.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
@@ -179,6 +182,7 @@ model/response75.ts
 model/response76.ts
 model/response77.ts
 model/response78.ts
+model/response79.ts
 model/response8.ts
 model/response9.ts
 model/restartPolicy.ts

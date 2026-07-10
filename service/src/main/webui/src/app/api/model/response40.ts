@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { FeatureFlowPhaseStepDto } from './featureFlowPhaseStepDto';
 
 
 export interface Response40 { 
-    featureFlowPhaseStep?: FeatureFlowPhaseStepDto;
+    success?: boolean;
 }
 

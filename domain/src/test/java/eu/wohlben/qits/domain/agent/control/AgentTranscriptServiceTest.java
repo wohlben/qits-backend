@@ -1,8 +1,11 @@
 package eu.wohlben.qits.domain.agent.control;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.domain.agent.entity.AgentSessionStat;
+import eu.wohlben.qits.domain.agent.persistence.AgentSessionStatRepository;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
@@ -48,6 +51,8 @@ public class AgentTranscriptServiceTest {
   @Inject WorkspaceRepository workspaceRepository;
 
   @Inject CommandRepository commandRepository;
+
+  @Inject AgentSessionStatRepository statRepository;
 
   @TempDir Path configDir;
 
@@ -100,6 +105,32 @@ public class AgentTranscriptServiceTest {
         + "\"message\":{\"content\":[{\"type\":\"text\",\"text\":\""
         + text
         + "\"}]}}";
+  }
+
+  /** A user turn with plain-string content (the shape the CLI writes for typed prompts). */
+  private static String userLine(String sessionId, String text) {
+    return "{\"sessionId\":\""
+        + sessionId
+        + "\",\"isSidechain\":false,\"timestamp\":\"2026-07-10T07:59:00.000Z\",\"type\":\"user\","
+        + "\"message\":{\"role\":\"user\",\"content\":\""
+        + text
+        + "\"}}";
+  }
+
+  /** A tool-result carrier — typed {@code user} but not a conversation turn. */
+  private static String toolResultLine(String sessionId) {
+    return "{\"sessionId\":\""
+        + sessionId
+        + "\",\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":"
+        + "[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_1\",\"content\":\"ok\"}]}}";
+  }
+
+  /** A meta line (harness-injected context, {@code isMeta: true}) — not a conversation turn. */
+  private static String metaLine(String sessionId) {
+    return "{\"sessionId\":\""
+        + sessionId
+        + "\",\"type\":\"user\",\"isMeta\":true,"
+        + "\"message\":{\"role\":\"user\",\"content\":\"Caveat: local command output\"}}";
   }
 
   private Path conventionalTranscript(String sessionId) throws IOException {
@@ -253,5 +284,100 @@ public class AgentTranscriptServiceTest {
     agentTranscriptService.sweep(commandId, configDir);
 
     assertEquals(0, transcriptLines(commandId).size());
+  }
+
+  @Test
+  public void theSweepAggregatesASessionStatRowCountingConversationTurns() throws IOException {
+    String sessionId = UUID.randomUUID().toString();
+    String commandId = seedCommand(List.of(pinned(sessionId)));
+    Files.write(
+        conventionalTranscript(sessionId),
+        List.of(
+            userLine(sessionId, "hello"),
+            line(sessionId, "hi there"),
+            toolResultLine(sessionId),
+            metaLine(sessionId)));
+
+    agentTranscriptService.sweep(commandId, configDir);
+
+    List<AgentSessionStat> stats = statRepository.findBySessionIds(List.of(sessionId));
+    assertEquals(1, stats.size());
+    AgentSessionStat stat = stats.get(0);
+    assertNull(stat.agentId);
+    assertEquals(commandId, stat.commandId);
+    // The user prompt and the assistant text turn count; the tool result and the meta line don't.
+    assertEquals(2, stat.messageCount);
+    // The first line's own timestamp, not the import time.
+    assertEquals(Instant.parse("2026-07-10T07:59:00.000Z"), stat.firstTimestamp);
+  }
+
+  @Test
+  public void sidechainsAggregateSubagentStatRowsCarryingTheirMetaLabels() throws IOException {
+    String sessionId = UUID.randomUUID().toString();
+    String commandId = seedCommand(List.of(pinned(sessionId)));
+    Files.write(conventionalTranscript(sessionId), List.of(line(sessionId, "main")));
+    Path subagents = configDir.resolve(Path.of("projects", "-workspace", sessionId, "subagents"));
+    Files.createDirectories(subagents);
+    Files.writeString(
+        subagents.resolve("agent-a1b2.jsonl"),
+        "{\"sessionId\":\""
+            + sessionId
+            + "\",\"isSidechain\":true,\"agentId\":\"a1b2\",\"type\":\"assistant\","
+            + "\"timestamp\":\"2026-07-10T08:01:00.000Z\","
+            + "\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"sidechain-work\"}]}}\n");
+    Files.writeString(
+        subagents.resolve("agent-a1b2.meta.json"),
+        "{\"agentType\":\"Explore\",\"description\":\"scan the tests\","
+            + "\"toolUseId\":\"toolu_123\",\"spawnDepth\":1}");
+
+    agentTranscriptService.sweep(commandId, configDir);
+
+    List<AgentSessionStat> stats = statRepository.findBySessionIds(List.of(sessionId));
+    assertEquals(2, stats.size());
+    AgentSessionStat subagent =
+        stats.stream().filter(s -> s.agentId != null).findFirst().orElseThrow();
+    assertEquals("a1b2", subagent.agentId);
+    assertEquals("Explore", subagent.agentType);
+    assertEquals("scan the tests", subagent.description);
+    assertEquals(1, subagent.messageCount);
+    assertEquals(Instant.parse("2026-07-10T08:01:00.000Z"), subagent.firstTimestamp);
+  }
+
+  @Test
+  public void resweepingReplacesStatRowsInsteadOfDuplicating() throws IOException {
+    String sessionId = UUID.randomUUID().toString();
+    String commandId = seedCommand(List.of(pinned(sessionId)));
+    Files.write(conventionalTranscript(sessionId), List.of(line(sessionId, "once")));
+
+    agentTranscriptService.sweep(commandId, configDir);
+    agentTranscriptService.sweep(commandId, configDir);
+
+    List<AgentSessionStat> stats = statRepository.findBySessionIds(List.of(sessionId));
+    assertEquals(1, stats.size());
+    assertEquals(1, stats.get(0).messageCount);
+  }
+
+  @Test
+  public void aLaterResumeSweepSupersedesTheEarlierImportsStats() throws IOException {
+    // Resume-in-place appends to the same JSONL, so the resuming command's sweep re-imports the
+    // whole session — its stat row replaces the original command's rather than duplicating it.
+    String sessionId = UUID.randomUUID().toString();
+    String original = seedCommand(List.of(pinned(sessionId)));
+    Files.write(conventionalTranscript(sessionId), List.of(line(sessionId, "one")));
+    agentTranscriptService.sweep(original, configDir);
+
+    String resumed =
+        seedCommand(
+            List.of(
+                new AgentSessionRef(
+                    sessionId, AgentSessionSource.RESUMED, null, null, Instant.now())));
+    Files.write(
+        conventionalTranscript(sessionId), List.of(line(sessionId, "one"), line(sessionId, "two")));
+    agentTranscriptService.sweep(resumed, configDir);
+
+    List<AgentSessionStat> stats = statRepository.findBySessionIds(List.of(sessionId));
+    assertEquals(1, stats.size());
+    assertEquals(2, stats.get(0).messageCount);
+    assertEquals(resumed, stats.get(0).commandId);
   }
 }
