@@ -1,4 +1,5 @@
 import { NewSnippet } from '@/shared/state/prompt-context.store';
+import { createComponentMatcher } from './component-matcher';
 import { DomPicker, LONG_PRESS_MS, PickedRef, PickOptions } from './dom-picker';
 
 /**
@@ -290,6 +291,84 @@ describe('DomPicker', () => {
     const doc = iframe.contentDocument!;
     click(doc, doc.querySelector('button')!);
     expect(picks.length).toBe(0);
+    picker.detach();
+  });
+
+  it('attributes a pick to the owning component via the matcher, with the enclosing chain', async () => {
+    const iframe = await frameWith(
+      '<app-root><app-greeting><button>Go</button></app-greeting></app-root>',
+    );
+    const picks: NewSnippet[] = [];
+    const picker = new DomPicker((p) => picks.push(p));
+    picker.setMatcher(
+      createComponentMatcher({
+        framework: 'angular',
+        components: [
+          {
+            className: 'Greeting',
+            componentFile: 'src/app/greeting.ts',
+            selectors: [{ element: 'app-greeting' }],
+          },
+          {
+            className: 'App',
+            componentFile: 'src/app/app.ts',
+            selectors: [{ element: 'app-root' }],
+          },
+        ],
+      }),
+    );
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const doc = iframe.contentDocument!;
+    click(doc, doc.querySelector('button')!);
+
+    expect(picks[0].component).toEqual({
+      selector: 'app-greeting',
+      className: 'Greeting',
+      files: ['src/app/greeting.ts'],
+      ancestors: ['app-root'],
+    });
+
+    // an element outside every known component degrades to today's snippet
+    click(doc, doc.body);
+    expect(picks[1].component).toBeUndefined();
+    picker.detach();
+  });
+
+  it('a throwing matcher never breaks the pick itself', async () => {
+    const iframe = await frameWith('<button>Go</button>');
+    const picks: NewSnippet[] = [];
+    const picker = new DomPicker((p) => picks.push(p));
+    picker.setMatcher(() => {
+      throw new Error('matcher exploded');
+    });
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const doc = iframe.contentDocument!;
+    click(doc, doc.querySelector('button')!);
+
+    expect(picks.length).toBe(1);
+    expect(picks[0].tag).toBe('button');
+    expect(picks[0].component).toBeUndefined();
+    picker.detach();
+  });
+
+  it('a pick made after an in-frame navigation carries the new URL', async () => {
+    const iframe = await frameWith('<button>here</button>');
+    const picks: NewSnippet[] = [];
+    const picker = new DomPicker((p) => picks.push(p));
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const doc = iframe.contentDocument!;
+    // an SPA-style navigation: same document, new URL (a full document swap is covered by the
+    // re-attach test above)
+    iframe.contentWindow!.location.hash = '#after-nav';
+    click(doc, doc.querySelector('button')!);
+
+    expect(picks[0].url).toContain('#after-nav');
     picker.detach();
   });
 });

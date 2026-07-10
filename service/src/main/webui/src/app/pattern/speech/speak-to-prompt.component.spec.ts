@@ -141,6 +141,26 @@ describe('SpeakToPromptComponent', () => {
     store.clear();
   });
 
+  it('names the attributed component on a picked-element row', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.add({
+      html: '<button class="cta">Go</button>',
+      selector: '#root > button',
+      url: 'http://localhost/daemon/wt/d/',
+      tag: 'button',
+      textPreview: 'Go',
+      component: {
+        selector: 'app-greeting',
+        className: 'Greeting',
+        files: ['src/app/greeting.ts'],
+      },
+    });
+    const fixture = createComponent();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Greeting');
+    store.clear();
+  });
+
   it('uploads the recording and appends the server transcript', async () => {
     const fixture = createComponent();
     fixture.componentInstance.transcript.set('earlier text');

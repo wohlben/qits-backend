@@ -5,19 +5,34 @@ import { PickedSnippet } from './prompt-context.store';
 const FENCE = '```';
 
 /**
- * Renders picked snippets as prompt text: a header naming the selector and page, then the HTML in
- * a fenced block (plus the open shadow root's content when captured). Appended to an agent's
- * initialContext or inserted into a chat draft.
+ * Renders picked snippets as prompt text: a header naming the selector and page, the component
+ * attribution when the pick carries one (file paths only — the agent runs in the workspace and
+ * reads them itself), then the HTML in a fenced block (plus the open shadow root's content when
+ * captured). Appended to an agent's initialContext or inserted into a chat draft.
  */
 export function formatSnippetsForPrompt(snippets: PickedSnippet[]): string {
   return snippets
     .map((snippet) => {
       const parts = [
         'Picked element <' + snippet.tag + '> (selector: ' + snippet.selector + ') on ' + snippet.url + ':',
-        FENCE + 'html',
-        snippet.html,
-        FENCE,
       ];
+      if (snippet.appPath) {
+        parts.push('App route: ' + snippet.appPath);
+      }
+      if (snippet.component) {
+        parts.push(
+          'Rendered by ' +
+            snippet.component.className +
+            ' (' +
+            snippet.component.selector +
+            ') — source files: ' +
+            snippet.component.files.join(', '),
+        );
+        if (snippet.component.ancestors?.length) {
+          parts.push('Enclosing components: ' + snippet.component.ancestors.join(', '));
+        }
+      }
+      parts.push(FENCE + 'html', snippet.html, FENCE);
       if (snippet.shadowHtml) {
         parts.push('Its open shadow root contains:', FENCE + 'html', snippet.shadowHtml, FENCE);
       }

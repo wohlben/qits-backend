@@ -1,4 +1,5 @@
-import { NewSnippet } from '@/shared/state/prompt-context.store';
+import { NewSnippet, SnippetComponent } from '@/shared/state/prompt-context.store';
+import { ComponentMatcher } from './component-matcher';
 import { freezeAppliedStyles } from './style-freeze';
 
 /** Per-pick modifiers, derived from the picking gesture. */
@@ -39,6 +40,7 @@ export class DomPicker {
   private lastPointerDown: { timeStamp: number; coarse: boolean } | null = null;
   private picked: PickedRef[] = [];
   private marked: { element: HTMLElement; outline: string; outlineOffset: string }[] = [];
+  private matcher: ComponentMatcher | null = null;
 
   constructor(
     private readonly onPick: (pick: NewSnippet, options: PickOptions) => void,
@@ -91,6 +93,15 @@ export class DomPicker {
     if (this.enabled && this.doc) {
       this.refreshMarks();
     }
+  }
+
+  /**
+   * Hands the picker the component matcher for the framed app, so picks carry an attribution of
+   * the component that renders them. A setter (not a constructor arg) because the component map
+   * arrives asynchronously — picks made before it resolves simply carry no attribution.
+   */
+  setMatcher(matcher: ComponentMatcher | null): void {
+    this.matcher = matcher;
   }
 
   private bind(): void {
@@ -213,7 +224,7 @@ export class DomPicker {
     const down = this.lastPointerDown;
     const longPress =
       down != null && down.coarse && event.timeStamp - down.timeStamp >= LONG_PRESS_MS;
-    this.onPick(buildSnippet(target), { keepPicking: event.shiftKey || longPress });
+    this.onPick(buildSnippet(target, this.matcher), { keepPicking: event.shiftKey || longPress });
   };
 }
 
@@ -226,7 +237,7 @@ function asElement(target: EventTarget | null): Element | null {
   return target && (target as Node).nodeType === Node.ELEMENT_NODE ? (target as Element) : null;
 }
 
-function buildSnippet(element: Element): NewSnippet {
+function buildSnippet(element: Element, matcher: ComponentMatcher | null): NewSnippet {
   const shadowHtml =
     element.shadowRoot != null ? element.shadowRoot.innerHTML : undefined;
   return {
@@ -237,7 +248,20 @@ function buildSnippet(element: Element): NewSnippet {
     url: element.ownerDocument.location?.href ?? '',
     tag: element.tagName.toLowerCase(),
     textPreview: (element.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 120),
+    component: attributeComponent(element, matcher),
   };
+}
+
+/** Best-effort: attribution enriches a pick but must never break one. */
+function attributeComponent(
+  element: Element,
+  matcher: ComponentMatcher | null,
+): SnippetComponent | undefined {
+  try {
+    return matcher?.(element) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

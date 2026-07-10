@@ -47,7 +47,7 @@ type Status = 'connecting' | 'open' | 'closed';
               [title]="'Insert ' + snippet.selector + ' into the message'"
               (click)="insertSnippet(snippet)"
             >
-              {{ snippet.tag }}
+              {{ snippet.component?.className ?? snippet.tag }}
             </button>
           }
         </div>

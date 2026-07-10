@@ -3,6 +3,7 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
+import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
@@ -34,6 +35,11 @@ describe('DaemonWebviewComponent', () => {
       .fn()
       .mockReturnValue(of({ entries: [] })),
   };
+  const workspaceService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdComponentMapGet: vi
+      .fn()
+      .mockReturnValue(of({ framework: 'angular', components: [] })),
+  };
   let queryClient: QueryClient;
 
   beforeEach(async () => {
@@ -53,6 +59,7 @@ describe('DaemonWebviewComponent', () => {
       providers: [
         provideTanStackQuery(queryClient),
         { provide: WorkspaceDaemonControllerService, useValue: daemonService },
+        { provide: WorkspaceControllerService, useValue: workspaceService },
       ],
     }).compileComponents();
   });
@@ -149,6 +156,119 @@ describe('DaemonWebviewComponent', () => {
     component.onPicked(snippet, { keepPicking: true });
     expect(TestBed.inject(PromptContextStore).count()).toBe(0);
     expect(component.pickMode()).toBe(true);
+  });
+
+  it('fetches the component map only once pick mode turns on', async () => {
+    const fixture = createComponent([instance()]);
+    expect(workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdComponentMapGet).not
+      .toHaveBeenCalled();
+
+    fixture.componentInstance.togglePickMode();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(
+      workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdComponentMapGet,
+    ).toHaveBeenCalledWith('repo-1', 'wt-1');
+  });
+
+  it('stores the app-side path alongside the pick-time URL', () => {
+    const fixture = createComponent([instance()]);
+    fixture.componentInstance.onPicked(
+      { ...snippet, url: 'http://localhost/daemon/wt-1/d-1/greeting?x=1' },
+      { keepPicking: false },
+    );
+
+    expect(TestBed.inject(PromptContextStore).snippets()[0].appPath).toBe('/greeting?x=1');
+  });
+
+  it('leaves appPath unset for a pick whose URL is outside the proxy prefix', () => {
+    const fixture = createComponent([instance()]);
+    fixture.componentInstance.onPicked(
+      { ...snippet, url: 'http://localhost/somewhere-else' },
+      { keepPicking: false },
+    );
+
+    expect(TestBed.inject(PromptContextStore).snippets()[0].appPath).toBeUndefined();
+  });
+
+  it('globe toggles the URL bar open (seeded with the current path) and back without applying', () => {
+    const fixture = createComponent([
+      instance({
+        daemon: { id: 'd-1', name: 'dev server', webView: { port: 4200, entryPath: 'greeting' } },
+      }),
+    ]);
+    const component = fixture.componentInstance;
+
+    // jsdom's iframe stays on about:blank, so seeding falls back to the entry path
+    component.toggleUrlBar();
+    fixture.detectChanges();
+    expect(component.urlBarOpen()).toBe(true);
+    expect(component.urlValue()).toBe('/greeting');
+    expect(fixture.nativeElement.querySelector('input[aria-label="App URL path"]')).not.toBeNull();
+
+    component.urlValue.set('/edited');
+    component.toggleUrlBar(); // escape hatch: closes without navigating
+    fixture.detectChanges();
+    expect(component.urlBarOpen()).toBe(false);
+    expect(fixture.nativeElement.querySelector('input[aria-label="App URL path"]')).toBeNull();
+
+    // reopening re-seeds from the frame, not from the discarded edit
+    component.toggleUrlBar();
+    expect(component.urlValue()).toBe('/greeting');
+  });
+
+  it('shows the reset control only while the value is dirty, and reset restores the opened-with path', () => {
+    const fixture = createComponent([instance()]);
+    const component = fixture.componentInstance;
+    component.toggleUrlBar();
+    fixture.detectChanges();
+    const resetButton = () =>
+      fixture.nativeElement.querySelector('button[aria-label^="Reset URL"]');
+
+    expect(component.urlDirty()).toBe(false);
+    expect(resetButton()).toBeNull();
+
+    component.urlValue.set('/elsewhere');
+    fixture.detectChanges();
+    expect(component.urlDirty()).toBe(true);
+    expect(resetButton()).not.toBeNull();
+
+    component.resetUrl();
+    fixture.detectChanges();
+    expect(component.urlValue()).toBe(component.urlOpenedWith());
+    expect(resetButton()).toBeNull();
+  });
+
+  it("rejects a URL outside this daemon's proxy prefix: inline error, apply disabled", () => {
+    const fixture = createComponent([instance()]);
+    const component = fixture.componentInstance;
+    component.toggleUrlBar();
+
+    component.urlValue.set('/daemon/wt-1/other-daemon/route');
+    fixture.detectChanges();
+
+    expect(component.urlError()).not.toBeNull();
+    const applyButton = fixture.nativeElement.querySelector(
+      'button[aria-label="Navigate the frame to this URL"]',
+    ) as HTMLButtonElement;
+    expect(applyButton.disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('#webview-url-error')).not.toBeNull();
+
+    // an invalid value cannot be applied even programmatically (Enter alias shares this path)
+    component.applyUrl();
+    expect(component.urlBarOpen()).toBe(true);
+  });
+
+  it('applying an unchanged path just closes the bar', () => {
+    const fixture = createComponent([instance()]);
+    const component = fixture.componentInstance;
+    component.toggleUrlBar();
+    expect(component.urlBarOpen()).toBe(true);
+
+    component.applyUrl();
+
+    expect(component.urlBarOpen()).toBe(false);
   });
 
   it('opens the frame at proxyPath + entryPath, and at the bare proxyPath without one', () => {
