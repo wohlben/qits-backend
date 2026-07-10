@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.agent.entity.AgentSessionStat;
 import eu.wohlben.qits.domain.agent.persistence.AgentSessionStatRepository;
+import eu.wohlben.qits.domain.command.control.CommandLogService;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
@@ -44,6 +45,8 @@ public class AgentTranscriptServiceTest {
 
   @Inject CommandService commandService;
 
+  @Inject CommandLogService commandLogService;
+
   @Inject ProjectRepository projectRepository;
 
   @Inject RepositoryRepository repositoryRepository;
@@ -57,8 +60,12 @@ public class AgentTranscriptServiceTest {
   @TempDir Path configDir;
 
   /** Seeds a finished agent command whose session list is exactly {@code refs}. */
-  @Transactional
   String seedCommand(List<AgentSessionRef> refs) {
+    return seedCommand(refs, CommandKind.CHAT);
+  }
+
+  @Transactional
+  String seedCommand(List<AgentSessionRef> refs, CommandKind kind) {
     Project project = new Project();
     project.id = UUID.randomUUID().toString();
     project.name = "Transcript project";
@@ -85,7 +92,7 @@ public class AgentTranscriptServiceTest {
             .actionName("Claude Code (repository MCP)")
             .executeScript("exec claude")
             .interactive(false)
-            .kind(CommandKind.CHAT)
+            .kind(kind)
             .status(CommandStatus.EXITED)
             .build();
     command.agentSessions.addAll(refs);
@@ -355,6 +362,112 @@ public class AgentTranscriptServiceTest {
     List<AgentSessionStat> stats = statRepository.findBySessionIds(List.of(sessionId));
     assertEquals(1, stats.size());
     assertEquals(1, stats.get(0).messageCount);
+  }
+
+  @Test
+  public void chatSweepSettlesUntilTheFileCatchesUpWithTheLiveTail() throws Exception {
+    String sessionId = UUID.randomUUID().toString();
+    String commandId = seedCommand(List.of(pinned(sessionId)));
+    Path file = conventionalTranscript(sessionId);
+    Files.write(file, List.of(line(sessionId, "one")));
+
+    // The harness flushes its JSONL asynchronously: the second line lands mid-settle.
+    Thread lateFlush =
+        new Thread(
+            () -> {
+              try {
+                Thread.sleep(300);
+                Files.write(
+                    file, List.of(line(sessionId, "two")), java.nio.file.StandardOpenOption.APPEND);
+              } catch (Exception e) {
+                throw new IllegalStateException(e);
+              }
+            });
+    lateFlush.start();
+    agentTranscriptService.chatSweep(commandId, 2, configDir);
+    lateFlush.join();
+
+    assertEquals(2, transcriptLines(commandId).size(), "the sweep must wait for the late flush");
+  }
+
+  @Test
+  public void chatSweepSweepsAnywayWhenTheFileNeverCatchesUp() throws IOException {
+    String sessionId = UUID.randomUUID().toString();
+    String commandId = seedCommand(List.of(pinned(sessionId)));
+    Files.write(conventionalTranscript(sessionId), List.of(line(sessionId, "only")));
+
+    agentTranscriptService.chatSweep(commandId, 3, configDir);
+
+    assertEquals(1, transcriptLines(commandId).size(), "exhausted retries still sweep");
+  }
+
+  @Test
+  public void chatReplayFallsBackToTheOutputStreamWhenNoTranscriptExists() {
+    // A pre-lineage chat has only intercepted stdout rows; the TRANSCRIPT request serves them.
+    String commandId = seedCommand(List.of(pinned(UUID.randomUUID().toString())));
+    commandLogService.importLines(
+        List.of(
+            new CommandLogService.PendingLine(
+                commandId,
+                0,
+                LogChannel.OUTPUT,
+                "{\"type\":\"user\",\"text\":\"hi\"}",
+                Instant.parse("2026-07-10T08:00:00Z")),
+            new CommandLogService.PendingLine(
+                commandId,
+                1,
+                LogChannel.OUTPUT,
+                "{\"type\":\"assistant\"}",
+                Instant.parse("2026-07-10T08:00:01Z"))));
+
+    List<CommandLogLineDto> lines = transcriptLines(commandId);
+    assertEquals(2, lines.size());
+    assertTrue(lines.get(0).content().contains("\"hi\""));
+  }
+
+  @Test
+  public void chatReplayMergesOnlyErrorResultsFromTheOutputChannel() throws IOException {
+    // A lineage-era chat persisted its FULL stream on OUTPUT; only the error result (which the
+    // transcript lacks) may merge in — anything more would double-render the conversation.
+    String sessionId = UUID.randomUUID().toString();
+    String commandId = seedCommand(List.of(pinned(sessionId)));
+    Files.write(
+        conventionalTranscript(sessionId),
+        List.of(userLine(sessionId, "question"), line(sessionId, "answer")));
+    agentTranscriptService.sweep(commandId, configDir);
+    commandLogService.importLines(
+        List.of(
+            new CommandLogService.PendingLine(
+                commandId,
+                0,
+                LogChannel.OUTPUT,
+                "{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"result\":\"boom\"}",
+                Instant.parse("2026-07-10T07:59:30Z")),
+            new CommandLogService.PendingLine(
+                commandId,
+                1,
+                LogChannel.OUTPUT,
+                "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"dup\"}]}}",
+                Instant.parse("2026-07-10T07:59:40Z"))));
+
+    List<CommandLogLineDto> lines = transcriptLines(commandId);
+    assertEquals(3, lines.size(), "transcript + the one error result, nothing else");
+    // userLine carries 07:59:00, the error 07:59:30, line() 08:00:00 — merged by timestamp.
+    assertTrue(lines.get(0).content().contains("question"));
+    assertTrue(lines.get(1).content().contains("\"boom\""));
+    assertTrue(lines.get(2).content().contains("answer"));
+  }
+
+  @Test
+  public void aTerminalCommandsTranscriptViewNeverFallsBackToPtyOutput() {
+    String commandId =
+        seedCommand(List.of(pinned(UUID.randomUUID().toString())), CommandKind.TERMINAL);
+    commandLogService.importLines(
+        List.of(
+            new CommandLogService.PendingLine(
+                commandId, 0, LogChannel.OUTPUT, "[2Jraw pty bytes", Instant.now())));
+
+    assertEquals(0, transcriptLines(commandId).size(), "no transcript means an empty view");
   }
 
   @Test

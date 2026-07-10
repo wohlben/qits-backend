@@ -34,8 +34,8 @@ Related/dependent plans:
 - **Complements [stream-json-chat](2026-07-01_stream-json-chat.md) /
   [persistent-chat-sessions](2026-07-04_persistent-chat-sessions.md).** Chat keeps its
   live stdout stream over the WebSocket; durable logs move to transcript extraction. Retiring
-  chat's redundant stdout-line persistence afterwards is its own follow-up:
-  [chat-persistence-on-transcript](../feature-ideas/chat-persistence-on-transcript.md).
+  chat's redundant stdout-line persistence landed as its own follow-up:
+  [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md).
 - **Builds on [container-agent-sessions](2026-07-04_container-agent-sessions.md).**
   The shared `qits_shared_dot_claude` volume (`qits.workspace.claude-volume`, mounted at
   `qits.workspace.claude-mount` = `/claude-home`) is where the transcripts live — qits reads them
@@ -251,11 +251,13 @@ scope picker).
 
 Where the implementation deviates from (or pins down) the idea above:
 
-- **No live transcript tail.** The original idea sketched a file-watch tail feeding a live
-  transcript view; cut deliberately — the transcript exists for post-hoc auditing/rationale, and
-  during the run the terminal (interactive) or chat stream (chat) is the view. The only import is
-  the post-exit sweep. If live transcript freshness is ever wanted, the follow-up is a
-  `ChatCommandSocket`-shaped `/api/transcript/commands/{id}` socket, not polling.
+- **No live transcript tail** (as shipped here). The original idea sketched a file-watch tail
+  feeding a live transcript view; cut deliberately — the transcript exists for post-hoc
+  auditing/rationale, and during the run the terminal (interactive) or chat stream (chat) is the
+  view. The only import was the post-exit sweep. Since superseded for chats:
+  [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md) adds a backend
+  poll-based file tail (the daemon-tail idiom — the "not polling" note above meant a UI-facing
+  socket, which still doesn't exist) so mid-run re-attach can replay from the transcript.
 - **`Command.id` is service-generated now** (was `@GeneratedValue`): the launch renders the
   session-report hook URL (`/api/commands/{id}/agent-session`) into the script *before* the row
   exists, so `CommandLifecycleService.createRunning` assigns the UUID (restoring the codebase-wide
@@ -275,9 +277,9 @@ Where the implementation deviates from (or pins down) the idea above:
   sidechain's lines; `linesToItems()` folds it into the collapsible group label and
   `foldSidechains()` anchors the group at the matching Task tool-call.
 - **Chat double-render guard**: `GET /commands/{id}/log` gains a `channel` filter; chat replay
-  pins `OUTPUT`, the transcript view pins `TRANSCRIPT` — chat's stdout persistence is untouched
-  until [chat-persistence-on-transcript](../feature-ideas/chat-persistence-on-transcript.md)
-  retires it.
+  pinned `OUTPUT`, the transcript view pins `TRANSCRIPT` — chat's stdout persistence stayed
+  untouched until [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md)
+  retired it (chat replay now pins `TRANSCRIPT` with a server-side fallback).
 - **TRANSCRIPT sequence space**: imported lines number from `1 << 40` (disjoint from live stdio
   sequences starting at 0), and the sweep is delete-and-reimport of the channel — idempotent.
 - The session-report write lives in `CommandLifecycleService.recordAgentSessionReport` (the single
@@ -287,8 +289,8 @@ Where the implementation deviates from (or pins down) the idea above:
 
 ## Extracted follow-ups
 
-- **Converging chat persistence onto `TRANSCRIPT`** — its own idea:
-  [chat-persistence-on-transcript](../feature-ideas/chat-persistence-on-transcript.md).
+- **Converging chat persistence onto `TRANSCRIPT`** — landed as
+  [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md).
 - **Cross-workspace fork** — a `docs/backlog.md` entry until the same-workspace lineage UX
   exists.
 

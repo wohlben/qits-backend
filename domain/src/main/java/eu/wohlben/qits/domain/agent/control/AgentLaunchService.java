@@ -94,6 +94,8 @@ public class AgentLaunchService {
 
   @Inject AgentTranscriptService agentTranscriptService;
 
+  @Inject AgentTranscriptTailService transcriptTailService;
+
   @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
   int qitsPort;
 
@@ -188,7 +190,9 @@ public class AgentLaunchService {
             spec.environment(),
             pinned.commandId(),
             pinned.ref(),
-            transcriptSweep());
+            chatTranscriptSweep());
+    // The live transcript import: the durable head a mid-run re-attach replays from.
+    transcriptTailService.startTail(command.id());
     if (initialContext != null && !initialContext.isBlank()) {
       // Seed the conversation as the first user turn. A stream-json chat only speaks over stdin,
       // so the seed can't be a CLI argument; the pipe buffers it until claude starts reading.
@@ -380,6 +384,18 @@ public class AgentLaunchService {
     // onCommandExit swallows its own failures, so the sweep can never break exit handling.
     return (commandId, exitCode, terminatedManually) ->
         agentTranscriptService.onCommandExit(commandId);
+  }
+
+  /**
+   * The chat exit chain: stop the live tail first (so no tail write can race the sweep), then the
+   * reconciling sweep, which waits for the harness's JSONL flush to catch up with what the tail
+   * already imported before its delete-and-reimport.
+   */
+  private CommandExitListener chatTranscriptSweep() {
+    return (commandId, exitCode, terminatedManually) -> {
+      long importedLive = transcriptTailService.stopAndDrain(commandId);
+      agentTranscriptService.onChatExit(commandId, importedLive);
+    };
   }
 
   /**

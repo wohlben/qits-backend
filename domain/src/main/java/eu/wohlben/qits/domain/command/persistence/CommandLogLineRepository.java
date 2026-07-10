@@ -21,11 +21,14 @@ public class CommandLogLineRepository implements PanacheRepository<CommandLogLin
     return list("command.id = ?1 and severity = ?2 order by sequence", commandId, severity);
   }
 
-  /** The head of a command's log: lines with sequence strictly below the bound, in order. */
-  public List<CommandLogLine> findByCommandAndSeqLessThanOrderBySeq(
-      String commandId, long sequenceExclusive) {
+  /** One channel's lines with sequence strictly below the bound, in order. */
+  public List<CommandLogLine> findByCommandAndChannelAndSeqLessThanOrderBySeq(
+      String commandId, LogChannel channel, long sequenceExclusive) {
     return list(
-        "command.id = ?1 and sequence < ?2 order by sequence", commandId, sequenceExclusive);
+        "command.id = ?1 and channel = ?2 and sequence < ?3 order by sequence",
+        commandId,
+        channel,
+        sequenceExclusive);
   }
 
   /** The subset of a command's log on exactly {@code channel}, in capture order. */

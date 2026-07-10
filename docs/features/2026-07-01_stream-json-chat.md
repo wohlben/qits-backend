@@ -34,6 +34,11 @@ consult both maps). Everything the client renders flows through **one unified li
 event Claude emits plus a synthetic `{"type":"user","text":…}` echo per user turn — ringed, broadcast,
 and persisted on `LogChannel.OUTPUT`, so **live and replay render identically**.
 
+> **Persistence contract superseded** by
+> [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md): the unified
+> stream is now ring+broadcast only (failure `result` events excepted); the durable record is the
+> imported agent transcript on `LogChannel.TRANSCRIPT`.
+
 **Launch + transport.** `CommandService.launchChat(...)` (kind `CHAT`) →
 `AgentLaunchService.launchChat(scope, …)` reuses the scope→MCP-server construction and renders with
 `CodingAgentFactory.ofType(CLAUDE).mcpServer(…).skipPermissions().chat()`. `AgentController` (the

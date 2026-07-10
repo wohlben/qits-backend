@@ -1,5 +1,7 @@
 package eu.wohlben.qits.domain.command.control;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
@@ -12,9 +14,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -29,11 +34,14 @@ import org.jboss.logging.Logger;
  *
  * <p>Everything the client renders flows through one unified line stream: each event Claude emits
  * on stdout, plus a synthetic {@code {"type":"user","text":…}} echo for every message the user
- * sends. That single stream is ringed (for re-attach), broadcast (live), and persisted un-truncated
- * on {@link LogChannel#OUTPUT} (for replay of a finished session) — so live and replay render
- * identically. Re-attach restores the <em>entire</em> conversation: lines evicted from the ring are
- * read back from the persisted log via {@link CommandLogReader}, stitched to the ring tail by
- * sequence number.
+ * sends. That single stream is ringed (for re-attach) and broadcast (live) — stdout interception is
+ * the <em>live transport</em>. The durable record is the imported agent transcript on {@link
+ * LogChannel#TRANSCRIPT} (live tail during the run, reconciling sweep on exit); the only stdout
+ * lines still persisted are failure {@code result} events, which the harness never writes to its
+ * transcript, kept as {@link LogChannel#OUTPUT} rows so error bubbles survive replay. Re-attach
+ * restores the <em>entire</em> conversation: the transcript head is stitched to the ring tail at
+ * the first ring line whose {@code uuid} the transcript already contains (stream-json events and
+ * transcript lines share uuids), so every event replays exactly once.
  */
 final class ChatSession {
 
@@ -154,8 +162,9 @@ final class ChatSession {
   }
 
   /**
-   * Ring + broadcast + persist a single JSON line of the unified conversation stream. Persisted
-   * whole, however large — the log column is a CLOB, and truncation would corrupt the stored JSON.
+   * Ring + broadcast a single JSON line of the unified conversation stream. Only failure {@code
+   * result} events are persisted (whole, however large — the log column is a CLOB): they are absent
+   * from the harness transcript, and everything else is durably covered by the transcript import.
    */
   private void emitLine(String line) {
     long seq;
@@ -164,31 +173,42 @@ final class ChatSession {
       appendToRing(seq, line);
       broadcast(line + "\n");
     }
-    if (logWriter != null) {
+    if (logWriter != null && ErrorResultLines.isErrorResult(line)) {
       logWriter.append(commandId, seq, LogChannel.OUTPUT, line, Instant.now());
     }
   }
 
   /**
-   * Replays the entire conversation to a (re)connecting client — the persisted head (lines already
-   * evicted from the ring) followed by the ring tail, stitched exactly at the first ring sequence —
-   * then subscribes it for live lines. Holding the session lock throughout means no live line can
-   * interleave mid-replay. Lines older than the ring head may still sit in the async write batch in
-   * theory, but flushing (≤ 500 ms) beats eviction (256 KB of scrollback) in practice; that window
-   * is accepted best-effort, like the writer itself.
+   * Replays the entire conversation to a (re)connecting client — the durable head (imported
+   * transcript lines, merged with any persisted error results) followed by the ring tail — then
+   * subscribes it for live lines. The seam is exact: the first ring line whose {@code uuid} the
+   * transcript already contains marks where the ring takes over; everything before it comes from
+   * the transcript (which also covers the real user turns whose ring echoes predate the seam).
+   * Holding the session lock throughout means no live line can interleave mid-replay. Freshness of
+   * the head is the live tail's poll cadence; a ring line not yet imported is simply served from
+   * the ring — the seam scan tolerates any tail lag.
    */
   synchronized void attach(CommandOutputSink sink) {
     StringBuilder replay = new StringBuilder();
-    if (!ring.isEmpty()) {
-      long firstRingSeq = ring.peekFirst().seq();
-      if (logReader != null && firstRingSeq > 0) {
-        for (String line : logReader.linesBefore(commandId, firstRingSeq)) {
-          replay.append(line).append('\n');
+    List<CommandLogReader.TimedLine> transcript =
+        logReader != null ? logReader.transcriptLines(commandId) : List.of();
+    if (transcript.isEmpty()) {
+      // Nothing imported yet: today's ring-only replay, prefixed by any error results the ring
+      // already evicted (their OUTPUT sequences share the ring's space, so the bound is exact).
+      if (!ring.isEmpty()) {
+        long firstRingSeq = ring.peekFirst().seq();
+        if (logReader != null && firstRingSeq > 0) {
+          for (CommandLogReader.TimedLine error :
+              logReader.outputLinesBefore(commandId, firstRingSeq)) {
+            replay.append(error.content()).append('\n');
+          }
+        }
+        for (RingLine entry : ring) {
+          replay.append(entry.line()).append('\n');
         }
       }
-      for (RingLine entry : ring) {
-        replay.append(entry.line()).append('\n');
-      }
+    } else {
+      appendStitched(replay, transcript);
     }
     if (!replay.isEmpty()) {
       try {
@@ -199,6 +219,151 @@ final class ChatSession {
       }
     }
     sinks.add(sink);
+  }
+
+  /** Transcript head + ring tail, stitched at the first ring line the transcript contains. */
+  private void appendStitched(StringBuilder replay, List<CommandLogReader.TimedLine> transcript) {
+    Map<String, Integer> transcriptIndexByUuid = new HashMap<>();
+    for (int i = 0; i < transcript.size(); i++) {
+      String uuid = uuidOf(transcript.get(i).content());
+      if (uuid != null) {
+        transcriptIndexByUuid.putIfAbsent(uuid, i);
+      }
+    }
+    int seamIndex = -1;
+    long seamSeq = -1;
+    int seamRingPos = -1;
+    int pos = 0;
+    for (RingLine entry : ring) {
+      Integer index = transcriptIndexByUuid.get(uuidOf(entry.line()));
+      if (index != null) {
+        seamIndex = index;
+        seamSeq = entry.seq();
+        seamRingPos = pos;
+        break;
+      }
+      pos++;
+    }
+    if (seamIndex >= 0) {
+      // Exact seam: transcript strictly before it, ring from it onward. Ring lines before the
+      // seam are stdout-only shapes (init, thinking budget, rate limits, user echoes) whose
+      // durable counterparts — where any exist — sit in the served transcript head.
+      appendMerged(replay, transcript.subList(0, seamIndex), errorResultsBefore(seamSeq));
+      int i = 0;
+      for (RingLine entry : ring) {
+        if (i++ >= seamRingPos) {
+          replay.append(entry.line()).append('\n');
+        }
+      }
+    } else {
+      // No shared uuid (tail lag, or the ring holds only echoes/noise): serve everything from
+      // both, skipping only synthetic user echoes the transcript head already covers. Residual
+      // double-render here is best-effort territory (256 KB of ring vs one poll interval).
+      long bound = ring.isEmpty() ? Long.MAX_VALUE : ring.peekFirst().seq();
+      appendMerged(replay, transcript, errorResultsBefore(bound));
+      Set<String> servedUserTexts = userTexts(transcript);
+      for (RingLine entry : ring) {
+        String echoText = syntheticEchoText(entry.line());
+        if (echoText != null && servedUserTexts.contains(echoText)) {
+          continue;
+        }
+        replay.append(entry.line()).append('\n');
+      }
+    }
+  }
+
+  private List<CommandLogReader.TimedLine> errorResultsBefore(long sequenceExclusive) {
+    return sequenceExclusive > 0
+        ? logReader.outputLinesBefore(commandId, sequenceExclusive)
+        : List.of();
+  }
+
+  /**
+   * Interleaves persisted error results into the transcript head by timestamp — both carry wall
+   * clocks of the same host, and errors sit at turn boundaries seconds apart, so ordering is safe.
+   */
+  private void appendMerged(
+      StringBuilder replay,
+      List<CommandLogReader.TimedLine> transcriptHead,
+      List<CommandLogReader.TimedLine> errors) {
+    int e = 0;
+    for (CommandLogReader.TimedLine line : transcriptHead) {
+      while (e < errors.size() && !errors.get(e).timestamp().isAfter(line.timestamp())) {
+        replay.append(errors.get(e++).content()).append('\n');
+      }
+      replay.append(line.content()).append('\n');
+    }
+    while (e < errors.size()) {
+      replay.append(errors.get(e++).content()).append('\n');
+    }
+  }
+
+  /** The top-level {@code uuid} of a stream/transcript line, or null (echoes, noise, non-JSON). */
+  private String uuidOf(String line) {
+    JsonNode node = parseQuietly(line);
+    JsonNode uuid = node != null ? node.get("uuid") : null;
+    return uuid != null && uuid.isTextual() ? uuid.asText() : null;
+  }
+
+  /** The text of a synthetic qits user echo ({@code {"type":"user","text":…}}), else null. */
+  private String syntheticEchoText(String line) {
+    JsonNode node = parseQuietly(line);
+    if (node == null || !"user".equals(node.path("type").asText())) {
+      return null;
+    }
+    JsonNode text = node.get("text");
+    return text != null && text.isTextual() ? text.asText() : null;
+  }
+
+  /**
+   * Every user-turn text in the transcript: {@code user} lines (string content, or text blocks
+   * joined) and {@code queued_command} attachments (how the harness persists a turn sent while the
+   * agent was mid-turn).
+   */
+  private Set<String> userTexts(List<CommandLogReader.TimedLine> transcript) {
+    Set<String> texts = new HashSet<>();
+    for (CommandLogReader.TimedLine line : transcript) {
+      JsonNode node = parseQuietly(line.content());
+      if (node == null) {
+        continue;
+      }
+      String type = node.path("type").asText();
+      if ("user".equals(type)) {
+        JsonNode content = node.path("message").path("content");
+        if (content.isTextual()) {
+          texts.add(content.asText());
+        } else {
+          addJoinedTextBlocks(texts, content);
+        }
+      } else if ("attachment".equals(type)
+          && "queued_command".equals(node.path("attachment").path("type").asText())) {
+        addJoinedTextBlocks(texts, node.path("attachment").path("prompt"));
+      }
+    }
+    return texts;
+  }
+
+  private static void addJoinedTextBlocks(Set<String> texts, JsonNode blocks) {
+    if (!blocks.isArray()) {
+      return;
+    }
+    StringBuilder joined = new StringBuilder();
+    for (JsonNode block : blocks) {
+      if ("text".equals(block.path("type").asText())) {
+        joined.append(block.path("text").asText());
+      }
+    }
+    if (!joined.isEmpty()) {
+      texts.add(joined.toString());
+    }
+  }
+
+  private JsonNode parseQuietly(String line) {
+    try {
+      return mapper.readTree(line);
+    } catch (JsonProcessingException e) {
+      return null;
+    }
   }
 
   synchronized void detach(CommandOutputSink sink) {

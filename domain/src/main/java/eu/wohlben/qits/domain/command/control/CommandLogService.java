@@ -98,14 +98,26 @@ public class CommandLogService implements CommandLogWriter, CommandLogReader {
     }
   }
 
-  /** The already-flushed head of a command's log, for full-transcript restore on re-attach. */
+  /** The imported agent transcript, for the durable-head restore on chat re-attach. */
   @Override
   @Transactional
-  public List<String> linesBefore(String commandId, long sequenceExclusive) {
+  public List<TimedLine> transcriptLines(String commandId) {
     return commandLogLineRepository
-        .findByCommandAndSeqLessThanOrderBySeq(commandId, sequenceExclusive)
+        .findByCommandAndChannelOrderBySeq(commandId, LogChannel.TRANSCRIPT)
         .stream()
-        .map(line -> line.content)
+        .map(line -> new TimedLine(line.sequence, line.content, line.timestamp))
+        .toList();
+  }
+
+  /** The already-flushed OUTPUT head below a live sequence bound (post-cutover: error results). */
+  @Override
+  @Transactional
+  public List<TimedLine> outputLinesBefore(String commandId, long sequenceExclusive) {
+    return commandLogLineRepository
+        .findByCommandAndChannelAndSeqLessThanOrderBySeq(
+            commandId, LogChannel.OUTPUT, sequenceExclusive)
+        .stream()
+        .map(line -> new TimedLine(line.sequence, line.content, line.timestamp))
         .toList();
   }
 
@@ -133,6 +145,55 @@ public class CommandLogService implements CommandLogWriter, CommandLogReader {
       lines = commandLogLineRepository.findByCommandOrderBySeq(commandId);
     }
     return lines.stream().map(commandLogLineMapper::toDto).toList();
+  }
+
+  /**
+   * The durable conversation of a chat: its imported {@code TRANSCRIPT} rows with the persisted
+   * error-result {@code OUTPUT} rows interleaved by timestamp (both clocks are this host's, and
+   * errors sit at turn boundaries seconds apart). The OUTPUT side is <em>filtered</em> to error
+   * results because lineage-era chats persisted their full stream there — merging those wholesale
+   * would double-render the conversation. No {@code TRANSCRIPT} rows at all means a pre-lineage
+   * chat: fall back to its full {@code OUTPUT} stream.
+   */
+  @Transactional
+  public List<CommandLogLineDto> chatLog(String commandId, LogSeverity severity) {
+    List<CommandLogLine> transcript =
+        commandLogLineRepository.findByCommandAndChannelOrderBySeq(
+            commandId, LogChannel.TRANSCRIPT);
+    if (transcript.isEmpty()) {
+      return log(commandId, severity, LogChannel.OUTPUT);
+    }
+    List<CommandLogLine> errors =
+        commandLogLineRepository
+            .findByCommandAndChannelOrderBySeq(commandId, LogChannel.OUTPUT)
+            .stream()
+            .filter(line -> ErrorResultLines.isErrorResult(line.content))
+            .toList();
+    List<CommandLogLine> merged = mergeByTimestamp(transcript, errors);
+    if (severity != null) {
+      merged = merged.stream().filter(line -> line.severity == severity).toList();
+    }
+    return merged.stream().map(commandLogLineMapper::toDto).toList();
+  }
+
+  /** Transcript order is authoritative; each error slots before the first later transcript line. */
+  private static List<CommandLogLine> mergeByTimestamp(
+      List<CommandLogLine> transcript, List<CommandLogLine> errors) {
+    if (errors.isEmpty()) {
+      return transcript;
+    }
+    List<CommandLogLine> merged = new ArrayList<>(transcript.size() + errors.size());
+    int e = 0;
+    for (CommandLogLine line : transcript) {
+      while (e < errors.size() && !errors.get(e).timestamp.isAfter(line.timestamp)) {
+        merged.add(errors.get(e++));
+      }
+      merged.add(line);
+    }
+    while (e < errors.size()) {
+      merged.add(errors.get(e++));
+    }
+    return merged;
   }
 
   /**

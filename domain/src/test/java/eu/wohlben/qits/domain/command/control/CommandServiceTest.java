@@ -110,43 +110,44 @@ public class CommandServiceTest {
   }
 
   @Test
-  public void launchChatRecordsAChatCommandAndCapturesItsJsonLines() throws Exception {
+  public void launchChatRecordsAChatCommandAndPersistsOnlyErrorResults() throws Exception {
     String repoId = repoWithWorkspace();
 
-    // A stand-in stream-json process: emit two event lines and exit (no real claude in the test).
+    // A stand-in stream-json process (no real claude in the test). Ordinary events stay
+    // ring+broadcast only — the durable record is the transcript import — but the failure result
+    // (absent from any transcript) still persists to OUTPUT so its error bubble survives replay.
     CommandDto command =
         commandService.launchChat(
             repoId,
             "work",
             "Claude chat",
-            "printf '%s\\n' '{\"type\":\"system\",\"subtype\":\"init\"}' '{\"type\":\"result\"}'",
+            "printf '%s\\n' '{\"type\":\"system\",\"subtype\":\"init\"}'"
+                + " '{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"result\":\"boom\"}'",
             Map.of());
 
     assertEquals(CommandKind.CHAT, command.kind());
 
-    // The conversation is persisted as OUTPUT log lines (raw JSON) so a finished chat can be
-    // replayed.
     List<CommandLogLineDto> lines = awaitLog(command.id());
     assertTrue(
-        lines.stream().anyMatch(l -> l.content().contains("\"subtype\":\"init\"")),
-        "captured JSONL should include the init event: " + lines);
+        lines.stream().anyMatch(l -> l.content().contains("\"boom\"")),
+        "the failure result must persist: " + lines);
     assertTrue(
-        lines.stream().anyMatch(l -> l.content().contains("\"type\":\"result\"")),
-        "captured JSONL should include the result event: " + lines);
+        lines.stream().noneMatch(l -> l.content().contains("\"subtype\":\"init\"")),
+        "ordinary stream events must no longer persist: " + lines);
   }
 
   @Test
-  public void chatLogRoundTripsEventsLargerThan64KbUntruncated() throws Exception {
+  public void chatLogRoundTripsErrorResultsLargerThan64KbUntruncated() throws Exception {
     String repoId = repoWithWorkspace();
 
-    // A single stream-json event well past the old 64 KB truncation cap, which used to corrupt
-    // the stored line into invalid JSON.
+    // A persisted event well past the old 64 KB truncation cap, which used to corrupt the stored
+    // line into invalid JSON.
     CommandDto command =
         commandService.launchChat(
             repoId,
             "work",
             "Claude chat",
-            "printf '{\"type\":\"assistant\",\"text\":\"%s\"}\\n'"
+            "printf '{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"result\":\"%s\"}\\n'"
                 + " \"$(head -c 70000 /dev/zero | tr '\\0' x)\"",
             Map.of());
 
@@ -158,7 +159,7 @@ public class CommandServiceTest {
             .orElseThrow(
                 () -> new AssertionError("no un-truncated large line persisted: " + lines));
     var event = new com.fasterxml.jackson.databind.ObjectMapper().readTree(big.content());
-    assertEquals(70000, event.get("text").asText().length(), "stored event must be intact JSON");
+    assertEquals(70000, event.get("result").asText().length(), "stored event must be intact JSON");
   }
 
   @Test
