@@ -17,8 +17,8 @@ import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonContr
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { PromptContextStore } from '@/shared/state/prompt-context.store';
-import { DomPicker } from './dom-picker';
+import { NewSnippet, PromptContextStore } from '@/shared/state/prompt-context.store';
+import { DomPicker, PickOptions } from './dom-picker';
 
 const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
   DaemonStatus.Ready,
@@ -34,7 +34,8 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
  * activation (the page passes `activated`) and then stays mounted while a live daemon exists, so
  * the framed app doesn't reload on every tab switch. Pick mode turns on the {@link DomPicker};
  * picked elements land in the root {@link PromptContextStore}, where the Chat tab's
- * speak-to-prompt and command chats pick them up.
+ * speak-to-prompt and command chats pick them up. A plain pick is one-shot — it drops pick mode —
+ * while shift-click (or a touch long press) keeps the mode on for multi-pick.
  */
 @Component({
   selector: 'app-daemon-webview',
@@ -71,7 +72,7 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
             [attr.aria-pressed]="pickMode()"
           >
             <ng-icon name="lucideCrosshair" class="size-4" />
-            {{ pickMode() ? 'Picking — click an element' : 'Pick element' }}
+            {{ pickMode() ? 'Picking — click an element (⇧ keeps picking)' : 'Pick element' }}
           </button>
           @if (pickerUnavailable()) {
             <span class="text-sm text-destructive">picker unavailable on external pages</span>
@@ -166,7 +167,7 @@ export class DaemonWebviewComponent {
   readonly pickerUnavailable = signal(false);
 
   private readonly picker = new DomPicker(
-    (pick) => this.promptContext.add(pick),
+    (pick, options) => this.onPicked(pick, options),
     (available) => this.pickerUnavailable.set(!available),
   );
 
@@ -179,10 +180,32 @@ export class DaemonWebviewComponent {
         this.picker.detach();
       }
     });
+    // Keep the picker's already-picked marks in sync with the store: new picks gain their
+    // border immediately, removed/cleared ones lose it.
+    effect(() => {
+      this.picker.setPicked(
+        this.promptContext.snippets().map((s) => ({ selector: s.selector, url: s.url })),
+      );
+    });
   }
 
   togglePickMode() {
-    const on = !this.pickMode();
+    this.setPickMode(!this.pickMode());
+  }
+
+  /**
+   * A pick is one-shot: it lands in the prompt context and drops pick mode, so the framed app is
+   * usable again immediately. The multi-pick gestures (shift-click, touch long press) set
+   * `keepPicking` and leave the mode on. Picking an already picked element unpicks it (toggle).
+   */
+  onPicked(pick: NewSnippet, options: PickOptions) {
+    this.promptContext.toggle(pick);
+    if (!options.keepPicking) {
+      this.setPickMode(false);
+    }
+  }
+
+  private setPickMode(on: boolean) {
     this.pickMode.set(on);
     this.picker.setEnabled(on);
   }

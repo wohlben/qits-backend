@@ -6,7 +6,16 @@ import { vi } from 'vitest';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
 import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
+import { NewSnippet, PromptContextStore } from '@/shared/state/prompt-context.store';
 import { DaemonWebviewComponent } from './daemon-webview.component';
+
+const snippet: NewSnippet = {
+  html: '<button>Go</button>',
+  selector: 'button:nth-of-type(1)',
+  url: 'http://localhost/daemon/wt-1/d-1/',
+  tag: 'button',
+  textPreview: 'Go',
+};
 
 function instance(overrides: Partial<DaemonInstanceDto> = {}): DaemonInstanceDto {
   return {
@@ -104,6 +113,42 @@ describe('DaemonWebviewComponent', () => {
     expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-1');
     fixture.componentInstance.selectedDaemonId.set('d-2');
     expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-2');
+  });
+
+  it('drops pick mode after a plain pick — the pick lands, the picking UX turns off', () => {
+    const fixture = createComponent([instance()]);
+    const component = fixture.componentInstance;
+    component.togglePickMode();
+    expect(component.pickMode()).toBe(true);
+
+    component.onPicked(snippet, { keepPicking: false });
+
+    expect(component.pickMode()).toBe(false);
+    expect(TestBed.inject(PromptContextStore).count()).toBe(1);
+  });
+
+  it('keeps pick mode on for a keepPicking pick (shift-click / touch long press)', () => {
+    const fixture = createComponent([instance()]);
+    const component = fixture.componentInstance;
+    component.togglePickMode();
+
+    component.onPicked(snippet, { keepPicking: true });
+
+    expect(component.pickMode()).toBe(true);
+    expect(TestBed.inject(PromptContextStore).count()).toBe(1);
+  });
+
+  it('picking an already picked element unpicks it', () => {
+    const fixture = createComponent([instance()]);
+    const component = fixture.componentInstance;
+    component.togglePickMode();
+
+    component.onPicked(snippet, { keepPicking: true });
+    expect(TestBed.inject(PromptContextStore).count()).toBe(1);
+
+    component.onPicked(snippet, { keepPicking: true });
+    expect(TestBed.inject(PromptContextStore).count()).toBe(0);
+    expect(component.pickMode()).toBe(true);
   });
 
   it('opens the frame at proxyPath + entryPath, and at the bare proxyPath without one', () => {

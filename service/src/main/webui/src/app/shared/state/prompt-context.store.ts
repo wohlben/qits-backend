@@ -9,6 +9,12 @@ export interface PickedSnippet {
   id: string;
   /** The element's outerHTML (shallow for custom elements — see shadowHtml). */
   html: string;
+  /**
+   * Optional style-frozen variant of {@link html}: the same fragment with every node's applied
+   * CSS (author rules, inheritance, inline styles) inlined as a `style` attribute, so it renders
+   * alike without the page's stylesheets. Best-effort — absent when the capture failed.
+   */
+  styledHtml?: string;
   /** innerHTML of the element's open shadow root, when it has one. */
   shadowHtml?: string;
   /** A best-effort selector: nearest id/data-testid anchor plus an nth-of-type chain. */
@@ -34,17 +40,44 @@ export const PromptContextStore = signalStore(
   withComputed((store) => ({
     count: computed(() => store.snippets().length),
   })),
-  withMethods((store) => ({
-    add(pick: NewSnippet): PickedSnippet {
+  withMethods((store) => {
+    // The element's identity: its selector at its pick-time document URL.
+    const findExisting = (pick: NewSnippet) =>
+      store.snippets().find((s) => s.selector === pick.selector && s.url === pick.url);
+    const remove = (id: string): void => {
+      patchState(store, (state) => ({ snippets: state.snippets.filter((s) => s.id !== id) }));
+    };
+    /**
+     * Idempotent on the element's identity: re-adding an already picked element returns the
+     * existing snippet instead of adding a duplicate.
+     */
+    const add = (pick: NewSnippet): PickedSnippet => {
+      const existing = findExisting(pick);
+      if (existing) {
+        return existing;
+      }
       const snippet: PickedSnippet = { ...pick, id: crypto.randomUUID(), capturedAt: Date.now() };
       patchState(store, (state) => ({ snippets: [...state.snippets, snippet] }));
       return snippet;
-    },
-    remove(id: string): void {
-      patchState(store, (state) => ({ snippets: state.snippets.filter((s) => s.id !== id) }));
-    },
-    clear(): void {
-      patchState(store, { snippets: [] });
-    },
-  })),
+    };
+    return {
+      add,
+      remove,
+      /**
+       * The pick gesture: adds the element, or — when it is already picked — removes it again.
+       * Returns the added snippet, or null when the pick unpicked an existing one.
+       */
+      toggle(pick: NewSnippet): PickedSnippet | null {
+        const existing = findExisting(pick);
+        if (existing) {
+          remove(existing.id);
+          return null;
+        }
+        return add(pick);
+      },
+      clear(): void {
+        patchState(store, { snippets: [] });
+      },
+    };
+  }),
 );
