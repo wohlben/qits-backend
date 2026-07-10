@@ -49,6 +49,9 @@ model/commitDto.ts
 model/commitFileChangeDto.ts
 model/commitFileDiffDto.ts
 model/commitLogDto.ts
+model/componentMapDto.ts
+model/componentMapEntryDto.ts
+model/componentSelectorDto.ts
 model/createActionConfigurationRequest.ts
 model/createFeatureFlowPhaseActionRequest.ts
 model/createFeatureFlowPhaseRequest.ts

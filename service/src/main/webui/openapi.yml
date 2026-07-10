@@ -251,6 +251,39 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CommitDto"
+    ComponentMapDto:
+      type: object
+      properties:
+        framework:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentMapEntryDto"
+    ComponentMapEntryDto:
+      type: object
+      properties:
+        className:
+          type: string
+        componentFile:
+          type: string
+        templateFile:
+          type: string
+        styleFiles:
+          type: array
+          items:
+            type: string
+        selectors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentSelectorDto"
+    ComponentSelectorDto:
+      type: object
+      properties:
+        element:
+          type: string
+        attribute:
+          type: string
     CreateActionConfigurationRequest:
       type: object
       required:
@@ -3253,6 +3286,29 @@ paths:
       summary: Launch
       tags:
       - Agent Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/component-map:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComponentMapDto"
+      summary: Component Map
+      tags:
+      - Workspace Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/conflicts:
     get:
       parameters:

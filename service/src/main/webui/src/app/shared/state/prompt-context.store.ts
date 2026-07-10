@@ -2,6 +2,20 @@ import { computed } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
 
 /**
+ * The component attributed as rendering a picked element: the nearest enclosing component the
+ * matcher could resolve, with its source files so the agent can open the code directly instead of
+ * grepping for it. Paths are workspace-relative; only paths ride along, never contents.
+ */
+export interface SnippetComponent {
+  selector: string;
+  className: string;
+  /** Workspace-relative source files: the component .ts, then template/styles when external. */
+  files: string[];
+  /** Enclosing component selectors, inner → outer — context for projected content. */
+  ancestors?: string[];
+}
+
+/**
  * One DOM element picked from a daemon's web view — a structural pointer for the agent, not a
  * reproduction (the HTML carries dev-time attributes and no computed styles).
  */
@@ -21,8 +35,12 @@ export interface PickedSnippet {
   selector: string;
   /** The framed document's location at pick time. */
   url: string;
+  /** The app-side route at pick time — {@link url} with the daemon's proxy prefix stripped. */
+  appPath?: string;
   tag: string;
   textPreview: string;
+  /** Best-effort attribution of the component that renders the element. */
+  component?: SnippetComponent;
   capturedAt: number;
 }
 

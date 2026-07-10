@@ -115,4 +115,42 @@ describe('formatSnippetsForPrompt', () => {
     expect(text).toContain('open shadow root');
     expect(text).toContain('<span>inside</span>');
   });
+
+  it('renders the component attribution and app route as paths-only header lines', () => {
+    const text = formatSnippetsForPrompt([
+      {
+        ...pick({
+          appPath: '/greeting/world',
+          component: {
+            selector: 'app-greeting',
+            className: 'Greeting',
+            files: ['src/app/greeting.ts', 'src/app/greeting.html'],
+            ancestors: ['app-root'],
+          },
+        }),
+        id: '1',
+        capturedAt: 0,
+      },
+    ]);
+
+    expect(text).toContain('App route: /greeting/world');
+    expect(text).toContain(
+      'Rendered by Greeting (app-greeting) — source files: src/app/greeting.ts, src/app/greeting.html',
+    );
+    expect(text).toContain('Enclosing components: app-root');
+    // attribution precedes the HTML block: it is header context, not part of the fragment
+    expect(text.indexOf('Rendered by')).toBeLessThan(text.indexOf('```html'));
+  });
+
+  it('renders without attribution exactly as before when the pick carries none', () => {
+    const text = formatSnippetsForPrompt([{ ...pick(), id: '1', capturedAt: 0 }]);
+
+    expect(text).not.toContain('App route:');
+    expect(text).not.toContain('Rendered by');
+    expect(text).not.toContain('Enclosing components:');
+    expect(text).toBe(
+      'Picked element <button> (selector: #root > button:nth-of-type(1)) on http://localhost:8080/daemon/wt/d/:\n' +
+        '```html\n<button class="cta">Go</button>\n```',
+    );
+  });
 });

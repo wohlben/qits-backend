@@ -120,6 +120,11 @@ import { WavRecorder } from './wav-recorder';
           @for (snippet of promptContext.snippets(); track snippet.id) {
             <div class="flex items-center gap-2 rounded-md border p-2 text-sm">
               <code class="text-xs text-muted-foreground">&lt;{{ snippet.tag }}&gt;</code>
+              @if (snippet.component; as component) {
+                <code class="text-xs font-medium" [title]="component.files.join(', ')">
+                  {{ component.className }}
+                </code>
+              }
               <span class="flex-1 truncate" [title]="snippet.selector">
                 {{ snippet.textPreview || snippet.selector }}
               </span>
