@@ -1,5 +1,6 @@
 import {
   applyPathFilters,
+  closestPath,
   filterFilePaths,
   fuzzyMatch,
   gitignoreGlobToRegExp,
@@ -190,7 +191,40 @@ describe('filterFilePaths', () => {
     expect(filterFilePaths(PATHS, [], 'domain')).toEqual([]);
   });
 
+  it('a name query containing / matches the full path (seeded/pasted paths)', () => {
+    expect(filterFilePaths(PATHS, [], 'domain/src/main/java/App.java')).toEqual([
+      'domain/src/main/java/App.java',
+    ]);
+    // Subsequence over the full path: the test file's extra characters don't break the match.
+    expect(filterFilePaths(PATHS, [], 'domain/src/App')).toEqual([
+      'domain/src/main/java/App.java',
+      'domain/src/test/java/AppTest.java',
+    ]);
+  });
+
   it('is a no-op filter when the name query is blank', () => {
     expect(filterFilePaths(PATHS, [], '  ')).toEqual(PATHS);
+  });
+});
+
+describe('closestPath', () => {
+  it('returns the exact path when it is among the candidates', () => {
+    expect(closestPath(PATHS, 'domain/src/main/java/App.java')).toBe(
+      'domain/src/main/java/App.java',
+    );
+  });
+
+  it('prefers the candidate sharing the longest suffix with the target', () => {
+    const candidates = ['src/app2/greeting.ts', 'src/other/greeting.spec.ts'];
+    expect(closestPath(candidates, 'src/app/greeting.ts')).toBe('src/app2/greeting.ts');
+  });
+
+  it('breaks suffix ties by shorter path, then lexicographic order', () => {
+    expect(closestPath(['src/deep/nested/a.ts', 'src/b/a.ts'], 'a.ts')).toBe('src/b/a.ts');
+    expect(closestPath(['src/b/a.ts', 'src/a/a.ts'], 'a.ts')).toBe('src/a/a.ts');
+  });
+
+  it('returns null when there are no candidates', () => {
+    expect(closestPath([], 'src/app/greeting.ts')).toBeNull();
   });
 });

@@ -503,6 +503,66 @@ describe('WorkspaceFileBrowserComponent', () => {
     expect(cmp.selectedPath()).toBe('README.md');
   });
 
+  it('openClosestMatch with an exact path seeds the filter and selects/reveals the file', () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+    const treeService = fixture.debugElement.query(By.directive(ZardTreeComponent))
+      .componentInstance.treeService;
+
+    cmp.openClosestMatch('domain/src/App.java');
+    fixture.detectChanges();
+
+    expect(cmp.nameQuery()).toBe('domain/src/App.java');
+    expect(cmp.selectedPath()).toBe('domain/src/App.java');
+    expect(treeService.selectedKeys()).toEqual(new Set(['domain/src/App.java']));
+    expect(treeService.isExpanded('domain')).toBe(true);
+    expect(treeService.isExpanded('domain/src')).toBe(true);
+  });
+
+  it('openClosestMatch with a stale path selects the closest match instead of nothing', () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+
+    // The directory moved since the pick: both App files fuzzy-match, the suffix decides.
+    cmp.openClosestMatch('domain/App.java');
+    fixture.detectChanges();
+
+    expect(cmp.selectedPath()).toBe('domain/src/App.java');
+    expect(cmp.nameQuery()).toBe('domain/App.java'); // the seed stays — it explains the narrowed tree
+  });
+
+  it('openClosestMatch without a plausible match leaves the filter seeded and selects nothing', () => {
+    const fixture = createComponent();
+    const cmp = fixture.componentInstance;
+
+    cmp.openClosestMatch('nonexistent/zzz.xyz');
+    fixture.detectChanges();
+
+    expect(cmp.selectedPath()).toBeNull();
+    expect(cmp.nameQuery()).toBe('nonexistent/zzz.xyz');
+    expect(cmp.filteredPaths()).toEqual([]);
+  });
+
+  it('defers closest-match resolution until the file list has loaded (deep-link race)', async () => {
+    // No seeded cache for this workspace → the component goes through a real (mocked) fetch.
+    workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesGet.mockReturnValueOnce(
+      of({ paths: PATHS, lazyDirs: [] }),
+    );
+    const fixture = TestBed.createComponent(WorkspaceFileBrowserComponent);
+    fixture.componentRef.setInput('repoId', 'repo-2');
+    fixture.componentRef.setInput('workspaceId', 'wt-2');
+    const cmp = fixture.componentInstance;
+
+    cmp.openClosestMatch('domain/src/App.java'); // armed before any data exists
+    fixture.detectChanges();
+    expect(cmp.selectedPath()).toBeNull();
+
+    await vi.waitFor(() => expect(cmp.filesQuery.isSuccess()).toBe(true)); // let the fetch settle
+    await fixture.whenStable(); // run the re-scheduled pending-target effect
+
+    expect(cmp.selectedPath()).toBe('domain/src/App.java');
+  });
+
   it('toggles a folder on row click instead of selecting it', () => {
     const fixture = createComponent();
     const cmp = fixture.componentInstance;

@@ -31,8 +31,8 @@ Each feature gets its own directory exporting a `*.routes.ts`, lazy-loaded via `
 | `/repositories/:repoId` | `RepositoryDetailPage` | drill-down only — no list route |
 | `/repositories/:repoId/branch/:branchName/commits` | `BranchCommitsPage` | |
 | `/repositories/:repoId/branch/:branchName/commits/:commitHash` | `CommitDetailPage` | optional `?parent=` |
-| `/repositories/:repoId/workspaces/:workspaceId` | `WorkspaceDetailPage` | file browser |
-| `/repositories/:repoId/workspaces/:workspaceId/wip` | `WorkspaceWipPage` | speak-to-prompt |
+| `/repositories/:repoId/workspaces/:workspaceId(/:tab)` | `WorkspaceDetailPage` | tab slug (`chat`, `files`, …) selects the active tab; optional `?path=` deep-links a file into the Files tab |
+| `/repositories/:repoId/workspaces/:workspaceId/wip` | `WorkspaceWipPage` | speak-to-prompt; `wip` is a reserved slug |
 | `/repositories/:repoId/history` | `WorkspaceHistoryPage` | |
 | `/repositories/:repoId/history/:id` | `WorkspaceHistoryDetailPage` | |
 | `/commands` | `CommandListPage` | records, not forms — no `new`/`edit` |
@@ -76,6 +76,7 @@ These are deliberate, and new routes in the same situations should follow them:
 - **Drill-down entities**: entities with no standalone "list all" requirement (repositories, workspaces) have no list route; they are reached from their parent's detail page.
 - **Record views**: system-produced records (commands, workspace history) have list + detail routes but no `new`/`edit` — creation happens through domain flows, not forms. Narrative edits (history preamble/result) mutate inline on the detail page.
 - **View dispatch inside one route**: `/commands/:commandId` renders a live chat, a chat replay, a live terminal, or a read-only log depending on the command's kind and status. Route on the entity; let the page pick the representation.
+- **URL-segment view selection**: the workspace detail page mirrors its active tab into an optional trailing segment (`/repositories/:repoId/workspaces/:workspaceId/web-view`) — one route, one page, the segment only picks the view. Implemented as a single `UrlMatcher` route (`workspaceDetailMatcher`), **not** two path entries: one `routeConfig` means bare↔slugged navigation reuses the component, so tab panels (iframes, sockets) never remount. The matcher reserves `wip` for the legacy page; no segment leaves the page's default view unpinned.
 
 ## Builder Pattern (Nested Sub-Entities)
 
@@ -153,4 +154,4 @@ Before adding a new route, ask:
 - [ ] Is my page component under ~150 lines? If not, extract a smart child component.
 - [ ] Are related entities shown inline (builder) or routed independently?
 - [ ] Is the route lazy-loaded and declared under `src/app/pages/`?
-- [ ] Does one of the established deviations above apply (parent-scoped create, drill-down, record view, view dispatch)?
+- [ ] Does one of the established deviations above apply (parent-scoped create, drill-down, record view, view dispatch, URL-segment view selection)?

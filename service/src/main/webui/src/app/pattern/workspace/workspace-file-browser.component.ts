@@ -48,6 +48,7 @@ import { compactFileTree, type CompactedChain } from '@/shared/utils/compact-fil
 import {
   applyPathFilters,
   basename,
+  closestPath,
   filterFilePaths,
   fuzzyMatch,
   type PathFilter,
@@ -738,6 +739,17 @@ export class WorkspaceFileBrowserComponent {
         return next;
       });
     });
+
+    // Resolve an armed openClosestMatch target once the file list has loaded: pick the closest
+    // match among the filtered paths (post-seed, so the selection agrees with the narrowed tree)
+    // and reveal it. No match → the seeded filter stays, nothing gets selected.
+    effect(() => {
+      const target = this.pendingClosestTarget();
+      if (target === null || !this.filesQuery.isSuccess()) return;
+      this.pendingClosestTarget.set(null); // one-shot
+      const match = closestPath(this.filteredPaths(), target);
+      if (match) this.revealPath(match);
+    });
   }
 
   readonly filesQuery = injectQuery(() => ({
@@ -1223,12 +1235,22 @@ export class WorkspaceFileBrowserComponent {
   /** Opens {@code path} in the viewer with {@code startLine}–{@code endLine} anchored. */
   openAtLine(path: string, startLine: number, endLine: number): void {
     this.anchor.set({ path, startLine, endLine });
+    this.revealPath(path);
+  }
+
+  /**
+   * Opens {@code path} in the viewer and reveals it in the tree: select the node and expand every
+   * ancestor prefix. The reveal is best-effort — a gitignored log file won't be in the tree, a
+   * target inside an unopened lazy directory isn't loaded yet, and that's fine. Safe with chain
+   * compaction: the mirroring effect in the constructor reconciles absorbed keys and only writes
+   * on a delta.
+   */
+  private revealPath(path: string): void {
     this.selectedPath.set(path);
     const treeService = this.treeCmp()?.treeService;
     if (!treeService) {
       return;
     }
-    // Best-effort tree reveal — a gitignored log file won't be in the tree, and that's fine.
     treeService.selectedKeys.set(new Set([path]));
     const parts = path.split('/');
     for (let i = 1; i < parts.length; i++) {
@@ -1273,18 +1295,25 @@ export class WorkspaceFileBrowserComponent {
     if (!this.allEagerPaths().includes(target)) {
       return; // dead link (missing file or a directory) — silent no-op
     }
-    this.selectedPath.set(target);
-    const treeService = this.treeCmp()?.treeService;
-    if (!treeService) {
-      return;
-    }
-    treeService.selectedKeys.set(new Set([target]));
-    // Expand every ancestor prefix so the node is visible. Safe with chain compaction: the
-    // mirroring effect in the constructor reconciles absorbed keys and only writes on a delta.
-    const parts = target.split('/');
-    for (let i = 1; i < parts.length; i++) {
-      treeService.expand(parts.slice(0, i).join('/'));
-    }
+    this.revealPath(target);
+  }
+
+  /**
+   * A `?path=` deep-link target: armed here, resolved by the constructor effect once the file
+   * list has loaded (a hard deep link arrives before {@link filesQuery} resolves).
+   */
+  private readonly pendingClosestTarget = signal<string | null>(null);
+
+  /**
+   * A possibly-stale path (e.g. a picked-element attribution): seed the name filter with it —
+   * exactly as if the user had typed it, narrowing and auto-expanding the tree — then open the
+   * closest match among the filtered paths. Deliberately more forgiving than
+   * {@link openLinkedPath}: picked snippets can outlive renames. No plausible match → the seeded
+   * filter stays visible and nothing is selected, so the user sees why the tree is narrowed.
+   */
+  openClosestMatch(path: string): void {
+    this.nameQuery.set(path);
+    this.pendingClosestTarget.set(path);
   }
 
   /**

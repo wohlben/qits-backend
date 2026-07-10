@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -35,7 +35,9 @@ describe('WorkspaceChatComponent', () => {
       .fn()
       .mockImplementation((id: string) => of({ command: chat({ id }) })),
   };
-  const router = { navigate: vi.fn() };
+  // The prompt panel's speak-to-prompt renders RouterLinks, which need a real router; the
+  // navigation assertion spies on the real instance instead.
+  let router: Router;
   let queryClient: QueryClient;
 
   beforeEach(async () => {
@@ -56,11 +58,13 @@ describe('WorkspaceChatComponent', () => {
     await TestBed.configureTestingModule({
       imports: [WorkspaceChatComponent],
       providers: [
+        provideRouter([]),
         provideTanStackQuery(queryClient),
         { provide: CommandControllerService, useValue: commandService },
-        { provide: Router, useValue: router },
       ],
     }).compileComponents();
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
   });
 
   afterEach(() => {

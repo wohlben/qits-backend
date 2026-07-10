@@ -204,7 +204,10 @@ export function applyPathFilters(paths: string[], filters: PathFilter[]): string
 
 /**
  * The full tree-filtering pipeline: the ordered filter list ({@link applyPathFilters}) followed by a
- * final fuzzy pass of the top input over each path's basename (the filename only).
+ * final fuzzy pass of the top input. A query without a `/` matches each path's basename (the
+ * filename only); a query containing `/` matches the full path — so a pasted or deep-linked path
+ * like `src/app/greeting.ts` narrows the tree instead of matching nothing (basenames never
+ * contain `/`).
  */
 export function filterFilePaths(
   paths: string[],
@@ -216,5 +219,43 @@ export function filterFilePaths(
   if (query === '') {
     return filtered;
   }
-  return filtered.filter((p) => fuzzyMatch(query, basename(p)));
+  const fullPath = query.includes('/');
+  return filtered.filter((p) => fuzzyMatch(query, fullPath ? p : basename(p)));
+}
+
+/** Matching characters counted from the end — how much of the target's tail a candidate keeps. */
+function commonSuffixLength(a: string, b: string): number {
+  let n = 0;
+  while (n < a.length && n < b.length && a[a.length - 1 - n] === b[b.length - 1 - n]) n++;
+  return n;
+}
+
+/**
+ * The candidate closest to {@code target}: the exact path when present, else the candidate sharing
+ * the longest character suffix with it — so for a stale `src/app/greeting.ts` a moved
+ * `src/app2/greeting.ts` (whole filename in the suffix) beats `src/other/greeting.spec.ts` (only
+ * `.ts`). Ties go to the shorter path (least extra prefix), then lexicographic order, keeping the
+ * pick deterministic. Callers pre-narrow the candidates (e.g. by {@link fuzzyMatch}); there is no
+ * minimum-score threshold here. Returns null when there are no candidates.
+ */
+export function closestPath(candidates: string[], target: string): string | null {
+  if (candidates.includes(target)) {
+    return target;
+  }
+  let best: string | null = null;
+  let bestSuffix = -1;
+  for (const candidate of candidates) {
+    const suffix = commonSuffixLength(candidate, target);
+    const better =
+      best === null ||
+      suffix > bestSuffix ||
+      (suffix === bestSuffix &&
+        (candidate.length < best.length ||
+          (candidate.length === best.length && candidate < best)));
+    if (better) {
+      best = candidate;
+      bestSuffix = suffix;
+    }
+  }
+  return best;
 }
