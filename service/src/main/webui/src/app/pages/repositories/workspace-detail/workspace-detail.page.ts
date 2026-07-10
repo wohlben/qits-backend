@@ -2,11 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
@@ -45,6 +47,24 @@ import {
 } from '@/shared/components/tabs';
 
 /**
+ * The active tab's URL slug per tab label. The slug is an optional trailing URL segment
+ * (`…/workspaces/:workspaceId/web-view`) matched by `workspaceDetailMatcher`, which reserves
+ * `wip` for the legacy page — never add a `wip` slug here. No segment = the tab group's own
+ * default (the user-reordered first tab), deliberately unpinned.
+ */
+const TAB_SLUG_BY_LABEL = new Map([
+  ['Chat', 'chat'],
+  ['Files', 'files'],
+  ['Daemons', 'daemons'],
+  ['Actions', 'actions'],
+  ['Web view', 'web-view'],
+  ['Telemetry', 'telemetry'],
+  ['Agents', 'agents'],
+]);
+
+const TAB_LABEL_BY_SLUG = new Map([...TAB_SLUG_BY_LABEL].map(([label, slug]) => [slug, label]));
+
+/**
  * The workspace detail page: everything the workspace offers as one tab row — Chat, Files,
  * Daemons (controls + events feed), Actions (effective actions + run history), Web view,
  * Telemetry, Agents (the embedded agent session + session history + plugins). All panels
@@ -54,6 +74,10 @@ import {
  * iframe survive tab switches. The tab row is drag-reorderable, persisted per browser under the
  * `qits.workspace-detail.tab-order` localStorage key. The older speak-to-prompt page stays
  * reachable at `…/wip` (unlinked, kept for prototyping).
+ *
+ * The active tab is mirrored into the URL as a trailing slug segment (see {@link TAB_SLUG_BY_LABEL})
+ * so every tab is shareable, and a `?path=` query param deep-links into the Files tab's browser
+ * (see the constructor effects).
  */
 @Component({
   selector: 'app-workspace-detail-page',
@@ -171,6 +195,7 @@ import {
 })
 export class WorkspaceDetailPage {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly commandService = inject(CommandControllerService);
   private readonly daemonService = inject(WorkspaceDaemonControllerService);
@@ -179,9 +204,75 @@ export class WorkspaceDetailPage {
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
   readonly workspaceId = this.route.snapshot.paramMap.get('workspaceId')!;
 
+  /** Reactive: tab switches navigate within this same route, only the `:tab` segment changes. */
+  private readonly params = toSignal(this.route.paramMap, {
+    initialValue: this.route.snapshot.paramMap,
+  });
+
+  /** Reactive: a picked-element file link re-targets `?path=` without leaving the route. */
+  private readonly queryParams = toSignal(this.route.queryParamMap, {
+    initialValue: this.route.snapshot.queryParamMap,
+  });
+
+  /**
+   * Mirror of the tab group's active label, written by {@link onTabChange} (the group's own
+   * `activeTab` is protected, and it emits `zTabChange` for every selection). Null until the
+   * group's `ngAfterViewInit` default-selects the first displayed tab — the URL→tab effect keys
+   * on that: it must apply the URL's tab *after* the unconditional default selection, whatever
+   * the effect/hook flush order of the pass that mounts the group.
+   */
+  private readonly activeLabel = signal<string | null>(null);
+
+  /**
+   * False until the URL→tab effect has applied (or skipped) the initial slug. Selections that
+   * fire earlier are the group's own init default or URL-driven — neither may write the URL
+   * (a bare URL deliberately stays bare).
+   */
+  private urlSyncReady = false;
+
+  /** One-shot guard: each distinct `?path=` value seeds the file browser exactly once. */
+  private lastHandledPath: string | null = null;
+
   constructor() {
     // Push freshness over one SSE channel; the child queries no longer poll (see WorkspaceLiveService).
     this.live.connect(this.repoId, this.workspaceId);
+
+    // URL → tab: resolve the `:tab` slug against the group once it is mounted *and* has made its
+    // own default selection (activeLabel non-null — see its doc). Unknown slugs normalize back to
+    // the bare URL (keeping the default selection); a missing segment is deliberate ("no tab
+    // pinned") and leaves the current selection alone.
+    effect(() => {
+      const group = this.tabGroup(); // re-runs when the success template mounts it
+      const slug = this.params().get('tab');
+      const active = this.activeLabel(); // re-runs after the group's init default selection
+      if (!group || active === null) {
+        return;
+      }
+      if (slug !== null) {
+        const label = TAB_LABEL_BY_SLUG.get(slug);
+        if (!label) {
+          void this.router.navigate(
+            ['/repositories', this.repoId, 'workspaces', this.workspaceId],
+            { replaceUrl: true, queryParamsHandling: 'preserve' },
+          );
+        } else if (label !== active) {
+          group.selectTabByLabel(label);
+        }
+      }
+      this.urlSyncReady = true;
+    });
+
+    // ?path= → file browser: hand each distinct value to openClosestMatch once. The browser
+    // panel is always mounted (hidden-tab mounting), so this works whatever tab is active.
+    effect(() => {
+      const browser = this.fileBrowser(); // mounts with the success template
+      const path = this.queryParams().get('path');
+      if (!browser || path === null || path === this.lastHandledPath) {
+        return;
+      }
+      this.lastHandledPath = path;
+      browser.openClosestMatch(path);
+    });
   }
 
   // Same key AND shape as the branch list's workspaces query, so both share one cache entry.
@@ -297,6 +388,21 @@ export class WorkspaceDetailPage {
     if (label === 'Agents') {
       this.agentsActivated.set(true);
     }
+    this.activeLabel.set(label);
+    // Mirror the selection into the URL (push — back walks through tabs). Guard 1 skips
+    // everything before the URL→tab effect settled (the group's init default selection, and the
+    // initial URL-driven selection); guard 2 skips the echo when the URL already says this.
+    if (!this.urlSyncReady) {
+      return;
+    }
+    const slug = TAB_SLUG_BY_LABEL.get(label);
+    if (!slug || slug === this.params().get('tab')) {
+      return;
+    }
+    void this.router.navigate(
+      ['/repositories', this.repoId, 'workspaces', this.workspaceId, slug],
+      { queryParamsHandling: 'preserve' },
+    );
   }
 
   /** The embedded session's deferred state jumps to the live conversation. */

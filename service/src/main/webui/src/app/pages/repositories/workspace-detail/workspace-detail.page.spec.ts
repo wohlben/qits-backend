@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router, type ParamMap } from '@angular/router';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
-import { of } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
@@ -45,13 +45,32 @@ describe('WorkspaceDetailPage', () => {
       .fn()
       .mockReturnValue(of({ sessions: [] })),
   };
+  // Subject-backed so tests can deep-link (set before creating) or emit in-page URL changes.
+  let paramMap$: BehaviorSubject<ParamMap>;
+  let queryParamMap$: BehaviorSubject<ParamMap>;
   const route = {
-    snapshot: { paramMap: convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1' }) },
+    get paramMap() {
+      return paramMap$.asObservable();
+    },
+    get queryParamMap() {
+      return queryParamMap$.asObservable();
+    },
+    snapshot: {
+      get paramMap() {
+        return paramMap$.value;
+      },
+      get queryParamMap() {
+        return queryParamMap$.value;
+      },
+    },
   };
+  const router = { navigate: vi.fn().mockResolvedValue(true) };
   let queryClient: QueryClient;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    paramMap$ = new BehaviorSubject(convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1' }));
+    queryParamMap$ = new BehaviorSubject(convertToParamMap({}));
     localStorage.clear(); // the page persists its tab order under qits.workspace-detail.tab-order
     // A seeded running chat mounts app-command-chat inline; keep its socket out of jsdom.
     vi.stubGlobal(
@@ -96,6 +115,7 @@ describe('WorkspaceDetailPage', () => {
       providers: [
         provideTanStackQuery(queryClient),
         { provide: ActivatedRoute, useValue: route },
+        { provide: Router, useValue: router },
         { provide: WorkspaceControllerService, useValue: workspaceService },
         { provide: CommandControllerService, useValue: commandService },
         { provide: RepositoryActionsControllerService, useValue: actionsService },
@@ -126,9 +146,10 @@ describe('WorkspaceDetailPage', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     // role="tab" (not the z-button default role="button") — regression for the clobbered-role bug.
-    const tabLabels = Array.from(el.querySelectorAll('nav[role="tablist"] [role="tab"]')).map((b) =>
-      b.textContent?.trim(),
-    );
+    // First tablist only: the Telemetry panel hosts its own nested sub-tab group.
+    const tabLabels = Array.from(
+      el.querySelector('nav[role="tablist"]')!.querySelectorAll('[role="tab"]'),
+    ).map((b) => b.textContent?.trim());
     expect(tabLabels).toEqual([
       'Chat',
       'Files',
@@ -160,9 +181,10 @@ describe('WorkspaceDetailPage', () => {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
-    const tabLabels = Array.from(el.querySelectorAll('nav[role="tablist"] [role="tab"]')).map((b) =>
-      b.textContent?.trim(),
-    );
+    // First tablist only — the Telemetry panel's nested sub-tab group is not part of this row.
+    const tabLabels = Array.from(
+      el.querySelector('nav[role="tablist"]')!.querySelectorAll('[role="tab"]'),
+    ).map((b) => b.textContent?.trim());
     // Persisted labels lead; tabs the saved order doesn't know keep their template order behind.
     expect(tabLabels).toEqual([
       'Chat',
@@ -384,5 +406,107 @@ describe('WorkspaceDetailPage', () => {
     tabButton(el, 'Files').click();
     fixture.detectChanges();
     expect(el.querySelector('app-daemon-webview iframe')).not.toBeNull();
+  });
+
+  it('deep-links a tab: the :tab slug selects it and trips its activation latch', () => {
+    queryClient.setQueryData(
+      ['workspace-daemons', 'repo-1', 'wt-1'],
+      [
+        {
+          daemon: { id: 'd-1', name: 'dev server' },
+          status: DaemonStatus.Ready,
+          restartCount: 0,
+          proxyPath: '/daemon/wt-1/d-1/',
+        },
+      ],
+    );
+    paramMap$.next(
+      convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1', tab: 'web-view' }),
+    );
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    fixture.detectChanges(); // effect selects the tab → second pass renders the selection
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(tabButton(el, 'Web view').getAttribute('aria-selected')).toBe('true');
+    // The latch tripped: the deep link mounts the iframe just like a click would.
+    expect(el.querySelector('app-daemon-webview iframe')).not.toBeNull();
+    // The URL already says web-view — the echoed selection must not navigate again.
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('a user tab switch pushes the slug into the URL — the initial default selection does not', () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Bare URL: the group's own default selection stays URL-less.
+    expect(router.navigate).not.toHaveBeenCalled();
+
+    tabButton(el, 'Telemetry').click();
+    fixture.detectChanges();
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/repositories', 'repo-1', 'workspaces', 'wt-1', 'telemetry'],
+      { queryParamsHandling: 'preserve' },
+    );
+  });
+
+  it('normalizes an unknown tab slug back to the bare URL', () => {
+    paramMap$.next(convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1', tab: 'bogus' }));
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/repositories', 'repo-1', 'workspaces', 'wt-1'],
+      { replaceUrl: true, queryParamsHandling: 'preserve' },
+    );
+  });
+
+  it('an in-page URL change switches the tab without navigating again (loop guard)', () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    paramMap$.next(convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1', tab: 'daemons' }));
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(tabButton(el, 'Daemons').getAttribute('aria-selected')).toBe('true');
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('seeds the file browser from a ?path= present at load', () => {
+    queryParamMap$.next(convertToParamMap({ path: 'src/app/greeting.ts' }));
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+
+    const fileBrowser = fixture.debugElement.query(
+      By.directive(WorkspaceFileBrowserComponent),
+    ).componentInstance;
+    expect(fileBrowser.nameQuery()).toBe('src/app/greeting.ts');
+  });
+
+  it('hands each distinct ?path= value to the file browser exactly once', () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const fileBrowser = fixture.debugElement.query(
+      By.directive(WorkspaceFileBrowserComponent),
+    ).componentInstance;
+    const openClosestMatch = vi
+      .spyOn(fileBrowser, 'openClosestMatch')
+      .mockImplementation(() => undefined);
+
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts' }));
+    fixture.detectChanges();
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts' })); // re-emit, same value
+    fixture.detectChanges();
+    expect(openClosestMatch).toHaveBeenCalledTimes(1);
+    expect(openClosestMatch).toHaveBeenCalledWith('src/a.ts');
+
+    queryParamMap$.next(convertToParamMap({ path: 'src/b.ts' }));
+    fixture.detectChanges();
+    expect(openClosestMatch).toHaveBeenCalledTimes(2);
+    expect(openClosestMatch).toHaveBeenLastCalledWith('src/b.ts');
   });
 });

@@ -6,7 +6,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMic, lucideSparkles, lucideSquare } from '@ng-icons/lucide';
 import { injectMutation } from '@tanstack/angular-query-experimental';
@@ -29,7 +29,7 @@ import { WavRecorder } from './wav-recorder';
  */
 @Component({
   selector: 'app-speak-to-prompt',
-  imports: [ZardButtonComponent, NgIcon],
+  imports: [ZardButtonComponent, NgIcon, RouterLink],
   template: `
     <div class="flex flex-col gap-6">
       <section class="flex flex-col gap-2">
@@ -146,8 +146,24 @@ import { WavRecorder } from './wav-recorder';
                     <span [title]="snippet.url">{{ appPath }}</span>
                   }
                   @if (snippet.component; as component) {
-                    <span class="truncate font-mono" [title]="component.files.join(', ')">
-                      {{ component.files.join(', ') }}
+                    <!-- Each source file deep-links into the Files tab; the browser seeds its
+                         filter from ?path= and opens the closest match (stale paths tolerated). -->
+                    <span class="flex min-w-0 flex-wrap gap-x-1 truncate font-mono">
+                      @for (file of component.files; track file; let last = $last) {
+                        <a
+                          class="hover:underline"
+                          [routerLink]="[
+                            '/repositories',
+                            repoId(),
+                            'workspaces',
+                            workspaceId(),
+                            'files',
+                          ]"
+                          [queryParams]="{ path: file }"
+                          [title]="'Open ' + file + ' in the file browser'"
+                          >{{ file }}{{ last ? '' : ',' }}</a
+                        >
+                      }
                     </span>
                     @if (component.ancestors; as ancestors) {
                       <span>in {{ ancestors.join(' › ') }}</span>

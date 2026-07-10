@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
@@ -26,20 +26,24 @@ describe('SpeakToPromptComponent', () => {
       .fn()
       .mockReturnValue(of({ command: { id: 'cmd-1' } })),
   };
-  const router = { navigate: vi.fn() };
+  // The template's RouterLinks need a real router (a bare `{ navigate }` mock can't satisfy
+  // them); the launch-navigation assertions spy on the real instance instead.
+  let router: Router;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     await TestBed.configureTestingModule({
       imports: [SpeakToPromptComponent],
       providers: [
+        provideRouter([]),
         provideTanStackQuery(new QueryClient()),
         { provide: SpeechControllerService, useValue: speechService },
         { provide: PromptRefinementControllerService, useValue: refinementService },
         { provide: AgentControllerService, useValue: agentService },
-        { provide: Router, useValue: router },
       ],
     }).compileComponents();
+    router = TestBed.inject(Router);
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
   });
 
   function createComponent() {
@@ -164,6 +168,43 @@ describe('SpeakToPromptComponent', () => {
     expect(text).toContain('/greeting/world');
     expect(text).toContain('src/app/greeting.ts');
     expect(text).toContain('in app-root');
+    store.clear();
+  });
+
+  it('links each attributed file into the workspace Files tab with a ?path= deep link', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.add({
+      html: '<button class="cta">Go</button>',
+      selector: '#root > button',
+      url: 'http://localhost/daemon/wt/d/greeting/world',
+      appPath: '/greeting/world',
+      tag: 'button',
+      textPreview: 'Go',
+      component: {
+        selector: 'app-greeting',
+        className: 'Greeting',
+        files: ['src/app/greeting.ts', 'src/app/greeting.html'],
+      },
+    });
+    const fixture = createComponent();
+
+    const links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a[href]'),
+    );
+    const expectedHref = (file: string) =>
+      router.serializeUrl(
+        router.createUrlTree(['/repositories', 'repo-1', 'workspaces', 'wt-1', 'files'], {
+          queryParams: { path: file },
+        }),
+      );
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([
+      expectedHref('src/app/greeting.ts'),
+      expectedHref('src/app/greeting.html'),
+    ]);
+    expect(links.map((a) => a.textContent?.trim())).toEqual([
+      'src/app/greeting.ts,',
+      'src/app/greeting.html',
+    ]);
     store.clear();
   });
 

@@ -32,8 +32,8 @@ whose picks should be attributed.
 
 ## 2. Tray chip deep-link into the workspace file browser — **graduated**
 
-Picked up as `docs/feature-ideas/workspace-tab-url-and-picked-file-deep-link.md` (the trigger
-fired): the speak-to-prompt rows' file paths become RouterLinks to the files tab with a `?path=`
+Shipped as `docs/features/2026-07-10_workspace-tab-url-and-picked-file-deep-link.md` (the trigger
+fired): the speak-to-prompt rows' file paths became RouterLinks to the files tab with a `?path=`
 query param the browser resolves to the closest match. The repo/workspace ids come from
 speak-to-prompt's own inputs, so `PickedSnippet` needs no extension. Still open here: the
 `command-chat` chips (rendered outside a workspace route) stay inert until a snippet carries its
