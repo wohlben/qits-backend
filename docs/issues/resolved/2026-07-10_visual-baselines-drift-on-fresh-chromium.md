@@ -44,3 +44,35 @@ timezone-dependent `DatePipe` output.)
   same browser build).
 - Consider a devcontainer-baked browser install (the `docker/workspace` image could pre-install
   the Playwright cache) so "fresh machine" and "CI" always mean the same renderer.
+
+## Resolution (2026-07-10)
+
+Confirmed still reproducing on `main` with a clean working tree: `pnpm test:visual` failed 4/11 on
+exactly the four listed baselines, each with a **small differ-ratio and no dimension change**
+(branch-tree 8448px / 0.03, commit-row 3286px / 0.05, file-viewer light+dark similar) — the
+fingerprint of pure text-rasterization drift, distinct from the earlier
+[dimension/content drift](resolved/2026-07-05_branch-tree-screenshot-baseline-drift.md) that a
+component change caused.
+
+Narrowed the root cause: `playwright` **is** already pinned by `pnpm-lock.yaml` (`1.61.0` →
+Chromium revision 1228 = Google Chrome for Testing **149.0.7827.55**), so the browser build is not
+the floating variable the original suspicion named. The residual variable is the **host font
+stack**, which Chromium rasterizes with and which nothing pins — which is why two of these four
+(branch-tree, file-viewer) were re-recorded only three days earlier (commit `84369ce`) yet drifted
+again here.
+
+Applied the issue's first suggested direction: deleted the four stale PNGs and re-recorded them on
+the current pinned toolchain (Chromium 149.0.7827.55) per `.pi/skills/screenshot-tests` — run once
+to regenerate (fails by design), run again to verify. `pnpm test:visual` now passes **11/11**. The
+regenerated PNGs are committed alongside this doc.
+
+Also, to keep the *next* drift diagnosable rather than mysterious:
+
+- Recorded the producing toolchain (Chromium build + the font-stack caveat) as a **baseline
+  provenance note** in `.pi/skills/screenshot-tests/SKILL.md`, with the instruction to bump that
+  line whenever baselines are re-recorded.
+- Filed the durable fix (bake the Playwright cache **and** a pinned font set into `docker/workspace`
+  so every environment renders identically) as
+  [`docs/backlog-ideas/screenshot-baseline-renderer-baked-into-image.md`](../backlog-ideas/screenshot-baseline-renderer-baked-into-image.md),
+  with a Trigger to pick it up on the next recurrence or when screenshot tests reach CI. Regenerate-
+  on-current-toolchain remains the documented stopgap until then.

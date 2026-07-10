@@ -96,6 +96,8 @@ Rules that matter:
   ```
 - **Commit the regenerated PNGs** alongside the code change that justified them.
 
+**Producing toolchain (baseline provenance).** The committed baselines are only reproducible on the exact browser build **and font stack** that rendered them. `playwright` is pinned by `pnpm-lock.yaml` (currently `1.61.0` → Chromium revision 1228 = **Google Chrome for Testing 149.0.7827.55**), so the browser build is fixed — but the **host font stack is not pinned**, and text rasterization drifts with it. All current baselines were (re-)recorded on **Chromium 149.0.7827.55** on the devcontainer's font stack (2026-07-10). If a baseline fails with only small sub-pixel drift (a low differ-ratio, no dimension change) and no relevant component changed, suspect a font-stack change on the runner — re-record on the current toolchain. When you re-record for that reason, update this version line so the provenance stays current. A durable fix (bake the Playwright cache + fonts into `docker/workspace` so every environment renders identically) is tracked in [`docs/backlog-ideas/screenshot-baseline-renderer-baked-into-image.md`](../../../../../../../docs/backlog-ideas/screenshot-baseline-renderer-baked-into-image.md).
+
 ## Debugging / gotchas
 
 | Symptom | Cause & fix |
