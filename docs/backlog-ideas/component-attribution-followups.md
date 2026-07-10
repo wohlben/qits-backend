@@ -30,17 +30,18 @@ map. Vue similarly via `__vue_app__`.
 **Trigger**: the first workspace fixture or real repository with a React or Vue dev-server daemon
 whose picks should be attributed.
 
-## 2. Tray chip deep-link into the workspace file browser
+## 2. Tray chip deep-link into the workspace file browser — **graduated**
 
-**Change**: the snippet chips in `command-chat` / `speak-to-prompt` show
-`component.className` but are inert (insert/remove only). Make the attribution a link that opens
-`component.files[0]` in the workspace file browser (route
-`/repositories/:repoId/workspaces/:workspaceId`, file preselected). Needs the snippet to carry the
-repo/workspace ids (today only the webview component knows them) — extend `PickedSnippet` or
-resolve via the pick-time proxy path.
+Picked up as `docs/feature-ideas/workspace-tab-url-and-picked-file-deep-link.md` (the trigger
+fired): the speak-to-prompt rows' file paths become RouterLinks to the files tab with a `?path=`
+query param the browser resolves to the closest match. The repo/workspace ids come from
+speak-to-prompt's own inputs, so `PickedSnippet` needs no extension. Still open here: the
+`command-chat` chips (rendered outside a workspace route) stay inert until a snippet carries its
+own workspace identity.
 
-**Trigger**: first time someone asks "which file was that again?" while triaging picked snippets —
-or when the file browser gains a query-param deep-link anyway.
+**Trigger** (for the command-chat remainder): a command chat user asking for the file behind a
+chip — needs `PickedSnippet` to carry repo/workspace ids or resolve them from the pick-time proxy
+path.
 
 ## 3. Untracked-file content edits don't invalidate the component-map cache
 
