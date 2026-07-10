@@ -118,25 +118,43 @@ import { WavRecorder } from './wav-recorder';
         <section class="flex flex-col gap-2">
           <span class="text-sm font-medium">Picked elements (attached to the prompt)</span>
           @for (snippet of promptContext.snippets(); track snippet.id) {
-            <div class="flex items-center gap-2 rounded-md border p-2 text-sm">
-              <code class="text-xs text-muted-foreground">&lt;{{ snippet.tag }}&gt;</code>
-              @if (snippet.component; as component) {
-                <code class="text-xs font-medium" [title]="component.files.join(', ')">
-                  {{ component.className }}
-                </code>
+            <div class="flex flex-col gap-0.5 rounded-md border p-2 text-sm">
+              <div class="flex items-center gap-2">
+                <code class="text-xs text-muted-foreground">&lt;{{ snippet.tag }}&gt;</code>
+                @if (snippet.component; as component) {
+                  <code class="text-xs font-medium">
+                    {{ component.className }} ({{ component.selector }})
+                  </code>
+                }
+                <span class="flex-1 truncate" [title]="snippet.selector">
+                  {{ snippet.textPreview || snippet.selector }}
+                </span>
+                <button
+                  z-button
+                  zType="ghost"
+                  type="button"
+                  (click)="promptContext.remove(snippet.id)"
+                  [attr.aria-label]="'Remove picked element ' + snippet.tag"
+                >
+                  Remove
+                </button>
+              </div>
+              <!-- The attribution the prompt will carry: pick-time route, source files, chain. -->
+              @if (snippet.appPath || snippet.component) {
+                <div class="flex flex-wrap items-baseline gap-x-3 text-xs text-muted-foreground">
+                  @if (snippet.appPath; as appPath) {
+                    <span [title]="snippet.url">{{ appPath }}</span>
+                  }
+                  @if (snippet.component; as component) {
+                    <span class="truncate font-mono" [title]="component.files.join(', ')">
+                      {{ component.files.join(', ') }}
+                    </span>
+                    @if (component.ancestors; as ancestors) {
+                      <span>in {{ ancestors.join(' › ') }}</span>
+                    }
+                  }
+                </div>
               }
-              <span class="flex-1 truncate" [title]="snippet.selector">
-                {{ snippet.textPreview || snippet.selector }}
-              </span>
-              <button
-                z-button
-                zType="ghost"
-                type="button"
-                (click)="promptContext.remove(snippet.id)"
-                [attr.aria-label]="'Remove picked element ' + snippet.tag"
-              >
-                Remove
-              </button>
             </div>
           }
         </section>

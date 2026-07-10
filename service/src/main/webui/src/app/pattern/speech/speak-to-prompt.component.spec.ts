@@ -141,23 +141,47 @@ describe('SpeakToPromptComponent', () => {
     store.clear();
   });
 
-  it('names the attributed component on a picked-element row', () => {
+  it('shows the full pick context on a picked-element row: component, route, files, chain', () => {
     const store = TestBed.inject(PromptContextStore);
     store.add({
       html: '<button class="cta">Go</button>',
       selector: '#root > button',
-      url: 'http://localhost/daemon/wt/d/',
+      url: 'http://localhost/daemon/wt/d/greeting/world',
+      appPath: '/greeting/world',
       tag: 'button',
       textPreview: 'Go',
       component: {
         selector: 'app-greeting',
         className: 'Greeting',
         files: ['src/app/greeting.ts'],
+        ancestors: ['app-root'],
       },
     });
     const fixture = createComponent();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Greeting');
+    const text = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('Greeting (app-greeting)');
+    expect(text).toContain('/greeting/world');
+    expect(text).toContain('src/app/greeting.ts');
+    expect(text).toContain('in app-root');
+    store.clear();
+  });
+
+  it('renders a plain row without an attribution line for an unattributed pick', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.add({
+      html: '<div>x</div>',
+      selector: 'div',
+      url: 'http://localhost/elsewhere',
+      tag: 'div',
+      textPreview: 'x',
+    });
+    const fixture = createComponent();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('Picked elements');
+    expect(text).not.toContain('in app-root');
+    expect(text).not.toContain('src/app/');
     store.clear();
   });
 
