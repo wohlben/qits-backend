@@ -3,8 +3,10 @@
 ## Introduction
 
 Found while running the `seed-webapp` reset during verification of
-[daemon-healthchecks](../features/2026-07-10_daemon-healthchecks.md) — unrelated to that feature.
-Introduced by [chat persistence on the transcript channel](../features/) (V28, commit `6640fea`).
+[daemon-healthchecks](../../features/2026-07-10_daemon-healthchecks.md) — unrelated to that feature.
+Introduced by
+[chat persistence on the transcript channel](../../features/2026-07-10_chat-persistence-on-transcript.md)
+(V28, commit `6640fea`).
 Related: `V10__worktree_history.sql` (which established the cascade convention this FK missed).
 
 ## Observed
@@ -52,3 +54,15 @@ alter table command_agent_session add constraint FK_command_agent_session_comman
 
 Plus a regression test: delete a repository/project whose command carries an agent session row
 (e.g. extend the seed/agent-session tests, which currently never delete after chatting).
+
+## Resolution (2026-07-10)
+
+`V32__command_agent_session_cascade.sql` rebuilds the FK with `on delete cascade`, exactly the
+V10 repair mirrored (and matching what `V30__agent_session_stat.sql` already did for its own
+command FK). Existing rows are unaffected; the migration only swaps the constraint.
+
+Regression test: `RepositoryServiceTest.deleteRepositoryCascadesCommandAgentSessionRows` —
+creates a project/repo/workspace, persists an `EXITED` agent command carrying one
+`AgentSessionRef`, then deletes via `ProjectService.delete` (the seed-reset path) and asserts
+the command row cascaded away. Verified to reproduce the original
+`FK_COMMAND_AGENT_SESSION_COMMAND` referential-integrity violation when run without V32.
