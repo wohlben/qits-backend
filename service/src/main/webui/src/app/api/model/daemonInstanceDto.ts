@@ -9,6 +9,7 @@
  */
 import { DaemonStatus } from './daemonStatus';
 import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { HealthCheckStatusDto } from './healthCheckStatusDto';
 
 
 export interface DaemonInstanceDto { 
@@ -17,6 +18,7 @@ export interface DaemonInstanceDto {
     restartCount?: number;
     commandId?: string;
     proxyPath?: string;
+    health?: Array<HealthCheckStatusDto>;
 }
 export namespace DaemonInstanceDto {
 }

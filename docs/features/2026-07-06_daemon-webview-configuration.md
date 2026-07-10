@@ -75,7 +75,7 @@ Related/dependent plans:
   [workspace containers](2026-07-04_workspace-containers.md): the target is a container
   port published at create time (`WorkspaceService.daemonPorts` → `-p 127.0.0.1:0:<port>`), so the
   create-time-publishing constraint carries over unchanged — see *Recreate-container friction*.
-- **Converges with [daemon-healthchecks](../feature-ideas/daemon-healthchecks.md).** That idea notes the
+- **Converges with [daemon-healthchecks](../features/2026-07-10_daemon-healthchecks.md).** That idea notes the
   mvn+Quinoa daemon stands up *two* servers (Quarkus :8080, Angular :4200) and that one `httpPort`
   "isn't enough," with a deferred "per-port web-view" that frames a *healthy* HTTP check. This
   idea is the manual counterpart: an explicit `port` you choose. If both land, the web-view target
@@ -294,7 +294,7 @@ input to the proxy path: `entryPath`/`basePath` are validated definition config,
 
 - **Auto-detecting the frontend port.** qits can't know a daemon spawns `:4200` without being told;
   `port` stays explicitly configured. A future convergence with
-  [daemon-healthchecks](../feature-ideas/daemon-healthchecks.md) could default the target to a healthy HTTP check's
+  [daemon-healthchecks](../features/2026-07-10_daemon-healthchecks.md) could default the target to a healthy HTTP check's
   port — noted there as "per-port web-view," kept out of scope here.
 - **Multiple web-views per daemon.** One `WebView` block per daemon (singular). Framing both
   Quarkus and Angular from one daemon is the healthchecks doc's per-port convergence, deferred with

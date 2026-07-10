@@ -20,4 +20,5 @@ public record RepositoryDaemonDto(
     String repositoryId,
     Map<String, String> environment,
     List<LogObserverDto> observers,
-    List<LogSourceDto> sources) {}
+    List<LogSourceDto> sources,
+    List<HealthCheckDto> healthChecks) {}

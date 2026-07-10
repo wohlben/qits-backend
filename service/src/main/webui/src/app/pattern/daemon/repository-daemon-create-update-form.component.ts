@@ -5,6 +5,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { RepositoryDaemonControllerService } from '@/api/api/repositoryDaemonController.service';
 import { CreateRepositoryDaemonRequest } from '@/api/model/createRepositoryDaemonRequest';
+import { HealthCheckInput } from '@/api/model/healthCheckInput';
 import { RepositoryDaemonDto } from '@/api/model/repositoryDaemonDto';
 import { UpdateRepositoryDaemonRequest } from '@/api/model/updateRepositoryDaemonRequest';
 import { WebViewInput } from '@/api/model/webViewInput';
@@ -12,6 +13,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
 import {
   DaemonFormComponent,
   DaemonFormData,
+  DaemonHealthCheckRow,
   DaemonObserverRow,
 } from '@/ui/forms/daemon/daemon-form.component';
 
@@ -78,6 +80,19 @@ export class RepositoryDaemonCreateUpdateFormComponent {
             path: s.path ?? '',
             label: s.label ?? '',
           })),
+          healthChecks: (d.healthChecks ?? []).map((c) => ({
+            name: c.name ?? '',
+            kind: c.kind ?? 'HTTP',
+            port: c.port != null ? String(c.port) : '',
+            path: c.path ?? '',
+            expectStatus: c.expectStatus ?? '',
+            command: c.command ?? '',
+            intervalMs: c.intervalMs != null ? String(c.intervalMs) : '',
+            timeoutMs: c.timeoutMs != null ? String(c.timeoutMs) : '',
+            healthyThreshold: c.healthyThreshold != null ? String(c.healthyThreshold) : '',
+            unhealthyThreshold: c.unhealthyThreshold != null ? String(c.unhealthyThreshold) : '',
+            initialDelayMs: c.initialDelayMs != null ? String(c.initialDelayMs) : '',
+          })),
         }
       : undefined;
   });
@@ -131,6 +146,9 @@ export class RepositoryDaemonCreateUpdateFormComponent {
       sources: data.sources
         .filter((row) => row.path.trim().length > 0)
         .map((row) => ({ path: row.path.trim(), label: row.label.trim() || undefined })),
+      healthChecks: data.healthChecks
+        .filter((row) => row.name.trim().length > 0)
+        .map((row) => this.toHealthCheck(row)),
     };
     if (this.daemon()) {
       this.updateMutation.mutate(request);
@@ -178,6 +196,28 @@ export class RepositoryDaemonCreateUpdateFormComponent {
       entryPath: data.webViewEntryPath.trim(),
       basePath: data.webViewBasePath.trim(),
     };
+  }
+
+  /** Only the fields of the selected kind travel; blank tuning fields mean server defaults. */
+  private toHealthCheck(row: DaemonHealthCheckRow): HealthCheckInput {
+    return {
+      name: row.name.trim(),
+      kind: row.kind,
+      port: row.kind !== 'COMMAND' ? this.parseOptionalInt(row.port) : undefined,
+      path: row.kind === 'HTTP' ? row.path.trim() || undefined : undefined,
+      expectStatus: row.kind === 'HTTP' ? row.expectStatus.trim() || undefined : undefined,
+      command: row.kind === 'COMMAND' ? row.command : undefined,
+      intervalMs: this.parseOptionalInt(row.intervalMs),
+      timeoutMs: this.parseOptionalInt(row.timeoutMs),
+      healthyThreshold: this.parseOptionalInt(row.healthyThreshold),
+      unhealthyThreshold: this.parseOptionalInt(row.unhealthyThreshold),
+      initialDelayMs: this.parseOptionalInt(row.initialDelayMs),
+    };
+  }
+
+  private parseOptionalInt(value: string): number | undefined {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   /** Only the fields of the selected kind travel; LOG_LEVEL needs no configuration. */

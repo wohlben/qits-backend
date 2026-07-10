@@ -133,7 +133,8 @@ public class DaemonSupervisorTest {
             null,
             null,
             observers,
-            sources)
+            sources,
+            null)
         .id;
   }
 
@@ -408,6 +409,7 @@ public class DaemonSupervisorTest {
                 "app",
                 null,
                 null,
+                null,
                 null)
             .id;
     workspaceService.createWorkspace(repo.id, "work", "master", "work");
@@ -484,6 +486,7 @@ public class DaemonSupervisorTest {
                 0,
                 null,
                 8124,
+                null,
                 null,
                 null,
                 null,
@@ -690,7 +693,7 @@ public class DaemonSupervisorTest {
     // Add a webView to the running daemon's definition.
     repositoryDaemonService.update(
         repoId, daemonId, null, null, null, null, null, null, null, null, null, 8125, null, null,
-        null, null, null);
+        null, null, null, null);
 
     // Kill the detached session — the liveness poll sees a crash and ON_FAILURE relaunches it. The
     // relaunch must read the just-added webView.

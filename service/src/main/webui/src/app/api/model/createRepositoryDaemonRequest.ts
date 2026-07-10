@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { RestartPolicy } from './restartPolicy';
+import { HealthCheckInput } from './healthCheckInput';
 import { LogObserverInput } from './logObserverInput';
 import { LogSourceInput } from './logSourceInput';
 import { WebViewInput } from './webViewInput';
@@ -27,6 +28,7 @@ export interface CreateRepositoryDaemonRequest {
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverInput>;
     sources?: Array<LogSourceInput>;
+    healthChecks?: Array<HealthCheckInput>;
 }
 export namespace CreateRepositoryDaemonRequest {
 }

@@ -5,6 +5,8 @@ import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.dto.DaemonInstanceDto;
 import eu.wohlben.qits.domain.daemon.dto.RepositoryDaemonDto;
 import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.LogSource;
@@ -77,6 +79,43 @@ public class DaemonMcpTools {
     }
   }
 
+  /** One healthcheck as accepted by the daemon tools; mirrors the REST {@code HealthCheckInput}. */
+  public record HealthCheckArg(
+      String name,
+      String kind,
+      Integer port,
+      String path,
+      String expectStatus,
+      String command,
+      Long intervalMs,
+      Long timeoutMs,
+      Integer healthyThreshold,
+      Integer unhealthyThreshold,
+      Long initialDelayMs) {
+    HealthCheck toEntity() {
+      HealthCheckKind checkKind =
+          parseEnum(HealthCheckKind.class, kind, "health check kind", "HTTP, TCP, COMMAND");
+      return new HealthCheck(
+          name,
+          checkKind,
+          port,
+          path,
+          expectStatus,
+          command,
+          intervalMs,
+          timeoutMs,
+          healthyThreshold,
+          unhealthyThreshold,
+          initialDelayMs);
+    }
+
+    static List<HealthCheck> toEntities(List<HealthCheckArg> healthChecks) {
+      return healthChecks == null
+          ? null
+          : healthChecks.stream().map(HealthCheckArg::toEntity).toList();
+    }
+  }
+
   /** Result of deleting a daemon. */
   public record DeletedDaemon(String id, boolean deleted) {}
 
@@ -107,8 +146,11 @@ public class DaemonMcpTools {
               + " (NEVER, ON_FAILURE or ALWAYS; default ON_FAILURE) with 'maxRestarts' (default 3),"
               + " 'environment', 'observers' (kind PATTERN needs a regex 'pattern' and a 'severity'"
               + " of INFO/WARNING/ERROR; kind LOG_LEVEL classifies by the level vocabulary in the"
-              + " lines), and 'sources' (workspace-relative files to tail into the observers, in"
-              + " addition to the process output).")
+              + " lines), 'sources' (workspace-relative files to tail into the observers, in"
+              + " addition to the process output), and 'healthChecks' (named HTTP/TCP/COMMAND"
+              + " probes run inside the container against the daemon's own loopback; their live"
+              + " healthy/unhealthy state shows in listWorkspaceDaemons and never affects the"
+              + " lifecycle status).")
   @Transactional
   public RepositoryDaemonDto createDaemon(
       @ToolArg(description = "id of a repository in this project") String repoId,
@@ -160,7 +202,16 @@ public class DaemonMcpTools {
       @ToolArg(required = false, description = "log observers watching the daemon's output")
           List<ObserverArg> observers,
       @ToolArg(required = false, description = "workspace-relative log files to tail")
-          List<SourceArg> sources) {
+          List<SourceArg> sources,
+      @ToolArg(
+              required = false,
+              description =
+                  "healthchecks probed in-container on an interval: each needs a unique 'name' and"
+                      + " a 'kind' of HTTP (with 'port', optional 'path' and 'expectStatus' like"
+                      + " '2xx,3xx' or '200'), TCP (with 'port'), or COMMAND (with 'command'; exit"
+                      + " 0 = healthy). Optional per check: intervalMs, timeoutMs,"
+                      + " healthyThreshold, unhealthyThreshold, initialDelayMs")
+          List<HealthCheckArg> healthChecks) {
     scopeGuard.requireRepoInProject(repoId);
     var daemon =
         repositoryDaemonService.create(
@@ -179,7 +230,8 @@ public class DaemonMcpTools {
             webViewBasePath,
             environment,
             ObserverArg.toEntities(observers),
-            SourceArg.toEntities(sources));
+            SourceArg.toEntities(sources),
+            HealthCheckArg.toEntities(healthChecks));
     return repositoryDaemonMapper.toDto(daemon);
   }
 
@@ -187,9 +239,9 @@ public class DaemonMcpTools {
   @Tool(
       description =
           "Edit one of a repository's daemons. Only the fields you pass change; omit a field to"
-              + " keep it. An empty 'readyPattern' clears it; 'environment', 'observers' and"
-              + " 'sources', when given, replace the whole collection. A running instance keeps its"
-              + " old definition until restarted.")
+              + " keep it. An empty 'readyPattern' clears it; 'environment', 'observers',"
+              + " 'sources' and 'healthChecks', when given, replace the whole collection. A running"
+              + " instance keeps its old definition until restarted.")
   @Transactional
   public RepositoryDaemonDto updateDaemon(
       @ToolArg(description = "id of a repository in this project") String repoId,
@@ -233,7 +285,13 @@ public class DaemonMcpTools {
       @ToolArg(required = false, description = "replacement log observers")
           List<ObserverArg> observers,
       @ToolArg(required = false, description = "replacement file log sources")
-          List<SourceArg> sources) {
+          List<SourceArg> sources,
+      @ToolArg(
+              required = false,
+              description =
+                  "replacement healthchecks (same shape as in createDaemon; replaces the whole"
+                      + " list)")
+          List<HealthCheckArg> healthChecks) {
     scopeGuard.requireRepoInProject(repoId);
     var daemon =
         repositoryDaemonService.update(
@@ -253,7 +311,8 @@ public class DaemonMcpTools {
             webViewBasePath,
             environment,
             ObserverArg.toEntities(observers),
-            SourceArg.toEntities(sources));
+            SourceArg.toEntities(sources),
+            HealthCheckArg.toEntities(healthChecks));
     return repositoryDaemonMapper.toDto(daemon);
   }
 
@@ -274,8 +333,9 @@ public class DaemonMcpTools {
   @Tool(
       description =
           "List the repository's daemons with their supervised runtime state in one workspace"
-              + " (STOPPED/STARTING/READY/DEGRADED/RESTARTING/CRASHED, restart count, and the"
-              + " commandId whose log holds the daemon's output).")
+              + " (STOPPED/STARTING/READY/DEGRADED/RESTARTING/CRASHED, restart count, the"
+              + " commandId whose log holds the daemon's output, and the live"
+              + " HEALTHY/UNHEALTHY/UNKNOWN result of each declared healthcheck).")
   public List<DaemonInstanceDto> listWorkspaceDaemons(
       @ToolArg(description = "id of a repository in this project") String repoId,
       @ToolArg(description = "id of the workspace (see listWorkspaces)") String workspaceId) {

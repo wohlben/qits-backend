@@ -67,7 +67,7 @@ Related/dependent plans:
   streams over WebSocket; what polls is the **discovery** query (`['commands']` @5s in
   `workspace-chat.component.ts`) that finds the newest running chat session to attach to. A
   command-lifecycle hint replaces that poll.
-- **[daemon-healthchecks](daemon-healthchecks.md)** (idea) — plans to ride "the workspace poll
+- **[daemon-healthchecks](2026-07-10_daemon-healthchecks.md)** (idea) — plans to ride "the workspace poll
   (3s/5s)" for its health dots. If this lands first, healthcheck state flips become another hint
   topic and the dots go live-on-change instead.
 - **[mutiny-reactive-programming](../features/2026-05-01_mutiny-reactive-programming.md)** — the

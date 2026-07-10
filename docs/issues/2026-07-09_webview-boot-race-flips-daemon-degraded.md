@@ -11,7 +11,7 @@ Found while end-to-end-verifying the
 SPA-observability `config.json` relay. Sibling of the resolved
 [degraded-false-positive-on-quarkus-dev-output](resolved/2026-07-05_degraded-false-positive-on-quarkus-dev-output.md)
 — same "healthy demo reads as broken" symptom, different (and this time genuinely
-ERROR-classified) trigger. The [daemon-healthchecks idea](../feature-ideas/daemon-healthchecks.md)'s
+ERROR-classified) trigger. The [daemon-healthchecks idea](../features/2026-07-10_daemon-healthchecks.md)'s
 deferred **auto-recovering DEGRADED** is the principled fix direction.
 
 ## Observed (devcontainer, 2026-07-09)

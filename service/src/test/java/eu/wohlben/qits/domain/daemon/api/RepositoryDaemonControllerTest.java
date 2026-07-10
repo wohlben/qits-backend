@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.hasItem;
 import eu.wohlben.qits.domain.daemon.api.RepositoryDaemonController.CreateRepositoryDaemonRequest;
 import eu.wohlben.qits.domain.daemon.api.RepositoryDaemonController.UpdateRepositoryDaemonRequest;
 import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.api.ProjectController;
@@ -87,7 +88,32 @@ public class RepositoryDaemonControllerTest {
                     new LogObserverInput(
                         LogObserverKind.PATTERN, "ERROR", DaemonEventSeverity.ERROR),
                     new LogObserverInput(LogObserverKind.LOG_LEVEL, null, null)),
-                List.of(new LogSourceInput("logs/app.log", "app log"))))
+                List.of(new LogSourceInput("logs/app.log", "app log")),
+                List.of(
+                    new HealthCheckInput(
+                        "Frontend",
+                        HealthCheckKind.HTTP,
+                        5173,
+                        "/",
+                        "2xx,3xx,4xx",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null),
+                    new HealthCheckInput(
+                        "API",
+                        HealthCheckKind.COMMAND,
+                        null,
+                        null,
+                        null,
+                        "curl -fsS localhost",
+                        2500L,
+                        1000L,
+                        2,
+                        5,
+                        15000L))))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
         .statusCode(200)
@@ -109,6 +135,12 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.observers[1].kind", equalTo("LOG_LEVEL"))
         .body("daemon.sources[0].path", equalTo("logs/app.log"))
         .body("daemon.sources[0].label", equalTo("app log"))
+        .body("daemon.healthChecks[0].name", equalTo("Frontend"))
+        .body("daemon.healthChecks[0].kind", equalTo("HTTP"))
+        .body("daemon.healthChecks[0].expectStatus", equalTo("2xx,3xx,4xx"))
+        .body("daemon.healthChecks[1].name", equalTo("API"))
+        .body("daemon.healthChecks[1].intervalMs", equalTo(2500))
+        .body("daemon.healthChecks[1].unhealthyThreshold", equalTo(5))
         .extract()
         .path("daemon.id");
   }
@@ -149,6 +181,7 @@ public class RepositoryDaemonControllerTest {
                 List.of(
                     new LogObserverInput(
                         LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING)),
+                null,
                 null))
         .put("/api/repositories/" + repoId + "/daemons/" + id)
         .then()
@@ -162,7 +195,8 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.autoStart", equalTo(true))
         .body("daemon.observers.size()", equalTo(1))
         .body("daemon.observers[0].pattern", equalTo("FATAL"))
-        .body("daemon.sources[0].path", equalTo("logs/app.log")); // null sources = keep as-is
+        .body("daemon.sources[0].path", equalTo("logs/app.log")) // null sources = keep as-is
+        .body("daemon.healthChecks.size()", equalTo(2)); // null healthChecks = keep as-is
 
     given()
         .delete("/api/repositories/" + repoId + "/daemons/" + id)
@@ -171,6 +205,75 @@ public class RepositoryDaemonControllerTest {
         .body("success", equalTo(true));
 
     given().get("/api/repositories/" + repoId + "/daemons/" + id).then().statusCode(404);
+  }
+
+  @Test
+  public void rejectsInvalidHealthChecks() {
+    String repoId = createRepository();
+
+    // Duplicate names, HTTP without a port, and a bad expectStatus token each fail the request.
+    createWithChecks(
+        repoId,
+        List.of(
+            new HealthCheckInput(
+                "dup", HealthCheckKind.TCP, 4200, null, null, null, null, null, null, null, null),
+            new HealthCheckInput(
+                "dup", HealthCheckKind.TCP, 8080, null, null, null, null, null, null, null, null)));
+    createWithChecks(
+        repoId,
+        List.of(
+            new HealthCheckInput(
+                "portless",
+                HealthCheckKind.HTTP,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null)));
+    createWithChecks(
+        repoId,
+        List.of(
+            new HealthCheckInput(
+                "bad-expect",
+                HealthCheckKind.HTTP,
+                8080,
+                null,
+                "6xx",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null)));
+  }
+
+  /** POSTs a minimal daemon carrying {@code healthChecks} and asserts the request fails 400. */
+  private void createWithChecks(String repoId, List<HealthCheckInput> healthChecks) {
+    given()
+        .contentType(ContentType.JSON)
+        .body(
+            new CreateRepositoryDaemonRequest(
+                "invalid-checks",
+                null,
+                "npm run dev",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                healthChecks))
+        .post("/api/repositories/" + repoId + "/daemons")
+        .then()
+        .statusCode(400);
   }
 
   @Test
@@ -272,6 +375,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
+                null,
                 null))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
@@ -297,6 +401,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 List.of(new LogObserverInput(LogObserverKind.PATTERN, null, null)),
+                null,
                 null))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
@@ -323,7 +428,8 @@ public class RepositoryDaemonControllerTest {
                   null,
                   null,
                   null,
-                  List.of(new LogSourceInput(path, null))))
+                  List.of(new LogSourceInput(path, null)),
+                  null))
           .post("/api/repositories/" + repoId + "/daemons")
           .then()
           .statusCode(400);

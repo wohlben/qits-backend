@@ -217,6 +217,85 @@ public class DaemonMcpToolsTest {
   }
 
   @Test
+  public void definesHealthChecksAndReadsLiveHealthPerWorkspace() {
+    String project = createProject("Daemon Health");
+    String repoId = createRepository(project);
+    createWorkspace(repoId, "work");
+    var client = client(project);
+
+    // Define with structured healthChecks — one per kind, string kinds parsed like observers'.
+    client
+        .when()
+        .toolsCall(
+            "createDaemon",
+            Map.of(
+                "repoId",
+                repoId,
+                "name",
+                "Checked server",
+                "startScript",
+                "npm run dev",
+                "healthChecks",
+                List.of(
+                    Map.of("name", "Quarkus", "kind", "COMMAND", "command", "curl -fsS x"),
+                    Map.of("name", "Angular", "kind", "http", "port", 4200, "path", "/"),
+                    Map.of("name", "Postgres", "kind", "TCP", "port", 5432))),
+            response -> {
+              assertFalse(response.isError(), "create should succeed: " + text(response));
+              String text = text(response);
+              assertTrue(text.contains("Quarkus"), "checks round-trip: " + text);
+              assertTrue(text.contains("HTTP"), "lower-case kind parsed: " + text);
+            })
+        .thenAssertResults();
+
+    // The definition round-trips over REST in declaration order...
+    given()
+        .get("/api/repositories/" + repoId + "/daemons")
+        .then()
+        .statusCode(200)
+        .body(
+            "entries[0].daemon.healthChecks.name",
+            org.hamcrest.Matchers.contains("Quarkus", "Angular", "Postgres"));
+
+    // ...and listWorkspaceDaemons reports live health — all UNKNOWN for a never-started daemon,
+    // one entry per declared check.
+    client
+        .when()
+        .toolsCall(
+            "listWorkspaceDaemons",
+            Map.of("repoId", repoId, "workspaceId", "work"),
+            response -> {
+              assertFalse(response.isError(), text(response));
+              String text = text(response);
+              assertTrue(text.contains("\"health\""), "live health surfaced: " + text);
+              assertTrue(text.contains("UNKNOWN"), "unprobed checks read UNKNOWN: " + text);
+            })
+        .thenAssertResults();
+
+    // A bad kind fails with a readable tool error, not a Jackson stack.
+    client
+        .when()
+        .toolsCall(
+            "createDaemon",
+            Map.of(
+                "repoId",
+                repoId,
+                "name",
+                "Bad check",
+                "startScript",
+                "npm run dev",
+                "healthChecks",
+                List.of(Map.of("name", "nope", "kind", "HTTPS", "port", 443))),
+            response -> {
+              assertTrue(response.isError(), "invalid kind must fail");
+              assertTrue(
+                  text(response).contains("HTTP, TCP, COMMAND"),
+                  "readable allowed-values hint: " + text(response));
+            })
+        .thenAssertResults();
+  }
+
+  @Test
   public void configuresTheWebViewThroughFlatArgs() {
     String project = createProject("Daemon WebView");
     String repoId = createRepository(project);

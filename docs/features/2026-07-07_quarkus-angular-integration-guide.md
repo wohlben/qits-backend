@@ -186,7 +186,7 @@ the fixture.
   prerequisite; the automation is its own idea once the guide has been exercised manually.
 - **Machine-checking the contract** — a preflight probe ("does the daemon serve under
   `$QITS_PUBLIC_BASE`? does `/api/config.json` answer?") overlaps the
-  [daemon-healthchecks](../feature-ideas/daemon-healthchecks.md) idea's territory; the guide documents, the probe
+  [daemon-healthchecks](../features/2026-07-10_daemon-healthchecks.md) idea's territory; the guide documents, the probe
   idea verifies.
 - **A starter template repo** (pre-integrated archetype to clone instead of a guide to follow) —
   attractive, but it rots silently; the guide + fixture pairing keeps the contract reviewable.

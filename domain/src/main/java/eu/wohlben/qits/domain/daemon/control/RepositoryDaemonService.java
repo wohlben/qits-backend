@@ -1,6 +1,7 @@
 package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.dto.RepositoryDaemonDto;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
@@ -50,7 +51,8 @@ public class RepositoryDaemonService {
       String webViewBasePath,
       Map<String, String> environment,
       List<LogObserver> observers,
-      List<LogSource> sources) {
+      List<LogSource> sources,
+      List<HealthCheck> healthChecks) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
     }
@@ -63,6 +65,7 @@ public class RepositoryDaemonService {
             webViewPort, webViewEntryPath, webViewBasePath);
     DaemonDefinitionValidator.requireValidObservers(observers);
     DaemonDefinitionValidator.requireValidSources(sources);
+    DaemonDefinitionValidator.requireValidHealthChecks(healthChecks);
 
     Repository repository =
         repositoryRepository
@@ -84,6 +87,7 @@ public class RepositoryDaemonService {
     daemon.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
     daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
     daemon.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
+    daemon.healthChecks = healthChecks != null ? new ArrayList<>(healthChecks) : new ArrayList<>();
     repositoryDaemonRepository.persist(daemon);
 
     return daemon;
@@ -135,7 +139,8 @@ public class RepositoryDaemonService {
       String webViewBasePath,
       Map<String, String> environment,
       List<LogObserver> observers,
-      List<LogSource> sources) {
+      List<LogSource> sources,
+      List<HealthCheck> healthChecks) {
     RepositoryDaemon daemon = get(repositoryId, daemonId);
 
     if (name != null && !name.isBlank()) {
@@ -192,6 +197,10 @@ public class RepositoryDaemonService {
     if (sources != null) {
       DaemonDefinitionValidator.requireValidSources(sources);
       daemon.sources = new ArrayList<>(sources);
+    }
+    if (healthChecks != null) {
+      DaemonDefinitionValidator.requireValidHealthChecks(healthChecks);
+      daemon.healthChecks = new ArrayList<>(healthChecks);
     }
 
     return daemon;

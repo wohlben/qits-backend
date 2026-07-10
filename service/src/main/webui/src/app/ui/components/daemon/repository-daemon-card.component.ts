@@ -27,6 +27,9 @@ import { CardLayoutComponent } from '@/layout/card-layout/card-layout.component'
       }
       <p class="mt-1 text-xs text-muted-foreground">
         {{ daemon().restartPolicy }} · {{ daemon().observers?.length ?? 0 }} observer(s)
+        @if (daemon().healthChecks?.length; as checkCount) {
+          · {{ checkCount }} health check(s)
+        }
         @if (daemon().webView?.port; as port) {
           · web view :{{ port
           }}@if (daemon().webView?.entryPath; as entryPath) {

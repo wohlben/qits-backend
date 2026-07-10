@@ -84,6 +84,11 @@ model/featureFlowConfigurationDto.ts
 model/featureFlowPhaseActionDto.ts
 model/featureFlowPhaseDto.ts
 model/featureFlowPhaseStepDto.ts
+model/healthCheckDto.ts
+model/healthCheckInput.ts
+model/healthCheckKind.ts
+model/healthCheckState.ts
+model/healthCheckStatusDto.ts
 model/installedPluginDto.ts
 model/launchAgentRequest.ts
 model/launchCommandRequest.ts

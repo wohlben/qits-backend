@@ -1,5 +1,14 @@
 # Daemon healthchecks: multiple probes per daemon, visible up/down status
 
+> **Status: implemented** (2026-07-10). Iteration one as scoped below: display-only, latest-result
+> cache, never persisted. Key pieces: `HealthCheck`/`HealthCheckKind` (`domain.daemon.entity`),
+> `HealthProbeService` (`domain.daemon.control`), the `DaemonSupervisor` wiring
+> (`Instance.health`, `startHealthProbes`), `HealthCheckStatusDto`/`HealthCheckState` on
+> `DaemonInstanceDto`, `HealthCheckInput` (REST) / `HealthCheckArg` (MCP), migration
+> `V31__daemon_healthchecks.sql`, and `DaemonHealthChecksComponent` in the UI. Deviations from the
+> original sketch are marked **[as built]** inline; the Open questions section records how each
+> was resolved.
+
 ## Introduction
 
 A [daemon](../features/2026-07-04_daemons.md)'s lifecycle status today collapses everything about
@@ -34,6 +43,10 @@ daemon's lifecycle chip on the **workspace detail route**. "Is my dev server up?
 cached latest-only and never persisted** — no database rows, dropped on restart, re-probed fresh.
 
 Related/dependent plans:
+
+- **How-to:** the integration walk documents declaring checks for your own app — including the
+  `$QITS_PUBLIC_BASE` COMMAND-vs-HTTP choice — as Tier 1b of the
+  [quarkus-angular integration guide](../guides/quarkus-angular-integration.md).
 
 - **Hard dependency on [daemons](../features/2026-07-04_daemons.md).** Healthchecks are a new
   ordered `@Embeddable` list on `RepositoryDaemon` — exactly the shape of the existing `observers`
@@ -214,8 +227,13 @@ under each daemon's `DaemonStatusChipComponent`, render a **health row**: one sm
 (green `HEALTHY` / red `UNHEALTHY` / grey `UNKNOWN`, matching the chip's existing Tailwind palette),
 each labelled with the check `name`, with the latency/detail in a tooltip and the failing evidence
 on click. A new presentational `DaemonHealthChecksComponent` (`ui/components/daemon/`, sibling of
-`daemon-status-chip.component.ts`), pure `input()`s, OnPush — fed by the `health` array the workspace
-poll already fetches (3s/5s), so no new query.
+`daemon-status-chip.component.ts`), pure `input()`s, OnPush — fed by the `health` array on the
+existing `workspace-daemons` query, so no new query. **[as built]** Freshness is SSE, not a poll:
+a check's public-state **flip** fires the same payload-free `DAEMONS` topic hint a lifecycle
+transition fires (`WorkspaceChangePublisher` → `workspace-live.service.ts` invalidation). Flips
+only, never per tick — per-tick hints would reinvent polling; the displayed latency/timestamp go
+stale between flips, which is fine because the dots are the feature. Latency/detail ride the
+native `title` tooltip.
 
 ```
 ● quarkus:dev  READY   Quarkus ●   Angular ●   ← both green: genuinely up
@@ -234,16 +252,24 @@ The `repository-daemon-card.component.ts` summary shows the check count.
 
 ## Seed / fixture
 
-`seed-webapp`'s quarkus-angular daemon becomes the reference example — two HTTP checks:
+`seed-webapp`'s quarkus-angular daemon becomes the reference example. **[as built]** Not the two
+bare HTTP checks originally sketched: the fixture launches with
+`-Dquarkus.http.root-path="${QITS_PUBLIC_BASE:-/}"`, so inside the workspace `/q/health` lives
+*under the proxy base path* and a literal `HTTP :8080 /q/health` check would sit red forever. The
+HTTP kind is deliberately shell-free (pure curl argv — no env expansion), so:
 
-- `Quarkus` → `HTTP :8080 /q/health` (the fixture is Quarkus 3; `smallrye-health` is already the
-  qits convention, see [health-checks](../features/2026-05-01_health-checks.md)).
-- `Angular` → `HTTP :4200 /` expecting `200`.
+- `Quarkus` → `COMMAND`: `curl -fsS -m 2 "http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health"` —
+  every probe's env carries `QITS_PUBLIC_BASE` (injected by the supervisor's `startHealthProbes`),
+  and the fixture has `smallrye-health` (see [health-checks](2026-05-01_health-checks.md)).
+- `Angular` → `HTTP :4200 /` expecting `2xx,3xx,4xx` — any HTTP answer means the dev server is
+  serving (it may 404 bare paths under a serve-path); connection-refused while compiling is the
+  red-then-green demo.
 
 So the seeded demo *shows* the feature: start the daemon (it reaches `READY` via `readyPattern` as
 today) and watch the two dots populate independently — Angular sits red while it compiles, Quarkus
 goes green, then Angular flips green. `seed` (the tiny testing-repo Python daemon) gets one
-`TCP :8000` check to exercise the dependency-free path.
+`TCP :8000` check to exercise the dependency-free path — the three seeded checks together cover
+all three probe kinds.
 
 ## Explicitly deferred
 
@@ -268,32 +294,30 @@ goes green, then Angular flips green. `seed` (the tiny testing-repo Python daemo
   timeline (SLO-style "up 97% this session") would need its *own* new persistence — it does not fall
   out of this feature, which persists nothing — so it's a separate build if ever wanted.
 
-## Open questions
+## Open questions — as resolved
 
-- **`curl` in `qits/workspace`.** The `HTTP` kind needs `curl`/`wget` in the fat default image
-  (`docker/workspace`). Confirm it's present; if not, either add it (small, high value) or make
-  `HTTP` degrade to a `/dev/tcp` connect + note the loss of status matching. `TCP`/`COMMAND` have no
-  such dependency.
-- **In-container exec vs host-side HTTP via the proxy's channel.** The webview proxy
-  (`DaemonProxyRoute`) *already* does exactly a host-side HTTP round-trip to the daemon — a Vert.x
-  `HttpClient` to `127.0.0.1:<hostPort>` off `ContainerRuntime.hostPort` — so reusing that channel
-  for `HTTP` checks is tempting: zero image tooling, no `docker exec` per probe. But it only works
-  for **published** ports (docker can't add ports to a live container, so a check on a not-declared
-  port needs a container recreate — the webview picker's known limitation), and only for HTTP.
-  Recommendation: **in-container `docker exec`** as the primary channel — it decouples check ports
-  from the create-time publish set (add a check without recreating the container), covers `TCP` and
-  `COMMAND` too, and probes the app's own loopback. Keep the proxy's host-side Vert.x client as an
-  optional fast path for checks whose port is already published (the `webView.port` case), if the extra
-  `docker exec` per tick ever measures as too costly.
-- **`UNKNOWN` vs `UNHEALTHY` display.** A probe that errors (exec failed, curl missing) vs a probe
-  that ran and got a bad answer — both are "not green," but one is "we couldn't tell." Lean: keep
-  them distinct (grey vs red) so a broken probe config doesn't masquerade as a down service.
-- **Probe cost / cadence.** A `docker exec` per check per interval is cheap but non-zero; default
-  `5s` and let per-check `intervalMs` tune. Cap concurrent probes to avoid a many-daemon workspace
-  hammering `docker exec`.
-- **Threshold defaults.** `unhealthyThreshold=3` debounces a single transient refusal; validate
-  against real dev-server boot flapping (Angular's first compile can take >10s — hence
-  `initialDelayMs`).
+- **`curl` in `qits/workspace`.** Confirmed present in the fat default image (`docker/workspace`
+  installs it via apt), so `HTTP` uses curl directly: `curl -sS -o /dev/null -m <t> -w
+  '%{http_code}'` (no `-f` — the status lands on stdout and is matched in Java against
+  `expectStatus`, so a 500 reads as "ran, got 500" rather than a transport error). A missing tool
+  (exit 126/127) reads UNKNOWN, WARN-logged once per check.
+- **In-container exec vs host-side HTTP via the proxy's channel.** In-container `docker exec` won,
+  exactly as recommended: it decouples check ports from the create-time publish set, covers `TCP`
+  and `COMMAND` too, and probes the app's own loopback. Timeouts are in-tool (`curl -m`, coreutils
+  `timeout` wrapping TCP/COMMAND) so a hung probe closes its own exec; there is no Java-side
+  watchdog (deferred hardening for a wedged dockerd — a stuck exec only stalls that one check's
+  cadence, `scheduleWithFixedDelay` never stacks ticks).
+- **`UNKNOWN` vs `UNHEALTHY` display.** Kept distinct (grey vs red). UNKNOWN = the probe itself
+  couldn't run (exec error, dead container, missing tool) and applies immediately, resetting the
+  debounce streaks; UNHEALTHY = the probe ran and the service answered wrong (bad status, nonzero
+  exit, timeout) and is threshold-debounced. A timeout is UNHEALTHY, not UNKNOWN — hung-but-alive
+  is precisely what the feature exists to expose.
+- **Probe cost / cadence.** Default `qits.daemons.health-poll-ms=5000`, per-check `intervalMs`
+  overrides (validated ≥250ms). Concurrency is naturally capped by the supervisor's shared
+  4-thread scheduler — at most 4 in-flight probe execs across all daemons.
+- **Threshold defaults.** `healthyThreshold=1` / `unhealthyThreshold=3` as sketched; from UNKNOWN
+  the state stays UNKNOWN until a threshold trips, so boot-time refusals never flash red before
+  `initialDelayMs` (default: the ready grace) plus the debounce have run their course.
 
 ## Testing sketch
 

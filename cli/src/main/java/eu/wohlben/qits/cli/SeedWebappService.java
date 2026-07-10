@@ -2,6 +2,8 @@ package eu.wohlben.qits.cli;
 
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.LogSource;
@@ -185,7 +187,38 @@ public class SeedWebappService {
                 LogObserverKind.PATTERN,
                 "(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)",
                 DaemonEventSeverity.ERROR)),
-        List.of(new LogSource("quarkus.log", "Quarkus dev log")));
+        List.of(new LogSource("quarkus.log", "Quarkus dev log")),
+        // The reference healthchecks — the two-servers-one-daemon case this feature exists for.
+        // Quarkus serves under $QITS_PUBLIC_BASE (see -Dquarkus.http.root-path above), so its
+        // /q/health is NOT at the bare root — a COMMAND check expands the env var at probe time
+        // (the plain HTTP kind is deliberately shell-free and can't). Angular: any HTTP answer on
+        // :4200 means the dev server is serving (it may 404 bare paths under a serve-path);
+        // connection-refused while it compiles is the red-then-green demo.
+        List.of(
+            new HealthCheck(
+                "Quarkus",
+                HealthCheckKind.COMMAND,
+                null,
+                null,
+                null,
+                "curl -fsS -m 2 \"http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health\"",
+                null,
+                null,
+                null,
+                null,
+                null),
+            new HealthCheck(
+                "Angular",
+                HealthCheckKind.HTTP,
+                4200,
+                "/",
+                "2xx,3xx,4xx",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null)));
 
     // One plain feature workspace so the detail view has more than one workspace to browse and run
     // the

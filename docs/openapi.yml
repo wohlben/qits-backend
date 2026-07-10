@@ -399,6 +399,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogSourceInput"
+        healthChecks:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthCheckInput"
     CreateWorkspaceRequest:
       type: object
       required:
@@ -473,6 +477,10 @@ components:
           type: string
         proxyPath:
           type: string
+        health:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthCheckStatusDto"
     DaemonStatus:
       type: string
       enum:
@@ -637,6 +645,100 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    HealthCheckDto:
+      type: object
+      properties:
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/HealthCheckKind"
+        port:
+          type: integer
+          format: int32
+        path:
+          type: string
+        expectStatus:
+          type: string
+        command:
+          type: string
+        intervalMs:
+          type: integer
+          format: int64
+        timeoutMs:
+          type: integer
+          format: int64
+        healthyThreshold:
+          type: integer
+          format: int32
+        unhealthyThreshold:
+          type: integer
+          format: int32
+        initialDelayMs:
+          type: integer
+          format: int64
+    HealthCheckInput:
+      type: object
+      required:
+      - name
+      - kind
+      properties:
+        name:
+          type: string
+          pattern: \S
+        kind:
+          $ref: "#/components/schemas/HealthCheckKind"
+        port:
+          type: integer
+          format: int32
+        path:
+          type: string
+        expectStatus:
+          type: string
+        command:
+          type: string
+        intervalMs:
+          type: integer
+          format: int64
+        timeoutMs:
+          type: integer
+          format: int64
+        healthyThreshold:
+          type: integer
+          format: int32
+        unhealthyThreshold:
+          type: integer
+          format: int32
+        initialDelayMs:
+          type: integer
+          format: int64
+    HealthCheckKind:
+      type: string
+      enum:
+      - HTTP
+      - TCP
+      - COMMAND
+    HealthCheckState:
+      type: string
+      enum:
+      - HEALTHY
+      - UNHEALTHY
+      - UNKNOWN
+    HealthCheckStatusDto:
+      type: object
+      properties:
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/HealthCheckKind"
+        state:
+          $ref: "#/components/schemas/HealthCheckState"
+        lastLatencyMs:
+          type: integer
+          format: int64
+        lastCheckedAt:
+          $ref: "#/components/schemas/Instant"
+        detail:
+          type: string
     InstalledPluginDto:
       type: object
       properties:
@@ -843,6 +945,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogSourceDto"
+        healthChecks:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthCheckDto"
     RepositoryDto:
       type: object
       properties:
@@ -1593,6 +1699,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LogSourceInput"
+        healthChecks:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthCheckInput"
     WebViewDto:
       type: object
       properties:

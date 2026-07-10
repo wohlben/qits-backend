@@ -56,7 +56,7 @@ Related/dependent plans:
 - **Surfaces via [workspace SSE live updates](../features/2026-07-07_workspace-sse-live-updates.md)**:
   the auto-started daemons appear as STARTING→READY chips on the workspace detail route with no
   new UI plumbing.
-- **Adjacent to the [daemon-healthchecks idea](daemon-healthchecks.md)** (richer READY signal for
+- **Adjacent to the [daemon-healthchecks idea](2026-07-10_daemon-healthchecks.md)** (richer READY signal for
   what auto-start brings up) and to [feature-flows](../features/2026-05-01_feature-flows.md)'
   deferred "gate a phase on the dev server" — auto-start makes "the dev server is (about to be)
   up" a workspace invariant instead of a manual precondition.
@@ -167,7 +167,7 @@ in place, `stop-container` settles it STOPPED instead of CRASHED). `seed`'s tiny
   Trigger: users complaining that a manual stop doesn't survive a workspace stop/start cycle
   (with auto-start, a manually-stopped daemon comes back on the next container start).
 - **Readiness-aware start** — holding "workspace is ready" (or a feature-flow phase) until
-  auto-started daemons are READY. That's the [healthchecks idea](daemon-healthchecks.md)'s gating
+  auto-started daemons are READY. That's the [healthchecks idea](2026-07-10_daemon-healthchecks.md)'s gating
   follow-up; auto-start only *launches*.
 - **Start ordering / dependencies between daemons** — launch order is undefined (they start
   concurrently via the supervisor). Trigger: a real fixture needs "db before app".
