@@ -28,6 +28,17 @@ public class AgentControllerTest {
   }
 
   @Test
+  public void forkWithoutResumeSessionIdIsRejected() {
+    given()
+        .contentType(ContentType.JSON)
+        .body(Map.of("scope", "REPOSITORY", "fork", true))
+        .when()
+        .post("/api/repositories/11111111-1111-1111-1111-111111111111/workspaces/wt/agents")
+        .then()
+        .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
+  }
+
+  @Test
   public void aNonUuidRepositoryIdIsRejected() {
     // Reaches the service, whose UUID guard rejects the repo id before it can be embedded in a
     // launch command. Proves the agent endpoint is wired without needing the claude binary.

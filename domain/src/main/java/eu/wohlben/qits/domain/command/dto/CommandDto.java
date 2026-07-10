@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.command.dto;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * A command flattened for the Commands UX — what's active and where it came from.
@@ -17,6 +18,7 @@ import java.time.Instant;
  * @param status the lifecycle state
  * @param exitCode the process exit code once finished (null while running)
  * @param interactive whether a human attaches a terminal to it
+ * @param agentSessions the ordered agent-session lineage (empty for non-agent commands)
  */
 public record CommandDto(
     String id,
@@ -32,4 +34,5 @@ public record CommandDto(
     boolean interactive,
     CommandKind kind,
     Instant launchedAt,
-    Instant finishedAt) {}
+    Instant finishedAt,
+    List<AgentSessionRefDto> agentSessions) {}

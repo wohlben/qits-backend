@@ -2,18 +2,22 @@ package eu.wohlben.qits.domain.command.entity;
 
 import eu.wohlben.qits.domain.repository.entity.Workspace;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
@@ -38,9 +42,7 @@ import org.hibernate.annotations.CreationTimestamp;
 @AllArgsConstructor
 public class Command extends PanacheEntityBase {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  public String id;
+  @Id public String id;
 
   @ManyToOne(optional = false)
   @JoinColumn(name = "workspace_id_fk", nullable = false)
@@ -97,4 +99,15 @@ public class Command extends PanacheEntityBase {
 
   @Column(name = "finished_at")
   public Instant finishedAt;
+
+  /**
+   * The ordered list of coding-agent sessions this command drove — the last entry is the current
+   * session. Empty for plain actions/terminals/daemons; exactly one entry for most agent launches;
+   * several when the user switched sessions inside the interactive TUI (hook-reported).
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "command_agent_session", joinColumns = @JoinColumn(name = "command_id"))
+  @OrderColumn(name = "session_index")
+  @Builder.Default
+  public List<AgentSessionRef> agentSessions = new ArrayList<>();
 }

@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry12 } from './entry12';
+import { LazyDirDto } from './lazyDirDto';
 
 
 export interface Response64 { 
-    entries?: Array<Entry12>;
+    paths?: Array<string>;
+    lazyDirs?: Array<LazyDirDto>;
 }
 

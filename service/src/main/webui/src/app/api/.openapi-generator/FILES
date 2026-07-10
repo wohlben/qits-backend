@@ -31,7 +31,10 @@ index.ts
 model/actionConfigurationDto.ts
 model/actionScope.ts
 model/actionType.ts
+model/agentLaunchMode.ts
 model/agentMcpScope.ts
+model/agentSessionRefDto.ts
+model/agentSessionSource.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
@@ -95,6 +98,7 @@ model/mergeWorkspaceRequest.ts
 model/models.ts
 model/projectDto.ts
 model/refinePromptRequest.ts
+model/reportAgentSessionRequest.ts
 model/repositoryArchetype.ts
 model/repositoryDaemonDto.ts
 model/repositoryDto.ts
@@ -174,6 +178,7 @@ model/response74.ts
 model/response75.ts
 model/response76.ts
 model/response77.ts
+model/response78.ts
 model/response8.ts
 model/response9.ts
 model/restartPolicy.ts

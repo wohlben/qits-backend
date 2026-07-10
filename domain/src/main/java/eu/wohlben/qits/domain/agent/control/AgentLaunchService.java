@@ -1,8 +1,12 @@
 package eu.wohlben.qits.domain.agent.control;
 
+import eu.wohlben.qits.domain.command.control.CommandExitListener;
 import eu.wohlben.qits.domain.command.control.CommandRegistry;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
+import eu.wohlben.qits.domain.command.entity.AgentSessionSource;
+import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
@@ -13,10 +17,12 @@ import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -84,6 +90,10 @@ public class AgentLaunchService {
 
   @Inject QitsHostResolver qitsHostResolver;
 
+  @Inject CommandRepository commandRepository;
+
+  @Inject AgentTranscriptService agentTranscriptService;
+
   @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
   int qitsPort;
 
@@ -125,6 +135,22 @@ public class AgentLaunchService {
    */
   public CommandDto launchChat(
       String repoId, String workspaceId, AgentMcpScope scope, String initialContext) {
+    return launchChat(repoId, workspaceId, scope, initialContext, null, false);
+  }
+
+  /**
+   * {@link #launchChat} with session lineage: a non-null {@code resumeSessionId} continues that
+   * session (it must belong to this workspace); {@code fork} additionally branches it into a fresh
+   * qits-pinned id. With neither, a fresh session id is pinned. Every launch records its first
+   * {@link AgentSessionRef} on the command row and carries the session-report hook.
+   */
+  public CommandDto launchChat(
+      String repoId,
+      String workspaceId,
+      AgentMcpScope scope,
+      String initialContext,
+      String resumeSessionId,
+      boolean fork) {
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -150,11 +176,19 @@ public class AgentLaunchService {
       return launchLogin(repoId, workspaceId);
     }
 
-    LaunchSpec spec = renderChat(repoId, workspaceId, scope);
+    PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork);
+    LaunchSpec spec = renderChat(repoId, workspaceId, scope, pinned);
 
     CommandDto command =
         commandService.launchChat(
-            repoId, workspaceId, nameFor(scope), spec.script(), spec.environment());
+            repoId,
+            workspaceId,
+            nameFor(scope),
+            spec.script(),
+            spec.environment(),
+            pinned.commandId(),
+            pinned.ref(),
+            transcriptSweep());
     if (initialContext != null && !initialContext.isBlank()) {
       // Seed the conversation as the first user turn. A stream-json chat only speaks over stdin,
       // so the seed can't be a CLI argument; the pipe buffers it until claude starts reading.
@@ -176,9 +210,60 @@ public class AgentLaunchService {
    */
   public CommandDto launchAutonomous(
       String repoId, String workspaceId, String name, String prompt) {
-    LaunchSpec spec = renderAutonomous(prompt);
+    PinnedSession pinned = pinSession(repoId, workspaceId, null, false);
+    LaunchSpec spec = renderAutonomous(prompt, pinned);
     return commandService.launchAgent(
-        repoId, workspaceId, name, spec.script(), true, spec.environment());
+        repoId,
+        workspaceId,
+        name,
+        spec.script(),
+        true,
+        spec.environment(),
+        pinned.commandId(),
+        pinned.ref(),
+        transcriptSweep());
+  }
+
+  /**
+   * Launches the full interactive Claude Code TUI (the plain {@code claude} REPL in xterm.js, kind
+   * {@code TERMINAL}) as a first-class agent session: same MCP scope servers, credential overlay
+   * and skip-permissions as chat, plus a pinned session id and the session-report hook — so the run
+   * is resumable, forkable, and its transcript is imported on exit like any chat. The PTY byte
+   * stream stays terminal-only; the structured conversation comes from the transcript.
+   */
+  public CommandDto launchInteractive(
+      String repoId,
+      String workspaceId,
+      AgentMcpScope scope,
+      String initialContext,
+      String resumeSessionId,
+      boolean fork) {
+    if (scope == null) {
+      throw new BadRequestException("scope is required");
+    }
+    if (!WORKSPACE_ID_PATTERN.matcher(workspaceId == null ? "" : workspaceId).matches()) {
+      throw new BadRequestException("Invalid workspace id: " + workspaceId);
+    }
+    requireUuid(repoId, "repository id");
+
+    // Same auth gate as chat: without the shared-volume login, redirect to the sign-in REPL.
+    workspaceService.ensureContainer(repoId, workspaceId);
+    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId)) {
+      return launchLogin(repoId, workspaceId);
+    }
+
+    PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork);
+    LaunchSpec spec = renderInteractive(repoId, workspaceId, scope, initialContext, pinned);
+    return commandService.launchAgent(
+        repoId,
+        workspaceId,
+        interactiveNameFor(scope),
+        spec.script(),
+        true,
+        spec.environment(),
+        pinned.commandId(),
+        pinned.ref(),
+        transcriptSweep());
   }
 
   /**
@@ -212,21 +297,131 @@ public class AgentLaunchService {
   }
 
   /**
+   * A launch's session identity, generated before anything exists: the command id (rendered into
+   * the session-report hook URL) and the first {@link AgentSessionRef} of its session list.
+   */
+  record PinnedSession(String commandId, AgentSessionRef ref) {}
+
+  /**
+   * Pins the launch's session identity. Fresh launches pin a brand-new UUID ({@code PINNED});
+   * resume reuses {@code resumeSessionId} in place ({@code RESUMED}); fork branches it into a fresh
+   * pin ({@code FORKED}, with the origin recorded). Resume/fork require the session to belong to
+   * this workspace — iteration one keeps lineage where the transcript's file references and git
+   * state live. A retried launch pins fresh ids (pinned ids are create-only).
+   */
+  PinnedSession pinSession(
+      String repoId, String workspaceId, String resumeSessionId, boolean fork) {
+    String commandId = UUID.randomUUID().toString();
+    if (resumeSessionId == null) {
+      if (fork) {
+        throw new BadRequestException("fork requires resumeSessionId");
+      }
+      return new PinnedSession(
+          commandId,
+          new AgentSessionRef(
+              UUID.randomUUID().toString(), AgentSessionSource.PINNED, null, null, Instant.now()));
+    }
+    requireUuid(resumeSessionId, "session id");
+    boolean owned =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () ->
+                    commandRepository.existsByWorkspaceAndSessionId(
+                        repoId, workspaceId, resumeSessionId));
+    if (!owned) {
+      throw new BadRequestException(
+          "Session " + resumeSessionId + " does not belong to workspace " + workspaceId);
+    }
+    if (fork) {
+      return new PinnedSession(
+          commandId,
+          new AgentSessionRef(
+              UUID.randomUUID().toString(),
+              AgentSessionSource.FORKED,
+              resumeSessionId,
+              null,
+              Instant.now()));
+    }
+    return new PinnedSession(
+        commandId,
+        new AgentSessionRef(
+            resumeSessionId, AgentSessionSource.RESUMED, null, null, Instant.now()));
+  }
+
+  /** Configures the agent's session flags + report hook from the pinned identity. */
+  private CodingAgent withSession(CodingAgent agent, PinnedSession pinned) {
+    AgentSessionRef ref = pinned.ref();
+    switch (ref.source) {
+      case PINNED -> agent.sessionId(ref.sessionId);
+      case RESUMED -> agent.resume(ref.sessionId);
+      case FORKED -> agent.resume(ref.forkedFromSessionId).fork(ref.sessionId);
+      case SWITCHED ->
+          throw new IllegalStateException("SWITCHED is hook-reported, never a launch source");
+    }
+    return agent.sessionReporting(sessionReportUrl(pinned.commandId()));
+  }
+
+  /**
+   * The container-reachable session-report endpoint for {@code commandId} — the SessionStart hook
+   * POSTs its stdin JSON here (composed exactly like {@link #derivedMcpUrl}).
+   */
+  private String sessionReportUrl(String commandId) {
+    return "http://"
+        + qitsHostResolver.qitsHost()
+        + ":"
+        + qitsPort
+        + "/api/commands/"
+        + commandId
+        + "/agent-session";
+  }
+
+  /** The post-exit transcript import, composed onto the registry exit listener at spawn. */
+  private CommandExitListener transcriptSweep() {
+    // onCommandExit swallows its own failures, so the sweep can never break exit handling.
+    return (commandId, exitCode, terminatedManually) ->
+        agentTranscriptService.onCommandExit(commandId);
+  }
+
+  /**
    * Renders the stream-json chat launch for {@code scope} with its MCP servers attached and {@code
    * HOME} pointed at the shared credential volume. Package-visible so the credential overlay is
    * assertable without spawning a container.
    */
-  LaunchSpec renderChat(String repoId, String workspaceId, AgentMcpScope scope) {
+  LaunchSpec renderChat(
+      String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
     CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
-    return withAgentHome(agent).skipPermissions().chat();
+    return withSession(withAgentHome(agent), pinned).skipPermissions().chat();
   }
 
   /** Renders the one-shot autonomous run over {@code prompt}, with the same credential overlay. */
-  LaunchSpec renderAutonomous(String prompt) {
-    return withAgentHome(CodingAgentFactory.ofType(AgentType.CLAUDE).skipPermissions()).run(prompt);
+  LaunchSpec renderAutonomous(String prompt, PinnedSession pinned) {
+    return withSession(
+            withAgentHome(CodingAgentFactory.ofType(AgentType.CLAUDE).skipPermissions()), pinned)
+        .run(prompt);
+  }
+
+  /**
+   * Renders the interactive TUI launch: the same scope servers and overlays as chat, but the full
+   * {@code claude} REPL ({@code start()}) with an optional seed prompt embedded. No {@code
+   * flatOutput} — xterm.js renders the TUI; the readable conversation is the imported transcript.
+   */
+  LaunchSpec renderInteractive(
+      String repoId,
+      String workspaceId,
+      AgentMcpScope scope,
+      String initialContext,
+      PinnedSession pinned) {
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
+      agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
+    }
+    if (initialContext != null && !initialContext.isBlank()) {
+      agent.initialContext(initialContext);
+    }
+    return withSession(withAgentHome(agent), pinned).skipPermissions().start();
   }
 
   /**
@@ -313,6 +508,14 @@ public class AgentLaunchService {
       case ACTIONS -> "Claude Code (actions + repository MCP)";
       case REPOSITORY -> "Claude Code (repository MCP)";
       case PROJECT -> "Claude Code (project MCP)";
+    };
+  }
+
+  private String interactiveNameFor(AgentMcpScope scope) {
+    return switch (scope) {
+      case ACTIONS -> "Claude Code terminal (actions + repository MCP)";
+      case REPOSITORY -> "Claude Code terminal (repository MCP)";
+      case PROJECT -> "Claude Code terminal (project MCP)";
     };
   }
 

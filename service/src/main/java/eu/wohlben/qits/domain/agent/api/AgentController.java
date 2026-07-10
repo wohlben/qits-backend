@@ -1,8 +1,10 @@
 package eu.wohlben.qits.domain.agent.api;
 
+import eu.wohlben.qits.domain.agent.control.AgentLaunchMode;
 import eu.wohlben.qits.domain.agent.control.AgentLaunchService;
 import eu.wohlben.qits.domain.agent.control.AgentMcpScope;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
+import eu.wohlben.qits.domain.error.BadRequestException;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -27,7 +29,17 @@ public class AgentController {
 
   @Inject AgentLaunchService agentLaunchService;
 
-  public static record LaunchAgentRequest(@NotNull AgentMcpScope scope, String initialContext) {
+  /**
+   * {@code mode} picks chat (default when null) or the interactive TUI. {@code resumeSessionId}
+   * continues an existing agent session of this workspace; {@code fork} additionally branches it
+   * into a fresh session.
+   */
+  public static record LaunchAgentRequest(
+      @NotNull AgentMcpScope scope,
+      String initialContext,
+      AgentLaunchMode mode,
+      String resumeSessionId,
+      Boolean fork) {
     public record Response(CommandDto command) {}
   }
 
@@ -36,8 +48,26 @@ public class AgentController {
       @PathParam("repoId") String repoId,
       @PathParam("workspaceId") String workspaceId,
       @Valid LaunchAgentRequest request) {
-    return new LaunchAgentRequest.Response(
-        agentLaunchService.launchChat(
-            repoId, workspaceId, request.scope(), request.initialContext()));
+    boolean fork = Boolean.TRUE.equals(request.fork());
+    if (fork && (request.resumeSessionId() == null || request.resumeSessionId().isBlank())) {
+      throw new BadRequestException("fork requires resumeSessionId");
+    }
+    CommandDto command =
+        request.mode() == AgentLaunchMode.INTERACTIVE
+            ? agentLaunchService.launchInteractive(
+                repoId,
+                workspaceId,
+                request.scope(),
+                request.initialContext(),
+                request.resumeSessionId(),
+                fork)
+            : agentLaunchService.launchChat(
+                repoId,
+                workspaceId,
+                request.scope(),
+                request.initialContext(),
+                request.resumeSessionId(),
+                fork);
+    return new LaunchAgentRequest.Response(command);
   }
 }

@@ -3,6 +3,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { LogChannel } from '@/api/model/logChannel';
 import { ChatTranscriptComponent } from './chat-transcript.component';
 import { linesToItems } from './chat-stream';
 
@@ -34,12 +35,15 @@ export class CommandChatLogComponent {
 
   private readonly commandService = inject(CommandControllerService);
 
+  // Pinned to the OUTPUT channel: the intercepted stream-json stdout. The command may also carry
+  // an imported agent transcript on TRANSCRIPT — that renders in the separate transcript view,
+  // and mixing the channels here would double-render the conversation.
   readonly logQuery = injectQuery(() => ({
-    queryKey: ['command-log', this.commandId()],
+    queryKey: ['command-log', this.commandId(), LogChannel.Output],
     queryFn: () =>
-      lastValueFrom(this.commandService.apiCommandsCommandIdLogGet(this.commandId())).then(
-        (r) => r.lines ?? [],
-      ),
+      lastValueFrom(
+        this.commandService.apiCommandsCommandIdLogGet(this.commandId(), LogChannel.Output),
+      ).then((r) => r.lines ?? []),
   }));
 
   readonly items = computed(() =>

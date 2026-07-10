@@ -5,16 +5,26 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
+import eu.wohlben.qits.domain.command.entity.AgentSessionSource;
+import eu.wohlben.qits.domain.command.entity.Command;
+import eu.wohlben.qits.domain.command.entity.CommandKind;
+import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.persistence.CommandRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.project.persistence.ProjectRepository;
 import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
 import eu.wohlben.qits.domain.repository.entity.Repository;
+import eu.wohlben.qits.domain.repository.entity.Workspace;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
+import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** Verifies the MCP scope → scoped-server-URL + read-only allowlist mapping of the agent path. */
@@ -29,6 +39,10 @@ public class AgentLaunchServiceTest {
 
   @Inject QitsHostResolver qitsHostResolver;
 
+  @Inject WorkspaceRepository workspaceRepository;
+
+  @Inject CommandRepository commandRepository;
+
   @Transactional
   void seedRepository(String projectId, String repositoryId) {
     Project project = new Project();
@@ -41,6 +55,39 @@ public class AgentLaunchServiceTest {
     repository.url = "https://example.com/repo.git";
     repository.project = project;
     repositoryRepository.persist(repository);
+  }
+
+  /** Seeds a finished agent command in {@code workspaceId} whose session list holds one entry. */
+  @Transactional
+  void seedCommandWithSession(String repositoryId, String workspaceId, String sessionId) {
+    Workspace workspace = new Workspace();
+    workspace.workspaceId = workspaceId;
+    workspace.repository = repositoryRepository.findById(repositoryId);
+    workspace.branch = "feature/x";
+    workspaceRepository.persist(workspace);
+
+    Command command =
+        Command.builder()
+            .id(UUID.randomUUID().toString())
+            .workspace(workspace)
+            .branch("feature/x")
+            .commitHash("abcdef1234567890")
+            .actionName("Claude Code (repository MCP)")
+            .executeScript("exec claude")
+            .interactive(false)
+            .kind(CommandKind.CHAT)
+            .status(CommandStatus.EXITED)
+            .build();
+    command.agentSessions.add(
+        new AgentSessionRef(sessionId, AgentSessionSource.PINNED, null, null, Instant.now()));
+    commandRepository.persist(command);
+  }
+
+  private static AgentLaunchService.PinnedSession freshPin() {
+    return new AgentLaunchService.PinnedSession(
+        UUID.randomUUID().toString(),
+        new AgentSessionRef(
+            UUID.randomUUID().toString(), AgentSessionSource.PINNED, null, null, Instant.now()));
   }
 
   @Test
@@ -152,7 +199,8 @@ public class AgentLaunchServiceTest {
     String repoId = "77777777-7777-7777-7777-777777777777";
     seedRepository(projectId, repoId);
 
-    LaunchSpec spec = agentLaunchService.renderChat(repoId, "work", AgentMcpScope.ACTIONS);
+    LaunchSpec spec =
+        agentLaunchService.renderChat(repoId, "work", AgentMcpScope.ACTIONS, freshPin());
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
     // Still the stream-json chat, unchanged.
@@ -161,10 +209,112 @@ public class AgentLaunchServiceTest {
 
   @Test
   public void autonomousLaunchPointsHomeAtTheSharedCredentialVolume() {
-    LaunchSpec spec = agentLaunchService.renderAutonomous("resolve the conflict");
+    LaunchSpec spec = agentLaunchService.renderAutonomous("resolve the conflict", freshPin());
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
     assertTrue(spec.script().startsWith("claude -p 'resolve the conflict'"), spec.script());
+  }
+
+  @Test
+  public void everyAgentRenderPinsTheSessionAndCarriesTheReportHook() {
+    String projectId = "aaaaaaaa-0000-0000-0000-000000000001";
+    String repoId = "aaaaaaaa-0000-0000-0000-000000000002";
+    seedRepository(projectId, repoId);
+    AgentLaunchService.PinnedSession pinned = freshPin();
+    String reportPath = "/api/commands/" + pinned.commandId() + "/agent-session";
+
+    LaunchSpec chat =
+        agentLaunchService.renderChat(repoId, "work", AgentMcpScope.REPOSITORY, pinned);
+    assertTrue(chat.script().contains("--session-id " + pinned.ref().sessionId), chat.script());
+    assertTrue(chat.script().contains(reportPath), chat.script());
+
+    LaunchSpec autonomous = agentLaunchService.renderAutonomous("go", pinned);
+    assertTrue(
+        autonomous.script().contains("--session-id " + pinned.ref().sessionId),
+        autonomous.script());
+    assertTrue(autonomous.script().contains(reportPath), autonomous.script());
+
+    LaunchSpec interactive =
+        agentLaunchService.renderInteractive(
+            repoId, "work", AgentMcpScope.REPOSITORY, "look around", pinned);
+    assertTrue(interactive.script().startsWith("exec claude 'look around'"), interactive.script());
+    assertTrue(interactive.interactive());
+    assertTrue(
+        interactive.script().contains("--session-id " + pinned.ref().sessionId),
+        interactive.script());
+    assertTrue(interactive.script().contains(reportPath), interactive.script());
+    assertEquals("/claude-home", interactive.environment().get("HOME"));
+  }
+
+  @Test
+  public void freshPinRecordsAPinnedRefAndSingleUseIds() {
+    String projectId = "aaaaaaaa-0000-0000-0000-000000000003";
+    String repoId = "aaaaaaaa-0000-0000-0000-000000000004";
+    seedRepository(projectId, repoId);
+
+    AgentLaunchService.PinnedSession first =
+        agentLaunchService.pinSession(repoId, "work", null, false);
+    AgentLaunchService.PinnedSession second =
+        agentLaunchService.pinSession(repoId, "work", null, false);
+
+    assertEquals(AgentSessionSource.PINNED, first.ref().source);
+    assertEquals(null, first.ref().forkedFromSessionId);
+    // A retried launch regenerates both ids — pinned session ids are create-only.
+    assertFalse(first.ref().sessionId.equals(second.ref().sessionId));
+    assertFalse(first.commandId().equals(second.commandId()));
+  }
+
+  @Test
+  public void resumeReusesTheOwnedSessionId() {
+    String projectId = "aaaaaaaa-0000-0000-0000-000000000005";
+    String repoId = "aaaaaaaa-0000-0000-0000-000000000006";
+    String sessionId = UUID.randomUUID().toString();
+    seedRepository(projectId, repoId);
+    seedCommandWithSession(repoId, "work", sessionId);
+
+    AgentLaunchService.PinnedSession pinned =
+        agentLaunchService.pinSession(repoId, "work", sessionId, false);
+
+    assertEquals(sessionId, pinned.ref().sessionId);
+    assertEquals(AgentSessionSource.RESUMED, pinned.ref().source);
+  }
+
+  @Test
+  public void forkPinsAFreshIdAndRecordsTheOrigin() {
+    String projectId = "aaaaaaaa-0000-0000-0000-000000000007";
+    String repoId = "aaaaaaaa-0000-0000-0000-000000000008";
+    String sessionId = UUID.randomUUID().toString();
+    seedRepository(projectId, repoId);
+    seedCommandWithSession(repoId, "work", sessionId);
+
+    AgentLaunchService.PinnedSession pinned =
+        agentLaunchService.pinSession(repoId, "work", sessionId, true);
+
+    assertEquals(AgentSessionSource.FORKED, pinned.ref().source);
+    assertEquals(sessionId, pinned.ref().forkedFromSessionId);
+    assertFalse(sessionId.equals(pinned.ref().sessionId));
+  }
+
+  @Test
+  public void resumingAForeignWorkspacesSessionIsRejected() {
+    // Iteration one scopes resume/fork to the session's own workspace — its transcript file
+    // references and git state belong there.
+    String projectId = "aaaaaaaa-0000-0000-0000-000000000009";
+    String repoId = "aaaaaaaa-0000-0000-0000-00000000000a";
+    String sessionId = UUID.randomUUID().toString();
+    seedRepository(projectId, repoId);
+    seedCommandWithSession(repoId, "other", sessionId);
+
+    assertThrows(
+        BadRequestException.class,
+        () -> agentLaunchService.pinSession(repoId, "work", sessionId, false));
+  }
+
+  @Test
+  public void forkWithoutResumeSessionIsRejected() {
+    String repoId = "aaaaaaaa-0000-0000-0000-00000000000b";
+    assertThrows(
+        BadRequestException.class, () -> agentLaunchService.pinSession(repoId, "work", null, true));
   }
 
   @Test
@@ -180,5 +330,14 @@ public class AgentLaunchServiceTest {
     assertEquals("exec claude", spec.script());
     assertTrue(spec.interactive());
     assertEquals("/claude-home", spec.environment().get("HOME"));
+  }
+
+  @Test
+  public void loginTerminalCarriesNoSessionIdentity() {
+    // The sign-in REPL is onboarding, not a conversation: no pinned id, no report hook.
+    LaunchSpec spec = agentLaunchService.renderLogin();
+
+    assertFalse(spec.script().contains("--session-id"), spec.script());
+    assertFalse(spec.script().contains("--settings"), spec.script());
   }
 }

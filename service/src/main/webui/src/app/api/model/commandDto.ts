@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { AgentSessionRefDto } from './agentSessionRefDto';
 import { CommandKind } from './commandKind';
 import { CommandStatus } from './commandStatus';
 
@@ -26,6 +27,7 @@ export interface CommandDto {
     kind?: CommandKind;
     launchedAt?: string;
     finishedAt?: string;
+    agentSessions?: Array<AgentSessionRefDto>;
 }
 export namespace CommandDto {
 }

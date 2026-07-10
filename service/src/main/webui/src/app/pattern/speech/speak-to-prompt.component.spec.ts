@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
 import { SpeechControllerService } from '@/api/api/speechController.service';
+import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { SpeakToPromptComponent } from './speak-to-prompt.component';
@@ -64,15 +65,32 @@ describe('SpeakToPromptComponent', () => {
   it('launches the agent with the refined prompt as initial context and opens its command', async () => {
     const fixture = createComponent();
     fixture.componentInstance.refinedPrompt.set('do the thing');
-    fixture.componentInstance.launch();
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
     expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
       'repo-1',
       'wt-1',
-      { scope: AgentMcpScope.Repository, initialContext: 'do the thing' },
+      { scope: AgentMcpScope.Repository, initialContext: 'do the thing', mode: AgentLaunchMode.Chat },
     );
     expect(router.navigate).toHaveBeenCalledWith(['/commands', 'cmd-1']);
+  });
+
+  it('launches the interactive terminal session when asked', async () => {
+    const fixture = createComponent();
+    fixture.componentInstance.refinedPrompt.set('do the thing');
+    fixture.componentInstance.launch(AgentLaunchMode.Interactive);
+    await fixture.whenStable();
+
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
+      'repo-1',
+      'wt-1',
+      {
+        scope: AgentMcpScope.Repository,
+        initialContext: 'do the thing',
+        mode: AgentLaunchMode.Interactive,
+      },
+    );
   });
 
   it('emits the launched command id alongside navigating by default', async () => {
@@ -80,7 +98,7 @@ describe('SpeakToPromptComponent', () => {
     let launchedId: string | undefined;
     fixture.componentInstance.launched.subscribe((id) => (launchedId = id));
     fixture.componentInstance.refinedPrompt.set('do the thing');
-    fixture.componentInstance.launch();
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
     expect(launchedId).toBe('cmd-1');
@@ -93,7 +111,7 @@ describe('SpeakToPromptComponent', () => {
     let launchedId: string | undefined;
     fixture.componentInstance.launched.subscribe((id) => (launchedId = id));
     fixture.componentInstance.refinedPrompt.set('do the thing');
-    fixture.componentInstance.launch();
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
     expect(launchedId).toBe('cmd-1');
@@ -111,7 +129,7 @@ describe('SpeakToPromptComponent', () => {
     });
     const fixture = createComponent();
     fixture.componentInstance.refinedPrompt.set('fix this button');
-    fixture.componentInstance.launch();
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
     const [, , body] =

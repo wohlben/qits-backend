@@ -7,12 +7,16 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { AgentLaunchMode } from './agentLaunchMode';
 import { AgentMcpScope } from './agentMcpScope';
 
 
 export interface LaunchAgentRequest { 
     scope: AgentMcpScope;
     initialContext?: string;
+    mode?: AgentLaunchMode;
+    resumeSessionId?: string;
+    fork?: boolean;
 }
 export namespace LaunchAgentRequest {
 }

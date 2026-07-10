@@ -3,8 +3,10 @@ package eu.wohlben.qits.domain.agent.control;
 import static eu.wohlben.qits.domain.agent.control.McpServers.httpMcp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -122,6 +124,110 @@ public class CodingAgentFactoryTest {
     LaunchSpec spec = CodingAgentFactory.ofType(AgentType.CLAUDE).skipPermissions().run("go");
 
     assertTrue(spec.script().endsWith(" --dangerously-skip-permissions"), spec.script());
+  }
+
+  private static final String SESSION_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  private static final String SESSION_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  private static final String REPORT_URL =
+      "http://qits:8080/api/commands/cccccccc-cccc-cccc-cccc-cccccccccccc/agent-session";
+
+  @Test
+  public void sessionIdPinsAFreshSessionOnEveryLaunchVariant() {
+    assertEquals(
+        "exec claude --session-id " + SESSION_A,
+        CodingAgentFactory.ofType(AgentType.CLAUDE).sessionId(SESSION_A).start().script());
+    assertEquals(
+        "claude -p 'hi' --session-id " + SESSION_A,
+        CodingAgentFactory.ofType(AgentType.CLAUDE).sessionId(SESSION_A).run("hi").script());
+    assertTrue(
+        CodingAgentFactory.ofType(AgentType.CLAUDE)
+            .sessionId(SESSION_A)
+            .chat()
+            .script()
+            .endsWith(" --session-id " + SESSION_A));
+  }
+
+  @Test
+  public void resumeContinuesTheSessionInPlace() {
+    assertEquals(
+        "exec claude --resume " + SESSION_A,
+        CodingAgentFactory.ofType(AgentType.CLAUDE).resume(SESSION_A).start().script());
+  }
+
+  @Test
+  public void resumeWithForkBranchesIntoTheNewPinnedId() {
+    assertEquals(
+        "exec claude --resume " + SESSION_A + " --fork-session --session-id " + SESSION_B,
+        CodingAgentFactory.ofType(AgentType.CLAUDE)
+            .resume(SESSION_A)
+            .fork(SESSION_B)
+            .start()
+            .script());
+  }
+
+  @Test
+  public void forkWithoutResumeThrows() {
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE).fork(SESSION_B);
+
+    assertThrows(IllegalStateException.class, agent::start);
+  }
+
+  @Test
+  public void pinAndResumeWithoutForkThrows() {
+    // A pinned id is create-only; combining it with resume is contradictory unless forking.
+    CodingAgent agent =
+        CodingAgentFactory.ofType(AgentType.CLAUDE).sessionId(SESSION_B).resume(SESSION_A);
+
+    assertThrows(IllegalStateException.class, agent::start);
+  }
+
+  @Test
+  public void nonUuidSessionIdsAreRejected() {
+    // The ids are interpolated into an argv, so only canonical UUIDs may pass.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CodingAgentFactory.ofType(AgentType.CLAUDE).sessionId("$(reboot)").start());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CodingAgentFactory.ofType(AgentType.CLAUDE).resume("1-2-3-4-5").start());
+  }
+
+  @Test
+  public void sessionReportingRendersASessionStartHookSettingsLayer() {
+    String cmd =
+        CodingAgentFactory.ofType(AgentType.CLAUDE).sessionReporting(REPORT_URL).chat().script();
+
+    // One --settings layer whose SessionStart hook POSTs the hook's stdin JSON to the endpoint.
+    assertTrue(cmd.contains(" --settings '"), cmd);
+    assertTrue(cmd.contains("\"SessionStart\""), cmd);
+    assertTrue(
+        cmd.contains(
+            "curl -fsS -m 5 -X POST -H \\\"Content-Type: application/json\\\" --data-binary @- "
+                + REPORT_URL),
+        cmd);
+  }
+
+  @Test
+  public void sessionReportingUrlWithAQuoteIsRejected() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CodingAgentFactory.ofType(AgentType.CLAUDE)
+                .sessionReporting("http://qits:8080/a'b")
+                .chat());
+  }
+
+  @Test
+  public void transcriptLocatorsFollowTheProjectsConvention() {
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+
+    // cwd /workspace escapes to -workspace (every non-alphanumeric character becomes a dash).
+    assertEquals(
+        Path.of("projects", "-workspace", SESSION_A + ".jsonl"),
+        agent.transcriptPath("/workspace", SESSION_A));
+    assertEquals(
+        Path.of("projects", "-workspace", SESSION_A, "subagents"),
+        agent.subagentsDir("/workspace", SESSION_A));
   }
 
   @Test
