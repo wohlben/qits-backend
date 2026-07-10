@@ -1,9 +1,12 @@
 package eu.wohlben.qits.domain.command.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -76,8 +79,39 @@ public class CommandController {
   @GET
   @Path("/{commandId}/log")
   public GetCommandLogRequest.Response log(
-      @PathParam("commandId") String commandId, @QueryParam("severity") LogSeverity severity) {
-    return new GetCommandLogRequest.Response(commandService.log(commandId, severity));
+      @PathParam("commandId") String commandId,
+      @QueryParam("severity") LogSeverity severity,
+      @QueryParam("channel") LogChannel channel) {
+    return new GetCommandLogRequest.Response(commandService.log(commandId, severity, channel));
+  }
+
+  /**
+   * The SessionStart hook's report body — the hook's stdin JSON forwarded verbatim from inside the
+   * workspace container, hence the snake_case fields and the tolerance for extras.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static record ReportAgentSessionRequest(
+      @JsonProperty("hook_event_name") String hookEventName,
+      @JsonProperty("source") String source,
+      @JsonProperty("session_id") String sessionId,
+      @JsonProperty("transcript_path") String transcriptPath) {
+    public record Response(CommandDto command) {}
+  }
+
+  /**
+   * Ingests a harness session report for a running command: the first report confirms the pinned
+   * session (recording the authoritative transcript path); a report with a different session id —
+   * the user switched sessions inside the interactive TUI — appends a {@code SWITCHED} entry to the
+   * command's session list. Reached from inside the container (like the git host and the MCP
+   * servers), so the id is validated and the command must exist and be running.
+   */
+  @POST
+  @Path("/{commandId}/agent-session")
+  public ReportAgentSessionRequest.Response reportAgentSession(
+      @PathParam("commandId") String commandId, @Valid ReportAgentSessionRequest request) {
+    return new ReportAgentSessionRequest.Response(
+        commandService.reportAgentSession(
+            commandId, request.sessionId(), request.transcriptPath()));
   }
 
   public static record TerminateCommandRequest() {

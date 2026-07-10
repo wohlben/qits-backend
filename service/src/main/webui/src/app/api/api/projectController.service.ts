@@ -23,8 +23,6 @@ import { CreateProjectRepositoryRequest } from '../model/createProjectRepository
 // @ts-ignore
 import { CreateProjectRequest } from '../model/createProjectRequest';
 // @ts-ignore
-import { Response41 } from '../model/response41';
-// @ts-ignore
 import { Response42 } from '../model/response42';
 // @ts-ignore
 import { Response43 } from '../model/response43';
@@ -40,6 +38,8 @@ import { Response47 } from '../model/response47';
 import { Response48 } from '../model/response48';
 // @ts-ignore
 import { Response49 } from '../model/response49';
+// @ts-ignore
+import { Response50 } from '../model/response50';
 // @ts-ignore
 import { UpdateProjectRequest } from '../model/updateProjectRequest';
 
@@ -66,9 +66,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response44>;
-    public apiProjectsGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response44>>;
-    public apiProjectsGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response44>>;
+    public apiProjectsGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response45>;
+    public apiProjectsGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response45>>;
+    public apiProjectsGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response45>>;
     public apiProjectsGet(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
@@ -98,7 +98,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response44>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response45>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -119,9 +119,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response46>;
-    public apiProjectsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response46>>;
-    public apiProjectsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response46>>;
+    public apiProjectsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response47>;
+    public apiProjectsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response47>>;
+    public apiProjectsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response47>>;
     public apiProjectsIdDelete(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiProjectsIdDelete.');
@@ -154,7 +154,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response46>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response47>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -175,9 +175,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response45>;
-    public apiProjectsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response45>>;
-    public apiProjectsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response45>>;
+    public apiProjectsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response46>;
+    public apiProjectsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response46>>;
+    public apiProjectsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response46>>;
     public apiProjectsIdGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiProjectsIdGet.');
@@ -210,7 +210,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response45>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response46>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -232,9 +232,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response41>;
-    public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response41>>;
-    public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response41>>;
+    public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response42>;
+    public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response42>>;
+    public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response42>>;
     public apiProjectsIdPut(id: string, updateProjectRequest: UpdateProjectRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiProjectsIdPut.');
@@ -279,7 +279,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response41>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response42>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateProjectRequest,
@@ -301,9 +301,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response49>;
-    public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response49>>;
-    public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response49>>;
+    public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response50>;
+    public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response50>>;
+    public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response50>>;
     public apiProjectsPost(createProjectRequest: CreateProjectRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (createProjectRequest === null || createProjectRequest === undefined) {
             throw new Error('Required parameter createProjectRequest was null or undefined when calling apiProjectsPost.');
@@ -345,7 +345,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response49>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response50>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createProjectRequest,
@@ -367,9 +367,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response43>;
-    public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response43>>;
-    public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response43>>;
+    public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response44>;
+    public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response44>>;
+    public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response44>>;
     public apiProjectsProjectIdFeatureFlowConfigurationsGet(projectId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (projectId === null || projectId === undefined) {
             throw new Error('Required parameter projectId was null or undefined when calling apiProjectsProjectIdFeatureFlowConfigurationsGet.');
@@ -402,7 +402,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "projectId", value: projectId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/feature-flow-configurations`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response43>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response44>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -424,9 +424,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response48>;
-    public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response48>>;
-    public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response48>>;
+    public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response49>;
+    public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response49>>;
+    public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response49>>;
     public apiProjectsProjectIdFeatureFlowConfigurationsPost(projectId: string, createProjectFeatureFlowConfigurationRequest: CreateProjectFeatureFlowConfigurationRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (projectId === null || projectId === undefined) {
             throw new Error('Required parameter projectId was null or undefined when calling apiProjectsProjectIdFeatureFlowConfigurationsPost.');
@@ -471,7 +471,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "projectId", value: projectId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/feature-flow-configurations`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response48>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response49>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createProjectFeatureFlowConfigurationRequest,
@@ -493,9 +493,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsProjectIdRepositoriesGet(projectId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response42>;
-    public apiProjectsProjectIdRepositoriesGet(projectId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response42>>;
-    public apiProjectsProjectIdRepositoriesGet(projectId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response42>>;
+    public apiProjectsProjectIdRepositoriesGet(projectId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response43>;
+    public apiProjectsProjectIdRepositoriesGet(projectId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response43>>;
+    public apiProjectsProjectIdRepositoriesGet(projectId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response43>>;
     public apiProjectsProjectIdRepositoriesGet(projectId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (projectId === null || projectId === undefined) {
             throw new Error('Required parameter projectId was null or undefined when calling apiProjectsProjectIdRepositoriesGet.');
@@ -528,7 +528,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "projectId", value: projectId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/repositories`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response42>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response43>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -550,9 +550,9 @@ export class ProjectControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response47>;
-    public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response47>>;
-    public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response47>>;
+    public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response48>;
+    public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response48>>;
+    public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response48>>;
     public apiProjectsProjectIdRepositoriesPost(projectId: string, createProjectRepositoryRequest: CreateProjectRepositoryRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (projectId === null || projectId === undefined) {
             throw new Error('Required parameter projectId was null or undefined when calling apiProjectsProjectIdRepositoriesPost.');
@@ -597,7 +597,7 @@ export class ProjectControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "projectId", value: projectId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/repositories`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response47>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response48>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createProjectRepositoryRequest,

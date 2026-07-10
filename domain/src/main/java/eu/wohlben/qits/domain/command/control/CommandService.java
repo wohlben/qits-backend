@@ -2,9 +2,11 @@ package eu.wohlben.qits.domain.command.control;
 
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
+import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
 import eu.wohlben.qits.domain.command.entity.Command;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
+import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import eu.wohlben.qits.domain.command.mapper.CommandMapper;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
@@ -42,6 +44,10 @@ public class CommandService {
 
   /** Workspace ids are path segments, so they must be strict slugs (mirrors WorkspaceService). */
   private static final String WORKSPACE_ID_PATTERN = "[A-Za-z0-9_-]{1,64}";
+
+  /** Canonical UUID shape for hook-reported session ids (they become transcript filenames). */
+  private static final String UUID_PATTERN =
+      "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
   /**
    * How long {@link #launchAndAwait} blocks before returning a still-running result. The process is
@@ -90,7 +96,10 @@ public class CommandService {
    * actionId} is null for agent launches (they aren't backed by an action). {@code otel} injects
    * the OTLP exporter environment (daemons with the toggle set; see {@link OtelEnvironment}).
    * {@code publicBase} is the proxied base path a web-viewable daemon must serve under, injected as
-   * {@code QITS_PUBLIC_BASE}; null for everything else.
+   * {@code QITS_PUBLIC_BASE}; null for everything else. {@code commandId} is a caller-chosen id
+   * (agent launches render it into the session-report hook URL before the row exists; null
+   * generates one) and {@code agentSession} the first entry of an agent launch's session list —
+   * both null for everything that isn't an agent session.
    */
   private record LaunchDescriptor(
       String actionId,
@@ -100,7 +109,9 @@ public class CommandService {
       Map<String, String> environment,
       CommandKind kind,
       boolean otel,
-      String publicBase) {
+      String publicBase,
+      String commandId,
+      AgentSessionRef agentSession) {
 
     static LaunchDescriptor of(ResolvedAction action) {
       return new LaunchDescriptor(
@@ -111,6 +122,8 @@ public class CommandService {
           action.environment(),
           CommandKind.TERMINAL,
           false,
+          null,
+          null,
           null);
     }
   }
@@ -137,14 +150,48 @@ public class CommandService {
       String script,
       boolean interactive,
       Map<String, String> environment) {
+    return launchAgent(
+        repoId, workspaceId, name, script, interactive, environment, null, null, null);
+  }
+
+  /**
+   * {@link #launchAgent} with session identity: {@code commandId} pre-names the row (it is rendered
+   * into the script's session-report hook URL), {@code agentSession} is persisted as the first
+   * entry of the command's session list, and {@code extraExitListener} runs after the status write
+   * (the transcript sweep). All three may be null.
+   */
+  public CommandDto launchAgent(
+      String repoId,
+      String workspaceId,
+      String name,
+      String script,
+      boolean interactive,
+      Map<String, String> environment,
+      String commandId,
+      AgentSessionRef agentSession,
+      CommandExitListener extraExitListener) {
     Prepared p =
         prepare(
             repoId,
             workspaceId,
             new LaunchDescriptor(
-                null, name, script, interactive, environment, CommandKind.TERMINAL, false, null));
+                null,
+                name,
+                script,
+                interactive,
+                environment,
+                CommandKind.TERMINAL,
+                false,
+                null,
+                commandId,
+                agentSession));
     registry.spawn(
-        p.dto().id(), p.container(), p.script(), p.env(), this::onExit, commandLogService);
+        p.dto().id(),
+        p.container(),
+        p.script(),
+        p.env(),
+        compose(extraExitListener),
+        commandLogService);
     return p.dto();
   }
 
@@ -159,21 +206,57 @@ public class CommandService {
       String name,
       String script,
       Map<String, String> environment) {
+    return launchChat(repoId, workspaceId, name, script, environment, null, null, null);
+  }
+
+  /** {@link #launchChat} with session identity — same extra parameters as {@link #launchAgent}. */
+  public CommandDto launchChat(
+      String repoId,
+      String workspaceId,
+      String name,
+      String script,
+      Map<String, String> environment,
+      String commandId,
+      AgentSessionRef agentSession,
+      CommandExitListener extraExitListener) {
     Prepared p =
         prepare(
             repoId,
             workspaceId,
             new LaunchDescriptor(
-                null, name, script, false, environment, CommandKind.CHAT, false, null));
+                null,
+                name,
+                script,
+                false,
+                environment,
+                CommandKind.CHAT,
+                false,
+                null,
+                commandId,
+                agentSession));
     registry.spawnChat(
         p.dto().id(),
         p.container(),
         p.script(),
         p.env(),
-        this::onExit,
+        compose(extraExitListener),
         commandLogService,
         commandLogService);
     return p.dto();
+  }
+
+  /**
+   * The lifecycle status write first (like {@link #launchDaemon}'s composite), then the extra
+   * listener — so e.g. the transcript sweep sees the finished row.
+   */
+  private CommandExitListener compose(CommandExitListener extra) {
+    if (extra == null) {
+      return this::onExit;
+    }
+    return (commandId, exitCode, terminatedManually) -> {
+      onExit(commandId, exitCode, terminatedManually);
+      extra.onExit(commandId, exitCode, terminatedManually);
+    };
   }
 
   /**
@@ -202,7 +285,16 @@ public class CommandService {
             repoId,
             workspaceId,
             new LaunchDescriptor(
-                null, name, script, true, environment, CommandKind.DAEMON, otel, publicBase));
+                null,
+                name,
+                script,
+                true,
+                environment,
+                CommandKind.DAEMON,
+                otel,
+                publicBase,
+                null,
+                null));
     CommandExitListener composite =
         (commandId, exitCode, terminatedManually) -> {
           onExit(commandId, exitCode, terminatedManually);
@@ -248,7 +340,16 @@ public class CommandService {
             repoId,
             workspaceId,
             new LaunchDescriptor(
-                null, name, script, true, environment, CommandKind.DAEMON, otel, publicBase));
+                null,
+                name,
+                script,
+                true,
+                environment,
+                CommandKind.DAEMON,
+                otel,
+                publicBase,
+                null,
+                null));
     return new DaemonRun(p.dto(), p.container(), p.env());
   }
 
@@ -369,7 +470,9 @@ public class CommandService {
             descriptor.name(),
             descriptor.script(),
             descriptor.interactive(),
-            descriptor.kind());
+            descriptor.kind(),
+            descriptor.commandId(),
+            descriptor.agentSession());
 
     // Only the resolved overlay reaches the container (as `docker exec -e` flags) — the host
     // environment (and its credentials) is deliberately never inherited into a workspace container.
@@ -418,8 +521,30 @@ public class CommandService {
 
   /** A command's captured per-line log (the audit history), optionally severity-filtered. */
   public List<CommandLogLineDto> log(String commandId, LogSeverity severity) {
+    return log(commandId, severity, null);
+  }
+
+  /**
+   * A command's captured per-line log (the audit history), optionally severity- and
+   * channel-filtered. The channel filter separates intercepted stdio ({@code OUTPUT}) from the
+   * imported agent transcript ({@code TRANSCRIPT}) so neither view double-renders the other.
+   */
+  public List<CommandLogLineDto> log(String commandId, LogSeverity severity, LogChannel channel) {
     get(commandId); // validates existence (404 if unknown)
-    return commandLogService.log(commandId, severity);
+    return commandLogService.log(commandId, severity, channel);
+  }
+
+  /**
+   * Ingest a SessionStart hook report from inside the workspace container (see {@link
+   * CommandLifecycleService#recordAgentSessionReport}). The endpoint is reachable without auth,
+   * like the git host and the MCP servers, so everything is validated: the id must be a UUID (it
+   * later becomes a transcript filename) and the command must exist and be running.
+   */
+  public CommandDto reportAgentSession(String commandId, String sessionId, String transcriptPath) {
+    if (sessionId == null || !sessionId.matches(UUID_PATTERN)) {
+      throw new BadRequestException("Invalid session id: " + sessionId);
+    }
+    return lifecycle.recordAgentSessionReport(commandId, sessionId, transcriptPath);
   }
 
   @Transactional

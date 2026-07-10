@@ -112,10 +112,43 @@ public class CommandLogService implements CommandLogWriter, CommandLogReader {
   /** A command's captured log in order; a non-null {@code severity} narrows to those lines. */
   @Transactional
   public List<CommandLogLineDto> log(String commandId, LogSeverity severity) {
-    List<CommandLogLine> lines =
-        severity == null
-            ? commandLogLineRepository.findByCommandOrderBySeq(commandId)
-            : commandLogLineRepository.findByCommandAndSeverityOrderBySeq(commandId, severity);
+    return log(commandId, severity, null);
+  }
+
+  /**
+   * A command's captured log in order; non-null {@code severity}/{@code channel} narrow to those
+   * lines (channel separates intercepted stdio from the imported agent transcript).
+   */
+  @Transactional
+  public List<CommandLogLineDto> log(String commandId, LogSeverity severity, LogChannel channel) {
+    List<CommandLogLine> lines;
+    if (channel != null) {
+      lines = commandLogLineRepository.findByCommandAndChannelOrderBySeq(commandId, channel);
+      if (severity != null) {
+        lines = lines.stream().filter(line -> line.severity == severity).toList();
+      }
+    } else if (severity != null) {
+      lines = commandLogLineRepository.findByCommandAndSeverityOrderBySeq(commandId, severity);
+    } else {
+      lines = commandLogLineRepository.findByCommandOrderBySeq(commandId);
+    }
     return lines.stream().map(commandLogLineMapper::toDto).toList();
+  }
+
+  /**
+   * Persist imported lines synchronously, bypassing the async queue — the transcript sweep needs
+   * deterministic completion (it deletes and reimports the {@code TRANSCRIPT} channel), so its
+   * lines must not interleave with a queue drain.
+   */
+  public void importLines(List<PendingLine> lines) {
+    for (int from = 0; from < lines.size(); from += BATCH_MAX) {
+      persister.persist(lines.subList(from, Math.min(from + BATCH_MAX, lines.size())));
+    }
+  }
+
+  /** Delete a command's lines on one channel (the sweep's delete-and-reimport idempotency). */
+  @Transactional
+  public long deleteChannel(String commandId, LogChannel channel) {
+    return commandLogLineRepository.deleteByCommandAndChannel(commandId, channel);
   }
 }

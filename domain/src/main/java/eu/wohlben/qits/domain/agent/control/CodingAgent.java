@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.agent.control;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -53,6 +54,18 @@ public abstract class CodingAgent {
    */
   protected boolean flatOutput;
 
+  /** The qits-chosen session UUID to pin at launch (create-only), or null. */
+  protected String sessionId;
+
+  /** An existing session UUID to continue, or null. */
+  protected String resumeSessionId;
+
+  /** Whether {@link #resumeSessionId} is branched into {@link #sessionId} instead of continued. */
+  protected boolean forkRequested;
+
+  /** The qits endpoint the harness reports session-identity changes to, or null. */
+  protected String sessionReportingUrl;
+
   /** Attaches an MCP server under {@code key} with a harness-agnostic {@link McpServers} config. */
   public CodingAgent mcpServer(String key, Object config) {
     this.mcpServers.put(key, config);
@@ -97,6 +110,74 @@ public abstract class CodingAgent {
     this.flatOutput = true;
     return this;
   }
+
+  /** Pins a fresh session under this qits-generated UUID (create-only external naming). */
+  public CodingAgent sessionId(String uuid) {
+    this.sessionId = uuid;
+    return this;
+  }
+
+  /** Continues an existing session in place (same ID, transcript appended). */
+  public CodingAgent resume(String sessionId) {
+    this.resumeSessionId = sessionId;
+    return this;
+  }
+
+  /**
+   * Branches the resumed session into a new one pinned as {@code newUuid} — the fork inherits the
+   * full conversation history but persists separately. Requires {@link #resume(String)}.
+   */
+  public CodingAgent fork(String newUuid) {
+    this.sessionId = newUuid;
+    this.forkRequested = true;
+    return this;
+  }
+
+  /**
+   * Has the harness report session identity changes (the initial start and any in-session switch,
+   * e.g. an in-TUI {@code /resume}) to this qits endpoint.
+   */
+  public CodingAgent sessionReporting(String url) {
+    this.sessionReportingUrl = url;
+    return this;
+  }
+
+  /**
+   * Render-time guard for the session configuration — harness-agnostic, called by implementations
+   * before interpolating anything into an argv. Session ids must be canonical UUIDs; {@code fork}
+   * without {@code resume} has nothing to branch; pinning <em>and</em> resuming without a fork is
+   * contradictory (a pinned id is create-only).
+   */
+  protected void validateSessionConfiguration() {
+    requireUuid(sessionId, "session id");
+    requireUuid(resumeSessionId, "resume session id");
+    if (forkRequested && resumeSessionId == null) {
+      throw new IllegalStateException("fork requires resume: no session to branch from");
+    }
+    if (sessionId != null && resumeSessionId != null && !forkRequested) {
+      throw new IllegalStateException(
+          "sessionId and resume are mutually exclusive unless forking: a pinned id is create-only");
+    }
+  }
+
+  /** Canonical UUID only — {@code UUID.fromString} is laxer (e.g. accepts {@code 1-2-3-4-5}). */
+  private static final String UUID_PATTERN =
+      "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+
+  private static void requireUuid(String value, String what) {
+    if (value != null && !value.matches(UUID_PATTERN)) {
+      throw new IllegalArgumentException("Invalid " + what + " (not a UUID): " + value);
+    }
+  }
+
+  /**
+   * Where this harness persists the transcript of a session run under {@code cwd}, relative to its
+   * config dir (harness-owned convention — no caller ever computes a path itself).
+   */
+  public abstract Path transcriptPath(String cwd, String sessionId);
+
+  /** Where this harness persists a session's subagent sidechains, relative to its config dir. */
+  public abstract Path subagentsDir(String cwd, String sessionId);
 
   /** Renders the configured agent as an interactive launch (a human attaches a terminal). */
   public abstract LaunchSpec start();

@@ -2,6 +2,8 @@ package eu.wohlben.qits.domain.agent.control;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -59,8 +61,20 @@ public class ClaudeCodeAgent extends CodingAgent {
     return new LaunchSpec(command.toString(), false, environment);
   }
 
-  /** Appends the model, the MCP config, the allowlist and the skip-permissions flag. */
+  /**
+   * Appends the session flags, the model, the MCP config, the allowlist, the session-report hook
+   * and the skip-permissions flag.
+   */
   private void appendFlags(StringBuilder command) {
+    validateSessionConfiguration();
+    if (resumeSessionId != null) {
+      command.append(" --resume ").append(resumeSessionId);
+      if (forkRequested) {
+        command.append(" --fork-session --session-id ").append(sessionId);
+      }
+    } else if (sessionId != null) {
+      command.append(" --session-id ").append(sessionId);
+    }
     if (model != null && !model.isBlank()) {
       command.append(" --model ").append(shellQuote(model));
     }
@@ -71,16 +85,67 @@ public class ClaudeCodeAgent extends CodingAgent {
     if (!allowedTools.isEmpty()) {
       command.append(" --allowedTools ").append(shellQuote(String.join(",", allowedTools)));
     }
+    if (sessionReportingUrl != null) {
+      command.append(" --settings ").append(shellQuote(writeJson(sessionReportSettings())));
+    }
     if (skipPermissions) {
       command.append(" --dangerously-skip-permissions");
     }
+  }
+
+  /**
+   * A settings layer whose {@code SessionStart} hook POSTs the hook's stdin JSON ({@code {source,
+   * session_id, transcript_path, …}}) to the qits session-report endpoint. SessionStart fires on
+   * {@code startup}/{@code resume}/{@code clear}/{@code compact}, so qits learns the live session
+   * whenever it changes underneath a running process — not just at launch.
+   */
+  private Map<String, Object> sessionReportSettings() {
+    if (sessionReportingUrl.contains("'")) {
+      // Defense in depth: the URL is composed of a resolver host, a port, and a UUID command id,
+      // none of which can contain a quote — but it ends up inside a single-quoted argv.
+      throw new IllegalArgumentException(
+          "Session-reporting URL must not contain quotes: " + sessionReportingUrl);
+    }
+    String post =
+        "curl -fsS -m 5 -X POST -H \"Content-Type: application/json\" --data-binary @- "
+            + sessionReportingUrl;
+    return Map.of(
+        "hooks",
+        Map.of(
+            "SessionStart",
+            List.of(Map.of("hooks", List.of(Map.of("type", "command", "command", post))))));
+  }
+
+  /**
+   * Claude Code persists a session's transcript under {@code
+   * $CLAUDE_CONFIG_DIR/projects/<escaped-cwd>/<sessionId>.jsonl}, where the escaped cwd replaces
+   * every non-alphanumeric character with {@code -} (verified against CLI 2.1.204, the pinned image
+   * version; a regression IT re-checks the convention when the pin moves).
+   */
+  @Override
+  public Path transcriptPath(String cwd, String sessionId) {
+    return Path.of("projects", escapeCwd(cwd), sessionId + ".jsonl");
+  }
+
+  /**
+   * Task-tool subagents persist beside the main JSONL: {@code
+   * projects/<escaped-cwd>/<sessionId>/subagents/agent-<agentId>.jsonl} plus a sibling {@code
+   * agent-<agentId>.meta.json} carrying {@code {agentType, description, toolUseId, spawnDepth}}.
+   */
+  @Override
+  public Path subagentsDir(String cwd, String sessionId) {
+    return Path.of("projects", escapeCwd(cwd), sessionId, "subagents");
+  }
+
+  private static String escapeCwd(String cwd) {
+    return cwd.replaceAll("[^A-Za-z0-9]", "-");
   }
 
   private String writeJson(Object value) {
     try {
       return mapper.writeValueAsString(value);
     } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to render MCP config", e);
+      throw new IllegalStateException("Failed to render agent config JSON", e);
     }
   }
 

@@ -12,7 +12,8 @@
 export const LogChannel = {
     Stdin: 'STDIN',
     Output: 'OUTPUT',
-    Stderr: 'STDERR'
+    Stderr: 'STDERR',
+    Transcript: 'TRANSCRIPT'
 } as const;
 export type LogChannel = typeof LogChannel[keyof typeof LogChannel];
 

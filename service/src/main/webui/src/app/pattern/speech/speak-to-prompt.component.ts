@@ -15,6 +15,7 @@ import { lastValueFrom } from 'rxjs';
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
 import { SpeechControllerService } from '@/api/api/speechController.service';
+import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
@@ -153,9 +154,18 @@ import { WavRecorder } from './wav-recorder';
               z-button
               [zDisabled]="!refinedPrompt()?.trim() || launchMutation.isPending()"
               [zLoading]="launchMutation.isPending()"
-              (click)="launch()"
+              (click)="launch(AgentLaunchMode.Chat)"
             >
               Launch agent with this prompt
+            </button>
+            <button
+              z-button
+              zType="secondary"
+              [zDisabled]="!refinedPrompt()?.trim() || launchMutation.isPending()"
+              (click)="launch(AgentLaunchMode.Interactive)"
+              title="The full Claude Code TUI in a terminal instead of the chat view"
+            >
+              Launch as terminal session
             </button>
           </div>
           @if (launchMutation.isError()) {
@@ -232,13 +242,15 @@ export class SpeakToPromptComponent {
     onSuccess: (res) => this.refinedPrompt.set(res.prompt ?? ''),
   }));
 
+  protected readonly AgentLaunchMode = AgentLaunchMode;
+
   readonly launchMutation = injectMutation(() => ({
-    mutationFn: (prompt: string) =>
+    mutationFn: ({ prompt, mode }: { prompt: string; mode: AgentLaunchMode }) =>
       lastValueFrom(
         this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           this.repoId(),
           this.workspaceId(),
-          { scope: AgentMcpScope.Repository, initialContext: prompt },
+          { scope: AgentMcpScope.Repository, initialContext: prompt, mode },
         ),
       ),
     onSuccess: (res) => {
@@ -252,11 +264,11 @@ export class SpeakToPromptComponent {
     },
   }));
 
-  launch() {
+  launch(mode: AgentLaunchMode) {
     const prompt = this.refinedPrompt()?.trim();
     if (!prompt) return;
     const snippets = this.promptContext.snippets();
     const context = snippets.length ? prompt + '\n\n' + formatSnippetsForPrompt(snippets) : prompt;
-    this.launchMutation.mutate(context);
+    this.launchMutation.mutate({ prompt: context, mode });
   }
 }

@@ -10,8 +10,8 @@
 
 
 export interface Response62 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    workspaceId?: string;
+    branch?: string;
+    commandId?: string;
 }
 

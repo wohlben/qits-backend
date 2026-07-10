@@ -38,6 +38,21 @@ public class CommandRepository implements PanacheRepositoryBase<Command, String>
   }
 
   /**
+   * Whether any command of the workspace drove the given agent session — the ownership check behind
+   * resume/fork (iteration one scopes both to the session's own workspace).
+   */
+  public boolean existsByWorkspaceAndSessionId(
+      String repositoryId, String workspaceId, String sessionId) {
+    return count(
+            "from Command c join c.agentSessions s where c.workspace.repository.id = ?1"
+                + " and c.workspace.workspaceId = ?2 and s.sessionId = ?3",
+            repositoryId,
+            workspaceId,
+            sessionId)
+        > 0;
+  }
+
+  /**
    * RUNNING commands of {@code kind} in a workspace (by repository id + workspace slug), newest
    * first — the server-side twin of the frontend's newest-running-chat resolution rule.
    */
