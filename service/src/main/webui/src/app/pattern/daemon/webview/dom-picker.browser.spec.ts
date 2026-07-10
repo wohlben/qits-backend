@@ -1,5 +1,5 @@
 import { NewSnippet } from '@/shared/state/prompt-context.store';
-import { DomPicker } from './dom-picker';
+import { DomPicker, LONG_PRESS_MS, PickedRef, PickOptions } from './dom-picker';
 
 /**
  * Functional picker coverage in a real headless Chromium (Vitest browser mode — jsdom's iframe
@@ -25,8 +25,12 @@ function frameWith(html: string): Promise<HTMLIFrameElement> {
   });
 }
 
-function click(doc: Document, element: Element): void {
-  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+function click(doc: Document, element: Element, init: MouseEventInit = {}): void {
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init }));
+}
+
+function pointerDown(element: Element, pointerType: string): void {
+  element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType }));
 }
 
 function hover(doc: Document, element: Element): void {
@@ -150,6 +154,130 @@ describe('DomPicker', () => {
     click(doc, host);
     expect(picks[0].shadowHtml).toBe('<span>inside</span>');
     expect(picks[0].html).toContain('id="host"');
+    picker.detach();
+  });
+
+  it('reports a plain click as a one-shot pick and shift-click as keepPicking', async () => {
+    const iframe = await frameWith('<button>multi</button>');
+    const options: PickOptions[] = [];
+    const picker = new DomPicker((_pick, o) => options.push(o));
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const doc = iframe.contentDocument!;
+    const button = doc.querySelector('button')!;
+    pointerDown(button, 'mouse');
+    click(doc, button);
+    expect(options[0].keepPicking).toBe(false);
+
+    pointerDown(button, 'mouse');
+    click(doc, button, { shiftKey: true });
+    expect(options[1].keepPicking).toBe(true);
+    picker.detach();
+  });
+
+  it('reports a touch long press as keepPicking, a short tap as one-shot', async () => {
+    const iframe = await frameWith('<button>touch</button>');
+    const options: PickOptions[] = [];
+    const picker = new DomPicker((_pick, o) => options.push(o));
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const doc = iframe.contentDocument!;
+    const button = doc.querySelector('button')!;
+    pointerDown(button, 'touch');
+    click(doc, button);
+    expect(options[0].keepPicking).toBe(false);
+
+    pointerDown(button, 'touch');
+    await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 50));
+    click(doc, button);
+    expect(options[1].keepPicking).toBe(true);
+
+    // A mouse press of the same duration stays one-shot — long press is a coarse-input gesture.
+    pointerDown(button, 'mouse');
+    await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 50));
+    click(doc, button);
+    expect(options[2].keepPicking).toBe(false);
+    picker.detach();
+  });
+
+  it('suppresses the context menu while picking, so a long press can reach the click', async () => {
+    const iframe = await frameWith('<button>menu</button>');
+    const picker = new DomPicker(() => undefined);
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const doc = iframe.contentDocument!;
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    doc.querySelector('button')!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+
+    picker.setEnabled(false);
+    const offEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    doc.querySelector('button')!.dispatchEvent(offEvent);
+    expect(offEvent.defaultPrevented).toBe(false);
+    picker.detach();
+  });
+
+  it('outlines already-picked elements while picking and reverts them when picking stops', async () => {
+    const iframe = await frameWith(
+      '<button id="a" style="outline: 1px dotted red">a</button><button id="b">b</button>',
+    );
+    const doc = iframe.contentDocument!;
+    const picker = new DomPicker(() => undefined);
+    picker.attach(iframe);
+    picker.setPicked([{ selector: '#a', url: doc.location.href }]);
+
+    // Not yet in pick mode — no marks.
+    expect(doc.querySelector('[data-qits-picked]')).toBeNull();
+
+    const a = doc.getElementById('a')!;
+    const originalOutline = a.style.outline; // as normalized by the browser
+    picker.setEnabled(true);
+    expect(a.hasAttribute('data-qits-picked')).toBe(true);
+    expect(a.style.outline).toContain('rgb(34, 197, 94)');
+    expect(doc.getElementById('b')!.hasAttribute('data-qits-picked')).toBe(false);
+
+    // Turning pick mode off restores the element's own inline outline.
+    picker.setEnabled(false);
+    expect(a.hasAttribute('data-qits-picked')).toBe(false);
+    expect(a.style.outline).toBe(originalOutline);
+    expect(a.style.outline).toContain('dotted');
+    picker.detach();
+  });
+
+  it('marks a newly picked element as soon as the owner feeds the pick back', async () => {
+    const iframe = await frameWith('<button id="target">pick me</button>');
+    const doc = iframe.contentDocument!;
+    const picked: PickedRef[] = [];
+    const picker = new DomPicker((pick) => {
+      picked.push({ selector: pick.selector, url: pick.url });
+      picker.setPicked(picked);
+    });
+    picker.attach(iframe);
+    picker.setEnabled(true);
+
+    const target = doc.getElementById('target')!;
+    click(doc, target, { shiftKey: true });
+
+    expect(target.hasAttribute('data-qits-picked')).toBe(true);
+    picker.detach();
+  });
+
+  it('skips refs from other pages and selectors that no longer resolve', async () => {
+    const iframe = await frameWith('<button id="a">a</button>');
+    const doc = iframe.contentDocument!;
+    const picker = new DomPicker(() => undefined);
+    picker.attach(iframe);
+    picker.setPicked([
+      { selector: '#a', url: 'http://elsewhere/other-page' },
+      { selector: '#gone', url: doc.location.href },
+      { selector: ':::not-a-selector', url: doc.location.href },
+    ]);
+    picker.setEnabled(true);
+
+    expect(doc.querySelector('[data-qits-picked]')).toBeNull();
     picker.detach();
   });
 

@@ -21,6 +21,14 @@ export function formatSnippetsForPrompt(snippets: PickedSnippet[]): string {
       if (snippet.shadowHtml) {
         parts.push('Its open shadow root contains:', FENCE + 'html', snippet.shadowHtml, FENCE);
       }
+      if (snippet.styledHtml) {
+        parts.push(
+          'Optional style-frozen variant (the applied CSS inlined as style attributes — use it when styling matters, the original above is authoritative for structure):',
+          FENCE + 'html',
+          snippet.styledHtml,
+          FENCE,
+        );
+      }
       return parts.join('\n');
     })
     .join('\n\n');
