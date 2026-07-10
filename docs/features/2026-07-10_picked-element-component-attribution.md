@@ -120,9 +120,11 @@ Rendered by Greeting (app-greeting) — source files: src/main/webui/src/app/gre
 Enclosing components: app-root
 ```
 
-The tray chips name the attributed component: `command-chat`'s chip label prefers
-`component.className` over the tag; `speak-to-prompt`'s row shows it next to the tag, with the
-files as the tooltip. A matcher failure never breaks a pick (try/catch to `undefined`).
+The trays surface the attribution: `command-chat`'s chip label prefers `component.className` over
+the tag; `speak-to-prompt`'s "Picked elements" row shows the full pick context — `className
+(selector)` next to the tag, plus a second muted line with the app route, the source file paths
+and the enclosing chain (`in app-root`) — i.e. everything the prompt will carry. A matcher failure
+never breaks a pick (try/catch to `undefined`).
 
 ### Web-view URL bar (globe icon)
 
