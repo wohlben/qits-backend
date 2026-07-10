@@ -1,6 +1,8 @@
 package eu.wohlben.qits.cli;
 
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
+import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
@@ -108,7 +110,22 @@ public class SeedService {
         null,
         null,
         List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
-        null);
+        null,
+        // The dependency-free healthcheck kind: a bash /dev/tcp connect proving :8000 accepts
+        // connections — one green dot next to the READY chip, no curl needed.
+        List.of(
+            new HealthCheck(
+                "HTTP :8000",
+                HealthCheckKind.TCP,
+                8000,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null)));
 
     // Build the branch tree.
     workspaceService.createWorkspace(repo.id, "mainline", "master", "mainline");

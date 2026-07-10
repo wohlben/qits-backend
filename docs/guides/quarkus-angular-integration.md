@@ -2,8 +2,8 @@
 
 This guide walks a **stock `code.quarkus.io` starter** (extensions `rest-jackson` +
 `quinoa`, Angular in `src/main/webui/`) to a fully qits-managed app: framework-aware file
-browsing, a web-viewable dev-server daemon, log observation, backend OTEL, and frontend OTEL
-through the backend gateway. It was written by performing exactly this walk on a fresh starter
+browsing, a web-viewable dev-server daemon with per-service healthchecks, log observation,
+backend OTEL, and frontend OTEL through the backend gateway. It was written by performing exactly this walk on a fresh starter
 (2026-07-06/07) and cross-checking against the reference implementation, the
 [`testing-repo-quarkus-angular` fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)
 — every snippet below is the validated form.
@@ -215,6 +215,75 @@ warm (<20 s) as long as the container lives, because the caches persist under `/
 
 **Verify:** status reaches `READY`; a `stop` (wait for `STOPPED` — stopping is asynchronous)
 followed by `start` reaches `READY` again quickly.
+
+---
+
+## Tier 1b — healthchecks: per-service health dots
+
+`READY` is a single bit, and this daemon stands up **two** servers (Quarkus `:8080` + the Angular
+dev server `:4200` — one process group, one `readyPattern`). If Angular dies or wedges while
+Quarkus stays up, the daemon still reads READY and the app is half-broken with no signal.
+Healthchecks close that gap: named probes qits runs on an interval **inside the workspace
+container**, each with its own green/red/grey dot beside the status chip. See
+[daemon healthchecks](../features/2026-07-10_daemon-healthchecks.md).
+
+**qits-side only — no app changes.** Extend the daemon definition (full `PUT`, as always):
+
+```json
+"healthChecks": [
+  {"name": "Quarkus", "kind": "COMMAND",
+   "command": "curl -fsS -m 2 \"http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health\""},
+  {"name": "Angular", "kind": "HTTP", "port": 4200, "path": "/", "expectStatus": "2xx,3xx,4xx"}
+]
+```
+
+(That is exactly the `seed-webapp` reference pair. `/q/health` assumes `smallrye-health` in your
+app — any always-200 API path works as well.)
+
+What each choice is doing:
+
+- **Probes run in the container's own network namespace** (`docker exec`), so `127.0.0.1:<port>`
+  is the service's own loopback. **No port publishing, no container recreate** — unlike
+  `webView.port` (rule 2), you can add or change checks freely; they apply on the next daemon
+  (re)launch (rule 1).
+- **Why the Quarkus check is a `COMMAND`, not `HTTP`:** after Tier 2 your backend serves under
+  `$QITS_PUBLIC_BASE` (`quarkus.http.root-path`), so `/q/health` is *not* at the bare root — and
+  the `HTTP` kind is deliberately shell-free (a plain curl argv; no env expansion in `path`), so
+  it cannot express `${QITS_PUBLIC_BASE%/}/q/health`. A `COMMAND` check is a bash script and can.
+  **Before Tier 2** (no root-path yet) the plain form works fine:
+  `{"name": "Quarkus", "kind": "HTTP", "port": 8080, "path": "/q/health"}`. All probes get
+  `QITS_PUBLIC_BASE` in their env (plus the daemon's own `environment` map).
+- **The Angular check accepts `4xx`** — under `--serve-path`, bare `/` on `:4200` may 404 or
+  redirect; any HTTP answer means the dev server is serving, while connection-refused (red) means
+  it's compiling or dead. That refused-while-compiling window is the demo: start the daemon and
+  watch Quarkus go green while Angular sits red, then flips.
+- There is also a dependency-free **`TCP`** kind (`{"kind": "TCP", "port": …}` — a bash
+  `/dev/tcp` connect) for ports that don't speak HTTP.
+- **Defaults:** probe every 5 s (`intervalMs`), 2 s timeout (`timeoutMs`), green after 1 success
+  (`healthyThreshold`), red only after 3 consecutive failures (`unhealthyThreshold` — debounces a
+  transient refusal), first probe after the daemon's ready grace (`initialDelayMs`). Check names
+  must be unique within the daemon.
+
+Semantics to rely on (and not fight):
+
+- **Display-only.** Health never changes `DaemonStatus`, never restarts anything, never writes a
+  `daemon_event` row. The dots sit *beside* the chip; a READY daemon with a red dot is exactly
+  the "half-down" state the feature exists to show.
+- **Live gauge, not history.** Only the latest result per check is kept, in memory: a qits
+  restart drops it (dots grey, then repopulate within one interval), a stopped daemon reads all
+  grey — never a stale red. `UNHEALTHY` means the probe ran and got a bad answer (wrong status,
+  nonzero exit, timeout); grey `UNKNOWN` means "no verdict" (not started, or the probe itself
+  couldn't run — e.g. a missing tool).
+- The dots update over the workspace's existing SSE feed (on state flips), and the hover tooltip
+  carries latency + the failing evidence (`exit 7: curl: (7) Failed to connect…`, `HTTP 503
+  (expected 2xx,3xx)`). Agents get the same data from the `listWorkspaceDaemons` MCP tool's
+  `health` field.
+
+**Verify:** start the daemon → both dots green within one interval of READY (Angular red first
+if you catch the compile window). Then kill the frontend inside the container:
+`docker exec <container> bash -c 'pkill -9 -f "ng serve"'` → the Angular dot flips red within
+~15 s (3 failed probes) **while the chip stays READY**, with the connection-refused evidence in
+the tooltip; the Events feed gains nothing. Restart the daemon → all dots reset grey, then green.
 
 ---
 
@@ -510,7 +579,8 @@ over all of these.
 Your workspace now supports the same manual E2E loop as the `seed-webapp` fixture (the
 executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp`):
 
-1. Daemon starts → `READY` (Tier 1).
+1. Daemon starts → `READY` (Tier 1); the Quarkus and Angular health dots go green, and killing
+   the frontend in-container flips its dot red while the chip stays READY (Tier 1b).
 2. Web view renders the SPA through the proxy prefix; an API round trip works; HMR live; DOM
    picker picks (Tier 2).
 3. A provoked backend error → Events tab + chat note (Tier 3).
@@ -521,6 +591,7 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
 ## Related documents
 
 - Features: [daemons](../features/2026-07-04_daemons.md) ·
+  [daemon healthchecks](../features/2026-07-10_daemon-healthchecks.md) ·
   [daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md) ·
   [daemon log observation](../features/2026-07-04_daemon-log-observation-expansion.md) ·
   [observability](../features/2026-07-04_observability.md) ·

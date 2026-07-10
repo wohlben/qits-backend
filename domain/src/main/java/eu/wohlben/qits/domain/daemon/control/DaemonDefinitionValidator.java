@@ -1,11 +1,14 @@
 package eu.wohlben.qits.domain.daemon.control;
 
+import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.WebView;
 import eu.wohlben.qits.domain.error.BadRequestException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -144,6 +147,143 @@ final class DaemonDefinitionValidator {
       if (path.equals(".git") || path.startsWith(".git/")) {
         throw new BadRequestException("Log source path may not point into .git: " + path);
       }
+    }
+  }
+
+  private static final Pattern EXPECT_STATUS_TOKEN = Pattern.compile("[1-5]xx|\\d{3}");
+
+  private static final int MAX_HEALTH_CHECKS = 20;
+
+  /**
+   * Healthchecks are validated per kind — fields that only make sense for another kind are rejected
+   * rather than silently ignored (the {@code requireValidWebView} philosophy: a broken definition
+   * fails the request, not the prober). Names must be unique because the supervisor's runtime state
+   * and the instance DTO align to declared checks by name.
+   */
+  static void requireValidHealthChecks(List<HealthCheck> healthChecks) {
+    if (healthChecks == null) {
+      return;
+    }
+    if (healthChecks.size() > MAX_HEALTH_CHECKS) {
+      throw new BadRequestException("At most " + MAX_HEALTH_CHECKS + " health checks per daemon");
+    }
+    Set<String> names = new HashSet<>();
+    for (HealthCheck check : healthChecks) {
+      if (check.name == null || check.name.isBlank()) {
+        throw new BadRequestException("Health checks require a name");
+      }
+      String name = check.name.trim();
+      if (name.length() > 255) {
+        throw new BadRequestException("Health check name too long: " + name);
+      }
+      if (!names.add(name)) {
+        throw new BadRequestException("Duplicate health check name: " + name);
+      }
+      if (check.kind == null) {
+        throw new BadRequestException("Health check '" + name + "' requires a kind");
+      }
+      switch (check.kind) {
+        case HTTP -> {
+          requireHealthCheckPort(check, name);
+          requireAbsent(check.command, "command", name, "HTTP checks take port/path");
+          validateHttpPath(check, name);
+          validateExpectStatus(check, name);
+        }
+        case TCP -> {
+          requireHealthCheckPort(check, name);
+          requireAbsent(check.path, "path", name, "TCP checks only connect to a port");
+          requireAbsent(check.expectStatus, "expectStatus", name, "TCP checks only connect");
+          requireAbsent(check.command, "command", name, "TCP checks only connect to a port");
+        }
+        case COMMAND -> {
+          if (check.command == null || check.command.isBlank()) {
+            throw new BadRequestException("Health check '" + name + "' requires a command");
+          }
+          if (check.command.length() > 4000) {
+            throw new BadRequestException("Health check '" + name + "' command too long");
+          }
+          if (check.port != null) {
+            throw new BadRequestException(
+                "Health check '" + name + "': COMMAND checks take a command, not a port");
+          }
+          requireAbsent(check.path, "path", name, "COMMAND checks take a command");
+          requireAbsent(check.expectStatus, "expectStatus", name, "COMMAND checks take a command");
+        }
+      }
+      requireInRange(check.intervalMs, 250, 3_600_000, "intervalMs", name);
+      requireInRange(check.timeoutMs, 100, 60_000, "timeoutMs", name);
+      requireInRange(
+          check.healthyThreshold == null ? null : check.healthyThreshold.longValue(),
+          1,
+          10,
+          "healthyThreshold",
+          name);
+      requireInRange(
+          check.unhealthyThreshold == null ? null : check.unhealthyThreshold.longValue(),
+          1,
+          10,
+          "unhealthyThreshold",
+          name);
+      requireInRange(check.initialDelayMs, 0, 600_000, "initialDelayMs", name);
+    }
+  }
+
+  private static void requireHealthCheckPort(HealthCheck check, String name) {
+    if (check.port == null) {
+      throw new BadRequestException(
+          "Health check '" + name + "' (" + check.kind + ") requires a port");
+    }
+    if (check.port < 1 || check.port > 65535) {
+      throw new BadRequestException(
+          "Health check '" + name + "' port must be between 1 and 65535: " + check.port);
+    }
+  }
+
+  /** The path lands verbatim in the curl URL (argv, no shell) — keep it a sane URL path anyway. */
+  private static void validateHttpPath(HealthCheck check, String name) {
+    if (check.path == null) {
+      return;
+    }
+    String path = check.path;
+    if (!path.startsWith("/")
+        || WHITESPACE_PATTERN.matcher(path).find()
+        || path.contains("\\")
+        || path.contains("'")
+        || path.contains("\"")
+        || path.chars().anyMatch(Character::isISOControl)) {
+      throw new BadRequestException("Health check '" + name + "': invalid path: " + path);
+    }
+  }
+
+  private static void validateExpectStatus(HealthCheck check, String name) {
+    if (check.expectStatus == null || check.expectStatus.isBlank()) {
+      return;
+    }
+    for (String token : check.expectStatus.split(",")) {
+      String trimmed = token.trim().toLowerCase();
+      if (!EXPECT_STATUS_TOKEN.matcher(trimmed).matches()
+          || (trimmed.matches("\\d{3}")
+              && (Integer.parseInt(trimmed) < 100 || Integer.parseInt(trimmed) > 599))) {
+        throw new BadRequestException(
+            "Health check '" + name + "': invalid expectStatus token: " + token.trim());
+      }
+    }
+  }
+
+  private static void requireAbsent(String value, String field, String name, String hint) {
+    if (value != null && !value.isBlank()) {
+      throw new BadRequestException(
+          "Health check '" + name + "': " + field + " is not allowed (" + hint + ")");
+    }
+  }
+
+  private static void requireInRange(Long value, long min, long max, String field, String name) {
+    if (value == null) {
+      return;
+    }
+    if (value < min || value > max) {
+      throw new BadRequestException(
+          "Health check '" + name + "': " + field + " must be between " + min + " and " + max);
     }
   }
 }

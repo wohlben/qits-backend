@@ -125,4 +125,11 @@ public class RepositoryDaemon extends PanacheEntityBase {
       joinColumns = @JoinColumn(name = "repository_daemon_id"))
   @OrderColumn(name = "source_index")
   public List<LogSource> sources = new ArrayList<>();
+
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+      name = "repository_daemon_healthcheck",
+      joinColumns = @JoinColumn(name = "repository_daemon_id"))
+  @OrderColumn(name = "healthcheck_index")
+  public List<HealthCheck> healthChecks = new ArrayList<>();
 }

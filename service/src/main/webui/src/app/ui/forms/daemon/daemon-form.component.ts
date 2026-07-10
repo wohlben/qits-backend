@@ -34,6 +34,21 @@ export interface DaemonSourceRow {
   label: string;
 }
 
+export interface DaemonHealthCheckRow {
+  name: string;
+  kind: 'HTTP' | 'TCP' | 'COMMAND';
+  /** Numeric fields are kept as text in the form and parsed on submit; blank = server default. */
+  port: string;
+  path: string;
+  expectStatus: string;
+  command: string;
+  intervalMs: string;
+  timeoutMs: string;
+  healthyThreshold: string;
+  unhealthyThreshold: string;
+  initialDelayMs: string;
+}
+
 export interface DaemonFormData {
   name: string;
   description: string;
@@ -55,6 +70,7 @@ export interface DaemonFormData {
   environment: DaemonEnvVarRow[];
   observers: DaemonObserverRow[];
   sources: DaemonSourceRow[];
+  healthChecks: DaemonHealthCheckRow[];
 }
 
 @Component({
@@ -277,6 +293,153 @@ export interface DaemonFormData {
         </div>
       </fieldset>
 
+      <!-- Healthchecks: named probes run inside the container on an interval, shown as live
+           green/red/grey dots beside the status chip. Display-only — they never affect the
+           daemon's lifecycle status or restarts. -->
+      <fieldset class="flex flex-col gap-2">
+        <legend class="text-sm font-medium">Health checks</legend>
+        @for (row of model().healthChecks; track $index) {
+          <div class="flex flex-col gap-2 rounded-md border p-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <input
+                z-input
+                class="w-40"
+                placeholder="name, e.g. Quarkus"
+                autocomplete="off"
+                [value]="row.name"
+                (input)="updateHealthCheck($index, 'name', $any($event.target).value)"
+                [attr.aria-label]="'Health check ' + ($index + 1) + ' name'"
+              />
+              <select
+                class="h-9 rounded-md border bg-transparent px-2 text-sm"
+                [value]="row.kind"
+                (change)="updateHealthCheck($index, 'kind', $any($event.target).value)"
+                [attr.aria-label]="'Health check ' + ($index + 1) + ' kind'"
+              >
+                <option value="HTTP">HTTP</option>
+                <option value="TCP">TCP</option>
+                <option value="COMMAND">Command</option>
+              </select>
+              @if (row.kind !== 'COMMAND') {
+                <input
+                  z-input
+                  class="w-24"
+                  placeholder="port"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="row.port"
+                  (input)="updateHealthCheck($index, 'port', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' port'"
+                />
+              }
+              @if (row.kind === 'HTTP') {
+                <input
+                  z-input
+                  class="flex-1"
+                  placeholder="path, e.g. /q/health"
+                  autocomplete="off"
+                  [value]="row.path"
+                  (input)="updateHealthCheck($index, 'path', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' path'"
+                />
+                <input
+                  z-input
+                  class="w-32"
+                  placeholder="2xx,3xx"
+                  autocomplete="off"
+                  [value]="row.expectStatus"
+                  (input)="updateHealthCheck($index, 'expectStatus', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' expected status'"
+                />
+              }
+              <button
+                z-button
+                zType="ghost"
+                type="button"
+                (click)="removeHealthCheck($index)"
+                [attr.aria-label]="'Remove health check ' + ($index + 1)"
+              >
+                Remove
+              </button>
+            </div>
+            @if (row.kind === 'COMMAND') {
+              <textarea
+                z-input
+                rows="2"
+                placeholder="in-container script; exit 0 = healthy"
+                [value]="row.command"
+                (input)="updateHealthCheck($index, 'command', $any($event.target).value)"
+                [attr.aria-label]="'Health check ' + ($index + 1) + ' command'"
+              ></textarea>
+            }
+            <details>
+              <summary class="cursor-pointer text-xs text-muted-foreground">
+                Timing & thresholds (blank = defaults)
+              </summary>
+              <div class="flex flex-wrap gap-2 pt-2">
+                <input
+                  z-input
+                  class="w-32"
+                  placeholder="interval ms"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="row.intervalMs"
+                  (input)="updateHealthCheck($index, 'intervalMs', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' interval ms'"
+                />
+                <input
+                  z-input
+                  class="w-32"
+                  placeholder="timeout ms"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="row.timeoutMs"
+                  (input)="updateHealthCheck($index, 'timeoutMs', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' timeout ms'"
+                />
+                <input
+                  z-input
+                  class="w-32"
+                  placeholder="healthy after"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="row.healthyThreshold"
+                  (input)="updateHealthCheck($index, 'healthyThreshold', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' healthy threshold'"
+                />
+                <input
+                  z-input
+                  class="w-32"
+                  placeholder="unhealthy after"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="row.unhealthyThreshold"
+                  (input)="
+                    updateHealthCheck($index, 'unhealthyThreshold', $any($event.target).value)
+                  "
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' unhealthy threshold'"
+                />
+                <input
+                  z-input
+                  class="w-32"
+                  placeholder="initial delay ms"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [value]="row.initialDelayMs"
+                  (input)="updateHealthCheck($index, 'initialDelayMs', $any($event.target).value)"
+                  [attr.aria-label]="'Health check ' + ($index + 1) + ' initial delay ms'"
+                />
+              </div>
+            </details>
+          </div>
+        }
+        <div>
+          <button z-button zType="secondary" type="button" (click)="addHealthCheck()">
+            Add health check
+          </button>
+        </div>
+      </fieldset>
+
       <!-- Environment variables overlaid on the process env when the daemon runs. -->
       <fieldset class="flex flex-col gap-2">
         <legend class="text-sm font-medium">Environment variables</legend>
@@ -347,6 +510,7 @@ export class DaemonFormComponent {
     environment: [],
     observers: [],
     sources: [],
+    healthChecks: [],
   });
   readonly form = form(this.model, (schemaPath) => {
     required(schemaPath.name, { message: 'Name is required' });
@@ -405,6 +569,44 @@ export class DaemonFormComponent {
     this.model.update((m) => ({
       ...m,
       sources: m.sources.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    }));
+  }
+
+  addHealthCheck() {
+    this.model.update((m) => ({
+      ...m,
+      healthChecks: [
+        ...m.healthChecks,
+        {
+          name: '',
+          kind: 'HTTP',
+          port: '',
+          path: '',
+          expectStatus: '',
+          command: '',
+          intervalMs: '',
+          timeoutMs: '',
+          healthyThreshold: '',
+          unhealthyThreshold: '',
+          initialDelayMs: '',
+        },
+      ],
+    }));
+  }
+
+  removeHealthCheck(index: number) {
+    this.model.update((m) => ({
+      ...m,
+      healthChecks: m.healthChecks.filter((_, i) => i !== index),
+    }));
+  }
+
+  updateHealthCheck(index: number, field: keyof DaemonHealthCheckRow, value: string) {
+    this.model.update((m) => ({
+      ...m,
+      healthChecks: m.healthChecks.map((row, i) =>
+        i === index ? { ...row, [field]: value } : row,
+      ),
     }));
   }
 

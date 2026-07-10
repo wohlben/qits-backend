@@ -8,6 +8,7 @@ import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { DaemonTerminalComponent } from '@/pattern/daemon/daemon-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
+import { DaemonHealthChecksComponent } from '@/ui/components/daemon/daemon-health-checks.component';
 import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-chip.component';
 
 /**
@@ -21,6 +22,7 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
   imports: [
     RouterLink,
     ZardButtonComponent,
+    DaemonHealthChecksComponent,
     DaemonStatusChipComponent,
     DaemonTerminalComponent,
   ],
@@ -54,6 +56,9 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
                   [status]="instance.status ?? 'STOPPED'"
                   [restartCount]="instance.restartCount ?? 0"
                 />
+                @if (instance.health?.length) {
+                  <app-daemon-health-checks [health]="instance.health!" />
+                }
                 @if (instance.commandId) {
                   <a
                     z-button

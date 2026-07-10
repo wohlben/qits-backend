@@ -43,7 +43,8 @@ public class RepositoryDaemonController {
       @Valid WebViewInput webView,
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
-      List<@Valid LogSourceInput> sources) {
+      List<@Valid LogSourceInput> sources,
+      List<@Valid HealthCheckInput> healthChecks) {
     public record Response(RepositoryDaemonDto daemon) {}
   }
 
@@ -69,7 +70,8 @@ public class RepositoryDaemonController {
             webView != null ? webView.basePath() : null,
             request.environment(),
             LogObserverInput.toEntities(request.observers()),
-            LogSourceInput.toEntities(request.sources()));
+            LogSourceInput.toEntities(request.sources()),
+            HealthCheckInput.toEntities(request.healthChecks()));
     return new CreateRepositoryDaemonRequest.Response(repositoryDaemonMapper.toDto(daemon));
   }
 
@@ -117,7 +119,8 @@ public class RepositoryDaemonController {
       @Valid WebViewInput webView,
       Map<String, String> environment,
       List<@Valid LogObserverInput> observers,
-      List<@Valid LogSourceInput> sources) {
+      List<@Valid LogSourceInput> sources,
+      List<@Valid HealthCheckInput> healthChecks) {
     public record Response(RepositoryDaemonDto daemon) {}
   }
 
@@ -148,7 +151,8 @@ public class RepositoryDaemonController {
             webView != null ? webView.basePathOrEmpty() : null,
             request.environment(),
             LogObserverInput.toEntities(request.observers()),
-            LogSourceInput.toEntities(request.sources()));
+            LogSourceInput.toEntities(request.sources()),
+            HealthCheckInput.toEntities(request.healthChecks()));
     return new UpdateRepositoryDaemonRequest.Response(repositoryDaemonMapper.toDto(daemon));
   }
 

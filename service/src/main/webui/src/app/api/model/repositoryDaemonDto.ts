@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { HealthCheckDto } from './healthCheckDto';
 import { WebViewDto } from './webViewDto';
 import { LogObserverDto } from './logObserverDto';
 import { LogSourceDto } from './logSourceDto';
@@ -29,6 +30,7 @@ export interface RepositoryDaemonDto {
     environment?: { [key: string]: string; };
     observers?: Array<LogObserverDto>;
     sources?: Array<LogSourceDto>;
+    healthChecks?: Array<HealthCheckDto>;
 }
 export namespace RepositoryDaemonDto {
 }
