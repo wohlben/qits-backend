@@ -63,6 +63,11 @@ public class AgentTranscriptService {
   /** The synthetic line type carrying a sidechain's meta (agent type, description, anchor). */
   static final String AGENT_META_TYPE = "qits_agent_meta";
 
+  /** How often and how long {@link #onChatExit} waits for the harness's JSONL flush. */
+  private static final int SETTLE_ATTEMPTS = 4;
+
+  private static final long SETTLE_DELAY_MS = 250;
+
   private static final AtomicBoolean MISSING_CONFIG_DIR_LOGGED = new AtomicBoolean();
 
   private final ObjectMapper mapper = new ObjectMapper();
@@ -101,6 +106,84 @@ public class AgentTranscriptService {
     } catch (RuntimeException e) {
       LOG.errorf(e, "Transcript sweep failed for command %s", commandId);
     }
+  }
+
+  /**
+   * The chat variant of {@link #onCommandExit}: the live tail has already imported {@code
+   * expectedMainLines} main-session lines, so wait for the harness's asynchronous JSONL flush to
+   * catch up before the delete-and-reimport — sweeping early would replace the tail's good rows
+   * with fewer. Bounded settle (the exit chain runs on the chat reader thread and {@code
+   * terminate()} waits only 2 s on the finish latch); on exhaustion, sweep anyway with a warning.
+   */
+  public void onChatExit(String commandId, long expectedMainLines) {
+    try {
+      chatSweep(commandId, expectedMainLines, Path.of(claudeConfigDir));
+    } catch (RuntimeException e) {
+      LOG.errorf(e, "Transcript sweep failed for command %s", commandId);
+    }
+  }
+
+  /** Settle-then-sweep; package-visible so tests can point it at a fixture config dir. */
+  void chatSweep(String commandId, long expectedMainLines, Path configDir) {
+    awaitSettled(commandId, expectedMainLines, configDir);
+    sweep(commandId, configDir);
+  }
+
+  private void awaitSettled(String commandId, long expectedMainLines, Path configDir) {
+    if (expectedMainLines <= 0 || !Files.isDirectory(configDir)) {
+      return;
+    }
+    SessionInfo main = mainSession(commandId);
+    if (main == null) {
+      return;
+    }
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    for (int attempt = 0; ; attempt++) {
+      Path transcript = resolveTranscript(configDir, agent, main);
+      if (transcript != null && countNonBlankLines(transcript) >= expectedMainLines) {
+        return;
+      }
+      if (attempt >= SETTLE_ATTEMPTS - 1) {
+        LOG.warnf(
+            "Transcript of command %s is still shorter than the %d line(s) already imported"
+                + " live — sweeping anyway",
+            commandId, expectedMainLines);
+        return;
+      }
+      try {
+        Thread.sleep(SETTLE_DELAY_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
+  }
+
+  private long countNonBlankLines(Path file) {
+    try (Stream<String> lines = Files.lines(file)) {
+      return lines.filter(line -> !line.isBlank()).count();
+    } catch (IOException e) {
+      return -1;
+    }
+  }
+
+  /** The command's first (for a chat: only) session, or null — read in its own transaction. */
+  SessionInfo mainSession(String commandId) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Command command = commandRepository.findById(commandId);
+              if (command == null || command.agentSessions.isEmpty()) {
+                return null;
+              }
+              var ref = command.agentSessions.get(0);
+              return new SessionInfo(ref.sessionId, ref.transcriptPath);
+            });
+  }
+
+  /** The line's own {@code timestamp} field when present and parseable, else null. */
+  Instant lineTimestamp(String line) {
+    return ownTimestamp(parseLine(line));
   }
 
   /** The sweep itself; package-visible so tests can point it at a fixture config dir. */
@@ -162,7 +245,8 @@ public class AgentTranscriptService {
   /** What the sweep needs from the row, copied out of the transaction. */
   private record CommandInfo(String repoId, String workspaceId, List<SessionInfo> sessions) {}
 
-  private record SessionInfo(String sessionId, String reportedTranscriptPath) {}
+  /** One session's identity + hook-reported path; shared with the live tail. */
+  record SessionInfo(String sessionId, String reportedTranscriptPath) {}
 
   /** Read in its own transaction — exit listeners run on registry reader threads. */
   private CommandInfo loadInfo(String commandId) {
@@ -186,9 +270,9 @@ public class AgentTranscriptService {
    * The session's transcript file: the hook-reported path (authoritative, remapped from the
    * container mount) when it resolves, else the harness convention, else an exact-filename lookup
    * under {@code projects/} (the recovery path if the escaping convention ever drifts across CLI
-   * upgrades), else null.
+   * upgrades), else null. Package-visible: the live tail resolves the same way.
    */
-  private Path resolveTranscript(Path configDir, CodingAgent agent, SessionInfo session) {
+  Path resolveTranscript(Path configDir, CodingAgent agent, SessionInfo session) {
     Path reported = remapReportedPath(configDir, session.reportedTranscriptPath());
     if (reported != null && Files.isRegularFile(reported)) {
       return reported;

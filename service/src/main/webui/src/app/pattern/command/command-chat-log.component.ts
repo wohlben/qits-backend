@@ -8,9 +8,9 @@ import { ChatTranscriptComponent } from './chat-transcript.component';
 import { linesToItems } from './chat-stream';
 
 /**
- * Read-only replay of a finished {@code CHAT} command: reads the persisted conversation from the same
- * `/log` endpoint terminals use (each captured line is one stream-json event) and renders it as chat
- * bubbles via {@link linesToMessages}.
+ * Read-only replay of a finished {@code CHAT} command: reads the durable conversation (the imported
+ * agent transcript) from the same `/log` endpoint terminals use and renders it as chat bubbles via
+ * {@link linesToItems}.
  */
 @Component({
   selector: 'app-command-chat-log',
@@ -35,14 +35,14 @@ export class CommandChatLogComponent {
 
   private readonly commandService = inject(CommandControllerService);
 
-  // Pinned to the OUTPUT channel: the intercepted stream-json stdout. The command may also carry
-  // an imported agent transcript on TRANSCRIPT — that renders in the separate transcript view,
-  // and mixing the channels here would double-render the conversation.
+  // Pinned to the TRANSCRIPT channel — for a chat that is "the durable conversation": the imported
+  // agent transcript (incl. subagent sidechains) merged server-side with the persisted error
+  // results, falling back to the full intercepted OUTPUT stream for pre-cutover chats.
   readonly logQuery = injectQuery(() => ({
-    queryKey: ['command-log', this.commandId(), LogChannel.Output],
+    queryKey: ['command-log', this.commandId(), LogChannel.Transcript],
     queryFn: () =>
       lastValueFrom(
-        this.commandService.apiCommandsCommandIdLogGet(this.commandId(), LogChannel.Output),
+        this.commandService.apiCommandsCommandIdLogGet(this.commandId(), LogChannel.Transcript),
       ).then((r) => r.lines ?? []),
   }));
 

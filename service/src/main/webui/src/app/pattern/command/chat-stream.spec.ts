@@ -87,6 +87,77 @@ describe('linesToItems (extracted transcripts)', () => {
 
     expect(items).toEqual([]);
   });
+
+  it('folds a real user turn whose message.content is an array of text blocks', () => {
+    const items = linesToItems([
+      transcriptLine({
+        type: 'user',
+        message: { content: [{ type: 'text', text: 'please fix the build' }] },
+      }),
+    ]);
+
+    expect(items).toEqual([{ kind: 'user', text: 'please fix the build' }]);
+  });
+
+  it('folds a queued_command attachment (a user turn sent mid-turn) into a user bubble', () => {
+    const items = linesToItems([
+      transcriptLine({
+        type: 'attachment',
+        attachment: {
+          type: 'queued_command',
+          prompt: [{ type: 'text', text: 'please stop and reply' }],
+          commandMode: 'prompt',
+        },
+      }),
+      transcriptLine({ type: 'attachment', attachment: { type: 'file' } }),
+    ]);
+
+    expect(items).toEqual([{ kind: 'user', text: 'please stop and reply' }]);
+  });
+
+  it('drops isMeta user lines (caveat preambles, injected context)', () => {
+    const items = linesToItems([
+      transcriptLine({
+        type: 'user',
+        isMeta: true,
+        message: { content: 'Caveat: the messages below were generated…' },
+      }),
+    ]);
+
+    expect(items).toEqual([]);
+  });
+
+  it('folds a stitched mixed stream (transcript head + live stdout tail) coherently', () => {
+    const items = linesToItems([
+      // Transcript-shaped head: the real user turn and an imported assistant event.
+      transcriptLine({
+        type: 'user',
+        message: { content: [{ type: 'text', text: 'first question' }] },
+      }),
+      transcriptLine({
+        type: 'assistant',
+        uuid: 'e1',
+        message: { content: [{ type: 'text', text: 'first answer' }] },
+      }),
+      // A persisted error result merged in by the server.
+      JSON.stringify({ type: 'result', subtype: 'error', is_error: true, result: 'rate limited' }),
+      // Live stdout-shaped ring tail: the synthetic echo and a fresh assistant event.
+      JSON.stringify({ type: 'user', text: 'second question' }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'e2',
+        message: { content: [{ type: 'text', text: 'second answer' }] },
+      }),
+    ]);
+
+    expect(items).toEqual([
+      { kind: 'user', text: 'first question' },
+      { kind: 'assistant', text: 'first answer' },
+      { kind: 'system', text: 'error: rate limited', error: true },
+      { kind: 'user', text: 'second question' },
+      { kind: 'assistant', text: 'second answer' },
+    ]);
+  });
 });
 
 describe('foldSidechains', () => {

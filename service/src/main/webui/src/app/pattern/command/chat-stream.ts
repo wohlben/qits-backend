@@ -51,8 +51,11 @@ interface StreamEvent {
   result?: string;
   is_error?: boolean;
   message?: { content?: ContentBlock[] | string };
+  // A user turn queued mid-turn persists as an attachment line, not a user line.
+  attachment?: { type?: string; prompt?: { type?: string; text?: string }[] };
   // Transcript persistence metadata (absent on live stream lines).
   isSidechain?: boolean;
+  isMeta?: boolean;
   agentId?: string;
   // qits_agent_meta fields (the synthetic sidechain label line the transcript import emits).
   agentType?: string;
@@ -75,6 +78,10 @@ export function linesToItems(lines: string[]): ChatItem[] {
     const before = out.length;
     switch (ev.type) {
       case 'user':
+        if (ev.isMeta) {
+          // Transcript bookkeeping stamped isMeta (caveat preambles, injected context) — not a turn.
+          break;
+        }
         if (typeof ev.text === 'string') {
           // The synthetic echo of the human's own turn (live chat).
           out.push({ kind: 'user', text: ev.text });
@@ -82,10 +89,13 @@ export function linesToItems(lines: string[]): ChatItem[] {
           // A real user turn as persisted in an extracted transcript.
           out.push({ kind: 'user', text: ev.message.content });
         } else {
-          // Claude echoes tool results back as a `user` event with tool_result content.
+          // Block-array content: a real user turn persists its text as text blocks, and Claude
+          // echoes tool results back as a `user` event with tool_result content.
           for (const block of ev.message?.content ?? []) {
             if (block.type === 'tool_result') {
               out.push({ kind: 'toolResult', text: toolResultText(block), error: block.is_error });
+            } else if (block.type === 'text' && block.text) {
+              out.push({ kind: 'user', text: block.text });
             }
           }
         }
@@ -116,6 +126,20 @@ export function linesToItems(lines: string[]): ChatItem[] {
           out.push({ kind: 'system', text: 'error: ' + (ev.result ?? ev.subtype ?? 'unknown'), error: true });
         }
         break;
+      case 'attachment': {
+        // A user turn sent while the agent was mid-turn persists as a queued_command attachment
+        // in the transcript (never as a user line) — fold it back into a user bubble.
+        if (ev.attachment?.type === 'queued_command') {
+          const text = (ev.attachment.prompt ?? [])
+            .filter((block) => block.type === 'text' && block.text)
+            .map((block) => block.text)
+            .join('');
+          if (text) {
+            out.push({ kind: 'user', text });
+          }
+        }
+        break;
+      }
       case 'session_closed':
         out.push({ kind: 'system', text: 'session ended' });
         break;

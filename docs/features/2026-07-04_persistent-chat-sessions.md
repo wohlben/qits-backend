@@ -1,5 +1,12 @@
 # Persistent chat sessions: full-transcript restore on reconnect
 
+> **Persistence contract superseded** by
+> [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md): chat stdout is
+> no longer persisted wholesale to `OUTPUT` (failure `result` events excepted) — the durable
+> record is the imported agent transcript on `TRANSCRIPT`, and the re-attach head described below
+> now comes from those rows, stitched to the ring by shared event `uuid` instead of by sequence.
+> The lossless-restore *behaviour* this doc motivates is unchanged.
+
 ## Introduction
 
 Reconnecting to a running `CHAT` command currently replays only the in-memory scrollback ring

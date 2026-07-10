@@ -527,10 +527,17 @@ public class CommandService {
   /**
    * A command's captured per-line log (the audit history), optionally severity- and
    * channel-filtered. The channel filter separates intercepted stdio ({@code OUTPUT}) from the
-   * imported agent transcript ({@code TRANSCRIPT}) so neither view double-renders the other.
+   * imported agent transcript ({@code TRANSCRIPT}) so neither view double-renders the other. For a
+   * chat, {@code TRANSCRIPT} means "the durable conversation": the transcript merged with its
+   * persisted error results, or the full {@code OUTPUT} stream for pre-lineage chats that have no
+   * transcript — scoped to {@code CHAT} so a terminal agent's transcript view never falls back to
+   * raw PTY bytes.
    */
   public List<CommandLogLineDto> log(String commandId, LogSeverity severity, LogChannel channel) {
-    get(commandId); // validates existence (404 if unknown)
+    CommandDto command = get(commandId); // validates existence (404 if unknown)
+    if (channel == LogChannel.TRANSCRIPT && command.kind() == CommandKind.CHAT) {
+      return commandLogService.chatLog(commandId, severity);
+    }
     return commandLogService.log(commandId, severity, channel);
   }
 
