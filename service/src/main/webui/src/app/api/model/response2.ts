@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { CommandDto } from './commandDto';
 
 
 export interface Response2 { 
-    command?: CommandDto;
+    prompt?: string;
 }
 

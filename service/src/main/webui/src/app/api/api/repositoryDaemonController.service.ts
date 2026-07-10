@@ -27,7 +27,7 @@ import { Response12 } from '../model/response12';
 // @ts-ignore
 import { Response13 } from '../model/response13';
 // @ts-ignore
-import { Response9 } from '../model/response9';
+import { Response14 } from '../model/response14';
 // @ts-ignore
 import { UpdateRepositoryDaemonRequest } from '../model/updateRepositoryDaemonRequest';
 
@@ -56,9 +56,9 @@ export class RepositoryDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response12>;
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response12>>;
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response12>>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response13>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response13>>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response13>>;
     public apiRepositoriesRepositoryIdDaemonsDaemonIdDelete(daemonId: string, repositoryId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (daemonId === null || daemonId === undefined) {
             throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepositoryIdDaemonsDaemonIdDelete.');
@@ -94,7 +94,7 @@ export class RepositoryDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response12>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response13>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -116,9 +116,9 @@ export class RepositoryDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response11>;
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response11>>;
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response11>>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response12>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response12>>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response12>>;
     public apiRepositoriesRepositoryIdDaemonsDaemonIdGet(daemonId: string, repositoryId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (daemonId === null || daemonId === undefined) {
             throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepositoryIdDaemonsDaemonIdGet.');
@@ -154,7 +154,7 @@ export class RepositoryDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response11>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response12>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -177,9 +177,9 @@ export class RepositoryDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response9>;
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response9>>;
-    public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response9>>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response10>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response10>>;
+    public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response10>>;
     public apiRepositoriesRepositoryIdDaemonsDaemonIdPut(daemonId: string, repositoryId: string, updateRepositoryDaemonRequest: UpdateRepositoryDaemonRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (daemonId === null || daemonId === undefined) {
             throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepositoryIdDaemonsDaemonIdPut.');
@@ -227,7 +227,7 @@ export class RepositoryDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response9>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response10>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateRepositoryDaemonRequest,
@@ -249,9 +249,9 @@ export class RepositoryDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response10>;
-    public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response10>>;
-    public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response10>>;
+    public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response11>;
+    public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response11>>;
+    public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response11>>;
     public apiRepositoriesRepositoryIdDaemonsGet(repositoryId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repositoryId === null || repositoryId === undefined) {
             throw new Error('Required parameter repositoryId was null or undefined when calling apiRepositoriesRepositoryIdDaemonsGet.');
@@ -284,7 +284,7 @@ export class RepositoryDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response10>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response11>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -306,9 +306,9 @@ export class RepositoryDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response13>;
-    public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response13>>;
-    public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response13>>;
+    public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response14>;
+    public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response14>>;
+    public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response14>>;
     public apiRepositoriesRepositoryIdDaemonsPost(repositoryId: string, createRepositoryDaemonRequest: CreateRepositoryDaemonRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repositoryId === null || repositoryId === undefined) {
             throw new Error('Required parameter repositoryId was null or undefined when calling apiRepositoriesRepositoryIdDaemonsPost.');
@@ -353,7 +353,7 @@ export class RepositoryDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response13>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response14>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createRepositoryDaemonRequest,

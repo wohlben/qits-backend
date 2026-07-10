@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonEventDto } from './daemonEventDto';
+import { CommandDto } from './commandDto';
 
 
 export interface Response8 { 
-    events?: Array<DaemonEventDto>;
+    command?: CommandDto;
 }
 

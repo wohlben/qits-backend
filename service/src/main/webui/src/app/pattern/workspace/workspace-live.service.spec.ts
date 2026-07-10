@@ -91,7 +91,11 @@ describe('WorkspaceLiveService', () => {
 
     invalidate.mockClear();
     source.emitTopic('commands');
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['commands'])]);
+    // The session tree derives from commands + the transcript sweep — it rides the same hint.
+    expect(invalidatedKeys()).toEqual([
+      JSON.stringify(['commands']),
+      JSON.stringify(['workspace-agent-sessions', 'repo-1', 'wt-1']),
+    ]);
   });
 
   it('a single telemetry hint refreshes all four telemetry views', () => {
@@ -123,13 +127,14 @@ describe('WorkspaceLiveService', () => {
 
     source.emitOpen();
 
-    // daemons(1) + daemon-events(1) + telemetry(4) + commands(1) = 7
-    expect(invalidate).toHaveBeenCalledTimes(7);
+    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) = 8
+    expect(invalidate).toHaveBeenCalledTimes(8);
     const keys = invalidatedKeys();
     expect(keys).toContain(JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['telemetry-logs', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['commands']));
+    expect(keys).toContain(JSON.stringify(['workspace-agent-sessions', 'repo-1', 'wt-1']));
   });
 
   it('closes the EventSource when the providing component is destroyed', () => {

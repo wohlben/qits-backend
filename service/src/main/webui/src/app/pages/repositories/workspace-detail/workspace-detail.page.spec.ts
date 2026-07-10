@@ -5,7 +5,9 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
+import { AgentControllerService } from '@/api/api/agentController.service';
 import { AgentPluginControllerService } from '@/api/api/agentPluginController.service';
+import { AgentSessionControllerService } from '@/api/api/agentSessionController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { RepositoryActionsControllerService } from '@/api/api/repositoryActionsController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
@@ -35,6 +37,14 @@ describe('WorkspaceDetailPage', () => {
       .fn()
       .mockReturnValue(of({ installed: [] })),
   };
+  const agentService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost: vi.fn().mockReturnValue(of({})),
+  };
+  const agentSessionService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentSessionsGet: vi
+      .fn()
+      .mockReturnValue(of({ sessions: [] })),
+  };
   const route = {
     snapshot: { paramMap: convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1' }) },
   };
@@ -51,6 +61,25 @@ describe('WorkspaceDetailPage', () => {
         close() {}
       },
     );
+    // A seeded running agent run mounts the embedded xterm terminal, which needs matchMedia +
+    // ResizeObserver that jsdom doesn't provide.
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      media: '',
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent: () => false,
+    }));
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     queryClient = new QueryClient({
       defaultOptions: { queries: { staleTime: Infinity, retry: false, refetchOnMount: false } },
     });
@@ -60,6 +89,7 @@ describe('WorkspaceDetailPage', () => {
     );
     queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], { paths: [], lazyDirs: [] });
     queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], []);
+    queryClient.setQueryData(['workspace-agent-sessions', 'repo-1', 'wt-1'], []);
 
     await TestBed.configureTestingModule({
       imports: [WorkspaceDetailPage],
@@ -70,6 +100,8 @@ describe('WorkspaceDetailPage', () => {
         { provide: CommandControllerService, useValue: commandService },
         { provide: RepositoryActionsControllerService, useValue: actionsService },
         { provide: AgentPluginControllerService, useValue: pluginService },
+        { provide: AgentControllerService, useValue: agentService },
+        { provide: AgentSessionControllerService, useValue: agentSessionService },
         { provide: ZardDarkMode, useValue: { themeMode: () => EDarkModes.LIGHT } },
       ],
     }).compileComponents();
@@ -237,6 +269,57 @@ describe('WorkspaceDetailPage', () => {
     expect(
       tabButton(el, 'Actions').querySelector('[title="A command is running"]'),
     ).not.toBeNull();
+  });
+
+  it('marks the Agents tab for a running interactive agent run — and keeps the Actions dot off', async () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(
+      tabButton(el, 'Agents').querySelector('[title="An agent session is running"]'),
+    ).toBeNull();
+
+    // A running TERMINAL command with a session lineage is an agent run: it lights the Agents
+    // dot, and no longer the Actions one (each dot points at its owner tab).
+    queryClient.setQueryData(
+      ['commands'],
+      [
+        {
+          id: 'cmd-3',
+          workspaceId: 'wt-1',
+          kind: CommandKind.Terminal,
+          status: CommandStatus.Running,
+          actionName: 'Claude Code (repository MCP)',
+          launchedAt: '2026-07-10T10:00:00Z',
+          agentSessions: [{ sessionId: 'sess-1', source: 'PINNED' }],
+        },
+      ],
+    );
+    await flush();
+    fixture.detectChanges();
+
+    expect(
+      tabButton(el, 'Agents').querySelector('[title="An agent session is running"]'),
+    ).not.toBeNull();
+    expect(tabButton(el, 'Actions').querySelector('[title="A command is running"]')).toBeNull();
+  });
+
+  it('resolves the embedded session only on the Agents tab first selection', async () => {
+    queryClient.setQueryData(['commands'], []);
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Mounted hidden with the other tabs, but nothing launches on page load.
+    expect(el.querySelector('app-workspace-agent-session')).not.toBeNull();
+    await flush();
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).not.toHaveBeenCalled();
+
+    tabButton(el, 'Agents').click();
+    fixture.detectChanges();
+    await flush();
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledTimes(1);
   });
 
   it('marks the Daemons tab with an aggregate status dot', async () => {

@@ -20,7 +20,10 @@ import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
 import { DaemonStatus } from '@/api/model/daemonStatus';
 import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
-import { newestRunningChat } from '@/pattern/command/running-chat';
+import {
+  newestRunningChat,
+  newestRunningInteractiveAgent,
+} from '@/pattern/command/running-chat';
 import { DaemonWebviewComponent } from '@/pattern/daemon/webview/daemon-webview.component';
 import {
   DaemonEventFileAnchor,
@@ -29,10 +32,12 @@ import {
 import { WorkspaceDaemonsComponent } from '@/pattern/daemon/workspace-daemons.component';
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
 import { WorkspaceActionsComponent } from '@/pattern/workspace/workspace-actions.component';
+import { WorkspaceAgentSessionComponent } from '@/pattern/workspace/workspace-agent-session.component';
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
 import { WorkspacePluginsComponent } from '@/pattern/workspace/workspace-plugins.component';
+import { WorkspaceSessionTreeComponent } from '@/pattern/workspace/workspace-session-tree.component';
 import {
   ZardTabComponent,
   ZardTabGroupComponent,
@@ -42,7 +47,7 @@ import {
 /**
  * The workspace detail page: everything the workspace offers as one tab row — Chat, Files,
  * Daemons (controls + events feed), Actions (effective actions + run history), Web view,
- * Telemetry, Agents (the plugins list). All panels
+ * Telemetry, Agents (the embedded agent session + session history + plugins). All panels
  * rely on the tab
  * group keeping hidden tabs mounted: the file browser's openFile anchors, the chat's WebSocket,
  * and the web view's
@@ -56,11 +61,13 @@ import {
     DaemonWebviewComponent,
     PageLayoutComponent,
     WorkspaceActionsComponent,
+    WorkspaceAgentSessionComponent,
     WorkspaceChatComponent,
     WorkspaceDaemonEventsComponent,
     WorkspaceDaemonsComponent,
     WorkspaceFileBrowserComponent,
     WorkspacePluginsComponent,
+    WorkspaceSessionTreeComponent,
     WorkspaceTelemetryComponent,
     ZardTabComponent,
     ZardTabGroupComponent,
@@ -137,8 +144,25 @@ import {
         <z-tab label="Telemetry">
           <app-workspace-telemetry [repoId]="repoId" [workspaceId]="workspaceId" />
         </z-tab>
-        <z-tab label="Agents">
-          <app-workspace-plugins [repoId]="repoId" [workspaceId]="workspaceId" />
+        <z-tab
+          label="Agents"
+          [indicator]="agentsIndicator()"
+          indicatorLabel="An agent session is running"
+        >
+          <div class="flex flex-col gap-6">
+            <app-workspace-agent-session
+              [repoId]="repoId"
+              [workspaceId]="workspaceId"
+              [activated]="agentsActivated()"
+              (jumpToChat)="jumpToChat()"
+            />
+            <app-workspace-session-tree
+              [repoId]="repoId"
+              [workspaceId]="workspaceId"
+              [currentSessionId]="currentAgentSessionId()"
+            />
+            <app-workspace-plugins [repoId]="repoId" [workspaceId]="workspaceId" />
+          </div>
         </z-tab>
       </z-tab-group>
     </app-page-layout>
@@ -192,18 +216,33 @@ export class WorkspaceDetailPage {
 
   /**
    * "Something is running here" for the Actions tab: a RUNNING TERMINAL command in this workspace
-   * — action-launched runs, not chats (the Chat dot) or daemons (the Daemons dot).
+   * — action-launched runs, not chats (the Chat dot), daemons (the Daemons dot), or agent runs
+   * (the Agents dot; a session lineage marks a command as agent-driven). Each dot points at its
+   * owner tab; the run-history list still shows everything.
    */
   readonly actionsIndicator = computed<ZardTabIndicator | null>(() =>
     (this.commandsQuery.data() ?? []).some(
       (c) =>
         c.kind === CommandKind.Terminal &&
         c.status === CommandStatus.Running &&
-        c.workspaceId === this.workspaceId,
+        c.workspaceId === this.workspaceId &&
+        (c.agentSessions?.length ?? 0) === 0,
     )
       ? 'primary'
       : null,
   );
+
+  /** The running-session dot on the Agents tab — the embedded interactive agent's owner dot. */
+  readonly agentsIndicator = computed<ZardTabIndicator | null>(() =>
+    newestRunningInteractiveAgent(this.commandsQuery.data(), this.workspaceId) ? 'primary' : null,
+  );
+
+  /** The embedded run's current session (its list's last entry) — highlights its tree row. */
+  readonly currentAgentSessionId = computed(() => {
+    const running = newestRunningInteractiveAgent(this.commandsQuery.data(), this.workspaceId);
+    const sessions = running?.agentSessions ?? [];
+    return sessions[sessions.length - 1]?.sessionId ?? null;
+  });
 
   // Same key AND shape as the Daemons/Web view tabs' queries, so all three share one cache entry.
   readonly daemonsQuery = injectQuery(() => ({
@@ -244,10 +283,25 @@ export class WorkspaceDetailPage {
   /** Latched on the Web view tab's first selection; gates the iframe (see DaemonWebviewComponent). */
   readonly webviewActivated = signal(false);
 
+  /**
+   * Latched on the Agents tab's first selection; gates the embedded session's launch side effect
+   * (see WorkspaceAgentSessionComponent) — the session is expensive to materialize, so nothing
+   * launches on page load.
+   */
+  readonly agentsActivated = signal(false);
+
   onTabChange(label: string): void {
     if (label === 'Web view') {
       this.webviewActivated.set(true);
     }
+    if (label === 'Agents') {
+      this.agentsActivated.set(true);
+    }
+  }
+
+  /** The embedded session's deferred state jumps to the live conversation. */
+  jumpToChat(): void {
+    this.tabGroup()?.selectTabByLabel('Chat');
   }
 
   /** An event's "open in source": make the jump visible by switching to Files, then anchor. */

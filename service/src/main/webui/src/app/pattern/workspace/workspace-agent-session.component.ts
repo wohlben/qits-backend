@@ -1,0 +1,278 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
+import { lastValueFrom } from 'rxjs';
+
+import { AgentControllerService } from '@/api/api/agentController.service';
+import { CommandControllerService } from '@/api/api/commandController.service';
+import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
+import { AgentMcpScope } from '@/api/model/agentMcpScope';
+import { CommandDto } from '@/api/model/commandDto';
+import { CommandStatus } from '@/api/model/commandStatus';
+import {
+  launchMillis,
+  newestRunningChat,
+  newestRunningInteractiveAgent,
+} from '@/pattern/command/running-chat';
+import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
+import { ZardButtonComponent } from '@/shared/components/button';
+
+/**
+ * The workspace's embedded agent session: the interactive Claude Code TUI living directly in the
+ * Agents tab. Nothing launches on page load — the session is expensive to materialize — so the tab
+ * latches on first selection (`activated`), then resolves in order: a running interactive agent
+ * run re-attaches (wherever it was started from); a running chat defers to the Chat tab (its
+ * session is actively being driven — a concurrent `--resume` is exactly the collision session
+ * pinning avoids); previous sessions auto-resume the workspace's last one; an empty history gets a
+ * fresh session. The tab group keeps hidden tabs mounted, so the socket and the process survive
+ * tab switches — the same contract as chat.
+ *
+ * A signed-out volume makes the launch return the sign-in REPL (a TERMINAL command with no
+ * session lineage): it is a PTY like any other, so it renders here in place, and its exit re-runs
+ * resolution — the next launch proceeds signed in. A finished run does NOT auto-relaunch (a
+ * crashing agent would loop); the ended state offers Resume plus a link to the imported
+ * transcript.
+ */
+@Component({
+  selector: 'app-workspace-agent-session',
+  imports: [RouterLink, WebTerminalComponent, ZardButtonComponent],
+  template: `
+    <section class="flex flex-col gap-3" aria-label="Agent session">
+      <div class="flex items-center justify-between gap-4">
+        <h2 class="text-lg font-semibold">Session</h2>
+        @if (attachedCommandId(); as id) {
+          <button
+            z-button
+            zType="destructive"
+            [zLoading]="terminateMutation.isPending()"
+            (click)="terminateMutation.mutate(id)"
+          >
+            Terminate
+          </button>
+        }
+      </div>
+
+      @if (attachedCommandId(); as id) {
+        <span class="text-xs text-muted-foreground">
+          Switching tabs keeps the agent running; come back to pick up the conversation.
+        </span>
+        <!-- Tracked by command id so a relaunch (new id) recreates the terminal — it connects
+             once per component instance. -->
+        @for (cid of [id]; track cid) {
+          <app-web-terminal [commandId]="cid" />
+        }
+      } @else if (runningChat(); as chat) {
+        <div class="rounded-md border px-4 py-6 text-sm text-muted-foreground">
+          This workspace's conversation is live in the Chat tab.
+          <button z-button zType="link" type="button" (click)="jumpToChat.emit()">
+            Go to Chat
+          </button>
+        </div>
+      } @else if (launchMutation.isPending()) {
+        <div class="rounded-md border px-4 py-6 text-sm text-muted-foreground">
+          Starting agent session…
+        </div>
+      } @else if (launchMutation.isError()) {
+        <div class="flex flex-col items-start gap-2 rounded-md border px-4 py-6">
+          <span class="text-sm text-destructive">Failed to launch the agent session.</span>
+          <button z-button zType="secondary" type="button" (click)="resume()">Retry</button>
+        </div>
+      } @else if (endedCommandId(); as endedId) {
+        <div class="flex flex-col items-start gap-3 rounded-md border px-4 py-6">
+          <span class="text-sm text-muted-foreground">The session has ended.</span>
+          <div class="flex items-center gap-2">
+            <button z-button zType="secondary" type="button" (click)="resume()">Resume</button>
+            <a z-button zType="link" [routerLink]="['/commands', endedId]">View transcript</a>
+          </div>
+        </div>
+      } @else {
+        <div class="rounded-md border px-4 py-6 text-sm text-muted-foreground">
+          Resolving the workspace's agent session…
+        </div>
+      }
+    </section>
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class WorkspaceAgentSessionComponent {
+  readonly repoId = input.required<string>();
+  readonly workspaceId = input.required<string>();
+
+  /** Latched true by the page on the Agents tab's first selection; gates the launch side effect. */
+  readonly activated = input.required<boolean>();
+
+  /** The deferred state's jump link — the page switches the tab group to Chat. */
+  readonly jumpToChat = output<void>();
+
+  private readonly agentService = inject(AgentControllerService);
+  private readonly commandService = inject(CommandControllerService);
+  private readonly queryClient = inject(QueryClient);
+
+  // Same key AND shape as the page's commands query, so both share one cache entry.
+  readonly commandsQuery = injectQuery(() => ({
+    queryKey: ['commands'],
+    queryFn: () =>
+      lastValueFrom(this.commandService.apiCommandsGet()).then(
+        (r) => r.entries?.map((e) => e.command!).filter((c): c is CommandDto => !!c) ?? [],
+      ),
+  }));
+
+  /** Bridges the invalidation gap between launching from this tab and the registry reporting it. */
+  readonly launchedCommandId = signal<string | null>(null);
+
+  /** One-shot: the launch side effect runs once per tab activation; attach stays live-computed. */
+  private readonly resolutionLatch = signal(false);
+
+  /** The last command this tab embedded — what the ended state refers to once nothing runs. */
+  private readonly lastAttachedId = signal<string | null>(null);
+
+  /** Sign-in REPL exits already handled (each re-runs resolution exactly once). */
+  private readonly handledLoginExits = new Set<string>();
+
+  /** A live chat owns the workspace's conversation — the embed defers instead of launching. */
+  readonly runningChat = computed(() =>
+    newestRunningChat(this.commandsQuery.data(), this.workspaceId()),
+  );
+
+  /**
+   * The command the embedded terminal attaches to: the newest running interactive agent run
+   * (live-computed — concurrent launches converge on the last-initiated one at the next SSE
+   * invalidation), else the just-launched bridge (which also carries the sign-in REPL, whose
+   * command has no session lineage).
+   */
+  readonly attachedCommandId = computed(() => {
+    const running = newestRunningInteractiveAgent(this.commandsQuery.data(), this.workspaceId());
+    if (running?.id) {
+      return running.id;
+    }
+    const launched = this.launchedCommandId();
+    if (!launched) {
+      return null;
+    }
+    // Once the registry knows the launched command and it isn't running, stop bridging.
+    const known = (this.commandsQuery.data() ?? []).find((c) => c.id === launched);
+    return known && known.status !== CommandStatus.Running ? null : launched;
+  });
+
+  readonly hasRunningSession = computed(() => this.attachedCommandId() !== null);
+
+  /** The finished embedded run the ended state refers to; null while something is attached. */
+  readonly endedCommandId = computed(() =>
+    this.attachedCommandId() ? null : this.lastAttachedId(),
+  );
+
+  /**
+   * The workspace's last session: the newest finished command with a session lineage, its list's
+   * last entry (the command's current session, per the lineage contract). Chat sessions count —
+   * resuming the last chat conversation in the terminal is deliberate continuity.
+   */
+  readonly lastSessionId = computed(() => {
+    const finished = (this.commandsQuery.data() ?? []).filter(
+      (c) =>
+        c.workspaceId === this.workspaceId() &&
+        c.status !== CommandStatus.Running &&
+        (c.agentSessions?.length ?? 0) > 0,
+    );
+    if (finished.length === 0) {
+      return null;
+    }
+    const newest = finished.reduce((best, c) => (launchMillis(c) > launchMillis(best) ? c : best));
+    const sessions = newest.agentSessions!;
+    return sessions[sessions.length - 1]?.sessionId ?? null;
+  });
+
+  readonly launchMutation = injectMutation(() => ({
+    mutationFn: (resumeSessionId: string | null) =>
+      lastValueFrom(
+        this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
+          this.repoId(),
+          this.workspaceId(),
+          {
+            scope: AgentMcpScope.Repository,
+            mode: AgentLaunchMode.Interactive,
+            ...(resumeSessionId ? { resumeSessionId } : {}),
+          },
+        ),
+      ),
+    onSuccess: (res) => {
+      const id = res.command?.id;
+      if (id) {
+        this.launchedCommandId.set(id);
+      }
+      return this.queryClient.invalidateQueries({ queryKey: ['commands'] });
+    },
+  }));
+
+  readonly terminateMutation = injectMutation(() => ({
+    mutationFn: (commandId: string) =>
+      lastValueFrom(this.commandService.apiCommandsCommandIdTerminatePost(commandId)),
+    onSuccess: () => this.queryClient.invalidateQueries({ queryKey: ['commands'] }),
+  }));
+
+  constructor() {
+    // Resolution runs once per activation, as soon as the commands registry has answered.
+    effect(() => {
+      if (!this.activated() || this.resolutionLatch()) {
+        return;
+      }
+      if (this.commandsQuery.data() === undefined) {
+        return;
+      }
+      this.resolutionLatch.set(true);
+      this.resolveAndLaunch();
+    });
+
+    // Remember what we embed, so its exit can render the ended state.
+    effect(() => {
+      const id = this.attachedCommandId();
+      if (id) {
+        this.lastAttachedId.set(id);
+      }
+    });
+
+    // A finished run without a session lineage was the sign-in REPL: the operator completed (or
+    // aborted) OAuth, so re-run resolution — the next launch proceeds signed in. Real agent runs
+    // never auto-relaunch (a crashing agent would loop).
+    effect(() => {
+      const endedId = this.endedCommandId();
+      if (!endedId || this.handledLoginExits.has(endedId)) {
+        return;
+      }
+      const command = (this.commandsQuery.data() ?? []).find((c) => c.id === endedId);
+      if (!command || (command.agentSessions?.length ?? 0) > 0) {
+        return;
+      }
+      this.handledLoginExits.add(endedId);
+      this.launchedCommandId.set(null);
+      this.lastAttachedId.set(null);
+      this.resolveAndLaunch();
+    });
+  }
+
+  /**
+   * The resolution order from the feature contract: attach a running interactive run, defer to a
+   * live chat, else launch — resuming the workspace's last session when one exists.
+   */
+  private resolveAndLaunch(): void {
+    if (this.attachedCommandId() || this.runningChat() || this.launchMutation.isPending()) {
+      return;
+    }
+    this.launchMutation.mutate(this.lastSessionId());
+  }
+
+  /** The ended state's Resume: re-runs resolution, which continues the just-ended session. */
+  resume(): void {
+    this.launchedCommandId.set(null);
+    this.lastAttachedId.set(null);
+    this.resolveAndLaunch();
+  }
+}

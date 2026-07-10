@@ -17,11 +17,11 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response14 } from '../model/response14';
-// @ts-ignore
 import { Response15 } from '../model/response15';
 // @ts-ignore
 import { Response16 } from '../model/response16';
+// @ts-ignore
+import { Response17 } from '../model/response17';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -49,9 +49,9 @@ export class WorkspaceDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response15>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response15>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response15>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response16>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response16>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response16>>;
     public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (daemonId === null || daemonId === undefined) {
             throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost.');
@@ -90,7 +90,7 @@ export class WorkspaceDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/start`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response15>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response16>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -113,9 +113,9 @@ export class WorkspaceDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response14>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response14>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response14>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response15>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response15>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response15>>;
     public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (daemonId === null || daemonId === undefined) {
             throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost.');
@@ -154,7 +154,7 @@ export class WorkspaceDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/stop`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response14>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response15>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -176,9 +176,9 @@ export class WorkspaceDaemonControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response16>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response16>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response16>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response17>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response17>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response17>>;
     public apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(repoId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet.');
@@ -214,7 +214,7 @@ export class WorkspaceDaemonControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/daemons`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response16>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response17>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
