@@ -29,6 +29,9 @@ Related/dependent plans:
   — fixes *when* ranges are emitted and *how* overlaps merge. Independent, but its
   `mergeReference` half lands in the store's `addReference`, and the chat/agent flow
   inherits the cleaned-up lifecycle for free.
+- [files-tab-line-picker-mode](2026-07-11_files-tab-line-picker-mode.md) — arms the collect
+  gesture behind a web-view-style picker toggle, so plain text selection stops collecting
+  references as a side effect; references additionally carry a display-only code excerpt.
 
 ## Design
 
@@ -111,7 +114,8 @@ one-line form.
 
 - No new pick gesture: the *selected file* (`selectedPath`) is browsing state, not context —
   merely clicking through the tree must not spray rows onto the Chat tab. Line selection
-  stays the sole attach gesture.
+  stays the sole attach gesture *while pick mode is armed* (the arming toggle arrived with
+  [files-tab-line-picker-mode](2026-07-11_files-tab-line-picker-mode.md)).
 - No change to *when* ranges are emitted or how overlaps merge — that is
   [line-reference-selection-lifecycle](2026-07-11_line-reference-selection-lifecycle.md)'s
   job; this feature only relocated where they accumulate.

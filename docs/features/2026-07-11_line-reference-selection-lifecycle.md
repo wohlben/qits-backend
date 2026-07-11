@@ -26,6 +26,10 @@ Related/dependent plans:
   so the merge half of this feature landed in the store's `addReference` (which previously
   only deduped exact triples), and the chat/agent flow inherits the cleaned-up lifecycle for
   free.
+- [files-tab-line-picker-mode](2026-07-11_files-tab-line-picker-mode.md) — gates this
+  lifecycle behind an explicit pick-mode toggle (web-view picker parity); the gesture
+  machinery itself stays as shipped here, and `mergeReference` additionally stitches the
+  merged reference's code excerpt.
 
 ## Design
 

@@ -246,6 +246,43 @@ describe('SpeakToPromptComponent', () => {
     store.clear();
   });
 
+  it('renders the excerpt beneath a reference row, and no block when the ref has none', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.addReference({
+      path: 'src/App.java',
+      startLine: 10,
+      endLine: 11,
+      excerpt: 'int x = 1;\nint y = 2;',
+    });
+    store.addReference({ path: 'src/Other.java', startLine: 3, endLine: 3 });
+    const fixture = createComponent();
+
+    const pres = (fixture.nativeElement as HTMLElement).querySelectorAll('pre');
+    expect(pres).toHaveLength(1); // only the excerpt-carrying ref renders a block
+    expect(pres[0].textContent).toBe('int x = 1;\nint y = 2;');
+    store.clear();
+  });
+
+  it('keeps the excerpt out of the launched prompt — only the path:lines label rides along', async () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.addReference({
+      path: 'src/App.java',
+      startLine: 10,
+      endLine: 12,
+      excerpt: 'int secret = 42;',
+    });
+    const fixture = createComponent();
+    fixture.componentInstance.refinedPrompt.set('fix this');
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
+    await fixture.whenStable();
+
+    const [, , body] =
+      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
+    expect(body.initialContext).toBe('fix this\n\nSelected code:\n- src/App.java:10-12');
+    expect(body.initialContext).not.toContain('int secret = 42;');
+    store.clear();
+  });
+
   it('removes a reference row via its Remove button', () => {
     const store = TestBed.inject(PromptContextStore);
     store.addReference({ path: 'src/App.java', startLine: 3, endLine: 3 });

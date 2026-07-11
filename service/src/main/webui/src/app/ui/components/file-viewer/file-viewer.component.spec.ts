@@ -59,6 +59,18 @@ describe('FileViewerComponent', () => {
     expect(ranges).toEqual([{ startLine: 2, endLine: 5 }]);
   });
 
+  it('threads pickMode through to the source view (off by default)', () => {
+    const fixture = createComponent({ path: 'main.ts', content: 'const x = 1;\n' });
+    const codeViewer = fixture.debugElement.query(By.directive(CodeViewerComponent))
+      .componentInstance as CodeViewerComponent;
+
+    expect(codeViewer.pickMode()).toBe(false);
+
+    fixture.componentRef.setInput('pickMode', true);
+    fixture.detectChanges();
+    expect(codeViewer.pickMode()).toBe(true);
+  });
+
   it('shows files without a renderer as source only, with no toggle', () => {
     const fixture = createComponent({ path: 'main.ts', content: 'const x = 1;\n' });
 

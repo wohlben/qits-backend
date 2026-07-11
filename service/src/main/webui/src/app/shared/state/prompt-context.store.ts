@@ -51,6 +51,12 @@ export interface CodeReference {
   path: string;
   startLine: number;
   endLine: number;
+  /**
+   * The referenced lines' text, captured at pick time. Display-only (the Chat tab's preview) —
+   * never serialized into the prompt, so staleness after workspace edits is cosmetic. Optional:
+   * refs from producers without the file content omit it.
+   */
+  excerpt?: string;
 }
 
 /**
@@ -61,31 +67,76 @@ export interface CodeReference {
 const shouldMerge = (a: CodeReference, b: CodeReference): boolean =>
   a.path === b.path && a.startLine <= b.endLine + 1 && b.startLine <= a.endLine + 1;
 
+/** The 1-based line-number → text map an excerpt-carrying reference contributes. */
+function excerptLines(ref: CodeReference): Map<number, string> {
+  const lines = new Map<number, string>();
+  if (ref.excerpt !== undefined) {
+    ref.excerpt.split('\n').forEach((text, i) => lines.set(ref.startLine + i, text));
+  }
+  return lines;
+}
+
+/**
+ * Reconstructs a merged range's excerpt from its partners' line maps: the merge rule guarantees
+ * the union is contiguous, so the excerpt is the map read out from `startLine` to `endLine`.
+ * Later partners overwrite earlier ones on overlapping lines — the caller puts the incoming
+ * pick last so its (fresh) text wins over a stale one. Undefined when any line is missing,
+ * i.e. a partner carried no excerpt: a fabricated gap would misrepresent the range.
+ */
+function stitchExcerpt(
+  partners: CodeReference[],
+  startLine: number,
+  endLine: number,
+): string | undefined {
+  const lines = new Map<number, string>();
+  for (const partner of partners) {
+    for (const [n, text] of excerptLines(partner)) {
+      lines.set(n, text);
+    }
+  }
+  const out: string[] = [];
+  for (let n = startLine; n <= endLine; n++) {
+    const text = lines.get(n);
+    if (text === undefined) {
+      return undefined;
+    }
+    out.push(text);
+  }
+  return out.join('\n');
+}
+
 /**
  * Adds `ref` to `refs`, collapsing it with every same-path reference it overlaps or touches into
  * one min-start/max-end range (transitively: a range bridging two references absorbs both). The
- * merged reference keeps the position of the first partner it absorbed so chips don't jump; a
+ * merged reference keeps the position of the first partner it absorbed so chips don't jump, and
+ * its excerpt is stitched from the partners' excerpts (the incoming pick's lines win); a
  * disjoint reference is appended. Pure — always returns a new array.
  */
 export function mergeReference(refs: CodeReference[], ref: CodeReference): CodeReference[] {
-  let merged: CodeReference = { ...ref };
+  let startLine = ref.startLine;
+  let endLine = ref.endLine;
+  const absorbed: CodeReference[] = [];
   const rest: CodeReference[] = [];
   let insertAt = -1;
   // A single pass is complete: store-held refs are pairwise non-mergeable (every add goes through
   // this function), so the growing interval can never retroactively reach a skipped ref.
   for (const existing of refs) {
-    if (shouldMerge(existing, merged)) {
+    if (shouldMerge(existing, { path: ref.path, startLine, endLine })) {
       if (insertAt === -1) {
         insertAt = rest.length;
       }
-      merged = {
-        path: merged.path,
-        startLine: Math.min(existing.startLine, merged.startLine),
-        endLine: Math.max(existing.endLine, merged.endLine),
-      };
+      absorbed.push(existing);
+      startLine = Math.min(existing.startLine, startLine);
+      endLine = Math.max(existing.endLine, endLine);
     } else {
       rest.push(existing);
     }
+  }
+  const excerpt =
+    insertAt === -1 ? ref.excerpt : stitchExcerpt([...absorbed, ref], startLine, endLine);
+  const merged: CodeReference = { path: ref.path, startLine, endLine };
+  if (excerpt !== undefined) {
+    merged.excerpt = excerpt; // keep the key absent (not `undefined`) on excerpt-less refs
   }
   if (insertAt === -1) {
     return [...rest, merged];
