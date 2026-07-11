@@ -219,8 +219,10 @@ Landed as planned, with the open questions resolved as follows (each verified ag
   `@WithSpan` spans by itself). Zero `POST /otel/v1/…` spans among 94. Tier-3 confirmed live: a
   backend log record arrived with `code.function.name=…ConfigDiagnostic.deprecated` and
   `code.line.number=83`.
-- **Caveat found during E2E**: the acceptance criterion "the drill-down shows the attributes" was
-  wrong as written — the Telemetry tab's trace detail deliberately renders kind/name/duration
-  only, so the enrichment is visible via the trace API and the agent's `telemetryTrace` MCP tool
-  but not (yet) in the UI. Filed as
-  [telemetry trace detail omits span attributes](../issues/2026-07-11_telemetry-trace-detail-omits-span-attributes.md).
+- **Caveat found during E2E** (since resolved): the acceptance criterion "the drill-down shows the
+  attributes" was wrong as written — the Telemetry tab's trace detail deliberately rendered
+  kind/name/duration only, so the enrichment was visible via the trace API and the agent's
+  `telemetryTrace` MCP tool but not in the UI. Filed as
+  [telemetry trace detail omits span attributes](../issues/resolved/2026-07-11_telemetry-trace-detail-omits-span-attributes.md)
+  and fixed there: span rows and log rows are now expandable disclosures that render the attribute
+  map, so the `code.*` / `greeting.*` enrichment is visible in the Telemetry tab.

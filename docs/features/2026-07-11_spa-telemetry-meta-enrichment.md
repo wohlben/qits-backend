@@ -24,7 +24,10 @@ supports today:
 Like the parent feature, this is a **convention extension, not a qits feature**: instrumentation
 remains the target app's business, the fixture is the reference implementation, and **qits ships
 zero backend changes** — `TelemetryDecoder`/`TelemetryStore` are attribute-agnostic and the
-Telemetry tab's span drill-down already renders arbitrary attributes.
+Telemetry tab's span drill-down renders arbitrary attributes (the drill-down was made
+attribute-rendering in
+[telemetry trace detail omits span attributes](../issues/resolved/2026-07-11_telemetry-trace-detail-omits-span-attributes.md);
+it previously showed kind/name/duration only).
 
 Related / dependent plans:
 

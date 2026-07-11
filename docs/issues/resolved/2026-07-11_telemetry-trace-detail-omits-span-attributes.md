@@ -44,3 +44,17 @@ key/value list — same for log rows in the log tail. Purely presentational: ext
 `telemetry-span-list.component.ts` (and `telemetry-log-tail.component.ts`), no API change. A
 follow-up polish could render `code.file.path` as a deep link into the Files tab (the
 picked-file deep-link move), which is why the backend derivation is workspace-relative.
+
+## Resolution
+
+Fixed as suggested — purely presentational, no API change. Each span row in the trace detail and
+each row in the log tail (plus the span list's "Correlated logs" sub-list) is now a native
+`<details>/<summary>` disclosure; expanding a row renders its `attributes` map as a `<dl>`
+key/value list (empty maps show "No attributes"). Matches the existing disclosure idiom in
+`pattern/daemon/workspace-daemon-events.component.ts`; attribute-map iteration uses a small
+`attrEntries()` helper (mirroring `envEntries()` in the action-configuration detail page) rather
+than a template pipe, per the webui style guide.
+
+Touched: `service/src/main/webui/src/app/ui/components/telemetry/telemetry-span-list.component.ts`
+and `telemetry-log-tail.component.ts`, with new `*.spec.ts` for each. The `code.file.path`
+Files-tab deep link remains the noted follow-up.
