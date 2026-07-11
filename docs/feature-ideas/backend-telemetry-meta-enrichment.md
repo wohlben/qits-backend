@@ -3,7 +3,7 @@
 ## Introduction
 
 The backend sibling of
-[SPA telemetry meta-enrichment](spa-telemetry-meta-enrichment.md). Quarkus's automatic
+[SPA telemetry meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md). Quarkus's automatic
 instrumentation produces exactly one span per request — `POST /greetings`, HTTP semconv
 attributes, nothing else. Which **class handled it**, which **method**, which **file** — absent;
 and the trace has no interior (no spans for the business methods the handler called). This idea
@@ -27,7 +27,7 @@ arbitrary attributes.
 
 Related / dependent plans:
 
-- **Sibling of [SPA telemetry meta-enrichment](spa-telemetry-meta-enrichment.md)** — together
+- **Sibling of [SPA telemetry meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md)** — together
   they make the full-stack trace source-addressed at every hop: browser fetch span
   (`code.function=Greeting.submit`) → server span (`code.filepath=src/main/java/…/
   GreetingResource.java`) → `GreetingService.compose`. The two should agree on `code.*` key
