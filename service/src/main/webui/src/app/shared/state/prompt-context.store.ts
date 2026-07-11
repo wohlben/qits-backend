@@ -54,6 +54,47 @@ export interface CodeReference {
 }
 
 /**
+ * Two same-file ranges merge when they overlap or touch (adjacent lines) — a single predicate so
+ * switching to strict-overlap-only (`a.startLine <= b.endLine && b.startLine <= a.endLine`) stays
+ * a one-line change.
+ */
+const shouldMerge = (a: CodeReference, b: CodeReference): boolean =>
+  a.path === b.path && a.startLine <= b.endLine + 1 && b.startLine <= a.endLine + 1;
+
+/**
+ * Adds `ref` to `refs`, collapsing it with every same-path reference it overlaps or touches into
+ * one min-start/max-end range (transitively: a range bridging two references absorbs both). The
+ * merged reference keeps the position of the first partner it absorbed so chips don't jump; a
+ * disjoint reference is appended. Pure — always returns a new array.
+ */
+export function mergeReference(refs: CodeReference[], ref: CodeReference): CodeReference[] {
+  let merged: CodeReference = { ...ref };
+  const rest: CodeReference[] = [];
+  let insertAt = -1;
+  // A single pass is complete: store-held refs are pairwise non-mergeable (every add goes through
+  // this function), so the growing interval can never retroactively reach a skipped ref.
+  for (const existing of refs) {
+    if (shouldMerge(existing, merged)) {
+      if (insertAt === -1) {
+        insertAt = rest.length;
+      }
+      merged = {
+        path: merged.path,
+        startLine: Math.min(existing.startLine, merged.startLine),
+        endLine: Math.max(existing.endLine, merged.endLine),
+      };
+    } else {
+      rest.push(existing);
+    }
+  }
+  if (insertAt === -1) {
+    return [...rest, merged];
+  }
+  rest.splice(insertAt, 0, merged);
+  return rest;
+}
+
+/**
  * The prompt-context cache: elements picked from a daemon web view plus code references selected
  * in the Files tab, waiting to be handed to an agent. Root-scoped so both outlive their collecting
  * component and navigation — pick or select, then use them from speak-to-prompt (initialContext)
@@ -102,13 +143,9 @@ export const PromptContextStore = signalStore(
         }
         return add(pick);
       },
-      /** Stages a reference; exact `(path, startLine, endLine)` duplicates are dropped. */
+      /** Stages a reference, merging it into any same-path references it overlaps or touches. */
       addReference(ref: CodeReference): void {
-        patchState(store, (state) => ({
-          references: state.references.some((r) => sameRef(r, ref))
-            ? state.references
-            : [...state.references, ref],
-        }));
+        patchState(store, (state) => ({ references: mergeReference(state.references, ref) }));
       },
       /** Removes by value — a reference's identity is its `(path, startLine, endLine)` triple. */
       removeReference(ref: CodeReference): void {

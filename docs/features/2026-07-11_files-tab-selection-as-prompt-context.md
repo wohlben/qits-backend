@@ -25,9 +25,9 @@ Related/dependent plans:
 - [workspace-tab-url-and-picked-file-deep-link](2026-07-10_workspace-tab-url-and-picked-file-deep-link.md)
   — owns the `?path=` deep link the reference rows link back through, extended here with the
   `?lines=` anchor.
-- [line-reference-selection-lifecycle](../feature-ideas/line-reference-selection-lifecycle.md)
-  (idea) — fixes *when* ranges are emitted and *how* overlaps merge. Independent, but its
-  `mergeReference` half now lands in the store's `addReference`, and the chat/agent flow
+- [line-reference-selection-lifecycle](2026-07-11_line-reference-selection-lifecycle.md)
+  — fixes *when* ranges are emitted and *how* overlaps merge. Independent, but its
+  `mergeReference` half lands in the store's `addReference`, and the chat/agent flow
   inherits the cleaned-up lifecycle for free.
 
 ## Design
@@ -39,8 +39,9 @@ A second slice beside `snippets` (`shared/state/prompt-context.store.ts`):
 - `CodeReference` (`{ path, startLine, endLine }`) moved from
   `workspace-file-browser.component.ts` to the store file; the browser imports it back.
 - State is `{ snippets: PickedSnippet[], references: CodeReference[] }` with methods
-  `addReference(ref)` (dedupe on exact `(path, startLine, endLine)` — overlap-merge arrives
-  with the lifecycle idea), `removeReference(ref)` (by value triple, not object identity),
+  `addReference(ref)` (initially dedupe on exact `(path, startLine, endLine)`; overlap-merge
+  arrived with the lifecycle feature), `removeReference(ref)` (by value triple, not object
+  identity),
   and `clear()` emptying **both** slices — one "Clear" affordance, one context.
 - The file browser's local `references` signal is gone; `references` is an alias of the store
   slice, so chips render from `promptContext.references()` and `removeReference` delegates to
@@ -112,7 +113,7 @@ one-line form.
   merely clicking through the tree must not spray rows onto the Chat tab. Line selection
   stays the sole attach gesture.
 - No change to *when* ranges are emitted or how overlaps merge — that is
-  [line-reference-selection-lifecycle](../feature-ideas/line-reference-selection-lifecycle.md)'s
+  [line-reference-selection-lifecycle](2026-07-11_line-reference-selection-lifecycle.md)'s
   job; this feature only relocated where they accumulate.
 - No backend changes: references travel inside the existing `initialContext` / chat text.
 

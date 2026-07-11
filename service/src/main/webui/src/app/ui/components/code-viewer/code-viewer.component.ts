@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -39,6 +40,9 @@ export interface LineRange {
   endLine: number;
 }
 
+/** Quiet period after the last keyboard-driven selection change before the range is emitted. */
+const SELECTION_DEBOUNCE_MS = 400;
+
 const setHighlights = StateEffect.define<LineRange[]>();
 
 /** A CodeMirror StateField that paints the given line ranges with the `.cm-refHighlight` class. */
@@ -71,7 +75,8 @@ function buildHighlights(state: EditorState, ranges: LineRange[]): DecorationSet
 /**
  * Presentational, read-only code viewer built on CodeMirror 6. It shows a file's text with syntax
  * highlighting (grammar chosen from the filename), lets the user select a line range — emitted via
- * {@link selectRange} — and paints already-collected ranges (the `highlights` input) so referenced
+ * {@link selectRange} once per finalized gesture (mouseup for pointer drags, a quiet period for
+ * keyboard selections) — and paints already-collected ranges (the `highlights` input) so referenced
  * code stays visibly marked. No services/API/routing: theme is passed in via `isDark` to keep this
  * in the `ui/` layer. Editing is disabled; this is a viewer, not an editor.
  */
@@ -113,11 +118,23 @@ export class CodeViewerComponent {
   readonly selectRange = output<LineRange>();
 
   private readonly hostRef = viewChild<ElementRef<HTMLElement>>('host');
+  private readonly document = inject(DOCUMENT);
   private readonly languageCompartment = new Compartment();
   private view?: EditorView;
 
+  private pendingRange: LineRange | null = null;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** True between a mousedown inside the editor and the next document mouseup. */
+  private pointerSelecting = false;
+
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.destroyView());
+    // Pointer drags can end outside the editor, so the flush listens on the document; registered
+    // once for the component's lifetime — it is a no-op when no selection is pending.
+    this.document.addEventListener('mouseup', this.onDocumentMouseUp);
+    inject(DestroyRef).onDestroy(() => {
+      this.document.removeEventListener('mouseup', this.onDocumentMouseUp);
+      this.destroyView();
+    });
 
     // Rebuild the editor whenever the file, its content, or the theme changes. Highlights are read
     // untracked so collecting a reference doesn't tear down and rebuild the whole view.
@@ -194,6 +211,15 @@ export class CodeViewerComponent {
       highlightField,
       this.languageCompartment.of([]),
       EditorView.updateListener.of((u) => this.onUpdate(u)),
+      EditorView.domEventHandlers({
+        mousedown: () => {
+          // A pointer gesture finalizes on mouseup, not after a quiet period — suspend the
+          // keyboard debounce until the drag ends. Don't return true: CodeMirror still handles
+          // the selection itself.
+          this.pointerSelecting = true;
+          this.cancelDebounce();
+        },
+      }),
       EditorView.theme({
         // Fill the parent by default; in fit mode grow to content instead so the viewer is only as
         // tall as its text (capped, so an unexpectedly huge snippet still scrolls rather than sprawls).
@@ -225,15 +251,56 @@ export class CodeViewerComponent {
     }
     const sel = update.state.selection.main;
     if (sel.empty) {
-      return; // a plain cursor click is not a range selection
+      // A plain click collapses the selection — abandon any pending range so the following
+      // mouseup (or a still-running debounce) doesn't emit a stale gesture.
+      this.clearPending();
+      return;
     }
-    const startLine = update.state.doc.lineAt(sel.from).number;
-    const endLine = update.state.doc.lineAt(sel.to).number;
+    this.pendingRange = {
+      startLine: update.state.doc.lineAt(sel.from).number,
+      endLine: update.state.doc.lineAt(sel.to).number,
+    };
+    // Keyboard gestures (shift+arrows) have no mouseup: flush after a quiet period. During a
+    // pointer drag the mouseup is the finalizer, so no timer runs.
+    this.cancelDebounce();
+    if (!this.pointerSelecting) {
+      this.debounceTimer = setTimeout(() => this.flushPending(), SELECTION_DEBOUNCE_MS);
+    }
+  }
+
+  private readonly onDocumentMouseUp = (): void => {
+    this.pointerSelecting = false;
+    this.flushPending();
+  };
+
+  /** Emits the pending range — one flush per gesture, whichever seam (mouseup, timer) fires first. */
+  private flushPending(): void {
+    this.cancelDebounce();
+    const range = this.pendingRange;
+    if (!range) {
+      return; // mouseup with nothing pending (plain click, click elsewhere on the page, …)
+    }
+    this.pendingRange = null;
     // Defer so we never emit (and trigger a downstream dispatch) mid-update.
-    queueMicrotask(() => this.selectRange.emit({ startLine, endLine }));
+    queueMicrotask(() => this.selectRange.emit(range));
+  }
+
+  private clearPending(): void {
+    this.pendingRange = null;
+    this.cancelDebounce();
+  }
+
+  private cancelDebounce(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
   }
 
   private destroyView(): void {
+    // A rebuild or destroy mid-gesture must never emit a range computed against the old document.
+    this.clearPending();
+    this.pointerSelecting = false;
     this.view?.destroy();
     this.view = undefined;
   }

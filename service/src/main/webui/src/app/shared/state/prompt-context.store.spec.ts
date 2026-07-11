@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { PromptContextStore } from './prompt-context.store';
+import { type CodeReference, mergeReference, PromptContextStore } from './prompt-context.store';
 import { formatReferencesForPrompt, formatSnippetsForPrompt } from './snippet-format';
 
 const pick = (overrides: Partial<Parameters<typeof formatSnippetsForPrompt>[0][number]> = {}) => ({
@@ -73,15 +73,22 @@ describe('PromptContextStore', () => {
     expect(s.count()).toBe(0);
   });
 
-  it('adds references and drops exact (path, startLine, endLine) duplicates', () => {
+  it('adds references, keeping exact duplicates as one entry', () => {
     const s = store();
     s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
     s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
     expect(s.references()).toHaveLength(1);
 
-    // A different range on the same path is a different reference.
+    // A disjoint range on the same path is a separate reference.
     s.addReference({ path: 'src/App.java', startLine: 10, endLine: 10 });
     expect(s.references()).toHaveLength(2);
+  });
+
+  it('merges an added reference into overlapping same-path references', () => {
+    const s = store();
+    s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    s.addReference({ path: 'src/App.java', startLine: 6, endLine: 9 });
+    expect(s.references()).toEqual([{ path: 'src/App.java', startLine: 3, endLine: 9 }]);
   });
 
   it('removes a reference by value, not object identity', () => {
@@ -102,6 +109,49 @@ describe('PromptContextStore', () => {
     s.clear();
     expect(s.snippets()).toHaveLength(0);
     expect(s.references()).toHaveLength(0);
+  });
+});
+
+describe('mergeReference', () => {
+  const ref = (startLine: number, endLine: number, path = 'a.ts'): CodeReference => ({
+    path,
+    startLine,
+    endLine,
+  });
+
+  it('appends a disjoint same-file range', () => {
+    expect(mergeReference([ref(1, 2)], ref(10, 11))).toEqual([ref(1, 2), ref(10, 11)]);
+  });
+
+  it('merges an overlapping range into min-start/max-end', () => {
+    expect(mergeReference([ref(3, 7)], ref(5, 12))).toEqual([ref(3, 12)]);
+  });
+
+  it('merges a touching range (adjacent lines)', () => {
+    expect(mergeReference([ref(3, 7)], ref(8, 10))).toEqual([ref(3, 10)]);
+  });
+
+  it('keeps a containing reference unchanged when a subrange is added', () => {
+    expect(mergeReference([ref(3, 10)], ref(5, 6))).toEqual([ref(3, 10)]);
+  });
+
+  it('bridges two existing references into one', () => {
+    expect(mergeReference([ref(1, 3), ref(8, 10)], ref(4, 7))).toEqual([ref(1, 10)]);
+  });
+
+  it('never merges across files', () => {
+    expect(mergeReference([ref(1, 5, 'a.ts')], ref(3, 7, 'b.ts'))).toEqual([
+      ref(1, 5, 'a.ts'),
+      ref(3, 7, 'b.ts'),
+    ]);
+  });
+
+  it('places the merged reference at the first absorbed partner and preserves the rest', () => {
+    const refs = [ref(1, 3, 'a.ts'), ref(1, 1, 'b.ts'), ref(8, 10, 'a.ts')];
+    expect(mergeReference(refs, ref(2, 9, 'a.ts'))).toEqual([
+      ref(1, 10, 'a.ts'),
+      ref(1, 1, 'b.ts'),
+    ]);
   });
 });
 
