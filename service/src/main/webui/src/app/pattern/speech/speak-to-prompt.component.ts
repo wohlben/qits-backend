@@ -186,23 +186,32 @@ import { WavRecorder } from './wav-recorder';
         <section class="flex flex-col gap-2">
           <span class="text-sm font-medium">Selected code (attached to the prompt)</span>
           @for (ref of promptContext.references(); track refLabel(ref)) {
-            <div class="flex items-center gap-2 rounded-md border p-2 text-sm">
-              <a
-                class="min-w-0 flex-1 truncate font-mono text-xs hover:underline"
-                [routerLink]="['/repositories', repoId(), 'workspaces', workspaceId(), 'files']"
-                [queryParams]="{ path: ref.path, lines: ref.startLine + '-' + ref.endLine }"
-                [title]="'Open ' + refLabel(ref) + ' in the file browser'"
-                >{{ refLabel(ref) }}</a
-              >
-              <button
-                z-button
-                zType="ghost"
-                type="button"
-                (click)="promptContext.removeReference(ref)"
-                [attr.aria-label]="'Remove reference ' + refLabel(ref)"
-              >
-                Remove
-              </button>
+            <div class="flex flex-col gap-1 rounded-md border p-2 text-sm">
+              <div class="flex items-center gap-2">
+                <a
+                  class="min-w-0 flex-1 truncate font-mono text-xs hover:underline"
+                  [routerLink]="['/repositories', repoId(), 'workspaces', workspaceId(), 'files']"
+                  [queryParams]="{ path: ref.path, lines: ref.startLine + '-' + ref.endLine }"
+                  [title]="'Open ' + refLabel(ref) + ' in the file browser'"
+                  >{{ refLabel(ref) }}</a
+                >
+                <button
+                  z-button
+                  zType="ghost"
+                  type="button"
+                  (click)="promptContext.removeReference(ref)"
+                  [attr.aria-label]="'Remove reference ' + refLabel(ref)"
+                >
+                  Remove
+                </button>
+              </div>
+              <!-- A pick-time preview so the user sees *what* they attached; the launch prompt
+                   still carries only the path:lines label (the agent reads the file itself). -->
+              @if (ref.excerpt !== undefined && ref.excerpt !== '') {
+                <pre
+                  class="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-xs"
+                >{{ ref.excerpt }}</pre>
+              }
             </div>
           }
         </section>

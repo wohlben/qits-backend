@@ -21,11 +21,13 @@ describe('CodeViewerComponent', () => {
     path: string;
     content: string | null;
     binary?: boolean;
+    pickMode?: boolean;
   }) {
     const fixture = TestBed.createComponent(CodeViewerComponent);
     fixture.componentRef.setInput('path', inputs.path);
     fixture.componentRef.setInput('content', inputs.content);
     fixture.componentRef.setInput('binary', inputs.binary ?? false);
+    fixture.componentRef.setInput('pickMode', inputs.pickMode ?? false);
     fixture.detectChanges();
     return fixture;
   }
@@ -47,11 +49,11 @@ describe('CodeViewerComponent', () => {
   });
 
   describe('selection lifecycle', () => {
-    function mountWithSelection() {
+    function mountWithSelection(inputs: { pickMode?: boolean } = {}) {
       // Fake only the timer APIs: the queueMicrotask emit deferral must stay real (drained with
-      // an awaited Promise.resolve()).
+      // an awaited Promise.resolve()). The lifecycle only runs while picking, so arm by default.
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-      const fixture = createComponent({ path: 'a.ts', content: CONTENT });
+      const fixture = createComponent({ path: 'a.ts', content: CONTENT, pickMode: true, ...inputs });
       const emits: LineRange[] = [];
       fixture.componentInstance.selectRange.subscribe((r) => emits.push(r));
       const dom = (fixture.nativeElement as HTMLElement).querySelector('.cm-editor');
@@ -139,6 +141,53 @@ describe('CodeViewerComponent', () => {
       await Promise.resolve();
 
       expect(emits).toEqual([]);
+    });
+
+    it('is inert with pick mode off — neither mouseup nor the debounce emits', async () => {
+      const { emits, view } = mountWithSelection({ pickMode: false });
+
+      selectLines(view, 2, 8);
+      mouseup();
+      vi.advanceTimersByTime(400);
+      await Promise.resolve();
+
+      expect(emits).toEqual([]);
+    });
+
+    it('clears the pending range when the picker disarms mid-gesture', async () => {
+      const { fixture, emits, view } = mountWithSelection();
+
+      selectLines(view, 2, 5);
+      fixture.componentRef.setInput('pickMode', false);
+      fixture.detectChanges(); // runs the disarm effect → pending range abandoned
+      mouseup();
+      vi.advanceTimersByTime(400);
+      await Promise.resolve();
+      expect(emits).toEqual([]);
+
+      // Re-arming restores the lifecycle.
+      fixture.componentRef.setInput('pickMode', true);
+      fixture.detectChanges();
+      selectLines(view, 3, 4);
+      mouseup();
+      await Promise.resolve();
+      expect(emits).toEqual([{ startLine: 3, endLine: 4 }]);
+    });
+
+    it('toggling pick mode swaps extensions in place instead of rebuilding the view', () => {
+      const { fixture, view } = mountWithSelection({ pickMode: false });
+      const dom = (fixture.nativeElement as HTMLElement).querySelector('.cm-editor');
+      expect(dom!.querySelector('.cm-selectionLayer')).toBeNull();
+
+      fixture.componentRef.setInput('pickMode', true);
+      fixture.detectChanges();
+      expect(EditorView.findFromDOM(dom as HTMLElement)).toBe(view); // same instance, no rebuild
+      expect(dom!.querySelector('.cm-selectionLayer')).not.toBeNull(); // drawSelection armed
+
+      fixture.componentRef.setInput('pickMode', false);
+      fixture.detectChanges();
+      expect(EditorView.findFromDOM(dom as HTMLElement)).toBe(view);
+      expect(dom!.querySelector('.cm-selectionLayer')).toBeNull();
     });
   });
 });

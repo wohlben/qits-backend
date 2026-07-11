@@ -29,6 +29,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import {
   Decoration,
   type DecorationSet,
+  drawSelection,
   EditorView,
   lineNumbers,
   type ViewUpdate,
@@ -59,6 +60,16 @@ const highlightField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+/**
+ * Pick-mode extensions: CodeMirror-drawn selection feedback plus native text selection
+ * suppressed (the gesture reads as picking lines, not selecting copyable text — CodeMirror's
+ * own mouse selection computes positions itself, so the gesture machinery keeps working).
+ * Empty when off: selection is fully native.
+ */
+function pickExtensions(on: boolean): Extension {
+  return on ? [drawSelection(), EditorView.theme({ '.cm-content': { userSelect: 'none' } })] : [];
+}
+
 function buildHighlights(state: EditorState, ranges: LineRange[]): DecorationSet {
   const lineDeco = Decoration.line({ class: 'cm-refHighlight' });
   const marks = [];
@@ -74,11 +85,13 @@ function buildHighlights(state: EditorState, ranges: LineRange[]): DecorationSet
 
 /**
  * Presentational, read-only code viewer built on CodeMirror 6. It shows a file's text with syntax
- * highlighting (grammar chosen from the filename), lets the user select a line range — emitted via
- * {@link selectRange} once per finalized gesture (mouseup for pointer drags, a quiet period for
- * keyboard selections) — and paints already-collected ranges (the `highlights` input) so referenced
- * code stays visibly marked. No services/API/routing: theme is passed in via `isDark` to keep this
- * in the `ui/` layer. Editing is disabled; this is a viewer, not an editor.
+ * highlighting (grammar chosen from the filename) and paints already-collected ranges (the
+ * `highlights` input) so referenced code stays visibly marked. While `pickMode` is armed the user
+ * can pick a line range — emitted via {@link selectRange} once per finalized gesture (mouseup for
+ * pointer drags, a quiet period for keyboard selections) — with native text selection suppressed;
+ * with it off (the default) selection is plain native text selection and nothing is emitted. No
+ * services/API/routing: theme is passed in via `isDark` to keep this in the `ui/` layer. Editing
+ * is disabled; this is a viewer, not an editor.
  */
 @Component({
   selector: 'app-code-viewer',
@@ -114,12 +127,15 @@ export class CodeViewerComponent {
    * embedded snippets (e.g. a file's frontmatter) that should be only as tall as the text.
    */
   readonly fit = input(false);
+  /** Arms the line-pick gesture; off (default) leaves selection fully native and emits nothing. */
+  readonly pickMode = input(false);
 
   readonly selectRange = output<LineRange>();
 
   private readonly hostRef = viewChild<ElementRef<HTMLElement>>('host');
   private readonly document = inject(DOCUMENT);
   private readonly languageCompartment = new Compartment();
+  private readonly pickCompartment = new Compartment();
   private view?: EditorView;
 
   private pendingRange: LineRange | null = null;
@@ -163,6 +179,18 @@ export class CodeViewerComponent {
       this.scrollToLine();
       if (this.view) {
         this.applyScrollToLine();
+      }
+    });
+
+    // Swap the pick extensions in place — toggling must not tear down the editor — and abandon
+    // any half-finished gesture when the picker disarms so a later mouseup can't emit it.
+    effect(() => {
+      const on = this.pickMode();
+      if (this.view) {
+        this.view.dispatch({ effects: this.pickCompartment.reconfigure(pickExtensions(on)) });
+      }
+      if (!on) {
+        this.clearPending();
       }
     });
   }
@@ -210,9 +238,15 @@ export class CodeViewerComponent {
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       highlightField,
       this.languageCompartment.of([]),
+      // extensions() only runs inside the rebuild effect's untracked(), so this read doesn't
+      // make pickMode a rebuild trigger — toggling reconfigures the compartment in place.
+      this.pickCompartment.of(pickExtensions(this.pickMode())),
       EditorView.updateListener.of((u) => this.onUpdate(u)),
       EditorView.domEventHandlers({
         mousedown: () => {
+          if (!this.pickMode()) {
+            return; // picker disarmed: nothing pending, nothing to suspend
+          }
           // A pointer gesture finalizes on mouseup, not after a quiet period — suspend the
           // keyboard debounce until the drag ends. Don't return true: CodeMirror still handles
           // the selection itself.
@@ -246,7 +280,7 @@ export class CodeViewerComponent {
   }
 
   private onUpdate(update: ViewUpdate): void {
-    if (!update.selectionSet) {
+    if (!update.selectionSet || !this.pickMode()) {
       return;
     }
     const sel = update.state.selection.main;

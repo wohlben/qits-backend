@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   signal,
   TemplateRef,
   viewChild,
@@ -15,6 +16,7 @@ import {
   lucideChevronRight,
   lucideChevronUp,
   lucideCode,
+  lucideCrosshair,
   lucideEye,
   lucideEyeOff,
   lucideFile,
@@ -214,6 +216,7 @@ function markLazyStubs(
       lucideFileStack,
       lucideLayers,
       lucideCode,
+      lucideCrosshair,
       lucideFlaskConical,
     }),
   ],
@@ -318,8 +321,21 @@ function markLazyStubs(
 
       <z-resizable-panel zDefaultSize="80">
         <section class="flex h-full min-w-0 flex-col gap-2">
-          @if (references().length > 0) {
+          @if (references().length > 0 || codeViewActive()) {
             <div class="flex flex-wrap items-center gap-1.5">
+              @if (codeViewActive()) {
+                <button
+                  z-button
+                  [zType]="pickMode() ? 'default' : 'outline'"
+                  zSize="sm"
+                  type="button"
+                  [attr.aria-pressed]="pickMode()"
+                  (click)="togglePickMode()"
+                >
+                  <ng-icon name="lucideCrosshair" class="size-4" />
+                  {{ pickMode() ? 'Picking — select line ranges' : 'Pick lines' }}
+                </button>
+              }
               @for (ref of references(); track trackRef(ref)) {
                 <z-badge zType="secondary" class="gap-1 font-mono text-xs">
                   {{ ref.path }}:{{ ref.startLine }}
@@ -376,6 +392,7 @@ function markLazyStubs(
                   [isDark]="isDark()"
                   [highlights]="currentHighlights()"
                   [scrollToLine]="anchorScrollLine()"
+                  [pickMode]="pickMode()"
                   [mode]="viewerMode()"
                   (modeChange)="setViewerMode($event)"
                   (selectRange)="addReference($event)"
@@ -1286,6 +1303,28 @@ export class WorkspaceFileBrowserComponent {
     this.rendererModes.update((modes) => new Map(modes).set(renderer.id, mode));
   }
 
+  /**
+   * Arms the line picker (sticky across picks — mirrors the web view's pick affordance but not
+   * its one-shot contract). Ephemeral viewer state: switching files disarms it, hence the
+   * linkedSignal keyed on the open path.
+   */
+  readonly pickMode = linkedSignal({ source: this.selectedPath, computation: () => false });
+
+  togglePickMode(): void {
+    this.pickMode.update((on) => !on);
+  }
+
+  /** True when the file viewer is showing the CodeMirror source view for a pickable (text) file. */
+  readonly codeViewActive = computed<boolean>(() => {
+    const file = this.fileQuery.data();
+    if (!file || file.binary || file.content == null) {
+      return false;
+    }
+    // viewerMode() is 'source' whenever no renderer matches — same rule as the viewer's
+    // effectiveMode, so the toggle only shows for what is actually the code view.
+    return this.viewerMode() === 'source';
+  });
+
   /** A rendered relative link resolved to a repo path: open it in the browser. */
   openLinkedPath(target: string): void {
     if (!this.allEagerPaths().includes(target)) {
@@ -1526,10 +1565,21 @@ export class WorkspaceFileBrowserComponent {
 
   addReference(range: LineRange): void {
     const path = this.selectedPath();
-    if (!path) {
+    // The viewer only emits while picking; the pickMode guard also covers the race where the
+    // user disarms between the viewer's deferred emit and this handler running.
+    if (!path || !this.pickMode()) {
       return;
     }
-    this.promptContext.addReference({ path, startLine: range.startLine, endLine: range.endLine });
+    const content = this.fileQuery.data()?.content;
+    const ref: CodeReference = { path, startLine: range.startLine, endLine: range.endLine };
+    if (typeof content === 'string') {
+      // The excerpt the Chat tab previews — sliced from the same content the viewer rendered.
+      ref.excerpt = content
+        .split('\n')
+        .slice(range.startLine - 1, range.endLine)
+        .join('\n');
+    }
+    this.promptContext.addReference(ref);
   }
 
   removeReference(ref: CodeReference): void {

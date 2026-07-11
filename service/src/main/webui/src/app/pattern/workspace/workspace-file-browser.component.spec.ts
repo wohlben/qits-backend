@@ -66,6 +66,7 @@ describe('WorkspaceFileBrowserComponent', () => {
   it('collects a selected range as a reference and de-dupes identical ones', () => {
     const cmp = createComponent().componentInstance;
     cmp.selectedPath.set('README.md');
+    cmp.pickMode.set(true);
 
     cmp.addReference({ startLine: 2, endLine: 5 });
     cmp.addReference({ startLine: 2, endLine: 5 }); // duplicate — ignored
@@ -77,12 +78,52 @@ describe('WorkspaceFileBrowserComponent', () => {
     ]);
   });
 
+  it('collects nothing while the picker is disarmed', () => {
+    const cmp = createComponent().componentInstance;
+    cmp.selectedPath.set('README.md');
+
+    cmp.addReference({ startLine: 2, endLine: 5 }); // pickMode is off by default
+
+    expect(cmp.references()).toEqual([]);
+  });
+
+  it('disarms the picker when the open file changes', () => {
+    const cmp = createComponent().componentInstance;
+    cmp.selectedPath.set('README.md');
+    cmp.pickMode.set(true);
+
+    cmp.selectedPath.set('service/main.ts');
+
+    expect(cmp.pickMode()).toBe(false);
+  });
+
+  it('captures the picked lines as the reference’s excerpt from the loaded content', () => {
+    queryClient.setQueryData(['workspace-file', 'repo-1', 'wt-1', 'service/main.ts'], {
+      path: 'service/main.ts',
+      content: 'l1\nl2\nl3\nl4\nl5',
+      binary: false,
+    });
+    const cmp = createComponent().componentInstance;
+    cmp.selectedPath.set('service/main.ts');
+    cmp.pickMode.set(true);
+
+    cmp.addReference({ startLine: 2, endLine: 4 });
+
+    expect(cmp.references()).toEqual([
+      { path: 'service/main.ts', startLine: 2, endLine: 4, excerpt: 'l2\nl3\nl4' },
+    ]);
+    // sticky: a landed pick does not disarm the mode
+    expect(cmp.pickMode()).toBe(true);
+  });
+
   it('exposes only the current file’s references as viewer highlights', () => {
     const cmp = createComponent().componentInstance;
 
     cmp.selectedPath.set('README.md');
+    cmp.pickMode.set(true);
     cmp.addReference({ startLine: 1, endLine: 1 });
     cmp.selectedPath.set('src/app/main.ts');
+    cmp.pickMode.set(true);
     cmp.addReference({ startLine: 10, endLine: 12 });
 
     // highlights reflect the now-open file only
@@ -92,6 +133,7 @@ describe('WorkspaceFileBrowserComponent', () => {
   it('removes a reference', () => {
     const cmp = createComponent().componentInstance;
     cmp.selectedPath.set('README.md');
+    cmp.pickMode.set(true);
     cmp.addReference({ startLine: 3, endLine: 4 });
 
     const [ref] = cmp.references();
@@ -104,6 +146,7 @@ describe('WorkspaceFileBrowserComponent', () => {
     const cmp = createComponent().componentInstance;
     const store = TestBed.inject(PromptContextStore);
     cmp.selectedPath.set('README.md');
+    cmp.pickMode.set(true);
 
     cmp.addReference({ startLine: 2, endLine: 5 });
     expect(store.references()).toEqual([{ path: 'README.md', startLine: 2, endLine: 5 }]);
@@ -111,6 +154,62 @@ describe('WorkspaceFileBrowserComponent', () => {
     // Removing from the store side (e.g. a Chat-tab row) empties the chips too — same slice.
     store.removeReference({ path: 'README.md', startLine: 2, endLine: 5 });
     expect(cmp.references()).toEqual([]);
+  });
+
+  describe('pick-lines toggle', () => {
+    function pickButton(el: HTMLElement): HTMLButtonElement | undefined {
+      return [...el.querySelectorAll('button')].find((b) =>
+        (b.textContent ?? '').includes('Pick'),
+      );
+    }
+
+    it('renders only when the code view is active, with aria-pressed tracking the mode', async () => {
+      queryClient.setQueryData(['workspace-file', 'repo-1', 'wt-1', 'README.md'], {
+        path: 'README.md',
+        content: '# Title\n',
+        binary: false,
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      const el = fixture.nativeElement as HTMLElement;
+
+      cmp.selectedPath.set('README.md'); // markdown defaults to the rendered view
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(pickButton(el)).toBeUndefined();
+
+      cmp.setViewerMode('source');
+      fixture.detectChanges();
+      const button = pickButton(el)!;
+      expect(button).toBeDefined();
+      expect(button.getAttribute('aria-pressed')).toBe('false');
+
+      button.click();
+      fixture.detectChanges();
+      expect(cmp.pickMode()).toBe(true);
+      expect(pickButton(el)!.getAttribute('aria-pressed')).toBe('true');
+
+      pickButton(el)!.click();
+      fixture.detectChanges();
+      expect(cmp.pickMode()).toBe(false);
+    });
+
+    it('does not render for a binary file', async () => {
+      queryClient.setQueryData(['workspace-file', 'repo-1', 'wt-1', 'service/main.ts'], {
+        path: 'service/main.ts',
+        content: null,
+        binary: true,
+      });
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+
+      cmp.selectedPath.set('service/main.ts');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(cmp.codeViewActive()).toBe(false);
+      expect(pickButton(fixture.nativeElement as HTMLElement)).toBeUndefined();
+    });
   });
 
   it('exposes a programmatic filter API (add / update / remove / clear)', () => {
@@ -901,6 +1000,7 @@ describe('WorkspaceFileBrowserComponent', () => {
     it('keeps each file’s reference chips across a tab switch (references are path-keyed)', () => {
       const cmp = createComponent().componentInstance;
       cmp.selectedPath.set('src/main/java/com/App.java');
+      cmp.pickMode.set(true);
       cmp.addReference({ startLine: 1, endLine: 3 });
       expect(cmp.currentHighlights()).toEqual([{ startLine: 1, endLine: 3 }]);
 

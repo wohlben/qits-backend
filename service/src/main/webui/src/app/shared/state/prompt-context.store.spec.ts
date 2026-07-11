@@ -153,6 +153,63 @@ describe('mergeReference', () => {
       ref(1, 1, 'b.ts'),
     ]);
   });
+
+  describe('excerpt stitching', () => {
+    /** A ref whose excerpt is its line numbers rendered as `L<n>` — self-describing fixtures. */
+    const exRef = (startLine: number, endLine: number, path = 'a.ts'): CodeReference => ({
+      path,
+      startLine,
+      endLine,
+      excerpt: Array.from({ length: endLine - startLine + 1 }, (_, i) => `L${startLine + i}`).join(
+        '\n',
+      ),
+    });
+
+    it('stitches an overlapping merge into one contiguous excerpt', () => {
+      expect(mergeReference([exRef(3, 7)], exRef(5, 12))).toEqual([exRef(3, 12)]);
+    });
+
+    it('stitches a touching merge', () => {
+      expect(mergeReference([exRef(3, 7)], exRef(8, 10))).toEqual([exRef(3, 10)]);
+    });
+
+    it('keeps the containing range’s excerpt but overwrites the contained lines with the fresh pick', () => {
+      const stale = { ...exRef(3, 10), excerpt: 'old3\nold4\nold5\nold6\nold7\nold8\nold9\nold10' };
+      expect(mergeReference([stale], exRef(5, 6))).toEqual([
+        { path: 'a.ts', startLine: 3, endLine: 10, excerpt: 'old3\nold4\nL5\nL6\nold7\nold8\nold9\nold10' },
+      ]);
+    });
+
+    it('stitches a bridge across two references', () => {
+      expect(mergeReference([exRef(1, 3), exRef(8, 10)], exRef(4, 7))).toEqual([exRef(1, 10)]);
+    });
+
+    it('lets the incoming pick’s lines win over a stale overlapping excerpt', () => {
+      const stale = { ...exRef(3, 7), excerpt: 'old3\nold4\nold5\nold6\nold7' };
+      expect(mergeReference([stale], exRef(5, 9))).toEqual([
+        { path: 'a.ts', startLine: 3, endLine: 9, excerpt: 'old3\nold4\nL5\nL6\nL7\nL8\nL9' },
+      ]);
+    });
+
+    it('keeps disjoint references’ own excerpts untouched', () => {
+      expect(mergeReference([exRef(1, 2)], exRef(10, 11))).toEqual([exRef(1, 2), exRef(10, 11)]);
+    });
+
+    it('drops the excerpt entirely when a merge partner carries none', () => {
+      const bare = ref(3, 7); // no excerpt — its lines can't be reconstructed
+      const merged = mergeReference([bare], exRef(5, 12));
+      expect(merged).toEqual([{ path: 'a.ts', startLine: 3, endLine: 12 }]);
+      expect('excerpt' in merged[0]).toBe(false);
+    });
+
+    it('preserves an empty-string excerpt (a picked blank line)', () => {
+      const blank: CodeReference = { path: 'a.ts', startLine: 4, endLine: 4, excerpt: '' };
+      expect(mergeReference([], blank)).toEqual([blank]);
+      expect(mergeReference([blank], exRef(5, 6))).toEqual([
+        { path: 'a.ts', startLine: 4, endLine: 6, excerpt: '\nL5\nL6' },
+      ]);
+    });
+  });
 });
 
 describe('formatSnippetsForPrompt', () => {
@@ -244,5 +301,13 @@ describe('formatReferencesForPrompt', () => {
     ]);
 
     expect(text).toBe('Selected code:\n- a/B.java:3-9\n- a/B.java:12');
+  });
+
+  it('never serializes the excerpt — it is a display-only preview', () => {
+    const text = formatReferencesForPrompt([
+      { path: 'a/B.java', startLine: 3, endLine: 4, excerpt: 'secret();\nmore();' },
+    ]);
+
+    expect(text).toBe('Selected code:\n- a/B.java:3-4');
   });
 });

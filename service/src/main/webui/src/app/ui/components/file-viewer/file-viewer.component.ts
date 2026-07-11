@@ -72,6 +72,7 @@ export type FileViewMode = 'rendered' | 'source';
           [isDark]="isDark()"
           [highlights]="highlights()"
           [scrollToLine]="scrollToLine()"
+          [pickMode]="pickMode()"
           (selectRange)="selectRange.emit($event)"
         />
       }
@@ -87,6 +88,8 @@ export class FileViewerComponent {
   readonly highlights = input<LineRange[]>([]);
   /** Passed through to the source view: scroll this 1-based line into view. */
   readonly scrollToLine = input<number | null>(null);
+  /** Passed through to the source view: arms the line-pick gesture. */
+  readonly pickMode = input(false);
   /** Controlled by the parent — this host never stores the mode itself. */
   readonly mode = input<FileViewMode>('rendered');
 
