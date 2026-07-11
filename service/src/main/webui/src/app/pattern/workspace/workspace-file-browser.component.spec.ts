@@ -20,6 +20,7 @@ function findNode(nodes: TreeNode<HasPath>[], key: string): TreeNode<HasPath> | 
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
 import { EDarkModes, ZardDarkMode } from '@/shared/services/dark-mode';
+import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { WorkspaceFileBrowserComponent } from './workspace-file-browser.component';
 
 const PATHS = ['README.md', 'domain/src/App.java', 'domain/src/AppTest.java', 'service/main.ts'];
@@ -96,6 +97,19 @@ describe('WorkspaceFileBrowserComponent', () => {
     const [ref] = cmp.references();
     cmp.removeReference(ref);
 
+    expect(cmp.references()).toEqual([]);
+  });
+
+  it('stages references in the shared PromptContextStore, not component-local state', () => {
+    const cmp = createComponent().componentInstance;
+    const store = TestBed.inject(PromptContextStore);
+    cmp.selectedPath.set('README.md');
+
+    cmp.addReference({ startLine: 2, endLine: 5 });
+    expect(store.references()).toEqual([{ path: 'README.md', startLine: 2, endLine: 5 }]);
+
+    // Removing from the store side (e.g. a Chat-tab row) empties the chips too — same slice.
+    store.removeReference({ path: 'README.md', startLine: 2, endLine: 5 });
     expect(cmp.references()).toEqual([]);
   });
 

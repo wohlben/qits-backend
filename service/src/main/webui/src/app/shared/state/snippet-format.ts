@@ -1,4 +1,4 @@
-import { PickedSnippet } from './prompt-context.store';
+import { CodeReference, PickedSnippet } from './prompt-context.store';
 
 // Built here in plain TS — never inline a fence into an Angular template (backticks inside
 // inline templates break the template literal).
@@ -47,4 +47,20 @@ export function formatSnippetsForPrompt(snippets: PickedSnippet[]): string {
       return parts.join('\n');
     })
     .join('\n\n');
+}
+
+/** `path:start` or `path:start-end` — the chip/row label and the chat dialog's insert form. */
+export function codeReferenceLabel(ref: CodeReference): string {
+  return ref.startLine === ref.endLine
+    ? `${ref.path}:${ref.startLine}`
+    : `${ref.path}:${ref.startLine}-${ref.endLine}`;
+}
+
+/**
+ * Renders staged code references as prompt text: a "Selected code:" header plus one
+ * `- path:start[-end]` bullet per reference. Paths and line ranges only, never file contents —
+ * the agent runs inside the workspace and reads the files itself.
+ */
+export function formatReferencesForPrompt(refs: CodeReference[]): string {
+  return ['Selected code:', ...refs.map((r) => '- ' + codeReferenceLabel(r))].join('\n');
 }

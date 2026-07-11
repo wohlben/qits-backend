@@ -43,6 +43,7 @@ import { ZardTreeComponent } from '@/shared/components/tree/tree.component';
 import { ZardTreeImports } from '@/shared/components/tree/tree.imports';
 import type { TreeNode } from '@/shared/components/tree/tree.types';
 import { EDarkModes, ZardDarkMode } from '@/shared/services/dark-mode';
+import { type CodeReference, PromptContextStore } from '@/shared/state/prompt-context.store';
 import { buildFileTree, type HasPath } from '@/shared/utils/build-file-tree';
 import { compactFileTree, type CompactedChain } from '@/shared/utils/compact-file-tree';
 import {
@@ -72,13 +73,6 @@ import {
   type FileViewMode,
 } from '@/ui/components/file-viewer/file-viewer.component';
 import { findRenderer } from '@/ui/components/file-viewer/renderers';
-
-/** A collected reference to a range of a file, staged to later become part of a Claude prompt. */
-export interface CodeReference {
-  path: string;
-  startLine: number;
-  endLine: number;
-}
 
 /**
  * A dynamic filter *selection* — a generator, not a rule. Its generated rules are derived from the
@@ -182,8 +176,9 @@ function markLazyStubs(
 /**
  * Smart component: browses a workspace's files. A folder tree on the left (built from the git file
  * list) drives a read-only code viewer on the right. Selecting a line range in the viewer collects a
- * {@link CodeReference} into a local cache, shown as removable chips and painted back into the viewer
- * as a persistent highlight.
+ * {@link CodeReference} into the root {@link PromptContextStore}, shown as removable chips here and
+ * as rows on the Chat tab, painted back into the viewer as a persistent highlight, and serialized
+ * into the agent's prompt on launch.
  *
  * The tree can be narrowed two ways: a top **filter input** (fuzzy over the filename) and an
  * **advanced filter dialog** holding an ordered rule list evaluated gitignore-style
@@ -636,6 +631,7 @@ export class WorkspaceFileBrowserComponent {
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly darkMode = inject(ZardDarkMode);
   private readonly dialog = inject(ZardDialogService);
+  private readonly promptContext = inject(PromptContextStore);
 
   protected readonly visiblePreviewLimit = VISIBLE_PREVIEW_LIMIT;
 
@@ -1326,7 +1322,8 @@ export class WorkspaceFileBrowserComponent {
     return path ? resolveLinkedGroup(path, this.detectedProjects(), this.allEagerPaths()) : [];
   });
 
-  readonly references = signal<CodeReference[]>([]);
+  /** Staged code references — the root prompt-context slice, shared with the Chat tab's tray. */
+  readonly references = this.promptContext.references;
 
   /** Ranges collected for the currently open file, painted as highlights in the viewer. */
   readonly currentHighlights = computed<LineRange[]>(() => {
@@ -1532,18 +1529,11 @@ export class WorkspaceFileBrowserComponent {
     if (!path) {
       return;
     }
-    const ref: CodeReference = { path, startLine: range.startLine, endLine: range.endLine };
-    this.references.update((refs) =>
-      refs.some(
-        (r) => r.path === ref.path && r.startLine === ref.startLine && r.endLine === ref.endLine,
-      )
-        ? refs
-        : [...refs, ref],
-    );
+    this.promptContext.addReference({ path, startLine: range.startLine, endLine: range.endLine });
   }
 
   removeReference(ref: CodeReference): void {
-    this.references.update((refs) => refs.filter((r) => r !== ref));
+    this.promptContext.removeReference(ref);
   }
 
   protected trackRef(ref: CodeReference): string {

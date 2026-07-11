@@ -509,4 +509,62 @@ describe('WorkspaceDetailPage', () => {
     expect(openClosestMatch).toHaveBeenCalledTimes(2);
     expect(openClosestMatch).toHaveBeenLastCalledWith('src/b.ts');
   });
+
+  it('anchors the exact file at ?lines= instead of fuzzy-matching the path', () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const fileBrowser = fixture.debugElement.query(
+      By.directive(WorkspaceFileBrowserComponent),
+    ).componentInstance;
+    const openAtLine = vi.spyOn(fileBrowser, 'openAtLine').mockImplementation(() => undefined);
+    const openClosestMatch = vi
+      .spyOn(fileBrowser, 'openClosestMatch')
+      .mockImplementation(() => undefined);
+
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts', lines: '10-20' }));
+    fixture.detectChanges();
+    expect(openAtLine).toHaveBeenCalledWith('src/a.ts', 10, 20);
+    expect(openClosestMatch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the fuzzy match when ?lines= is malformed or reversed', () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const fileBrowser = fixture.debugElement.query(
+      By.directive(WorkspaceFileBrowserComponent),
+    ).componentInstance;
+    const openAtLine = vi.spyOn(fileBrowser, 'openAtLine').mockImplementation(() => undefined);
+    const openClosestMatch = vi
+      .spyOn(fileBrowser, 'openClosestMatch')
+      .mockImplementation(() => undefined);
+
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts', lines: 'garbage' }));
+    fixture.detectChanges();
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts', lines: '20-10' }));
+    fixture.detectChanges();
+
+    expect(openAtLine).not.toHaveBeenCalled();
+    expect(openClosestMatch).toHaveBeenCalledTimes(2);
+    expect(openClosestMatch).toHaveBeenCalledWith('src/a.ts');
+  });
+
+  it('handles the same path with different lines as distinct targets, once each', () => {
+    const fixture = TestBed.createComponent(WorkspaceDetailPage);
+    fixture.detectChanges();
+    const fileBrowser = fixture.debugElement.query(
+      By.directive(WorkspaceFileBrowserComponent),
+    ).componentInstance;
+    const openAtLine = vi.spyOn(fileBrowser, 'openAtLine').mockImplementation(() => undefined);
+
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts', lines: '1-3' }));
+    fixture.detectChanges();
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts', lines: '1-3' })); // re-emit
+    fixture.detectChanges();
+    expect(openAtLine).toHaveBeenCalledTimes(1);
+
+    queryParamMap$.next(convertToParamMap({ path: 'src/a.ts', lines: '7-9' }));
+    fixture.detectChanges();
+    expect(openAtLine).toHaveBeenCalledTimes(2);
+    expect(openAtLine).toHaveBeenLastCalledWith('src/a.ts', 7, 9);
+  });
 });
