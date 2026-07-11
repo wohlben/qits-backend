@@ -3,7 +3,7 @@
 ## Introduction
 
 The backend sibling of
-[SPA telemetry meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md). Quarkus's automatic
+[SPA telemetry meta-enrichment](2026-07-11_spa-telemetry-meta-enrichment.md). Quarkus's automatic
 instrumentation produces exactly one span per request — `POST /greetings`, HTTP semconv
 attributes, nothing else. Which **class handled it**, which **method**, which **file** — absent;
 and the trace has no interior (no spans for the business methods the handler called). This idea
@@ -27,26 +27,26 @@ arbitrary attributes.
 
 Related / dependent plans:
 
-- **Sibling of [SPA telemetry meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md)** — together
+- **Sibling of [SPA telemetry meta-enrichment](2026-07-11_spa-telemetry-meta-enrichment.md)** — together
   they make the full-stack trace source-addressed at every hop: browser fetch span
   (`code.function=Greeting.submit`) → server span (`code.filepath=src/main/java/…/
   GreetingResource.java`) → `GreetingService.compose`. The two should agree on `code.*` key
   naming (see open questions) and ideally land around the same time.
-- **Extends the [observability](../features/2026-07-04_observability.md) feature's env-var half**
+- **Extends the [observability](2026-07-04_observability.md) feature's env-var half**
   — the backend telemetry that pipeline already collects gets richer; receiver, decoder, store,
   MCP tools all unchanged. The agent's `telemetryTrace` tool now returns spans that name their
   source files — directly actionable for a coding agent.
-- **Feeds [workspace observation tabs](../features/2026-07-06_workspace-observation-tabs.md)** —
+- **Feeds [workspace observation tabs](2026-07-06_workspace-observation-tabs.md)** —
   richer drill-downs with zero UI change.
-- **Modifies the [servable quarkus-angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)**
+- **Modifies the [servable quarkus-angular fixture](2026-07-05_servable-quarkus-angular-fixture.md)**
   — all code lands in `testing-repo-quarkus-angular.git`; same branch procedure (commit on
   `main`, rebase `feature/greeting` fast-forward, `feature/diverged` untouched).
 - **Updates [the Quarkus/Angular integration guide](../guides/quarkus-angular-integration.md)**
   in the same change.
-- **Possible later synergy with the [workspace file browser](../features/2026-07-02_workspace-file-browser.md)**
+- **Possible later synergy with the [workspace file browser](2026-07-02_workspace-file-browser.md)**
   — `code.filepath` is deliberately derived *workspace-relative*, so a later display polish could
   deep-link a span's attribute straight into the Files tab (the same move
-  [picked-file deep links](workspace-tab-url-and-picked-file-deep-link.md) made for picks). Out
+  [picked-file deep links](2026-07-10_workspace-tab-url-and-picked-file-deep-link.md) made for picks). Out
   of scope here; noted so the path format is chosen with that in mind.
 
 ## The gap, concretely
@@ -163,3 +163,64 @@ qits side: `docs/guides/quarkus-angular-integration.md` gains the convention; no
 - **How far does the `@WithSpan` decree reach in a real app?** The guide should phrase it as
   "boundary→control seams and anything worth timing", not "every method" — span-per-method is
   noise. The fixture demonstrates exactly one.
+
+## Implementation notes
+
+Landed as planned, with the open questions resolved as follows (each verified against the
+`quarkus-opentelemetry` 3.37.1 artifacts the fixture actually resolves, not the docs):
+
+- **`code.*` keys follow today's stable semconv**, matching what the SPA sibling actually stamps:
+  `code.function.name` (fully qualified — FQCN + `.` + method, replacing the plan's separate
+  `code.namespace`/`code.function`) and `code.file.path`. The constants come from
+  `io.opentelemetry.semconv.CodeAttributes` (`opentelemetry-semconv`, already transitive). No
+  line number, as planned.
+- **Quarkus does not stamp any `code.*` on server spans** — confirmed by inspecting the 3.37.1
+  runtime: the only `CodeAttributes` use is in the log handler (next bullet). Tier 1 was needed.
+- **Filter placement**: the Quarkus-native form won — a plain class with one
+  `@ServerRequestFilter` method taking `org.jboss.resteasy.reactive.server.SimpleResourceInfo`
+  (post-matching by default; classes with such methods auto-register, no `@Provider`).
+  `SimpleResourceInfo` beats JAX-RS `ResourceInfo`: no reflective `Method` lookup, and its
+  no-match contract is an explicit null `getResourceClass()` — the 404 guard.
+- **Span name untouched**, as leaned — the handler is an attribute, not an identity.
+- **Tier 3 resolved: log-record source info is already shipping upstream.** Quarkus's
+  `OpenTelemetryLogHandler` stamps `code.function.name` (source class + method),
+  `code.line.number`, `log.logger.namespace` and `thread.*` onto every exported log record. There
+  is no `code.file.path` (a JUL `LogRecord` has no source file) — noted as the upstream gap; the
+  guide documents the free attribution, nothing hand-rolled.
+- **`GreetingResponse` is gone**: `GreetingService.Greeting` carries the identical JSON shape
+  (`name`, `timestamp`), so the resource returns it directly and the wire contract (and
+  `GreetingResourceTest`) is unchanged.
+- **Span-level test with zero new dependencies** (`TelemetrySpansTest`): the `%test` profile
+  disables the SDK, so a `@TestProfile` re-enables it with `quarkus.otel.exporter.otlp.enabled=
+  false` (build-time, legal under re-augmentation — keeps the composite exporter from retrying a
+  nonexistent collector), `quarkus.otel.bsp.schedule.delay=100ms` (the batch processor's 5 s
+  default outlasts any sane poll), and logs/metrics off. The exporter is a ~15-line nested
+  `@ApplicationScoped @Unremovable` in-memory `SpanExporter` — picked up because the default
+  `quarkus.otel.traces.exporter=cdi` composes every CDI `SpanExporter` bean; inert in other
+  profiles where the SDK is off. A hand-rolled deadline poll replaces awaitility (deliberately
+  not on the fixture's test classpath). The test proves the whole chain: `Span.current()` in the
+  filter *is* the server span, and `GreetingService.compose` parents under it carrying
+  `greeting.name`.
+- The path derivation is a package-private static (`TelemetryMetaFilter.sourceFilePath`) so
+  `TelemetryMetaFilterTest` covers the nested-class walk and the default-package edge (probe
+  class reached via `Class.forName` — the default package can't be imported) as plain JUnit.
+
+## Testing
+
+- Fixture: `./mvnw test` green — 12 tests (existing 8 + 3 path-derivation + the span test).
+- qits: `domain` (308) and `cli` (3, incl. `SeedWebappServiceTest`) suites green after the
+  fixture push, cache bypassed.
+- E2E (`seed-webapp` → greeting workspace → daemon `otel` on → web-view greeting →
+  `telemetry/traces/{traceId}`): one trace, browser CLIENT `HTTP POST`
+  (`code.function.name=<instance_members_initializer>`, the SPA sibling's attribution) → SERVER
+  `POST /greetings` with `code.function.name=eu.wohlben.qits.testingrepo.GreetingResource.greet`
+  and `code.file.path=src/main/java/eu/wohlben/qits/testingrepo/GreetingResource.java` → INTERNAL
+  `GreetingService.compose` with `greeting.name=world` (Quarkus adds `code.function.name` to
+  `@WithSpan` spans by itself). Zero `POST /otel/v1/…` spans among 94. Tier-3 confirmed live: a
+  backend log record arrived with `code.function.name=…ConfigDiagnostic.deprecated` and
+  `code.line.number=83`.
+- **Caveat found during E2E**: the acceptance criterion "the drill-down shows the attributes" was
+  wrong as written — the Telemetry tab's trace detail deliberately renders kind/name/duration
+  only, so the enrichment is visible via the trace API and the agent's `telemetryTrace` MCP tool
+  but not (yet) in the UI. Filed as
+  [telemetry trace detail omits span attributes](../issues/2026-07-11_telemetry-trace-detail-omits-span-attributes.md).

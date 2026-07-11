@@ -477,6 +477,52 @@ them under *Traces* (SERVER spans) and, after a minute, *Metrics* (JVM gauges). 
 chat, the agent's `telemetryErrors`/`telemetryTrace`/`telemetrySlowSpans`/`telemetrySearchLogs`/
 `telemetryMetrics` MCP tools are attached and answer.
 
+### Meta-enrichment: handler attribution and span depth
+
+The backend counterpart of Tier 5's meta-enrichment
+([backend-telemetry-meta-enrichment](../features/2026-07-11_backend-telemetry-meta-enrichment.md)):
+Quarkus's automatic server spans carry HTTP semconv only — nothing names the handler, and the
+trace has no interior. Two conventions fix that, both demonstrated in the fixture:
+
+- **Handler attribution on every server span.** Copy `TelemetryMetaFilter` from the fixture
+  (adjust the package): one `@ServerRequestFilter` method (post-matching, so the resource is
+  resolved; auto-registered, no `@Provider`) that stamps onto the *current* span — never a second
+  one — the stable semconv `code.function.name`
+  (`eu.wohlben.qits.testingrepo.GreetingResource.greet`) and `code.file.path`
+  (`src/main/java/<pkg>/<TopLevelClass>.java`, nested classes resolving to their enclosing file).
+  Write-once: every resource in the app gets attribution with no per-method ceremony. Guards:
+  null resource class (nothing matched) and an invalid/non-recording span (SDK off, or the URI is
+  on the Tier 5 suppress list — suppression prevents span *creation*, so there is no ordering
+  hazard). The file path is a standard-Maven-layout derivation — wrong-by-construction for
+  Kotlin/generated/multi-source-root handlers; acceptable, it's metadata, not control flow. No
+  `code.line.number`: method line numbers aren't reachable via reflection.
+- **Trace interior via `@WithSpan`.** The annotations
+  (`io.opentelemetry.instrumentation.annotations.WithSpan`/`@SpanAttribute`/
+  `@AddingSpanAttributes`) ship with `quarkus-opentelemetry` and work on any CDI bean, no agent
+  needed. The decree: annotate **boundary→control seams and anything worth timing** — not every
+  method; span-per-method is noise. Tag interesting parameters:
+  `@WithSpan Greeting compose(@SpanAttribute("greeting.name") String name)` in the fixture's
+  `GreetingService`. One trap: the interceptor only fires through the **injected CDI proxy** — a
+  same-class self-invocation silently creates no span.
+- **Log records come pre-attributed — verify, don't build.** Quarkus's own OTel log handler
+  already stamps `code.function.name`, `code.line.number`, `log.logger.namespace` and `thread.*`
+  on every exported log record (no `code.file.path` — a JUL `LogRecord` has no source file).
+  Nothing to add app-side.
+
+Span-level tests need the SDK on (the `%test` profile disables it — Tier 4 above); the fixture's
+`TelemetrySpansTest` shows the dependency-free recipe: a `@TestProfile` re-enabling the SDK with
+`quarkus.otel.exporter.otlp.enabled=false` + `quarkus.otel.bsp.schedule.delay=100ms`, and a
+nested `@ApplicationScoped @Unremovable` in-memory `SpanExporter` bean — the default
+`quarkus.otel.traces.exporter=cdi` composes every CDI `SpanExporter` bean.
+
+**Verify:** post a greeting through the web view → the Telemetry tab's trace detail shows the
+`POST /greetings` SERVER span with an INTERNAL child `GreetingService.compose`. The attributes
+themselves (`code.function.name`, `code.file.path`, `greeting.name`, and Quarkus's own
+`code.function.name`/`code.line.number` on log records) are on the spans/records but the tab
+renders names/durations only — check them via the workspace `telemetry/traces/{traceId}` API or
+the agent's `telemetryTrace` MCP tool
+([known gap](../issues/2026-07-11_telemetry-trace-detail-omits-span-attributes.md)).
+
 ---
 
 ## Tier 5 — frontend OTEL through the backend gateway
@@ -637,6 +683,7 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
   [observability](../features/2026-07-04_observability.md) ·
   [spa-observability](../features/2026-07-06_spa-observability.md) ·
   [spa-telemetry-meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md) ·
+  [backend-telemetry-meta-enrichment](../features/2026-07-11_backend-telemetry-meta-enrichment.md) ·
   [framework-aware file browser](../features/2026-07-03_framework-aware-file-browser.md) ·
   [servable fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)
 - Resolved issues distilled above:
