@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
 import { PromptContextStore } from './prompt-context.store';
-import { formatSnippetsForPrompt } from './snippet-format';
+import { formatReferencesForPrompt, formatSnippetsForPrompt } from './snippet-format';
 
 const pick = (overrides: Partial<Parameters<typeof formatSnippetsForPrompt>[0][number]> = {}) => ({
   html: '<button class="cta">Go</button>',
@@ -71,6 +71,37 @@ describe('PromptContextStore', () => {
 
     s.clear();
     expect(s.count()).toBe(0);
+  });
+
+  it('adds references and drops exact (path, startLine, endLine) duplicates', () => {
+    const s = store();
+    s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    expect(s.references()).toHaveLength(1);
+
+    // A different range on the same path is a different reference.
+    s.addReference({ path: 'src/App.java', startLine: 10, endLine: 10 });
+    expect(s.references()).toHaveLength(2);
+  });
+
+  it('removes a reference by value, not object identity', () => {
+    const s = store();
+    s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    s.addReference({ path: 'src/Other.java', startLine: 1, endLine: 2 });
+
+    s.removeReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    expect(s.references()).toEqual([{ path: 'src/Other.java', startLine: 1, endLine: 2 }]);
+  });
+
+  it('keeps count() snippets-only and clear() empties both slices', () => {
+    const s = store();
+    s.add(pick());
+    s.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    expect(s.count()).toBe(1); // count labels the picker toolbar — references don't inflate it
+
+    s.clear();
+    expect(s.snippets()).toHaveLength(0);
+    expect(s.references()).toHaveLength(0);
   });
 });
 
@@ -152,5 +183,16 @@ describe('formatSnippetsForPrompt', () => {
       'Picked element <button> (selector: #root > button:nth-of-type(1)) on http://localhost:8080/daemon/wt/d/:\n' +
         '```html\n<button class="cta">Go</button>\n```',
     );
+  });
+});
+
+describe('formatReferencesForPrompt', () => {
+  it('renders a bullet per reference, collapsing single-line ranges to path:line', () => {
+    const text = formatReferencesForPrompt([
+      { path: 'a/B.java', startLine: 3, endLine: 9 },
+      { path: 'a/B.java', startLine: 12, endLine: 12 },
+    ]);
+
+    expect(text).toBe('Selected code:\n- a/B.java:3-9\n- a/B.java:12');
   });
 });

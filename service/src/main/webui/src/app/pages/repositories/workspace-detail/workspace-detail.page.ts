@@ -230,8 +230,8 @@ export class WorkspaceDetailPage {
    */
   private urlSyncReady = false;
 
-  /** One-shot guard: each distinct `?path=` value seeds the file browser exactly once. */
-  private lastHandledPath: string | null = null;
+  /** One-shot guard: each distinct `?path=`+`?lines=` target seeds the file browser exactly once. */
+  private lastHandledFileTarget: string | null = null;
 
   constructor() {
     // Push freshness over one SSE channel; the child queries no longer poll (see WorkspaceLiveService).
@@ -262,16 +262,29 @@ export class WorkspaceDetailPage {
       this.urlSyncReady = true;
     });
 
-    // ?path= → file browser: hand each distinct value to openClosestMatch once. The browser
-    // panel is always mounted (hidden-tab mounting), so this works whatever tab is active.
+    // ?path= → file browser: hand each distinct target to the browser once. The browser panel is
+    // always mounted (hidden-tab mounting), so this works whatever tab is active. A valid
+    // `?lines=start-end` (from a Chat-tab reference row, whose path is exact by construction)
+    // anchors the exact file at those lines; without one, fuzzy-match the path (picked-element
+    // attributions can be stale).
     effect(() => {
       const browser = this.fileBrowser(); // mounts with the success template
       const path = this.queryParams().get('path');
-      if (!browser || path === null || path === this.lastHandledPath) {
+      const lines = this.queryParams().get('lines');
+      if (!browser || path === null) {
         return;
       }
-      this.lastHandledPath = path;
-      browser.openClosestMatch(path);
+      const target = path + '\n' + (lines ?? '');
+      if (target === this.lastHandledFileTarget) {
+        return;
+      }
+      this.lastHandledFileTarget = target;
+      const range = lines ? /^(\d+)-(\d+)$/.exec(lines) : null;
+      if (range && +range[1] >= 1 && +range[2] >= +range[1]) {
+        browser.openAtLine(path, +range[1], +range[2]);
+      } else {
+        browser.openClosestMatch(path);
+      }
     });
   }
 

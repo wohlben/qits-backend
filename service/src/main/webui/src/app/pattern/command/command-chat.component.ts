@@ -11,8 +11,12 @@ import {
 
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardInputDirective } from '@/shared/components/input';
-import { PickedSnippet, PromptContextStore } from '@/shared/state/prompt-context.store';
-import { formatSnippetsForPrompt } from '@/shared/state/snippet-format';
+import {
+  type CodeReference,
+  PickedSnippet,
+  PromptContextStore,
+} from '@/shared/state/prompt-context.store';
+import { codeReferenceLabel, formatSnippetsForPrompt } from '@/shared/state/snippet-format';
 import { ChatTranscriptComponent } from './chat-transcript.component';
 import { isTurnEnd, linesToItems } from './chat-stream';
 
@@ -33,9 +37,10 @@ type Status = 'connecting' | 'open' | 'closed';
       <!-- The host must grow for the transcript's inner scroller to work and the form to pin. -->
       <app-chat-transcript class="flex min-h-0 flex-1 flex-col" [items]="items()" [waiting]="thinking()" />
 
-      <!-- Elements picked from a daemon web view (root-scoped cache) — click to drop one into
-           the draft as a fenced HTML block. -->
-      @if (promptContext.count() > 0) {
+      <!-- Elements picked from a daemon web view and code references selected in the Files tab
+           (root-scoped cache) — click to drop one into the draft: elements as a fenced HTML
+           block, references as their one-line path:start-end form. -->
+      @if (promptContext.count() > 0 || promptContext.references().length > 0) {
         <div class="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           <span>Picked:</span>
           @for (snippet of promptContext.snippets(); track snippet.id) {
@@ -48,6 +53,18 @@ type Status = 'connecting' | 'open' | 'closed';
               (click)="insertSnippet(snippet)"
             >
               {{ snippet.component?.className ?? snippet.tag }}
+            </button>
+          }
+          @for (ref of promptContext.references(); track refLabel(ref)) {
+            <button
+              z-button
+              zType="outline"
+              zSize="sm"
+              type="button"
+              [title]="'Insert ' + refLabel(ref) + ' into the message'"
+              (click)="insertReference(ref)"
+            >
+              {{ refLabel(ref) }}
             </button>
           }
         </div>
@@ -75,6 +92,8 @@ export class CommandChatComponent implements OnInit, OnDestroy {
   readonly heightClass = input('h-[70vh]');
 
   protected readonly promptContext = inject(PromptContextStore);
+  /** Template alias: the `path:start[-end]` label a reference renders (and tracks) as. */
+  protected readonly refLabel = codeReferenceLabel;
 
   private readonly lines = signal<string[]>([]);
   readonly items = computed(() => linesToItems(this.lines()));
@@ -130,6 +149,10 @@ export class CommandChatComponent implements OnInit, OnDestroy {
     this.draft.update((draft) =>
       (draft ? draft + '\n' : '') + formatSnippetsForPrompt([snippet]),
     );
+  }
+
+  insertReference(ref: CodeReference): void {
+    this.draft.update((draft) => (draft ? draft + '\n' : '') + codeReferenceLabel(ref));
   }
 
   onSubmit(event: Event): void {

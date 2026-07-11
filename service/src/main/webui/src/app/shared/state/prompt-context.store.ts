@@ -46,15 +46,22 @@ export interface PickedSnippet {
 
 export type NewSnippet = Omit<PickedSnippet, 'id' | 'capturedAt'>;
 
+/** A collected reference to a range of a file, staged to later become part of a Claude prompt. */
+export interface CodeReference {
+  path: string;
+  startLine: number;
+  endLine: number;
+}
+
 /**
- * The prompt-context cache: elements picked from a daemon web view, waiting to be handed to an
- * agent. Root-scoped so picks outlive the web-view dialog and navigation — pick, close the frame,
- * then use them from speak-to-prompt (initialContext) or a command chat (draft). The consumers
- * render the tray; this store is only the cache.
+ * The prompt-context cache: elements picked from a daemon web view plus code references selected
+ * in the Files tab, waiting to be handed to an agent. Root-scoped so both outlive their collecting
+ * component and navigation — pick or select, then use them from speak-to-prompt (initialContext)
+ * or a command chat (draft). The consumers render the tray; this store is only the cache.
  */
 export const PromptContextStore = signalStore(
   { providedIn: 'root' },
-  withState({ snippets: [] as PickedSnippet[] }),
+  withState({ snippets: [] as PickedSnippet[], references: [] as CodeReference[] }),
   withComputed((store) => ({
     count: computed(() => store.snippets().length),
   })),
@@ -62,6 +69,8 @@ export const PromptContextStore = signalStore(
     // The element's identity: its selector at its pick-time document URL.
     const findExisting = (pick: NewSnippet) =>
       store.snippets().find((s) => s.selector === pick.selector && s.url === pick.url);
+    const sameRef = (a: CodeReference, b: CodeReference) =>
+      a.path === b.path && a.startLine === b.startLine && a.endLine === b.endLine;
     const remove = (id: string): void => {
       patchState(store, (state) => ({ snippets: state.snippets.filter((s) => s.id !== id) }));
     };
@@ -93,8 +102,23 @@ export const PromptContextStore = signalStore(
         }
         return add(pick);
       },
+      /** Stages a reference; exact `(path, startLine, endLine)` duplicates are dropped. */
+      addReference(ref: CodeReference): void {
+        patchState(store, (state) => ({
+          references: state.references.some((r) => sameRef(r, ref))
+            ? state.references
+            : [...state.references, ref],
+        }));
+      },
+      /** Removes by value — a reference's identity is its `(path, startLine, endLine)` triple. */
+      removeReference(ref: CodeReference): void {
+        patchState(store, (state) => ({
+          references: state.references.filter((r) => !sameRef(r, ref)),
+        }));
+      },
+      /** Empties the whole context — snippets and references; "start a fresh prompt". */
       clear(): void {
-        patchState(store, { snippets: [] });
+        patchState(store, { snippets: [], references: [] });
       },
     };
   }),

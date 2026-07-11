@@ -20,9 +20,12 @@ Related/dependent plans:
 - [workspace-smart-file-display](../features/2026-07-03_workspace-smart-file-display.md)
   routes `selectRange` through `ui/components/file-viewer/file-viewer.component.ts` as a plain
   pass-through — unaffected, but it is the middle hop.
-- References are currently browser-local chips (nothing outside
-  `workspace-file-browser.component.ts` consumes `CodeReference` yet); any future plan that
-  feeds them to the chat/agent inherits the cleaned-up lifecycle for free.
+- [files-tab-selection-as-prompt-context](../features/2026-07-11_files-tab-selection-as-prompt-context.md)
+  re-homed the references into the root `PromptContextStore`
+  (`shared/state/prompt-context.store.ts`), where they feed the Chat tab and the agent prompt —
+  so the `mergeReference` half of this idea now lands in the store's `addReference` (which
+  currently only dedupes exact triples), and the chat/agent flow inherits the cleaned-up
+  lifecycle for free.
 
 ## Current behaviour (what's wrong)
 
@@ -30,8 +33,8 @@ Related/dependent plans:
   fires on every CodeMirror `ViewUpdate` with `selectionSet` — that is once per pointer move
   while dragging and once per shift+arrow keypress — and emits `selectRange` for every
   non-empty intermediate selection.
-- `WorkspaceFileBrowserComponent.addReference`
-  (`pattern/workspace/workspace-file-browser.component.ts:1530`) dedupes on **exact**
+- `PromptContextStore.addReference` (`shared/state/prompt-context.store.ts`, reached via
+  `WorkspaceFileBrowserComponent.addReference`) dedupes on **exact**
   `(path, startLine, endLine)` equality only, so each intermediate range becomes its own chip,
   and each chip immediately repaints via the `highlights` input — visible churn mid-drag.
 - Selecting a superset later (e.g. `10-20` after `12-15`) keeps both chips even though one

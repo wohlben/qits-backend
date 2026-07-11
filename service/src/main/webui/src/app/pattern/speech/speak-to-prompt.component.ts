@@ -19,7 +19,11 @@ import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
-import { formatSnippetsForPrompt } from '@/shared/state/snippet-format';
+import {
+  codeReferenceLabel,
+  formatReferencesForPrompt,
+  formatSnippetsForPrompt,
+} from '@/shared/state/snippet-format';
 import { WavRecorder } from './wav-recorder';
 
 /**
@@ -176,6 +180,34 @@ import { WavRecorder } from './wav-recorder';
         </section>
       }
 
+      <!-- Code references selected in the Files tab; they ride along with the launch the same way
+           picked elements do. Each row deep-links back to the file at its selected lines. -->
+      @if (promptContext.references().length > 0) {
+        <section class="flex flex-col gap-2">
+          <span class="text-sm font-medium">Selected code (attached to the prompt)</span>
+          @for (ref of promptContext.references(); track refLabel(ref)) {
+            <div class="flex items-center gap-2 rounded-md border p-2 text-sm">
+              <a
+                class="min-w-0 flex-1 truncate font-mono text-xs hover:underline"
+                [routerLink]="['/repositories', repoId(), 'workspaces', workspaceId(), 'files']"
+                [queryParams]="{ path: ref.path, lines: ref.startLine + '-' + ref.endLine }"
+                [title]="'Open ' + refLabel(ref) + ' in the file browser'"
+                >{{ refLabel(ref) }}</a
+              >
+              <button
+                z-button
+                zType="ghost"
+                type="button"
+                (click)="promptContext.removeReference(ref)"
+                [attr.aria-label]="'Remove reference ' + refLabel(ref)"
+              >
+                Remove
+              </button>
+            </div>
+          }
+        </section>
+      }
+
       @if (refinedPrompt() !== null) {
         <section class="flex flex-col gap-2">
           <label class="flex flex-col gap-1 text-sm">
@@ -230,6 +262,8 @@ export class SpeakToPromptComponent {
   private readonly agentService = inject(AgentControllerService);
   private readonly router = inject(Router);
   protected readonly promptContext = inject(PromptContextStore);
+  /** Template alias: the `path:start[-end]` label a reference renders (and tracks) as. */
+  protected readonly refLabel = codeReferenceLabel;
 
   readonly transcript = signal('');
   /** Null until a refinement (or "as-is") produced something — gates the launch section. */
@@ -307,7 +341,14 @@ export class SpeakToPromptComponent {
     const prompt = this.refinedPrompt()?.trim();
     if (!prompt) return;
     const snippets = this.promptContext.snippets();
-    const context = snippets.length ? prompt + '\n\n' + formatSnippetsForPrompt(snippets) : prompt;
-    this.launchMutation.mutate({ prompt: context, mode });
+    const references = this.promptContext.references();
+    const parts = [prompt];
+    if (snippets.length) {
+      parts.push(formatSnippetsForPrompt(snippets));
+    }
+    if (references.length) {
+      parts.push(formatReferencesForPrompt(references));
+    }
+    this.launchMutation.mutate({ prompt: parts.join('\n\n'), mode });
   }
 }

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { CommandChatComponent } from './command-chat.component';
@@ -53,5 +54,45 @@ describe('CommandChatComponent', () => {
 
     expect(component.draft().startsWith('Picked element')).toBe(true);
     store.clear();
+  });
+
+  it('inserts a code reference into the draft as its one-line path:start-end form', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+    const component = createComponent();
+
+    component.insertReference(store.references()[0]);
+    expect(component.draft()).toBe('src/App.java:3-7');
+
+    // A second insert joins on a newline.
+    component.insertReference({ path: 'src/App.java', startLine: 9, endLine: 9 });
+    expect(component.draft()).toBe('src/App.java:3-7\nsrc/App.java:9');
+    store.clear();
+  });
+
+  it('shows the Picked row with references only', () => {
+    // Rendering runs ngOnInit's connect(); stub the socket so no real connection is attempted.
+    vi.stubGlobal(
+      'WebSocket',
+      class {
+        send = vi.fn();
+        close = vi.fn();
+      },
+    );
+    try {
+      const store = TestBed.inject(PromptContextStore);
+      store.addReference({ path: 'src/App.java', startLine: 3, endLine: 7 });
+      const fixture = TestBed.createComponent(CommandChatComponent);
+      fixture.componentRef.setInput('commandId', 'cmd-1');
+      fixture.detectChanges();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent!;
+      expect(text).toContain('Picked:');
+      expect(text).toContain('src/App.java:3-7');
+      fixture.destroy();
+      store.clear();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

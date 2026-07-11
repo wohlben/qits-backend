@@ -226,6 +226,80 @@ describe('SpeakToPromptComponent', () => {
     store.clear();
   });
 
+  it('renders a Selected code row that deep-links to the file at its lines', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.addReference({ path: 'src/App.java', startLine: 10, endLine: 12 });
+    const fixture = createComponent();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(text).toContain('Selected code (attached to the prompt)');
+    expect(text).toContain('src/App.java:10-12');
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('a[href]');
+    expect(link?.getAttribute('href')).toBe(
+      router.serializeUrl(
+        router.createUrlTree(['/repositories', 'repo-1', 'workspaces', 'wt-1', 'files'], {
+          queryParams: { path: 'src/App.java', lines: '10-12' },
+        }),
+      ),
+    );
+    store.clear();
+  });
+
+  it('removes a reference row via its Remove button', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.addReference({ path: 'src/App.java', startLine: 3, endLine: 3 });
+    const fixture = createComponent();
+
+    const remove = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+    ).find((b) => b.getAttribute('aria-label') === 'Remove reference src/App.java:3');
+    expect(remove).toBeDefined();
+    remove!.click();
+    fixture.detectChanges();
+
+    expect(store.references()).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Selected code');
+  });
+
+  it('appends the references block after the snippets block in the initial context', async () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.add({
+      html: '<button class="cta">Go</button>',
+      selector: '#root > button',
+      url: 'http://localhost/daemon/wt/d/',
+      tag: 'button',
+      textPreview: 'Go',
+    });
+    store.addReference({ path: 'src/App.java', startLine: 10, endLine: 12 });
+    const fixture = createComponent();
+    fixture.componentInstance.refinedPrompt.set('fix this');
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
+    await fixture.whenStable();
+
+    const [, , body] =
+      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
+    expect(body.initialContext).toContain('Selected code:\n- src/App.java:10-12');
+    expect(body.initialContext.indexOf('Picked element')).toBeLessThan(
+      body.initialContext.indexOf('Selected code:'),
+    );
+    store.clear();
+  });
+
+  it('appends the references block even when no elements are picked', async () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.addReference({ path: 'src/App.java', startLine: 7, endLine: 7 });
+    const fixture = createComponent();
+    fixture.componentInstance.refinedPrompt.set('fix this');
+    fixture.componentInstance.launch(AgentLaunchMode.Chat);
+    await fixture.whenStable();
+
+    const [, , body] =
+      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
+    expect(body.initialContext).toBe('fix this\n\nSelected code:\n- src/App.java:7');
+    store.clear();
+  });
+
   it('uploads the recording and appends the server transcript', async () => {
     const fixture = createComponent();
     fixture.componentInstance.transcript.set('earlier text');
