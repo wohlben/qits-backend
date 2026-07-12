@@ -265,27 +265,31 @@ function markLazyStubs(
                 <!-- Same icon+label as the default node, but de-emphasised parts render dimmed
                      (without changing layout or click behaviour): a whole lazy directory stub, and
                      the ancestor prefix of a compacted "a / b / c" breadcrumb so the final segment
-                     stands out. -->
+                     stands out. A gitignored row (lazy stub or anything under a lazy dir) gets a
+                     muted-chip background so ignored content reads as "not source" at every depth. -->
                 <ng-template #nodeTemplate let-node>
-                  @if (frameworkIcon(node); as fwIcon) {
-                    <img [src]="fwIcon" class="size-4! shrink-0" alt="" />
-                  } @else if (node.icon) {
-                    <ng-icon
-                      [name]="node.icon"
-                      class="size-4! shrink-0"
-                      [style.opacity]="node.lazy ? dimOpacity : null"
-                    />
-                  }
-                  @if (node.lazy) {
-                    <span class="truncate" [style.opacity]="dimOpacity">{{ node.label }}</span>
-                  } @else {
-                    <span class="truncate"
-                      ><span [style.opacity]="dimOpacity" [style.fontSize]="breadcrumbPrefixSize">{{
-                        breadcrumbPrefix(node.label)
-                      }}</span
-                      >{{ breadcrumbLeaf(node.label) }}</span
-                    >
-                  }
+                  <span [class]="nodeWrapClass(node)">
+                    @if (frameworkIcon(node); as fwIcon) {
+                      <img [src]="fwIcon" class="size-4! shrink-0" alt="" />
+                    } @else if (node.icon) {
+                      <ng-icon
+                        [name]="node.icon"
+                        class="size-4! shrink-0"
+                        [style.opacity]="node.lazy ? dimOpacity : null"
+                      />
+                    }
+                    @if (node.lazy) {
+                      <span class="truncate" [style.opacity]="dimOpacity">{{ node.label }}</span>
+                    } @else {
+                      <span class="truncate"
+                        ><span
+                          [style.opacity]="dimOpacity"
+                          [style.fontSize]="breadcrumbPrefixSize"
+                          >{{ breadcrumbPrefix(node.label) }}</span
+                        >{{ breadcrumbLeaf(node.label) }}</span
+                      >
+                    }
+                  </span>
                 </ng-template>
               </z-tree>
             }
@@ -1518,9 +1522,16 @@ export class WorkspaceFileBrowserComponent {
     });
   }
 
-  /** The label for a test↔code tab: its role, capitalised. */
+  /**
+   * The label for a test↔code tab: the anchor **Code** tab, or a test's basename minus its final
+   * extension (`OtelProxyUnreachableTest`, `foo.component.spec`) — distinguishing the several test
+   * tabs a source can now have. The full path stays in the tab's `title` tooltip.
+   */
   protected tabLabel(file: LinkedFile): string {
-    return file.role === 'test' ? 'Test' : 'Code';
+    if (file.role === 'code') return 'Code';
+    const name = basename(file.path);
+    const dot = name.lastIndexOf('.');
+    return dot === -1 ? name : name.slice(0, dot);
   }
 
   removeDynamicFilter(id: string): void {
@@ -1561,6 +1572,27 @@ export class WorkspaceFileBrowserComponent {
   protected breadcrumbLeaf(label: string): string {
     const i = label.lastIndexOf(this.chainSeparator);
     return i === -1 ? label : label.slice(i + this.chainSeparator.length);
+  }
+
+  /**
+   * Whether a tree node is gitignored — a lazy directory stub, or at/under any known lazy directory.
+   * Ignored content never reaches the eager listing (`git ls-files --exclude-standard`); it only
+   * enters the tree via a lazy dir, so "at or under a lazy dir key" is exact without parsing any
+   * `.gitignore`. Compacted chains carry the deepest dir as `key`, so a chain ending inside an
+   * ignored dir dims as a whole.
+   */
+  protected isIgnored(node: TreeNode<HasPath>): boolean {
+    if (node.lazy) return true;
+    for (const dir of this.allLazyDirs().keys()) {
+      if (node.key === dir || node.key.startsWith(`${dir}/`)) return true;
+    }
+    return false;
+  }
+
+  /** Wrapper classes for a node row — a muted chip when ignored, else plain flex layout. */
+  protected nodeWrapClass(node: TreeNode<HasPath>): string {
+    const base = 'flex min-w-0 flex-1 items-center gap-1.5';
+    return this.isIgnored(node) ? `${base} -mx-1 rounded-sm bg-muted/50 px-1 opacity-70` : base;
   }
 
   addReference(range: LineRange): void {

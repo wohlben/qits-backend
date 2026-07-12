@@ -473,6 +473,45 @@ describe('WorkspaceFileBrowserComponent', () => {
     });
   });
 
+  describe('gitignored dimming', () => {
+    it('marks a lazy stub and anything at/under a lazy dir as ignored, tracked files as not', () => {
+      queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md'],
+        lazyDirs: [{ path: 'node_modules', childCount: 2, href: '/x' }],
+      });
+      queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1', 'node_modules'], {
+        dir: 'node_modules',
+        paths: ['node_modules/index.js'],
+        lazyDirs: [],
+      });
+      const cmp = createComponent().componentInstance;
+      cmp.openedLazyPaths.set(['node_modules']);
+
+      // the lazy dir itself (now a real, opened directory) is ignored…
+      expect(cmp['isIgnored']({ key: 'node_modules' } as TreeNode<HasPath>)).toBe(true);
+      // …as is its spliced-in child…
+      expect(cmp['isIgnored']({ key: 'node_modules/index.js' } as TreeNode<HasPath>)).toBe(true);
+      // …a raw lazy stub node is ignored regardless of dir keys…
+      expect(cmp['isIgnored']({ key: 'anything', lazy: true } as TreeNode<HasPath>)).toBe(true);
+      // …and a tracked file is not.
+      expect(cmp['isIgnored']({ key: 'README.md' } as TreeNode<HasPath>)).toBe(false);
+    });
+
+    it('gives ignored rows the muted-chip wrapper class, tracked rows plain layout', () => {
+      queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
+        paths: ['README.md'],
+        lazyDirs: [{ path: 'target', childCount: 1, href: '/x' }],
+      });
+      const cmp = createComponent().componentInstance;
+      expect(cmp['nodeWrapClass']({ key: 'target', lazy: true } as TreeNode<HasPath>)).toContain(
+        'bg-muted/50',
+      );
+      expect(cmp['nodeWrapClass']({ key: 'README.md' } as TreeNode<HasPath>)).not.toContain(
+        'bg-muted/50',
+      );
+    });
+  });
+
   it('compacts single-child directory chains in the rendered tree', () => {
     const cmp = createComponent().componentInstance;
 
@@ -995,6 +1034,56 @@ describe('WorkspaceFileBrowserComponent', () => {
       expect(cmp.linkedGroup().map((f) => f.path)).toEqual(['w/src/foo.ts', 'w/src/foo.spec.ts']);
       cmp.selectedPath.set('README.md');
       expect(cmp.linkedGroup()).toEqual([]);
+    });
+
+    it('labels tabs: Code for the anchor, basename-minus-extension for each test', () => {
+      const cmp = createComponent().componentInstance;
+      expect(cmp['tabLabel']({ role: 'code', path: 'src/main/java/com/App.java' })).toBe('Code');
+      expect(
+        cmp['tabLabel']({ role: 'test', path: 'src/test/java/com/OtelProxyUnreachableTest.java' }),
+      ).toBe('OtelProxyUnreachableTest');
+      expect(cmp['tabLabel']({ role: 'test', path: 'w/src/foo.component.spec.ts' })).toBe(
+        'foo.component.spec',
+      );
+    });
+
+    describe('permissive java folding — scenario-named test', () => {
+      const FOLD_PATHS = [
+        'pom.xml',
+        'src/main/java/com/OtelProxyResource.java',
+        'src/test/java/com/OtelProxyResourceTest.java',
+        'src/test/java/com/OtelProxyUnreachableTest.java',
+        'README.md',
+      ];
+
+      beforeEach(() => {
+        queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
+          paths: FOLD_PATHS,
+          lazyDirs: [],
+        });
+      });
+
+      it('shows three named tabs when opening the source (Code · both tests)', () => {
+        const cmp = createComponent().componentInstance;
+        cmp.selectedPath.set('src/main/java/com/OtelProxyResource.java');
+        expect(cmp.linkedGroup().map((f) => cmp['tabLabel'](f))).toEqual([
+          'Code',
+          'OtelProxyResourceTest',
+          'OtelProxyUnreachableTest',
+        ]);
+      });
+
+      it('hides the folded scenario test from the tree yet keeps it findable by name', () => {
+        const cmp = createComponent().componentInstance;
+        const tree = cmp.treeVisiblePaths();
+        expect(tree).toContain('src/main/java/com/OtelProxyResource.java');
+        expect(tree).not.toContain('src/test/java/com/OtelProxyUnreachableTest.java');
+
+        cmp.nameQuery.set('Unreachable');
+        expect(cmp.treeVisiblePaths()).toContain(
+          'src/test/java/com/OtelProxyUnreachableTest.java',
+        );
+      });
     });
 
     it('keeps each file’s reference chips across a tab switch (references are path-keyed)', () => {
