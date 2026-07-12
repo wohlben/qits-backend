@@ -98,6 +98,21 @@ describe('WorkspaceLiveService', () => {
     ]);
   });
 
+  it('a files hint refreshes the tree, detection, and open file content together', () => {
+    const { source } = connect();
+    invalidate.mockClear();
+
+    source.emitTopic('files');
+
+    // `workspace-files` is a prefix (covers lazy-dir subkeys); `workspace-detection` is shared by the
+    // file browser and the plugins recommender; `workspace-file` (prefix) refreshes open file viewers.
+    expect(invalidatedKeys()).toEqual([
+      JSON.stringify(['workspace-files', 'repo-1', 'wt-1']),
+      JSON.stringify(['workspace-detection', 'repo-1', 'wt-1']),
+      JSON.stringify(['workspace-file', 'repo-1', 'wt-1']),
+    ]);
+  });
+
   it('a single telemetry hint refreshes all four telemetry views', () => {
     const { source } = connect();
     invalidate.mockClear();
@@ -127,14 +142,17 @@ describe('WorkspaceLiveService', () => {
 
     source.emitOpen();
 
-    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) = 8
-    expect(invalidate).toHaveBeenCalledTimes(8);
+    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + files(3) = 11
+    expect(invalidate).toHaveBeenCalledTimes(11);
     const keys = invalidatedKeys();
     expect(keys).toContain(JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['telemetry-logs', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['commands']));
     expect(keys).toContain(JSON.stringify(['workspace-agent-sessions', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-files', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-detection', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-file', 'repo-1', 'wt-1']));
   });
 
   it('closes the EventSource when the providing component is destroyed', () => {

@@ -59,15 +59,12 @@ import {
   type PathFilterMode,
 } from '@/shared/utils/filter-file-paths';
 import {
-  detectFrameworks,
-  FRAMEWORK_DESCRIPTORS,
-  frameworkToRules,
-  linkedTestsOf,
-  resolveLinkedGroup,
-  type DetectedProject,
-  type FrameworkDescriptor,
+  autoExpandDir,
+  frameworkRootIcon,
   type LinkedFile,
 } from '@/shared/utils/detect-frameworks';
+import type { DetectionDto } from '@/api/model/detectionDto';
+import type { FrameworkMembershipDto } from '@/api/model/frameworkMembershipDto';
 import { ignorelistToRules } from '@/shared/utils/ignorelist-rules';
 import type { LineRange } from '@/ui/components/code-viewer/code-viewer.component';
 import {
@@ -138,6 +135,8 @@ const VISIBLE_PREVIEW_LIMIT = 500;
 interface LazyLevel {
   paths: string[];
   lazyDirs: LazyDirDto[];
+  /** The tree's structural generation token; the same value `/detection` stamps (root level only). */
+  generation?: string;
 }
 
 /**
@@ -740,9 +739,10 @@ export class WorkspaceFileBrowserComponent {
       if (!tree || newly.length === 0) return;
 
       const keys = new Set<string>();
-      for (const { root, descriptor } of projects) {
-        if (!newly.includes(descriptor.id)) continue;
-        const target = descriptor.autoExpandDir?.(root);
+      for (const p of projects) {
+        const frameworkId = p.frameworkId ?? '';
+        if (!newly.includes(frameworkId)) continue;
+        const target = autoExpandDir(frameworkId, p.root ?? '');
         if (!target) continue;
         // Open every ancestor directory down to (and including) the target.
         const parts = target.split('/');
@@ -777,8 +777,52 @@ export class WorkspaceFileBrowserComponent {
           this.repoId(),
           this.workspaceId(),
         ),
-      ).then((r) => ({ paths: r.paths ?? [], lazyDirs: r.lazyDirs ?? [] })),
+      ).then((r) => ({
+        paths: r.paths ?? [],
+        lazyDirs: r.lazyDirs ?? [],
+        generation: r.generation,
+      })),
   }));
+
+  /**
+   * Framework/project/test-link detection, computed server-side over the working tree and fetched
+   * once (a sibling of {@link filesQuery} — no polling; the same trigger that refreshes `/files`
+   * refreshes this). Everything framework-shaped below reads off {@link consistentDetection} (this,
+   * gated on a matching generation) instead of re-deriving from path strings: the projects, each
+   * framework's membership set (the filter input), and the source→test link graph with runner kinds.
+   */
+  readonly detectionQuery = injectQuery(() => ({
+    queryKey: ['workspace-detection', this.repoId(), this.workspaceId()],
+    queryFn: (): Promise<DetectionDto> =>
+      lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDetectionGet(
+          this.repoId(),
+          this.workspaceId(),
+        ),
+      ),
+  }));
+
+  /**
+   * Detection gated for render-consistency: it is applied only while its generation token matches the
+   * tree (`/files`) generation currently rendered, so the user never sees a skewed combination of
+   * tree + detection while the two independent fetches settle after a working-tree change. On a
+   * mismatch the last consistent detection is <em>held</em> (not blanked); the next tick — which
+   * refetches both — resolves it. The tokens agree on first load (same tree), so there is no initial
+   * flash.
+   */
+  readonly consistentDetection = linkedSignal<
+    { generation: string | undefined; detection: DetectionDto | undefined },
+    DetectionDto | undefined
+  >({
+    source: () => ({
+      generation: this.filesQuery.data()?.generation,
+      detection: this.detectionQuery.data(),
+    }),
+    computation: (source, previous) =>
+      source.detection && source.detection.generation === source.generation
+        ? source.detection
+        : previous?.value,
+  });
 
   /** Lazy directories the user has expanded — each triggers a one-level fetch, cached per path. */
   readonly openedLazyPaths = signal<string[]>([]);
@@ -832,9 +876,13 @@ export class WorkspaceFileBrowserComponent {
     return [...paths];
   });
 
-  /** Every framework/language project detected in the loaded path list — a pure, content-free pass. */
-  readonly detectedProjects = computed<DetectedProject[]>(() =>
-    detectFrameworks(this.allEagerPaths()),
+  /**
+   * Every framework/language project detected server-side, with its resolved membership set and
+   * already-refined label (`Java / Quarkus`). The single source of truth for the framework UI; each
+   * entry carries `frameworkId`, `root`, `label`, and `memberPaths`.
+   */
+  readonly detectedProjects = computed<FrameworkMembershipDto[]>(
+    () => this.consistentDetection()?.frameworks ?? [],
   );
 
   /** Manual advanced-filter criteria — public and settable in code (this is the programmatic API). */
@@ -934,101 +982,52 @@ export class WorkspaceFileBrowserComponent {
 
   // --- Framework (dynamic) filters ---
 
-  /**
-   * Marker files (java `pom.xml`) to peek for a label refinement (Maven → Quarkus), deduped. The
-   * always-visible quick-access footer labels its Java toggle from this, so it is fetched whenever a
-   * java project is detected (cheap, cached per path via the shared file-content key).
-   */
-  private readonly frameworkMarkersToFetch = computed<string[]>(() => {
-    const markers = new Set<string>();
-    for (const { root, descriptor } of this.detectedProjects()) {
-      const marker = descriptor.labelPeekMarker?.(root);
-      if (marker) markers.add(marker);
-    }
-    return [...markers];
-  });
-
-  /**
-   * Lazy fetch of each marker file's content, reusing {@link fileQuery}'s key so a `pom.xml` opened
-   * in the viewer is one request. Purely cosmetic (upgrades a label) — never blocks detection.
-   */
-  private readonly frameworkMarkerContents = injectQueries(() => ({
-    queries: this.frameworkMarkersToFetch().map((path) => ({
-      queryKey: ['workspace-file', this.repoId(), this.workspaceId(), path],
-      queryFn: (): Promise<WorkspaceFileContentDto> =>
-        lastValueFrom(
-          this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesContentGet(
-            this.repoId(),
-            this.workspaceId(),
-            path,
-          ),
-        ),
-    })),
-  }));
-
-  /** Marker path → its fetched content (present only once the lazy peek resolves). */
-  private readonly frameworkMarkerContentByPath = computed(() => {
-    const paths = this.frameworkMarkersToFetch();
-    const results = this.frameworkMarkerContents();
-    const map = new Map<string, string>();
-    for (let i = 0; i < paths.length; i++) {
-      const content = results[i]?.data()?.content;
-      if (content != null) map.set(paths[i], content);
-    }
-    return map;
-  });
-
-  /** A descriptor's label, refined from its marker content when available (else the base label). */
-  private refinedLabel(descriptor: FrameworkDescriptor, root: string): string {
-    const marker = descriptor.labelPeekMarker?.(root);
-    const content = marker ? this.frameworkMarkerContentByPath().get(marker) : undefined;
-    return (content && descriptor.refineLabel?.(content)) || descriptor.label;
+  /** Every detected framework entry keyed by its filter `param` (descriptorId or descriptorId::root). */
+  private paramOf(frameworkId: string, root: string): string {
+    return frameworkId === 'docs' ? 'docs' : `${frameworkId}${FRAMEWORK_PARAM_SEP}${root}`;
   }
 
   /**
    * The offer-able framework filters: one aggregate `Docs` filter spanning every detected `docs/`
-   * dir, plus one per detected java/angular root (labelled with the root, and refined to Quarkus
-   * when the lazy pom peek says so).
+   * dir, plus one per detected java/angular root (labelled with the root; labels arrive already
+   * refined to Quarkus from the server, no client round-trip).
    */
   readonly frameworkOptions = computed<FrameworkOption[]>(() => {
     const projects = this.detectedProjects();
     const options: FrameworkOption[] = [];
-    const docs = projects.filter((p) => p.descriptor.id === 'docs');
+    const docs = projects.filter((p) => p.frameworkId === 'docs');
     if (docs.length > 0) {
       options.push({
         param: 'docs',
         descriptorId: 'docs',
-        roots: docs.map((p) => p.root),
-        label: docs[0].descriptor.label,
+        roots: docs.map((p) => p.root ?? ''),
+        label: docs[0].label ?? 'Docs',
       });
     }
-    for (const { root, descriptor } of projects) {
-      if (descriptor.id === 'docs') continue;
+    for (const p of projects) {
+      if (p.frameworkId === 'docs') continue;
+      const root = p.root ?? '';
       options.push({
-        param: `${descriptor.id}${FRAMEWORK_PARAM_SEP}${root}`,
-        descriptorId: descriptor.id,
+        param: this.paramOf(p.frameworkId ?? '', root),
+        descriptorId: p.frameworkId ?? '',
         roots: [root],
-        label: `${this.refinedLabel(descriptor, root)} (${root === '' ? 'root' : root})`,
+        label: `${p.label} (${root === '' ? 'root' : root})`,
       });
     }
     return options;
   });
 
   /**
-   * Detection-root directory path → the framework icon URL painted on that folder node. Java roots
-   * show the Quarkus mark or the Java cup depending on the lazy pom peek; angular roots the Angular
-   * shield. The repo root (`''`) has no folder row, so it is skipped.
+   * Detection-root directory path → the framework icon URL painted on that folder node (Quarkus/Java
+   * cup by the server-refined label, Angular shield). The repo root (`''`) has no folder row.
    */
   readonly frameworkRootIcons = computed(() => {
     const map = new Map<string, string>();
-    for (const { root, descriptor } of this.detectedProjects()) {
+    for (const p of this.detectedProjects()) {
+      const root = p.root ?? '';
       if (root === '') continue;
-      if (descriptor.id === 'ts-angular') {
-        map.set(root, '/angular.svg');
-      } else if (descriptor.id === 'java-quarkus') {
-        const quarkus = this.refinedKindLabel(descriptor, [root]).includes('Quarkus');
-        map.set(root, quarkus ? '/quarkus.svg' : '/java.svg');
-      }
+      const icon = frameworkRootIcon(p.frameworkId ?? '', p.label ?? '');
+      if (icon) map.set(root, icon);
     }
     return map;
   });
@@ -1046,17 +1045,43 @@ export class WorkspaceFileBrowserComponent {
     return this.frameworkOptions().filter((o) => !selected.has(o.param));
   });
 
-  private readonly descriptorsById = new Map(FRAMEWORK_DESCRIPTORS.map((d) => [d.id, d]));
+  /**
+   * A leading `restrict` whitelist over an explicit, server-resolved membership set — the drop-in
+   * replacement for the old client-generated framework glob rules. It leads `effectiveFilters` with
+   * the default-hidden stance (like the `restrict` glob rules it replaces), so only the union of the
+   * selected frameworks' member paths shows, and a manual whitelist can still re-reveal a hidden file.
+   */
+  private membershipRule(id: string, memberPaths: readonly string[]): PathFilter {
+    return {
+      id: `fw:${id}`,
+      kind: 'glob',
+      mode: 'whitelist',
+      restrict: true,
+      paths: memberPaths,
+      query: id,
+      enabled: true,
+    };
+  }
 
-  /** Selected framework filters → their generated (restrict-whitelist) rules, grouped by param. */
+  /** Each framework filter `param` → the union of its detected roots' resolved member paths. */
+  private readonly membershipByParam = computed(() => {
+    const map = new Map<string, string[]>();
+    for (const p of this.detectedProjects()) {
+      const param = this.paramOf(p.frameworkId ?? '', p.root ?? '');
+      const list = map.get(param) ?? [];
+      list.push(...(p.memberPaths ?? []));
+      map.set(param, list);
+    }
+    return map;
+  });
+
+  /** Selected framework filters → their single membership rule, grouped by param. */
   readonly frameworkRuleGroups = computed(() => {
-    const options = new Map(this.frameworkOptions().map((o) => [o.param, o]));
+    const membership = this.membershipByParam();
     const groups = new Map<string, PathFilter[]>();
     for (const dyn of this.dynamicFilters()) {
       if (dyn.type !== 'framework') continue;
-      const option = options.get(dyn.param);
-      const descriptor = option && this.descriptorsById.get(option.descriptorId);
-      if (option && descriptor) groups.set(dyn.param, frameworkToRules(descriptor, option.roots));
+      groups.set(dyn.param, [this.membershipRule(dyn.param, membership.get(dyn.param) ?? [])]);
     }
     return groups;
   });
@@ -1071,15 +1096,11 @@ export class WorkspaceFileBrowserComponent {
     return rules;
   });
 
-  /** The refined label for a whole kind: `Java / Quarkus` if *any* of its roots' poms say so. */
-  private refinedKindLabel(descriptor: FrameworkDescriptor, roots: readonly string[]): string {
-    for (const root of roots) {
-      const marker = descriptor.labelPeekMarker?.(root);
-      const content = marker ? this.frameworkMarkerContentByPath().get(marker) : undefined;
-      const refined = content ? descriptor.refineLabel?.(content) : null;
-      if (refined) return refined;
-    }
-    return descriptor.label;
+  /** The server-refined label for a whole kind: `Java / Quarkus` if *any* of its roots say so. */
+  private kindLabel(frameworkId: string): string {
+    const projects = this.detectedProjects().filter((p) => p.frameworkId === frameworkId);
+    const refined = projects.find((p) => (p.label ?? '').includes('Quarkus'));
+    return (refined ?? projects[0])?.label ?? frameworkId;
   }
 
   /**
@@ -1089,17 +1110,16 @@ export class WorkspaceFileBrowserComponent {
    * several toggled compose as a union.
    */
   readonly frameworkQuickAccess = computed(() => {
-    const rootsByKind = new Map<string, { descriptor: FrameworkDescriptor; roots: string[] }>();
-    for (const { root, descriptor } of this.detectedProjects()) {
-      const entry = rootsByKind.get(descriptor.id) ?? { descriptor, roots: [] };
-      entry.roots.push(root);
-      rootsByKind.set(descriptor.id, entry);
+    const kinds: string[] = [];
+    for (const p of this.detectedProjects()) {
+      const id = p.frameworkId ?? '';
+      if (!kinds.includes(id)) kinds.push(id);
     }
     const active = this.activeFrameworkKinds();
-    return [...rootsByKind.values()].map(({ descriptor, roots }) => ({
-      id: descriptor.id,
-      label: lastLabelSegment(this.refinedKindLabel(descriptor, roots)),
-      active: active.has(descriptor.id),
+    return kinds.map((id) => ({
+      id,
+      label: lastLabelSegment(this.kindLabel(id)),
+      active: active.has(id),
     }));
   });
 
@@ -1107,17 +1127,17 @@ export class WorkspaceFileBrowserComponent {
   readonly generatedQuickFrameworkRules = computed<PathFilter[]>(() => {
     const active = this.activeFrameworkKinds();
     if (active.size === 0) return [];
-    const rootsByKind = new Map<string, string[]>();
-    for (const { root, descriptor } of this.detectedProjects()) {
-      if (!active.has(descriptor.id)) continue;
-      const list = rootsByKind.get(descriptor.id);
-      if (list) list.push(root);
-      else rootsByKind.set(descriptor.id, [root]);
+    const membersByKind = new Map<string, string[]>();
+    for (const p of this.detectedProjects()) {
+      const id = p.frameworkId ?? '';
+      if (!active.has(id)) continue;
+      const list = membersByKind.get(id) ?? [];
+      list.push(...(p.memberPaths ?? []));
+      membersByKind.set(id, list);
     }
     const rules: PathFilter[] = [];
-    for (const [id, roots] of rootsByKind) {
-      const descriptor = this.descriptorsById.get(id);
-      if (descriptor) rules.push(...frameworkToRules(descriptor, roots));
+    for (const [id, members] of membersByKind) {
+      rules.push(this.membershipRule(`kind:${id}`, members));
     }
     return rules;
   });
@@ -1143,21 +1163,38 @@ export class WorkspaceFileBrowserComponent {
     filterFilePaths(this.allEagerPaths(), this.effectiveFilters(), this.nameQuery()),
   );
 
+  /** The precomputed source→test link graph, keyed by source path (server-resolved over the tree). */
+  private readonly linkedTestsBySource = computed(() => {
+    const map = new Map<string, string[]>();
+    for (const link of this.consistentDetection()?.links ?? []) {
+      if (link.path) map.set(link.path, (link.tests ?? []).map((t) => t.path ?? '').filter(Boolean));
+    }
+    return map;
+  });
+
+  /** The inverse test→source lookup, derived from {@link linkedTestsBySource}. */
+  private readonly sourceByTest = computed(() => {
+    const map = new Map<string, string>();
+    for (const [source, tests] of this.linkedTestsBySource()) {
+      for (const test of tests) map.set(test, source);
+    }
+    return map;
+  });
+
   /**
    * What the tree actually renders: {@link filteredPaths} minus test files reachable via a visible
-   * source's Test tab (they'd be redundant in the tree). "Reachable" is computed with the exact same
-   * {@link linkedTestsOf} primitive the viewer's tabs use — a test is hidden iff some visible source
-   * would surface it as a tab. Skipped while name-searching, so a test can still be found by name.
+   * source's Test tab (they'd be redundant in the tree). Uses the same server-precomputed `links`
+   * graph the viewer's tabs read — a test is hidden iff some visible source surfaces it as a tab.
+   * Skipped while name-searching, so a test can still be found by name.
    */
   readonly treeVisiblePaths = computed(() => {
     const visible = this.filteredPaths();
     if (this.nameQuery().trim() !== '') return visible;
-    const projects = this.detectedProjects();
-    const all = this.allEagerPaths();
+    const linkedTests = this.linkedTestsBySource();
     const visibleSet = new Set(visible);
     const hidden = new Set<string>();
     for (const source of visible) {
-      for (const test of linkedTestsOf(source, projects, all)) {
+      for (const test of linkedTests.get(source) ?? []) {
         if (visibleSet.has(test)) hidden.add(test);
       }
     }
@@ -1362,7 +1399,18 @@ export class WorkspaceFileBrowserComponent {
    */
   readonly linkedGroup = computed<LinkedFile[]>(() => {
     const path = this.selectedPath();
-    return path ? resolveLinkedGroup(path, this.detectedProjects(), this.allEagerPaths()) : [];
+    if (!path) return [];
+    const linkedTests = this.linkedTestsBySource();
+    // Resolve the group off the owning source (not just `[source, thisFile]`) so opening any member
+    // shows the identical, fully-named strip — the group-normalization the client keeps.
+    const source = linkedTests.has(path) ? path : this.sourceByTest().get(path);
+    if (!source) return [];
+    const tests = linkedTests.get(source) ?? [];
+    if (tests.length === 0) return [];
+    return [
+      { role: 'code', path: source },
+      ...tests.map((p): LinkedFile => ({ role: 'test', path: p })),
+    ];
   });
 
   /** Staged code references — the root prompt-context slice, shared with the Chat tab's tray. */

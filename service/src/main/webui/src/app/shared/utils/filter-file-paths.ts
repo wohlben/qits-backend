@@ -27,6 +27,14 @@ export interface PathFilter {
    * matches. Used by framework filters; ignored for manual/non-glob rules.
    */
   restrict?: boolean;
+  /**
+   * A generated-only **explicit path set** the rule matches by identity — used by framework
+   * membership filters, whose member paths are resolved server-side (from `/detection`) rather than
+   * expressed as a client-evaluated glob. When present it supersedes `query`/`kind` for matching
+   * (see {@link compileMatcher}); pair it with `restrict: true` so a leading one leads restrictive
+   * exactly like the glob whitelists it replaces.
+   */
+  paths?: readonly string[];
 }
 
 /**
@@ -148,6 +156,11 @@ export function fuzzyMatch(query: string, target: string): boolean {
  */
 function compileMatcher(filter: PathFilter): (path: string) => boolean {
   const { kind, query } = filter;
+  if (filter.paths) {
+    // A server-resolved membership set: match by identity, not by pattern.
+    const set = new Set(filter.paths);
+    return (p) => set.has(p);
+  }
   if (kind === 'glob') {
     const re = gitignoreGlobToRegExp(query, true); // git default: case-sensitive
     return (p) => re.test(p);

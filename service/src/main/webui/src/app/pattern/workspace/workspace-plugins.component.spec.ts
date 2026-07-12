@@ -24,6 +24,11 @@ describe('WorkspacePluginsComponent', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesGet: vi
       .fn()
       .mockReturnValue(of({ paths: [], lazyDirs: [] })),
+    // Framework detection now comes from the server; default to no detected projects so
+    // non-recommendation tests render with an empty registry-only list.
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdDetectionGet: vi
+      .fn()
+      .mockReturnValue(of({ projects: [], frameworks: [], links: [] })),
   };
   let queryClient: QueryClient;
 
@@ -45,10 +50,21 @@ describe('WorkspacePluginsComponent', () => {
     }).compileComponents();
   });
 
-  /** Preset the (already-transformed) query caches so the component renders synchronously. */
-  function seed(installed: Map<string, boolean>, paths: string[] = []) {
+  /**
+   * Preset the (already-transformed) query caches so the component renders synchronously.
+   * `projects` are the server-detected projects (frameworkId drives the "Recommended" badge — the
+   * detection previously derived client-side from the file list now arrives on the detection query).
+   */
+  function seed(
+    installed: Map<string, boolean>,
+    projects: { root: string; frameworkId: string; label: string }[] = [],
+  ) {
     queryClient.setQueryData(['workspace-plugins', 'repo-1', 'wt-1'], installed);
-    queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], { paths, lazyDirs: [] });
+    queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+      projects,
+      frameworks: [],
+      links: [],
+    });
   }
 
   function createComponent() {
@@ -94,8 +110,9 @@ describe('WorkspacePluginsComponent', () => {
   });
 
   it('floats a framework-recommended plugin to the top and badges it', () => {
-    // A pom.xml at the root → java-quarkus detected → jdtls-lsp recommended.
-    seed(new Map(), ['pom.xml', 'src/main/java/App.java']);
+    // The server detects a java-quarkus project → jdtls-lsp (frameworkIds: ['java-quarkus']) is
+    // recommended. (Detection is a backend concern now — see FrameworkDetectionServiceTest.)
+    seed(new Map(), [{ root: '', frameworkId: 'java-quarkus', label: 'Java / Quarkus' }]);
     const el = createComponent().nativeElement as HTMLElement;
 
     expect(el.textContent).toContain('Recommended');

@@ -66,6 +66,8 @@ model/daemonEventKind.ts
 model/daemonEventSeverity.ts
 model/daemonInstanceDto.ts
 model/daemonStatus.ts
+model/detectedProjectDto.ts
+model/detectionDto.ts
 model/discardWorkspaceRequest.ts
 model/echoRequest.ts
 model/echoResponse.ts
@@ -87,6 +89,8 @@ model/featureFlowConfigurationDto.ts
 model/featureFlowPhaseActionDto.ts
 model/featureFlowPhaseDto.ts
 model/featureFlowPhaseStepDto.ts
+model/fileLinkDto.ts
+model/frameworkMembershipDto.ts
 model/healthCheckDto.ts
 model/healthCheckInput.ts
 model/healthCheckKind.ts
@@ -202,6 +206,7 @@ model/telemetryLogDto.ts
 model/telemetryMetricDto.ts
 model/telemetrySpanDto.ts
 model/telemetryTraceDto.ts
+model/testLinkDto.ts
 model/traceResponse.ts
 model/transcribeRequest.ts
 model/updateActionConfigurationRequest.ts

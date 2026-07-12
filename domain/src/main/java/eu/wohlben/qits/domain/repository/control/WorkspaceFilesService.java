@@ -39,6 +39,8 @@ public class WorkspaceFilesService {
 
   @Inject WorkspaceFileAccess access;
 
+  @Inject WorkspaceTreeFingerprint fingerprint;
+
   @Inject @Any Instance<LazyDirectoryStrategy> lazyStrategies;
 
   @ConfigProperty(name = "qits.repositories.file-tree.laziness", defaultValue = "gitignore")
@@ -52,10 +54,12 @@ public class WorkspaceFilesService {
   public record LazyDir(String path, int childCount) {}
 
   /**
-   * One level of a workspace's file tree: eager {@code paths} (files rendered immediately) plus
-   * {@code lazyDirs} (collapsed stubs). Returned for both the root and a single lazy directory.
+   * One level of a workspace's file tree: eager {@code paths} (files rendered immediately), {@code
+   * lazyDirs} (collapsed stubs), and the whole-tree structural {@code generation} token (a hash of
+   * the sorted {@code ls-files}) — the same value {@code /detection} stamps, so the client renders
+   * the two generation-consistent. Returned for both the root and a single lazy directory.
    */
-  public record Listing(List<String> paths, List<LazyDir> lazyDirs) {}
+  public record Listing(List<String> paths, List<LazyDir> lazyDirs, String generation) {}
 
   /**
    * Lists a workspace level as a {@link Listing}. With no {@code path} this is the root: eager
@@ -83,7 +87,8 @@ public class WorkspaceFilesService {
         strategy().lazyDirectories(repoId, workspaceId, access).stream()
             .map(dir -> new LazyDir(dir, access.childCount(repoId, workspaceId, dir)))
             .toList();
-    return new Listing(paths, lazyDirs);
+    // The root already holds the whole-tree ls-files, so fingerprint it directly (no second call).
+    return new Listing(paths, lazyDirs, WorkspaceTreeFingerprint.of(paths));
   }
 
   /**
@@ -128,7 +133,9 @@ public class WorkspaceFilesService {
     }
     files.sort(Comparator.naturalOrder());
     dirs.sort(Comparator.comparing(LazyDir::path));
-    return new Listing(files, dirs);
+    // A lazy level holds only its own slice, so fingerprint the whole tree separately — the client
+    // gates on the same token regardless of which level triggered the fetch.
+    return new Listing(files, dirs, fingerprint.compute(repoId, workspaceId));
   }
 
   /** The active laziness strategy, selected by {@code qits.repositories.file-tree.laziness}. */
