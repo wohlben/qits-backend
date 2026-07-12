@@ -22,6 +22,26 @@ const OK_SPAN: TelemetrySpanDto = {
   durationMs: 42,
 };
 
+const RESOURCE_FETCH_SPAN: TelemetrySpanDto = {
+  traceId: '11111111111111111111111111111111',
+  spanId: 'aaaaaaaaaaaaaaaa',
+  name: 'resourceFetch',
+  kind: 'INTERNAL',
+  status: 'UNSET',
+  startEpochNanos: 1_500_000_000,
+  durationMs: 3,
+};
+
+const NAVIGATION_SPAN: TelemetrySpanDto = {
+  traceId: '22222222222222222222222222222222',
+  spanId: 'bbbbbbbbbbbbbbbb',
+  name: 'Navigation',
+  kind: 'INTERNAL',
+  status: 'UNSET',
+  startEpochNanos: 1_800_000_000,
+  durationMs: 12,
+};
+
 const METRIC: TelemetryMetricDto = {
   name: 'jvm.memory.used',
   unit: 'By',
@@ -109,7 +129,10 @@ describe('WorkspaceTelemetryComponent', () => {
       spans: errorGroup().errorSpans,
       logs: [LOG],
     });
-    queryClient.setQueryData(['telemetry-spans', 'repo-1', 'wt-1', 'recent'], [OK_SPAN]);
+    queryClient.setQueryData(
+      ['telemetry-spans', 'repo-1', 'wt-1', 'recent'],
+      [OK_SPAN, NAVIGATION_SPAN, RESOURCE_FETCH_SPAN],
+    );
     queryClient.setQueryData(['telemetry-metrics', 'repo-1', 'wt-1'], [METRIC]);
 
     await TestBed.configureTestingModule({
@@ -202,6 +225,30 @@ describe('WorkspaceTelemetryComponent', () => {
 
     expect(fixture.componentInstance.selectedTraceId()).toBe(TRACE_ID);
     expect(element.textContent).toContain('Trace');
+  });
+
+  it('hides the browser page-load spans from the Traces list until revealed', () => {
+    const fixture = createComponent();
+    const element = fixture.nativeElement as HTMLElement;
+
+    // Navigation is INTERNAL too but stays visible; the resourceFetch flood is hidden by default.
+    expect(element.textContent).toContain('Navigation');
+    expect(element.textContent).not.toContain('resourceFetch');
+    expect(fixture.componentInstance.hiddenSpanCount()).toBe(1);
+    expect(fixture.componentInstance.visibleSpans().map((s) => s.name)).toEqual([
+      'POST /greetings',
+      'Navigation',
+    ]);
+
+    const revealButton = Array.from(element.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('page-load'),
+    );
+    expect(revealButton).toBeDefined();
+    revealButton!.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.showPageLoadSpans()).toBe(true);
+    expect(element.textContent).toContain('resourceFetch');
   });
 
   it('refetches with the duration sort when the Slowest lens is toggled', () => {

@@ -6,6 +6,7 @@ import { lastValueFrom } from 'rxjs';
 import { WorkspaceTelemetryControllerService } from '@/api/api/workspaceTelemetryController.service';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardTabComponent, ZardTabGroupComponent } from '@/shared/components/tabs';
+import { isPageLoadSpan } from '@/ui/components/telemetry/telemetry-span-classification';
 import { TelemetryErrorFeedComponent } from '@/ui/components/telemetry/telemetry-error-feed.component';
 import { TelemetryLogTailComponent } from '@/ui/components/telemetry/telemetry-log-tail.component';
 import { TelemetryMetricListComponent } from '@/ui/components/telemetry/telemetry-metric-list.component';
@@ -13,8 +14,9 @@ import { TelemetrySpanListComponent } from '@/ui/components/telemetry/telemetry-
 
 /**
  * The workspace's telemetry tab, split into signal sub-tabs: **Traces** (a recent-errors feed,
- * every buffered span behind a Recent / Slowest lens, click-through to the flat span list of its
- * trace), **Logs** (a tail filterable by service) and **Metrics** (the latest point of every
+ * every buffered span behind a Recent / Slowest lens — with the browser's page-load spans
+ * (`resourceFetch` &c.) default-hidden behind a reveal toggle — click-through to the flat span
+ * list of its trace), **Logs** (a tail filterable by service) and **Metrics** (the latest point of every
  * series) — the whole in-memory OTLP buffer, so a healthy app shows its traffic too, not just
  * failures. Ephemeral by design. Hidden sub-tabs stay mounted (the z-tab-group contract), so
  * queries stay warm across switches. These queries do not poll: `WorkspaceLiveService`
@@ -76,15 +78,33 @@ import { TelemetrySpanListComponent } from '@/ui/components/telemetry/telemetry-
                 Slowest
               </button>
             </div>
+            @if (hiddenSpanCount() > 0) {
+              <button
+                z-button
+                zSize="sm"
+                zType="ghost"
+                type="button"
+                class="self-start text-xs text-muted-foreground"
+                [attr.aria-pressed]="showPageLoadSpans()"
+                (click)="showPageLoadSpans.set(!showPageLoadSpans())"
+              >
+                {{ showPageLoadSpans() ? 'Hide' : 'Show' }} {{ hiddenSpanCount() }} page-load
+                {{ hiddenSpanCount() === 1 ? 'span' : 'spans' }}
+              </button>
+            }
             @if (spansQuery.isPending()) {
               <p class="text-sm text-muted-foreground">Loading traces…</p>
             } @else if (spansQuery.isError()) {
               <p class="text-sm text-destructive">Failed to load traces</p>
             } @else {
-              @let spans = spansQuery.data() ?? [];
+              @let spans = visibleSpans();
               @if (spans.length === 0) {
                 <p class="text-sm text-muted-foreground">
-                  No spans captured yet — interact with the app to generate traces.
+                  @if (hiddenSpanCount() > 0) {
+                    Only page-load spans captured — reveal them above.
+                  } @else {
+                    No spans captured yet — interact with the app to generate traces.
+                  }
                 </p>
               } @else {
                 <ul class="flex flex-col divide-y rounded-md border">
@@ -173,6 +193,12 @@ export class WorkspaceTelemetryComponent {
   readonly serviceFilter = signal<string | null>(null);
   /** The traces lens: chronological ("what did I just do") or by duration ("what's slow"). */
   readonly spanSort = signal<'recent' | 'slowest'>('recent');
+  /**
+   * Reveal the browser's page-load instrumentation spans (`resourceFetch` &c.) in the Traces list.
+   * Hidden by default: opening a web view floods the buffer with one per subresource. See
+   * {@link isPageLoadSpan}.
+   */
+  readonly showPageLoadSpans = signal(false);
 
   readonly errorsQuery = injectQuery(() => ({
     queryKey: ['telemetry-errors', this.repoId(), this.workspaceId()],
@@ -199,6 +225,17 @@ export class WorkspaceTelemetryComponent {
         ),
       ).then((r) => r.spans ?? []),
   }));
+
+  /** Page-load spans in the current buffer, hidden from the list unless {@link showPageLoadSpans}. */
+  readonly hiddenSpanCount = computed(
+    () => (this.spansQuery.data() ?? []).filter(isPageLoadSpan).length,
+  );
+
+  /** The traces the list renders: the full buffer minus page-load spans, unless revealed. */
+  readonly visibleSpans = computed(() => {
+    const spans = this.spansQuery.data() ?? [];
+    return this.showPageLoadSpans() ? spans : spans.filter((span) => !isPageLoadSpan(span));
+  });
 
   readonly traceQuery = injectQuery(() => ({
     queryKey: ['telemetry-trace', this.repoId(), this.workspaceId(), this.selectedTraceId()],
