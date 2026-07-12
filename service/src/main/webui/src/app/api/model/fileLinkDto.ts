@@ -7,12 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { LazyDirDto } from './lazyDirDto';
+import { TestLinkDto } from './testLinkDto';
 
 
-export interface Response65 { 
-    paths?: Array<string>;
-    lazyDirs?: Array<LazyDirDto>;
-    generation?: string;
+export interface FileLinkDto { 
+    path?: string;
+    projectRoot?: string;
+    tests?: Array<TestLinkDto>;
 }
 

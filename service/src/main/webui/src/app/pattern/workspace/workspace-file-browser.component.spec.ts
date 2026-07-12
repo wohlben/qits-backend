@@ -31,6 +31,13 @@ describe('WorkspaceFileBrowserComponent', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesContentGet: vi
       .fn()
       .mockReturnValue(of({ path: 'README.md', content: '# Title\n', binary: false })),
+    // Framework/project/test-link detection is computed server-side (see the backend
+    // FrameworkDetectionServiceTest) and read via the detection query. Default to empty detection so
+    // the tree/filter/lazy tests run without frameworks, quick-access, or test-hiding; framework
+    // tests seed an explicit DetectionDto into the ['workspace-detection', …] cache below.
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdDetectionGet: vi
+      .fn()
+      .mockReturnValue(of({ projects: [], frameworks: [], links: [] })),
   };
   const darkMode = { themeMode: () => EDarkModes.LIGHT };
   let queryClient: QueryClient;
@@ -754,8 +761,40 @@ describe('WorkspaceFileBrowserComponent', () => {
     const paramFor = (cmp: WorkspaceFileBrowserComponent, id: string) =>
       cmp.frameworkOptions().find((o) => o.descriptorId === id)!.param;
 
+    // The server-supplied detection for FW_PATHS: a java root (''), an angular root, and a docs root,
+    // each carrying the membership set the filter whitelists (the component narrows to exactly these).
+    const FW_DETECTION = {
+      projects: [
+        { root: '', frameworkId: 'java-quarkus', label: 'Java / Maven' },
+        { root: 'service/src/main/webui', frameworkId: 'ts-angular', label: 'TypeScript / Angular' },
+        { root: 'docs', frameworkId: 'docs', label: 'Docs' },
+      ],
+      frameworks: [
+        {
+          frameworkId: 'java-quarkus',
+          root: '',
+          label: 'Java / Maven',
+          memberPaths: ['pom.xml', 'src/main/java/com/App.java', 'src/test/java/com/AppTest.java'],
+        },
+        {
+          frameworkId: 'ts-angular',
+          root: 'service/src/main/webui',
+          label: 'TypeScript / Angular',
+          memberPaths: [
+            'service/src/main/webui/angular.json',
+            'service/src/main/webui/package.json',
+            'service/src/main/webui/src/app/x.ts',
+            'service/src/main/webui/src/app/x.spec.ts',
+          ],
+        },
+        { frameworkId: 'docs', root: 'docs', label: 'Docs', memberPaths: ['docs/plan.md'] },
+      ],
+      links: [],
+    };
+
     beforeEach(() => {
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], { paths: FW_PATHS, lazyDirs: [] });
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], FW_DETECTION);
     });
 
     it('offers a per-root filter for java/angular and one aggregate Docs filter', () => {
@@ -769,21 +808,48 @@ describe('WorkspaceFileBrowserComponent', () => {
       expect(options.find((o) => o.descriptorId === 'docs')?.roots).toEqual(['docs']);
     });
 
-    it('upgrades the Java label to Quarkus when the pom content mentions quarkus', async () => {
-      queryClient.setQueryData(['workspace-file', 'repo-1', 'wt-1', 'pom.xml'], {
-        path: 'pom.xml',
-        content: '<dependency>io.quarkus</dependency>',
-        binary: false,
+    it('holds detection until its generation matches the tree generation', () => {
+      // A working-tree change advanced /files to a new generation before /detection caught up: the
+      // stale detection must not be applied (no framework offers) — it is held for the next tick.
+      queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
+        paths: FW_PATHS,
+        lazyDirs: [],
+        generation: 'tree-gen-2',
       });
-      const fixture = createComponent();
-      const cmp = fixture.componentInstance;
-      const label = () => cmp.frameworkOptions().find((o) => o.descriptorId === 'java-quarkus')?.label;
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        ...FW_DETECTION,
+        generation: 'detection-gen-1',
+      });
+      const cmp = createComponent().componentInstance;
+      expect(cmp.frameworkOptions()).toEqual([]);
+    });
 
-      // the pom is peeked as soon as a java project is detected (the always-visible footer needs it)
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(label()).toBe('Java / Quarkus (root)');
+    it('applies detection once its generation matches the tree generation', () => {
+      queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
+        paths: FW_PATHS,
+        lazyDirs: [],
+        generation: 'tree-gen-9',
       });
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        ...FW_DETECTION,
+        generation: 'tree-gen-9',
+      });
+      const cmp = createComponent().componentInstance;
+      expect(cmp.frameworkOptions().length).toBe(3);
+    });
+
+    it('reflects the server-refined Quarkus label in the framework option', () => {
+      // Quarkus refinement (peeking pom.xml for `io.quarkus`) moved to the backend — see
+      // FrameworkDetectionServiceTest. The client just renders the label the server already refined.
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        ...FW_DETECTION,
+        frameworks: FW_DETECTION.frameworks.map((f) =>
+          f.frameworkId === 'java-quarkus' ? { ...f, label: 'Java / Quarkus' } : f,
+        ),
+      });
+      const cmp = createComponent().componentInstance;
+      const label = cmp.frameworkOptions().find((o) => o.descriptorId === 'java-quarkus')?.label;
+      expect(label).toBe('Java / Quarkus (root)');
     });
 
     it('enabling the Java filter shows only java/pom and hides the webui TS + docs', () => {
@@ -815,10 +881,38 @@ describe('WorkspaceFileBrowserComponent', () => {
       ]);
     });
 
+    it('lets a manual whitelist re-reveal a file the framework filter hid (manual wins last)', () => {
+      // The membership filter hides files client-side (it is a leading restrict whitelist), so a
+      // manual whitelist appended after it can still resurrect one — the composition the
+      // server-membership design preserves.
+      const fixture = createComponent();
+      const cmp = fixture.componentInstance;
+      cmp.addDynamicFilter('framework', paramFor(cmp, 'java-quarkus')); // hides README.md + the TS/docs
+      cmp.setFilters([{ id: 'm1', kind: 'exact', mode: 'whitelist', query: 'README.md', enabled: true }]);
+      fixture.detectChanges();
+      // README.md is not in java's memberPaths, yet the trailing manual whitelist brings it back…
+      expect(cmp.filteredPaths()).toContain('README.md');
+      // …without un-hiding the rest of the non-java tree (the angular/docs files stay hidden).
+      expect(cmp.filteredPaths()).not.toContain('service/src/main/webui/src/app/x.ts');
+      expect(cmp.filteredPaths()).not.toContain('docs/plan.md');
+    });
+
     it('the Docs filter whitelists the union of every docs dir and hides everything else', () => {
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
         paths: ['docs/a.md', 'service/docs/b.md', 'src/main.ts', 'README.md'],
         lazyDirs: [],
+      });
+      // Two docs roots both key to the single `docs` filter param → its membership is their union.
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        projects: [
+          { root: 'docs', frameworkId: 'docs', label: 'Docs' },
+          { root: 'service/docs', frameworkId: 'docs', label: 'Docs' },
+        ],
+        frameworks: [
+          { frameworkId: 'docs', root: 'docs', label: 'Docs', memberPaths: ['docs/a.md'] },
+          { frameworkId: 'docs', root: 'service/docs', label: 'Docs', memberPaths: ['service/docs/b.md'] },
+        ],
+        links: [],
       });
       const fixture = createComponent();
       const cmp = fixture.componentInstance;
@@ -829,10 +923,10 @@ describe('WorkspaceFileBrowserComponent', () => {
   });
 
   describe('framework root icons', () => {
-    const seedPom = (path: string, content: string) =>
-      queryClient.setQueryData(['workspace-file', 'repo-1', 'wt-1', path], { path, content, binary: false });
-
-    it('maps a quarkus root to the quarkus mark and an angular root to the shield; skips repo root', async () => {
+    // The icon is chosen from each detected project's server-refined label (`Java / Quarkus` →
+    // quarkus mark, `Java / Maven` → java cup, angular → shield). The Quarkus-vs-Maven distinction
+    // (peeking pom.xml) is now a backend concern — see FrameworkDetectionServiceTest.
+    it('maps a quarkus root to the quarkus mark and an angular root to the shield; skips repo root', () => {
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
         paths: [
           'pom.xml',
@@ -842,32 +936,57 @@ describe('WorkspaceFileBrowserComponent', () => {
         ],
         lazyDirs: [],
       });
-      seedPom('domain/pom.xml', 'io.quarkus'); // up-front so the peek is deterministic (no mock race)
-      const fixture = createComponent();
-      const cmp = fixture.componentInstance;
-
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(cmp.frameworkRootIcons().get('domain')).toBe('/quarkus.svg');
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        projects: [
+          { root: '', frameworkId: 'java-quarkus', label: 'Java / Maven' },
+          { root: 'domain', frameworkId: 'java-quarkus', label: 'Java / Quarkus' },
+          { root: 'service/src/main/webui', frameworkId: 'ts-angular', label: 'TypeScript / Angular' },
+        ],
+        frameworks: [
+          { frameworkId: 'java-quarkus', root: '', label: 'Java / Maven', memberPaths: ['pom.xml'] },
+          {
+            frameworkId: 'java-quarkus',
+            root: 'domain',
+            label: 'Java / Quarkus',
+            memberPaths: ['domain/pom.xml', 'domain/src/main/java/com/D.java'],
+          },
+          {
+            frameworkId: 'ts-angular',
+            root: 'service/src/main/webui',
+            label: 'TypeScript / Angular',
+            memberPaths: ['service/src/main/webui/angular.json'],
+          },
+        ],
+        links: [],
       });
+      const cmp = createComponent().componentInstance;
+
+      expect(cmp.frameworkRootIcons().get('domain')).toBe('/quarkus.svg');
       expect(cmp.frameworkRootIcons().get('service/src/main/webui')).toBe('/angular.svg');
       // the repo-root java project has no folder row → no icon
       expect(cmp.frameworkRootIcons().has('')).toBe(false);
     });
 
-    it('shows the Java cup for a plain (non-quarkus) maven root', async () => {
+    it('shows the Java cup for a plain (non-quarkus) maven root', () => {
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
         paths: ['domain/pom.xml', 'domain/src/main/java/com/D.java'],
         lazyDirs: [],
       });
-      seedPom('domain/pom.xml', '<project>plain maven</project>');
-      const fixture = createComponent();
-      const cmp = fixture.componentInstance;
-
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(cmp.frameworkRootIcons().get('domain')).toBe('/java.svg');
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        projects: [{ root: 'domain', frameworkId: 'java-quarkus', label: 'Java / Maven' }],
+        frameworks: [
+          {
+            frameworkId: 'java-quarkus',
+            root: 'domain',
+            label: 'Java / Maven',
+            memberPaths: ['domain/pom.xml', 'domain/src/main/java/com/D.java'],
+          },
+        ],
+        links: [],
       });
+      const cmp = createComponent().componentInstance;
+
+      expect(cmp.frameworkRootIcons().get('domain')).toBe('/java.svg');
     });
   });
 
@@ -883,28 +1002,63 @@ describe('WorkspaceFileBrowserComponent', () => {
       'README.md',
     ];
 
+    // Two java roots ('' + 'domain'), one angular root, one docs root — the footer collapses each
+    // kind to a single toggle whose aggregate membership spans all its roots.
+    const QA_DETECTION = {
+      projects: [
+        { root: '', frameworkId: 'java-quarkus', label: 'Java / Maven' },
+        { root: 'domain', frameworkId: 'java-quarkus', label: 'Java / Maven' },
+        { root: 'service/src/main/webui', frameworkId: 'ts-angular', label: 'TypeScript / Angular' },
+        { root: 'docs', frameworkId: 'docs', label: 'Docs' },
+      ],
+      frameworks: [
+        {
+          frameworkId: 'java-quarkus',
+          root: '',
+          label: 'Java / Maven',
+          memberPaths: ['pom.xml', 'src/main/java/com/App.java'],
+        },
+        {
+          frameworkId: 'java-quarkus',
+          root: 'domain',
+          label: 'Java / Maven',
+          memberPaths: ['domain/pom.xml', 'domain/src/main/java/com/D.java'],
+        },
+        {
+          frameworkId: 'ts-angular',
+          root: 'service/src/main/webui',
+          label: 'TypeScript / Angular',
+          memberPaths: ['service/src/main/webui/angular.json', 'service/src/main/webui/src/app/x.ts'],
+        },
+        { frameworkId: 'docs', root: 'docs', label: 'Docs', memberPaths: ['docs/plan.md'] },
+      ],
+      links: [],
+    };
+
     beforeEach(() => {
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], { paths: QA_PATHS, lazyDirs: [] });
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], QA_DETECTION);
     });
 
     it('offers one aggregate toggle per framework kind (not per root)', () => {
       const cmp = createComponent().componentInstance;
-      // two poms (root + domain) collapse into a single Java toggle
+      // two java roots (root + domain) collapse into a single Java toggle
       expect(cmp.frameworkQuickAccess().map((f) => f.label)).toEqual(['Maven', 'Angular', 'Docs']);
     });
 
-    it('shows the short Quarkus label once any pom mentions quarkus', async () => {
-      queryClient.setQueryData(['workspace-file', 'repo-1', 'wt-1', 'domain/pom.xml'], {
-        path: 'domain/pom.xml',
-        content: 'io.quarkus',
-        binary: false,
+    it('shows the short Quarkus label once the server refines a pom to Quarkus', () => {
+      // The Quarkus refinement moved to the backend (see FrameworkDetectionServiceTest); the footer
+      // just shows the short segment of whichever label the server sends.
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        ...QA_DETECTION,
+        frameworks: QA_DETECTION.frameworks.map((f) =>
+          f.frameworkId === 'java-quarkus' && f.root === 'domain'
+            ? { ...f, label: 'Java / Quarkus' }
+            : f,
+        ),
       });
-      const fixture = createComponent();
-      const cmp = fixture.componentInstance;
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(cmp.frameworkQuickAccess().find((f) => f.id === 'java-quarkus')?.label).toBe('Quarkus');
-      });
+      const cmp = createComponent().componentInstance;
+      expect(cmp.frameworkQuickAccess().find((f) => f.id === 'java-quarkus')?.label).toBe('Quarkus');
     });
 
     it('toggling a kind restricts to it (all roots), untoggling restores everything', () => {
@@ -937,14 +1091,27 @@ describe('WorkspaceFileBrowserComponent', () => {
     it('opens the tree to a framework-aware depth on toggle (java → src/main), not fully', () => {
       // `resources` makes `src/main` a real branch node (not absorbed into a chain); two packages
       // under `com` make it a branch too, so it can stay collapsed below the src/main landing.
+      const FOLD_JAVA_PATHS = [
+        'domain/pom.xml',
+        'domain/src/main/java/com/a/A.java',
+        'domain/src/main/java/com/b/B.java',
+        'domain/src/main/resources/app.properties',
+      ];
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
-        paths: [
-          'domain/pom.xml',
-          'domain/src/main/java/com/a/A.java',
-          'domain/src/main/java/com/b/B.java',
-          'domain/src/main/resources/app.properties',
-        ],
+        paths: FOLD_JAVA_PATHS,
         lazyDirs: [],
+      });
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+        projects: [{ root: 'domain', frameworkId: 'java-quarkus', label: 'Java / Maven' }],
+        frameworks: [
+          {
+            frameworkId: 'java-quarkus',
+            root: 'domain',
+            label: 'Java / Maven',
+            memberPaths: FOLD_JAVA_PATHS,
+          },
+        ],
+        links: [],
       });
       const fixture = createComponent();
       const cmp = fixture.componentInstance;
@@ -986,8 +1153,28 @@ describe('WorkspaceFileBrowserComponent', () => {
       'README.md',
     ];
 
+    // The server's source→test link graph: java App↔AppTest, angular foo↔foo.spec. The viewer tabs
+    // and the tree's redundant-test hiding both read this (no client re-derivation).
+    const TAB_DETECTION = {
+      projects: [],
+      frameworks: [],
+      links: [
+        {
+          path: 'src/main/java/com/App.java',
+          projectRoot: '',
+          tests: [{ path: 'src/test/java/com/AppTest.java', kinds: ['junit'] }],
+        },
+        {
+          path: 'w/src/foo.ts',
+          projectRoot: 'w',
+          tests: [{ path: 'w/src/foo.spec.ts', kinds: ['vitest'] }],
+        },
+      ],
+    };
+
     beforeEach(() => {
       queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], { paths: TAB_PATHS, lazyDirs: [] });
+      queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], TAB_DETECTION);
     });
 
     it('links a java source to its test symmetrically (code tab first either way)', () => {
@@ -1060,6 +1247,22 @@ describe('WorkspaceFileBrowserComponent', () => {
         queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], {
           paths: FOLD_PATHS,
           lazyDirs: [],
+        });
+        // The server folds both scenario-named tests under the one source (the permissive-java
+        // matching that used to live client-side is now FrameworkDetectionServiceTest's concern).
+        queryClient.setQueryData(['workspace-detection', 'repo-1', 'wt-1'], {
+          projects: [],
+          frameworks: [],
+          links: [
+            {
+              path: 'src/main/java/com/OtelProxyResource.java',
+              projectRoot: '',
+              tests: [
+                { path: 'src/test/java/com/OtelProxyResourceTest.java', kinds: ['junit'] },
+                { path: 'src/test/java/com/OtelProxyUnreachableTest.java', kinds: ['junit'] },
+              ],
+            },
+          ],
         });
       });
 

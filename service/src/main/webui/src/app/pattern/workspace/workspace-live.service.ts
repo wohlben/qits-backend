@@ -4,9 +4,10 @@ import { QueryClient, QueryKey } from '@tanstack/angular-query-experimental';
 /**
  * Keeps the workspace detail route fresh over one Server-Sent-Events channel instead of eight
  * free-running polls. The backend pushes payload-free topic hints (`daemons`, `daemon-events`,
- * `telemetry`, `commands`); each maps to one or more TanStack Query invalidations, so data keeps
- * flowing through the unchanged REST endpoints — polling becomes fetch-on-signal, and an idle
- * workspace fetches nothing.
+ * `telemetry`, `commands`, `files`); each maps to one or more TanStack Query invalidations, so data
+ * keeps flowing through the unchanged REST endpoints — polling becomes fetch-on-signal, and an idle
+ * workspace fetches nothing. The `files` hint is pushed by the per-workspace file watcher when the
+ * working tree changes on disk (e.g. the coding agent scaffolds without a commit).
  *
  * This is the sanctioned exception to the "no raw fetch/HttpClient in components" rule (like the
  * existing WebSocket code): `EventSource` can't ride the generated API client. It uses a same-origin
@@ -81,6 +82,17 @@ export class WorkspaceLiveService {
       // The session tree derives from commands + the post-exit transcript sweep, which both fire
       // the `commands` hint — so it rides the same topic instead of adding one.
       commands: [['commands'], ['workspace-agent-sessions', repoId, workspaceId]],
+      // The working tree changed on disk: refresh the tree, detection, and any open file's content
+      // together. `workspace-files` is a prefix (also refetches every opened lazy directory
+      // `['workspace-files', repoId, workspaceId, dir]`); `workspace-detection` is shared by the file
+      // browser and the plugins recommender; `workspace-file` (prefix) refreshes open file viewers so
+      // an uncommitted edit shows without a reload. The file browser renders detection only when its
+      // generation token matches the tree's, so the three never show as a skewed combination.
+      files: [
+        ['workspace-files', repoId, workspaceId],
+        ['workspace-detection', repoId, workspaceId],
+        ['workspace-file', repoId, workspaceId],
+      ],
     };
   }
 }

@@ -7,12 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { LazyDirDto } from './lazyDirDto';
 
 
-export interface Response65 { 
-    paths?: Array<string>;
-    lazyDirs?: Array<LazyDirDto>;
-    generation?: string;
+export interface FrameworkMembershipDto { 
+    frameworkId?: string;
+    root?: string;
+    label?: string;
+    memberPaths?: Array<string>;
 }
 

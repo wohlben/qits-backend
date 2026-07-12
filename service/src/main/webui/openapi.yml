@@ -523,6 +523,32 @@ components:
       - RESTARTING
       - CRASHED
       - STOPPED
+    DetectedProjectDto:
+      type: object
+      properties:
+        root:
+          type: string
+        frameworkId:
+          type: string
+        label:
+          type: string
+    DetectionDto:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/DetectedProjectDto"
+        frameworks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FrameworkMembershipDto"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileLinkDto"
+        generation:
+          type: string
     DiscardWorkspaceRequest:
       type: object
       properties:
@@ -678,6 +704,30 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
+    FileLinkDto:
+      type: object
+      properties:
+        path:
+          type: string
+        projectRoot:
+          type: string
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestLinkDto"
+    FrameworkMembershipDto:
+      type: object
+      properties:
+        frameworkId:
+          type: string
+        root:
+          type: string
+        label:
+          type: string
+        memberPaths:
+          type: array
+          items:
+            type: string
     HealthCheckDto:
       type: object
       properties:
@@ -1362,6 +1412,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LazyDirDto"
+        generation:
+          type: string
     Response66:
       type: object
       properties:
@@ -1615,6 +1667,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryLogDto"
+    TestLinkDto:
+      type: object
+      properties:
+        path:
+          type: string
+        kinds:
+          type: array
+          items:
+            type: string
     TraceResponse:
       type: object
       properties:
@@ -3411,6 +3472,29 @@ paths:
       summary: Stop
       tags:
       - Workspace Daemon Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/detection:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionDto"
+      summary: Detection
+      tags:
+      - Workspace Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/discard:
     post:
       parameters:

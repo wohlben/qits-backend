@@ -4,7 +4,6 @@ import { lastValueFrom } from 'rxjs';
 
 import { AgentPluginControllerService } from '@/api/api/agentPluginController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
-import { detectFrameworks } from '@/shared/utils/detect-frameworks';
 import { ZardButtonComponent } from '@/shared/components/button';
 import {
   PluginInstallStatus,
@@ -121,26 +120,29 @@ export class WorkspacePluginsComponent {
   }));
 
   /**
-   * The workspace's file paths, reused (same key + shape) from the file browser so we share its
-   * cache entry. Only the eager root listing is needed — framework marker files (`pom.xml`,
-   * `angular.json`) live at project roots and come back in it.
+   * The workspace's server-computed framework detection, reused (same key) from the file browser so
+   * we share its cache entry — so plugin recommendation and the file tree never disagree.
    */
-  private readonly filesQuery = injectQuery(() => ({
-    queryKey: ['workspace-files', this.repoId(), this.workspaceId()],
+  private readonly detectionQuery = injectQuery(() => ({
+    queryKey: ['workspace-detection', this.repoId(), this.workspaceId()],
     queryFn: () =>
       lastValueFrom(
-        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdFilesGet(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDetectionGet(
           this.repoId(),
           this.workspaceId(),
         ),
-      ).then((r) => ({ paths: r.paths ?? [], lazyDirs: r.lazyDirs ?? [] })),
+      ),
   }));
 
-  /** The framework ids detected in this workspace (empty until the file listing resolves). */
-  private readonly detectedFrameworkIds = computed(() => {
-    const paths = this.filesQuery.data()?.paths ?? [];
-    return new Set(detectFrameworks(paths).map((p) => p.descriptor.id));
-  });
+  /** The framework ids detected in this workspace (empty until the detection query resolves). */
+  private readonly detectedFrameworkIds = computed(
+    () =>
+      new Set(
+        (this.detectionQuery.data()?.projects ?? [])
+          .map((p) => p.frameworkId)
+          .filter((id): id is string => !!id),
+      ),
+  );
 
   /** The registry joined with status + recommendation, recommended plugins floated to the top. */
   readonly rows = computed<PluginRow[]>(() => {

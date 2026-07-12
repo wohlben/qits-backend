@@ -13,7 +13,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # git + a shell toolchain (setsid/kill come from util-linux/procps, needed for the registry's
 # process-group termination), python, jq (JSON wrangling in scripts — e.g. the Claude Code
-# statusline script on the shared /claude-home volume), and unzip. `openssh-client` gives git an
+# statusline script on the shared /claude-home volume), and unzip. `inotify-tools` provides
+# `inotifywait`, spawned per workspace by WorkspaceWatchService to push live working-tree changes
+# (agent scaffolds a module/pom/test without a commit) out over the /events SSE channel so the file
+# browser and detection refresh without a reload. `openssh-client` gives git an
 # ssh transport for pushing/fetching ssh remotes — qits' own git verbs speak smart-HTTP to the
 # in-process git server, but the devcontainer (which extends this image) pushes qits itself to an
 # ssh origin, and VS Code only forwards the host ssh-agent into a container that has the client
@@ -29,6 +32,7 @@ RUN apt-get update \
         bash \
         gpg \
         jq \
+        inotify-tools \
         openssh-client \
         unzip \
         util-linux \
