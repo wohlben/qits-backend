@@ -98,8 +98,11 @@ export const FRAMEWORK_DESCRIPTORS: readonly FrameworkDescriptor[] = [
       const m = JAVA_SOURCE.exec(rel);
       if (!m) return [];
       const pkg = m[1] ?? '';
-      const name = m[2];
-      return [`src/test/java/${pkg}${name}*Test.java`, `src/test/java/${pkg}${name}*IT.java`];
+      // Pre-filter on the source's **2-word camel prefix** (the full name when it has fewer words),
+      // so a scenario-named test (`OtelProxyUnreachableTest` for `OtelProxyResource`) is a
+      // candidate; `ownerSource` then decides which matched test truly belongs here.
+      const prefix = camelWords(m[2]).slice(0, 2).join('');
+      return [`src/test/java/${pkg}${prefix}*Test.java`, `src/test/java/${pkg}${prefix}*IT.java`];
     },
     sourceCandidates: (relTest) => {
       const m = JAVA_TEST.exec(relTest);
@@ -107,8 +110,16 @@ export const FRAMEWORK_DESCRIPTORS: readonly FrameworkDescriptor[] = [
       const pkg = m[1] ?? '';
       // The `*Test`/`*IT` qualifier makes the inverse ambiguous, so try every CamelCase prefix of
       // the base **longest-first** (`TheFileSpecialCase` → `TheFileSpecialCase`, `TheFileSpecial`,
-      // `TheFile`, `The`); the caller picks the first that exists — the deepest class that owns it.
-      return camelPrefixes(m[2]).map((n) => `src/main/java/${pkg}${n}.java`);
+      // `TheFile`, `The`); the caller picks the first that owns it — the deepest such class.
+      const candidates: string[] = [];
+      for (const { prefix, words } of camelPrefixes(m[2])) {
+        candidates.push(`src/main/java/${pkg}${prefix}.java`);
+        // Beyond an exact match, a ≥2-word prefix may be *extended* by a single owning source
+        // (`OtelProxy[A-Z]*.java` → `OtelProxyResource.java`); a 1-word prefix (`Otel`, `Workspace`)
+        // never fuzzy-claims a test.
+        if (words >= 2) candidates.push(`src/main/java/${pkg}${prefix}[A-Z]*.java`);
+      }
+      return candidates;
     },
     labelPeekMarker: (root) => (root === '' ? 'pom.xml' : `${root}/pom.xml`),
     refineLabel: (content) => (/quarkus/i.test(content) ? 'Java / Quarkus' : null),
@@ -202,18 +213,26 @@ function byClosest(a: string, b: string): number {
 }
 
 /**
- * The CamelCase prefixes of a class base name, **longest first**: `TheFileCase` →
- * `[TheFileCase, TheFile, The]`. A run of capitals stays together (`HTTPServer` → `[HTTPServer,
- * HTTP]`). Used to resolve a qualified test (`TheFileCaseTest`) to the deepest source class.
+ * The CamelCase "words" of a class base name: `TheFileCase` → `[The, File, Case]`. A run of capitals
+ * stays together (`HTTPServer` → `[HTTP, Server]`). Falls back to `[base]` if nothing matches.
  */
-function camelPrefixes(base: string): string[] {
-  const words = base.match(/[A-Z][a-z0-9]*|[A-Z]+(?![a-z])/g) ?? [base];
-  const prefixes: string[] = [];
+function camelWords(base: string): string[] {
+  return base.match(/[A-Z][a-z0-9]*|[A-Z]+(?![a-z])/g) ?? [base];
+}
+
+/**
+ * The CamelCase prefixes of a class base name, **longest first**, each tagged with its word count:
+ * `TheFileCase` → `[{TheFileCase,3}, {TheFile,2}, {The,1}]`. The word count lets callers gate the
+ * fuzzy extension match on prefix length. Used to resolve a qualified test (`TheFileCaseTest`) to
+ * the deepest source class.
+ */
+function camelPrefixes(base: string): { prefix: string; words: number }[] {
+  const prefixes: { prefix: string; words: number }[] = [];
   let acc = '';
-  for (const word of words) {
+  camelWords(base).forEach((word, i) => {
     acc += word;
-    prefixes.push(acc);
-  }
+    prefixes.push({ prefix: acc, words: i + 1 });
+  });
   return prefixes.reverse();
 }
 
@@ -233,7 +252,15 @@ function ownerSource(
   if (!descriptor.isTestPath?.(rel)) return null;
   for (const candidate of descriptor.sourceCandidates?.(rel) ?? []) {
     const full = root === '' ? candidate : `${root}/${candidate}`;
-    if (full !== path && existing.has(full)) return full;
+    if (full.includes('*')) {
+      // A pattern candidate (`P[A-Z]*.java`) owns the test only when it matches **exactly one**
+      // source; ambiguity claims nothing and the walk continues to a shorter prefix.
+      const re = gitignoreGlobToRegExp(full, true);
+      const matches = [...existing].filter((p) => p !== path && re.test(p));
+      if (matches.length === 1) return matches[0];
+    } else if (full !== path && existing.has(full)) {
+      return full;
+    }
   }
   return null;
 }
@@ -294,7 +321,15 @@ export function resolveLinkedGroup(
   }
   const sources = linkedSourcesOf(path, projects, allPaths);
   if (sources.length > 0) {
-    return [...sources.map((p): LinkedFile => ({ role: 'code', path: p })), { role: 'test', path }];
+    // Resolve the group off the owning source (not just `[source, thisTest]`) so opening any member
+    // of a linked group shows the identical, fully-named tab strip. `path` is contained in
+    // `linkedTestsOf(source)` (its owner is `source`), so the opened file keeps its tab.
+    const source = sources[0];
+    const groupTests = linkedTestsOf(source, projects, allPaths);
+    return [
+      { role: 'code', path: source },
+      ...groupTests.map((p): LinkedFile => ({ role: 'test', path: p })),
+    ];
   }
   return [];
 }

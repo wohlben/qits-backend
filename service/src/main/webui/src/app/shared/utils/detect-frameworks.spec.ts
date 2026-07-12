@@ -239,6 +239,100 @@ describe('linkedTestsOf / linkedSourcesOf (the shared tab + tree-hiding primitiv
   });
 });
 
+describe('permissive java test folding (extension)', () => {
+  const SRC = 'src/main/java/com';
+  const TST = 'src/test/java/com';
+
+  it('folds a scenario-named test into the single source that extends its ≥2-word prefix', () => {
+    // No OtelProxyUnreachable.java / OtelProxy.java — OtelProxyUnreachableTest still belongs to the
+    // one OtelProxy* source that exists.
+    const p = [
+      'pom.xml',
+      `${SRC}/OtelProxyResource.java`,
+      `${TST}/OtelProxyResourceTest.java`,
+      `${TST}/OtelProxyUnreachableTest.java`,
+    ];
+    const proj = detectFrameworks(p);
+    expect(linkedSourcesOf(`${TST}/OtelProxyUnreachableTest.java`, proj, p)).toEqual([
+      `${SRC}/OtelProxyResource.java`,
+    ]);
+    // source → both its exact and its extension-folded tests
+    expect(linkedTestsOf(`${SRC}/OtelProxyResource.java`, proj, p).sort()).toEqual([
+      `${TST}/OtelProxyResourceTest.java`,
+      `${TST}/OtelProxyUnreachableTest.java`,
+    ]);
+  });
+
+  it('prefers a more-specific exact source over an extension match (longest-first)', () => {
+    const p = [
+      'pom.xml',
+      `${SRC}/OtelProxyResource.java`,
+      `${SRC}/OtelProxyUnreachable.java`,
+      `${TST}/OtelProxyUnreachableTest.java`,
+    ];
+    const proj = detectFrameworks(p);
+    // OtelProxyUnreachable.java wins at step 1 before OtelProxy[A-Z]* is ever tried
+    expect(linkedSourcesOf(`${TST}/OtelProxyUnreachableTest.java`, proj, p)).toEqual([
+      `${SRC}/OtelProxyUnreachable.java`,
+    ]);
+    expect(linkedTestsOf(`${SRC}/OtelProxyResource.java`, proj, p)).toEqual([]);
+  });
+
+  it('folds into neither source when the extension prefix matches two sources (ambiguous)', () => {
+    const p = [
+      'pom.xml',
+      `${SRC}/OtelProxyResource.java`,
+      `${SRC}/OtelProxyClient.java`,
+      `${TST}/OtelProxyUnreachableTest.java`,
+    ];
+    const proj = detectFrameworks(p);
+    expect(linkedSourcesOf(`${TST}/OtelProxyUnreachableTest.java`, proj, p)).toEqual([]);
+    expect(linkedTestsOf(`${SRC}/OtelProxyResource.java`, proj, p)).toEqual([]);
+    expect(linkedTestsOf(`${SRC}/OtelProxyClient.java`, proj, p)).toEqual([]);
+  });
+
+  it('never fuzzy-folds a test that shares only its first camel word with a source', () => {
+    const p = ['pom.xml', `${SRC}/FooBaz.java`, `${TST}/FooBarTest.java`];
+    const proj = detectFrameworks(p);
+    // prefix FooBar has no exact/extension owner; the 1-word prefix Foo never fuzzy-claims
+    expect(linkedSourcesOf(`${TST}/FooBarTest.java`, proj, p)).toEqual([]);
+    expect(linkedTestsOf(`${SRC}/FooBaz.java`, proj, p)).toEqual([]);
+  });
+
+  it('folds a …QuarkusTest like any …Test (suffix stripped, then owned by exact prefix)', () => {
+    const p = [
+      'pom.xml',
+      `${SRC}/GreetingResource.java`,
+      `${TST}/GreetingResourceQuarkusTest.java`,
+    ];
+    const proj = detectFrameworks(p);
+    expect(linkedSourcesOf(`${TST}/GreetingResourceQuarkusTest.java`, proj, p)).toEqual([
+      `${SRC}/GreetingResource.java`,
+    ]);
+    expect(linkedTestsOf(`${SRC}/GreetingResource.java`, proj, p)).toEqual([
+      `${TST}/GreetingResourceQuarkusTest.java`,
+    ]);
+  });
+
+  it('opening any group member yields the identical fully-named strip (symmetric group)', () => {
+    const p = [
+      'pom.xml',
+      `${SRC}/OtelProxyResource.java`,
+      `${TST}/OtelProxyResourceTest.java`,
+      `${TST}/OtelProxyUnreachableTest.java`,
+    ];
+    const proj = detectFrameworks(p);
+    const fromSource = resolveLinkedGroup(`${SRC}/OtelProxyResource.java`, proj, p);
+    const fromTest = resolveLinkedGroup(`${TST}/OtelProxyUnreachableTest.java`, proj, p);
+    expect(fromTest).toEqual(fromSource);
+    expect(fromSource.map((f) => f.path)).toEqual([
+      `${SRC}/OtelProxyResource.java`,
+      `${TST}/OtelProxyResourceTest.java`,
+      `${TST}/OtelProxyUnreachableTest.java`,
+    ]);
+  });
+});
+
 describe('java label refinement (Quarkus peek)', () => {
   it('upgrades to Quarkus only when the pom content mentions quarkus', () => {
     const java = descriptor('java-quarkus');
