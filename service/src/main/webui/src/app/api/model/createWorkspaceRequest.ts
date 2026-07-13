@@ -14,5 +14,6 @@ export interface CreateWorkspaceRequest {
     parent?: string;
     branch?: string;
     preamble?: string;
+    adoptExisting?: boolean;
 }
 

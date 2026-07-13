@@ -82,6 +82,7 @@ interface CreateWorkspaceForm {
             (configureWithClaude)="configureWithClaude($event)"
             (resolveConflict)="openResolveConflict($event)"
             (branchOff)="openCreate($event)"
+            (createWorkspace)="onCreateWorkspace($event)"
             (integrate)="openIntegrate($event)"
             (abandon)="openAbandon($event)"
             (cleanup)="onCleanup($event)"
@@ -580,13 +581,20 @@ export class BranchListComponent {
   readonly abandonResult = signal('');
 
   readonly createMutation = injectMutation(() => ({
-    mutationFn: (data: { id: string; parent: string; branch: string; preamble: string }) =>
+    mutationFn: (data: {
+      id: string;
+      parent: string;
+      branch: string;
+      preamble: string;
+      adoptExisting?: boolean;
+    }) =>
       lastValueFrom(
         this.workspaceService.apiRepositoriesRepoIdWorkspacesPost(this.repoId(), {
           id: data.id,
           parent: data.parent || undefined,
           branch: data.branch || undefined,
           preamble: data.preamble || undefined,
+          adoptExisting: data.adoptExisting || undefined,
         }),
       ),
     onSuccess: () => this.onMutationSuccess(),
@@ -802,6 +810,35 @@ export class BranchListComponent {
     this.createPreamble.set('');
     patchState(this.ui, { selected: null, parent });
     this.openDialog('New workspace from ' + parent, this.createTpl());
+  }
+
+  /**
+   * Adopt a branch that has no workspace: create one over the existing branch (no dialog), with the
+   * id derived from the branch name and the parent set to the repository's configured main branch.
+   */
+  onCreateWorkspace(branch: string) {
+    this.createMutation.mutate({
+      id: this.deriveWorkspaceId(branch),
+      parent: this.mainBranch(),
+      branch,
+      preamble: '',
+      adoptExisting: true,
+    });
+  }
+
+  /**
+   * Turns a branch name into a valid workspace id (the server slug rule: [A-Za-z0-9_-], ≤64 chars,
+   * not dash-leading), de-colliding against existing active workspace ids by suffixing -2, -3, …
+   */
+  private deriveWorkspaceId(branch: string): string {
+    let slug = branch.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64);
+    if (!slug || slug.startsWith('-')) slug = 'workspace';
+    const taken = new Set((this.workspacesQuery.data() ?? []).map((w) => w.workspaceId));
+    if (!taken.has(slug)) return slug;
+    for (let i = 2; ; i++) {
+      const candidate = `${slug.slice(0, 62)}-${i}`;
+      if (!taken.has(candidate)) return candidate;
+    }
   }
 
   openIntegrate(branch: string) {

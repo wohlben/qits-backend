@@ -66,7 +66,9 @@ describe('BranchTreeComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
+    // The connector (the ahead/behind count / conflict marker) is the titled `.font-mono` element —
+    // scoped past other titled controls like the workspaceless row's "Create workspace" button.
+    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title].font-mono')!;
     expect(connector.textContent).toContain('+5');
     expect(connector.textContent).not.toContain('-2');
     expect(connector.querySelector('ng-icon')).toBeTruthy();
@@ -211,7 +213,7 @@ describe('BranchTreeComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title]')!;
+    const connector = (fixture.nativeElement as HTMLElement).querySelector('[title].font-mono')!;
     const spans = Array.from(connector.querySelectorAll('span'));
     const aheadSpan = spans.find((s) => s.classList.contains('font-semibold'))!;
     const behindSpan = spans.find((s) => s !== aheadSpan)!;

@@ -450,6 +450,8 @@ components:
           type: string
         preamble:
           type: string
+        adoptExisting:
+          type: boolean
     DaemonEventDto:
       type: object
       properties:
