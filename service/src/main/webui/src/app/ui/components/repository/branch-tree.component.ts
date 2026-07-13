@@ -254,6 +254,7 @@ interface NodeSummary {
             (run)="run.emit(node.label)"
             (configureWithClaude)="configureWithClaude.emit(node.label)"
             (branchOff)="branchOff.emit(node.label)"
+            (createWorkspace)="createWorkspace.emit(node.label)"
             (abandon)="abandon.emit(node.data)"
             (cleanup)="cleanup.emit(node.label)"
             (delete)="delete.emit(node.label)"
@@ -287,6 +288,8 @@ export class BranchTreeComponent {
   /** Launch the repository-MCP Claude action in a subtree's terminal (carries the branch name). */
   readonly configureWithClaude = output<string>();
   readonly branchOff = output<string>();
+  /** Adopt a workspaceless branch as a new workspace (carries the branch name), parent = main. */
+  readonly createWorkspace = output<string>();
   /** Open the resolve-conflict flow for a conflicting workspace (carries the workspace). */
   readonly resolveConflict = output<WorkspaceDto>();
   readonly integrate = output<string>();

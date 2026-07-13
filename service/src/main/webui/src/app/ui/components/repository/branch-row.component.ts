@@ -83,9 +83,19 @@ import { ZardButtonComponent } from '@/shared/components/button';
             </button>
           }
         }
-        <button z-button [zType]="workspace() ? 'secondary' : 'default'" (click)="branchOff.emit()">
-          Branch off workspace
-        </button>
+        @if (!workspace()) {
+          <!-- The branch exists but has no workspace yet: adopt it in place (parent = the repo's
+               main branch) so it can be worked on, run, and integrated. Distinct from "Branch off",
+               which forks a new branch. -->
+          <button
+            z-button
+            title="Create a workspace for this branch (parent: the repository's main branch)"
+            (click)="createWorkspace.emit()"
+          >
+            Create workspace
+          </button>
+        }
+        <button z-button zType="secondary" (click)="branchOff.emit()">Branch off workspace</button>
         @if (canCleanup()) {
           <!-- Fully integrated with nothing unmerged and no dependents: offer a safe, no-confirm
                cleanup instead of Integrate/Abandon (the backend re-verifies before deleting). -->
@@ -130,6 +140,8 @@ export class BranchRowComponent {
   /** Launch the repository-MCP Claude action in this workspace's terminal. */
   readonly configureWithClaude = output<void>();
   readonly branchOff = output<void>();
+  /** Adopt this (workspaceless) branch as a new workspace, parented on the repo's main branch. */
+  readonly createWorkspace = output<void>();
   readonly abandon = output<void>();
   readonly delete = output<void>();
   readonly cleanup = output<void>();
