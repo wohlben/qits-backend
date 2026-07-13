@@ -80,6 +80,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
+            "providersFile": "src/test-providers.ts",
             "exclude": [
               "src/**/*.browser.spec.ts"
             ]
@@ -88,6 +89,7 @@
         "test-visual": {
           "builder": "@angular/build:unit-test",
           "options": {
+            "providersFile": "src/test-providers.ts",
             "buildTarget": "qits-ui:build",
             "browsers": [
               "chromium"
