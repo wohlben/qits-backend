@@ -69,7 +69,9 @@ read host secrets but can exfiltrate what it finds inside the container); the do
   --add-host=host.docker.internal:host-gateway <image> sleep infinity`), `exec`, `execArgv` (the
   `docker exec` prefix the registry prepends), `exists`, `rm`, `restart`,
   `listWorkspaceContainers` (reads the labels back).
-- Committed `docker/workspace/Dockerfile` (git + node/pnpm + JDK + python; `/workspace` made
+- Committed `docker/workspace/Dockerfile` (git + node/pnpm + JDK + python + pinned fonts &
+  Playwright Chromium — the screenshot-baseline renderer, see
+  `2026-07-13_screenshot-baseline-renderer-baked-into-image.md`; `/workspace` made
   world-writable and `HOME`, since the container runs as an arbitrary host uid). Build locally:
   `docker build -t qits/workspace docker/workspace`.
 - Config `qits.workspace.{image,container-runtime,git-host,qits-port,term-grace-ms}` in `service`
