@@ -75,7 +75,9 @@ browser → 127.0.0.1:4200 (devcontainer Quinoa, ingress) → localhost:8080 (de
 
 ## The devcontainer (`.devcontainer/`)
 
-- `Dockerfile` extends `qits/workspace:latest` (JDK 25, Node/pnpm, git — the workspace toolchain) and
+- `Dockerfile` extends `qits/workspace:latest` (JDK 25, Node/pnpm, git, pinned fonts + Playwright
+  Chromium — the workspace toolchain incl. the screenshot-baseline renderer, see
+  `2026-07-13_screenshot-baseline-renderer-baked-into-image.md`) and
   adds the **docker CLI** (docker-outside-of-docker) so qits manages sibling workspace containers via
   the mounted socket.
 - `docker-compose.yml` runs qits on `qits-net` with alias `qits`; mounts the repo source (live

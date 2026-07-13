@@ -81,6 +81,58 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && corepack prepare pnpm@latest --activate \
     && rm -rf /var/lib/apt/lists/*
 
+# ---- Screenshot-test renderer: pinned fonts + Playwright Chromium ---------------------------
+# The visual baselines committed under service/src/main/webui (__screenshots__/*.png) are only
+# reproducible on the exact Chromium build AND font stack that rendered them, so both are baked
+# into this image, which is the sole sanctioned producer of baselines — see
+# docs/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md and the
+# screenshot-tests skill. Fonts first, in their own layer (they essentially never change; the
+# browser layer below changes on playwright bumps): fontconfig + DejaVu (Chromium's default Linux
+# sans-serif fallback), Liberation (metric-compatible Arial/Helvetica/Times), Noto core + color
+# emoji (broad Unicode/emoji fallback, so a stray glyph rasterizes identically everywhere instead
+# of from a host font).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        fontconfig \
+        fonts-dejavu-core \
+        fonts-liberation \
+        fonts-noto-core \
+        fonts-noto-color-emoji \
+    && rm -rf /var/lib/apt/lists/*
+
+# The Playwright-managed Chromium, keyed to the playwright version the frontend lockfile resolves —
+# PLAYWRIGHT_VERSION MUST match service/src/main/webui/pnpm-lock.yaml (grep "playwright@" there).
+# Bump both together, rebuild this image, and re-record the baselines: that pairing is the
+# intended, reviewable re-record event. A lockfile bump without an image rebuild fails loudly at
+# test time with "Executable doesn't exist at /opt/ms-playwright/…" — that error means "rebuild
+# this image", never "playwright install locally". Installed to a FIXED path via
+# PLAYWRIGHT_BROWSERS_PATH rather than the default ~/.cache/ms-playwright, because workspace
+# containers run as an arbitrary uid with HOME=/workspace and the devcontainer as `dev` with
+# HOME=/home/dev — a per-HOME cache would be invisible to both. npx (not pnpm) because no
+# package.json exists at image build time; --with-deps apt-installs Chromium's shared-library and
+# supplemental font dependencies (it shells apt-get install, so the apt lists must be refreshed
+# first in the same layer).
+ARG PLAYWRIGHT_VERSION=1.61.0
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN apt-get update \
+    && npx -y playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium \
+    && chmod -R a+rX ${PLAYWRIGHT_BROWSERS_PATH} \
+    && rm -rf /root/.npm /var/lib/apt/lists/*
+
+# Renderer provenance, greppable from inside any container (workspace containers have no docker
+# CLI, so a file beats a LABEL): the exact Chromium build plus every baked font package — including
+# the supplemental fonts --with-deps pulled in, hence the 'fonts-*' glob rather than the five named
+# above (grep -v drops known-but-not-installed packages the glob also matches). The trailing grep
+# asserts the chromium line made it in, so a browser-layout change (the chrome-linux64 path is
+# playwright-version-specific) fails the build loudly instead of leaving provenance silently
+# incomplete. The screenshot-tests skill's baseline-provenance note points here.
+RUN { echo "playwright=${PLAYWRIGHT_VERSION}"; \
+      ${PLAYWRIGHT_BROWSERS_PATH}/chromium-*/chrome-linux*/chrome --version | sed 's/^/chromium=/'; \
+      dpkg-query -W -f='${Package}=${Version}\n' fontconfig 'fonts-*' | grep -v '=$'; \
+    } > /etc/qits-renderer-provenance \
+    && grep -q '^chromium=' /etc/qits-renderer-provenance \
+    && cat /etc/qits-renderer-provenance
+
 # The coding agent (Claude Code) runs inside this container — the single biggest executor of
 # arbitrary commands in the sandbox. Bake the CLI in at a pinned version (bump CLAUDE_CODE_VERSION
 # to any published release; the build fails loudly if it doesn't exist). The native installer

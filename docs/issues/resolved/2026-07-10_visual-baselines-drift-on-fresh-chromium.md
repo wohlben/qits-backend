@@ -72,7 +72,6 @@ Also, to keep the *next* drift diagnosable rather than mysterious:
   provenance note** in `.pi/skills/screenshot-tests/SKILL.md`, with the instruction to bump that
   line whenever baselines are re-recorded.
 - Filed the durable fix (bake the Playwright cache **and** a pinned font set into `docker/workspace`
-  so every environment renders identically) as
-  [`docs/backlog-ideas/screenshot-baseline-renderer-baked-into-image.md`](../backlog-ideas/screenshot-baseline-renderer-baked-into-image.md),
-  with a Trigger to pick it up on the next recurrence or when screenshot tests reach CI. Regenerate-
-  on-current-toolchain remains the documented stopgap until then.
+  so every environment renders identically) as a backlog idea — since **implemented 2026-07-13** as
+  [`docs/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md`](../../features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md);
+  the `qits/workspace` image is now the sole sanctioned baseline producer.
