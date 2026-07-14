@@ -538,7 +538,11 @@ adjust the package):
 1. **`ConfigResource`** — `GET /api/config.json`, relays the injected OTEL identity
    (`otel.exporter.otlp.endpoint` / `otel.resource.attributes` / `otel.service.name` via
    MicroProfile Config); returns `"telemetry": null` when no endpoint is configured — the gate
-   that keeps a standalone or otel-off run dark (the library stays inert dead weight).
+   that keeps a standalone or otel-off run dark (the library stays inert dead weight). It also
+   relays the independently-nullable `capture` section
+   ([spa-feature-capture](../features/2026-07-14_spa-feature-capture.md)):
+   `{"ingestUrl": <qits.capture.endpoint>, "resourceAttributes": …}` from
+   `QITS_CAPTURE_ENDPOINT`, `null` without it — the gate that hides the capture button.
 2. **`OtelProxyResource`** — `POST /api/otel/v1/{traces|logs|metrics}`, byte-verbatim
    passthrough to `${endpoint}/v1/{signal}`; 404 when unconfigured, 502 on forward failure.
 
@@ -587,7 +591,9 @@ initQitsIntegration()
 providers: [
   provideBrowserGlobalErrorListeners(),
   provideRouter(routes),
-  provideQitsIntegration(), // telemetry ErrorHandler + navigation spans + app.route.* stamping
+  // Telemetry ErrorHandler + navigation spans + app.route.* stamping; withFeatureCapture
+  // renders the config-gated capture button (snapshot the SPA into a qits workspace).
+  provideQitsIntegration(withFeatureCapture()),
   provideHttpClient(withFetch()),
 ],
 ```
@@ -668,6 +674,7 @@ over all of these.
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `otel: true` | `http/protobuf` | match it (`quarkus.otel.exporter.otlp.protocol`) |
 | `OTEL_SERVICE_NAME` | `otel: true` | the daemon name | backend ignores it (artifactId wins — fine); relay to the browser, which appends `-browser` |
 | `OTEL_RESOURCE_ATTRIBUTES` | `otel: true` | `qits.workspace.id=…,qits.repository.id=…,qits.command.id=…` | leave alone (Quarkus honors it — it routes telemetry to your workspace); relay verbatim to the browser |
+| `QITS_CAPTURE_ENDPOINT` | every daemon (not gated on `otel`) | `http://<qits-host>:<port>/api/capture` (container-reachable; the library posts same-origin when framed) | relay to the browser via `config.json`'s `capture` section (`qits.capture.endpoint` in MicroProfile terms) — the gate that shows the capture button |
 
 ## Final acceptance
 

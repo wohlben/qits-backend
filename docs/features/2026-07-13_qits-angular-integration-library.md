@@ -33,7 +33,7 @@ providers: [provideQitsIntegration()]
 ```
 
 This is the foundation for making the integration *grow features* instead of *grow the copy*: the
-[SPA feature capture button](../feature-ideas/spa-feature-capture-3.md) and the
+[SPA feature capture button](2026-07-14_spa-feature-capture.md) and the
 [state snapshot integration](../feature-ideas/capture-state-snapshot-4.md) ship inside this library, so an
 integrated app gets them by upgrading a dependency, not by re-copying files.
 
@@ -54,7 +54,7 @@ Related / dependent plans:
 - Modifies the [servable fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md):
   the fixture's copied `telemetry.ts` is replaced by the library dependency — the fixture stays
   the reference implementation, now of the *library consumption* instead of the file copy.
-- Depended on by [spa-feature-capture](../feature-ideas/spa-feature-capture-3.md) and
+- Depended on by [spa-feature-capture](2026-07-14_spa-feature-capture.md) and
   [capture-state-snapshot](../feature-ideas/capture-state-snapshot-4.md) (they are library features), and indirectly
   by [capture-ingest-workspace](2026-07-14_capture-ingest-workspace.md) (its E2E story runs through the
   library's capture button).

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The state dimension of [SPA feature capture](spa-feature-capture-3.md): a small registry in the
+The state dimension of [SPA feature capture](../features/2026-07-14_spa-feature-capture.md): a small registry in the
 [qits Angular integration library](../features/2026-07-13_qits-angular-integration-library.md) that apps hook their
 state into, so a capture carries **what the app knew**, not just what it rendered. Primary
 integration is an `@ngrx/signals` custom feature — `withQitsSnapshot('name')` — because that is
@@ -21,12 +21,12 @@ export const CartStore = signalStore(
 registerCaptureState('session', () => ({ user: auth.user()?.name ?? null }));
 ```
 
-At capture time, the [capture payload](spa-feature-capture-3.md)'s `state` field becomes
+At capture time, the [capture payload](../features/2026-07-14_spa-feature-capture.md)'s `state` field becomes
 `{ "cart": {…}, "session": {…} }`.
 
 Related / dependent plans:
 
-- **Consumed by** [spa-feature-capture](spa-feature-capture-3.md) — capture works without any
+- **Consumed by** [spa-feature-capture](../features/2026-07-14_spa-feature-capture.md) — capture works without any
   registered state (the `state` field is just absent/empty), and this integration is testable
   without capture (the registry is a pure library seam). Strictly separable, in both directions.
 - **Ships in** [qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md) — hard
@@ -100,7 +100,7 @@ Suppliers return arbitrary objects; captures must never fail because of one bad 
   destroy (TestBed scope teardown).
 - Sanitizer: cycle, depth, size, `Map`/`Set`, class instance, function — each yields its marker,
   everything else round-trips `JSON.parse(JSON.stringify(...))`-clean.
-- Integration (with [spa-feature-capture](spa-feature-capture-3.md), once both exist): a browser
+- Integration (with [spa-feature-capture](../features/2026-07-14_spa-feature-capture.md), once both exist): a browser
   spec asserting the POSTed payload's `state` contains the registered slices.
 
 ## Open questions
@@ -108,7 +108,7 @@ Suppliers return arbitrary objects; captures must never fail because of one bad 
 - **Name**: `withQitsSnapshot` vs `withCaptureSnapshot` — lean `withQitsSnapshot`, the qits
   prefix marks it as integration-owned in an app's store definition.
 - Should the fixture's demo store live in this idea or in
-  [spa-feature-capture](spa-feature-capture-3.md)'s fixture change? Lean: here — it is the
+  [spa-feature-capture](../features/2026-07-14_spa-feature-capture.md)'s fixture change? Lean: here — it is the
   reference for *this* API, and capture's fixture change is already load-bearing.
 - Version pinning: `signalStoreFeature` API stability across `@ngrx/signals` versions — the
   library should declare a peer range validated against what qits and the fixture actually use.
