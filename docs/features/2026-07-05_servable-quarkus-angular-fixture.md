@@ -1,5 +1,11 @@
 # Servable Quarkus + Angular test fixture (`testing-repo-quarkus-angular`)
 
+> **Update (2026-07-13):** the fixture's copied `telemetry.ts` was replaced by a SHA-pinned
+> git dependency on the [`@qits/angular` library](https://github.com/wohlben/qits-angular)
+> ([qits-angular-integration-library](2026-07-13_qits-angular-integration-library.md)) — the
+> fixture stays the reference implementation of the SPA integration, now of the *library
+> consumption* instead of the file copy. Backend gateway resources are unchanged.
+
 ## Introduction
 
 The only in-repo git fixture used to be

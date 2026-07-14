@@ -3,7 +3,7 @@
 ## Introduction
 
 A **floaty capture button** shipped by the
-[qits Angular integration library](qits-angular-integration-library-1.md), rendered inside the
+[qits Angular integration library](../features/2026-07-13_qits-angular-integration-library.md), rendered inside the
 integrated app itself — not in qits' web view. Pressing it takes a **moment-in-time snapshot of
 the running SPA**: the complete rendered DOM with effective styles frozen inline, the current
 URL/route, viewport + environment metadata, and (via the
@@ -17,7 +17,7 @@ and you are standing in a qits workspace that already knows what you were lookin
 
 Related / dependent plans:
 
-- **Ships as a feature of** [qits-angular-integration-library](qits-angular-integration-library-1.md)
+- **Ships as a feature of** [qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md)
   (`provideQitsIntegration(withFeatureCapture())`) — hard dependency; capture is the first
   concrete payoff of having a library instead of copied files.
 - **Pairs with** [capture-ingest-workspace](capture-ingest-workspace-2.md) — the qits-side

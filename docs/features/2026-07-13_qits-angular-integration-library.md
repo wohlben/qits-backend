@@ -1,5 +1,21 @@
 # qits Angular integration library: `provideQitsIntegration()` instead of copy-paste
 
+> **Status: implemented 2026-07-13.** The library lives in
+> [`wohlben/qits-angular`](https://github.com/wohlben/qits-angular) (commit `9be4580` ports the
+> convention; 27 unit tests across 7 spec files cover gating, exporter URL composition,
+> `ignoreUrls`, error-record shape, route/interaction stamping, and frame parsing) and the
+> fixture consumes it as a SHA-pinned git dependency (fixture commit `9b91238` — `telemetry.ts`
+> deleted, two-line wiring, `onlyBuiltDependencies` allowlist). As-built notes against the plan
+> below: the `packageExtensions` zone.js workaround **does not propagate** from the library
+> (pnpm reads it from the consumer's root manifest only) but it's a peer-warning silencer, not
+> an install blocker, so the library did *not* need to vendor the interaction wiring — every
+> consumer keeps the entry, documented in the library README; the library's `check-exports`
+> gained a `dependencies`-drift check (root and `projects/qits-angular/package.json` both carry
+> the OTEL deps — one feeds the consumer's package manager, the other ng-packagr);
+> `TelemetryErrorHandler` stays unexported (provided via `provideQitsIntegration()`), keeping
+> the public API to exactly the two functions + two types. The guide's Tier 5 was rewritten in
+> the same change.
+
 ## Introduction
 
 Package the SPA half of the qits integration convention — today four files copied from the
@@ -17,12 +33,16 @@ providers: [provideQitsIntegration()]
 ```
 
 This is the foundation for making the integration *grow features* instead of *grow the copy*: the
-[SPA feature capture button](spa-feature-capture-3.md) and the
-[state snapshot integration](capture-state-snapshot-4.md) ship inside this library, so an
+[SPA feature capture button](../feature-ideas/spa-feature-capture-3.md) and the
+[state snapshot integration](../feature-ideas/capture-state-snapshot-4.md) ship inside this library, so an
 integrated app gets them by upgrading a dependency, not by re-copying files.
 
 Related / dependent plans:
 
+- **Preceded by** [angular-lib-repo-bootstrap](../features/2026-07-13_angular-lib-repo-bootstrap.md)
+  — creates the standalone `wohlben/qits-angular` repository and proves the git-install
+  distribution mechanics with a walking skeleton; this plan fills that proven shell with the
+  ported convention.
 - Packages the as-built conventions of
   [spa-observability](../features/2026-07-06_spa-observability.md) and
   [spa-telemetry-meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md) —
@@ -34,9 +54,9 @@ Related / dependent plans:
 - Modifies the [servable fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md):
   the fixture's copied `telemetry.ts` is replaced by the library dependency — the fixture stays
   the reference implementation, now of the *library consumption* instead of the file copy.
-- Depended on by [spa-feature-capture](spa-feature-capture-3.md) and
-  [capture-state-snapshot](capture-state-snapshot-4.md) (they are library features), and indirectly
-  by [capture-ingest-workspace](capture-ingest-workspace-2.md) (its E2E story runs through the
+- Depended on by [spa-feature-capture](../feature-ideas/spa-feature-capture-3.md) and
+  [capture-state-snapshot](../feature-ideas/capture-state-snapshot-4.md) (they are library features), and indirectly
+  by [capture-ingest-workspace](../feature-ideas/capture-ingest-workspace-2.md) (its E2E story runs through the
   library's capture button).
 - **Backend resources are out of scope.** `ConfigResource` / `OtelProxyResource` are Java and
   stay app-side copies for now; a Quarkus extension counterpart is a separate later idea (see
@@ -119,7 +139,9 @@ supported, which rules out nesting it inside qits' webui workspace. Consequences
   its own README as the consumer contract and this repo's guide links to it.
 - The `prepare`-build path (ng-packagr running on the consumer's install) must be validated
   early — it is the one moving part of git distribution. If it fights, the fallback is
-  committing the `dist/` output on a release branch and pointing the git ref there.
+  committing the `dist/` output on a release branch and pointing the git ref there. Both the
+  validation and the repo skeleton are carved out as their own step-0 plan:
+  [angular-lib-repo-bootstrap](../features/2026-07-13_angular-lib-repo-bootstrap.md).
 - Rejected: inside the fixture repo (the fixture demonstrates consumption; a library living in
   its own demo can't be consumed by anyone else), and inside qits' webui workspace (see above —
   revisit if distribution ever moves to a registry).

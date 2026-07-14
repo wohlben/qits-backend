@@ -1,5 +1,11 @@
 # SPA observability: the backend proxies browser OTLP and relays identity via `/api/config.json`
 
+> **Update (2026-07-13):** the SPA half of this convention (everything `telemetry.ts` below)
+> now ships as the [`@qits/angular` library](https://github.com/wohlben/qits-angular)
+> ([qits-angular-integration-library](2026-07-13_qits-angular-integration-library.md)); the
+> traps documented here moved into it verbatim. The backend gateway resources and the gate
+> semantics are unchanged. This doc remains the design record.
+
 ## Introduction
 
 Implemented 2026-07-06 — fixture commits `5b1ec80` (config relay + OTLP passthrough + instrumented

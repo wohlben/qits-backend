@@ -1,5 +1,11 @@
 # SPA telemetry meta-enrichment: route context, named interactions, request caller attribution
 
+> **Update (2026-07-13):** this layer now ships inside the
+> [`@qits/angular` library](https://github.com/wohlben/qits-angular)
+> ([qits-angular-integration-library](2026-07-13_qits-angular-integration-library.md)) — apps
+> get it from `provideQitsIntegration()`; the `data-track-event` decree stays the app's only
+> touchpoint. This doc remains the design record.
+
 ## Introduction
 
 The [SPA observability](2026-07-06_spa-observability.md) convention made browser
