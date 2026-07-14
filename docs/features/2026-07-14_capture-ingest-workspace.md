@@ -38,8 +38,8 @@ Related / dependent plans:
   workspace directly; other open qits tabs pick the workspace up on their next list fetch (the
   branch/workspace lists are client-side query-invalidated — there is no repository-level SSE
   channel, and none was needed for this flow).
-- **Consumed by** [capture-state-snapshot](../feature-ideas/capture-state-snapshot-4.md)'s payoff —
-  registered state renders as fenced JSON in the goal.
+- **Consumed by** [capture-state-snapshot](2026-07-14_capture-state-snapshot.md)'s payoff
+  (landed 2026-07-14) — registered state renders as fenced JSON in the goal.
 
 ## Motivation
 
