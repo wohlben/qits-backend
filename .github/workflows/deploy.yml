@@ -27,9 +27,13 @@ jobs:
     steps:
       # Recurse: the fixture submodules (and the nested webui submodule) are needed for the build's
       # fixture-derivation step and the unit tests. Public repos, so the default token suffices.
+      # fetch-depth: 0 = full history for the superproject AND submodules — the default shallow
+      # (--depth=1) submodule clone can't be pushed into the derived bares (derive-fixture-bares.sh),
+      # failing with "shallow update not allowed".
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Set up JDK 25
         uses: actions/setup-java@v4
