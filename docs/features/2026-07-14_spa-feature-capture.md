@@ -213,7 +213,7 @@ frame-detection fallback, no new backend mechanism.
 
 ## As built (2026-07-14)
 
-Implemented as planned; library commit `a49bb76` in `qits-angular`, consumed by the fixture at
+Implemented as planned; library commit `a49bb76` in `qits-angular-integration`, consumed by the fixture at
 that pin. Decisions taken during implementation:
 
 - **Otel-off identity gap accepted (iteration one):** `QITS_CAPTURE_ENDPOINT` is injected for

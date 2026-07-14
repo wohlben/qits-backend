@@ -61,7 +61,7 @@ Related / dependent plans:
   `docs/features/2026-07-14_capture-state-snapshot.md` — the SPA features that move **with** the SPA
   into the new `angular` repo. Their behaviour is untouched; only where the SPA lives changes.
 - `docs/features/2026-07-13_qits-angular-integration-library.md` — the SPA depends on `@qits/angular`
-  (`git+https://github.com/wohlben/qits-angular.git#<sha>`). That library repo already exists and is
+  (`git+https://github.com/wohlben/qits-angular-integration.git#<sha>`). That library repo already exists and is
   **not** part of this split; it stays a normal git dependency of the extracted SPA (pnpm still
   fetches it from GitHub, exactly as today).
 - `docs/features/2026-07-05_maven-build-cache.md` — the build-cache excludes and the per-module
@@ -94,7 +94,7 @@ and a nested-composition axis.
 | `qits-fixture-testing-repo` | `…/fixtures/testing-repo` | **Git mechanics**: clone, pull, branch discovery, ahead/behind/conflict divergence probes, the JGit git host. Drives the divergence/conflict unit tests. | `master`, `feature` |
 | `qits-fixture-angular` *(NEW)* | `…/fixtures/testing-repo-angular` *(NEW)* | **Angular-only workspace**: framework detection = Angular, SPA capture button / OPTIONS-gated availability, `withQitsSnapshot` state capture, `@qits/angular` consumption — all **without a backend**. Standalone showcase of the frontend surface. | `main`, `feature/greeting` (FF), `feature/diverged` (conflict) — the divergence is Angular content (`greeting.ts`). |
 | `qits-fixture-quarkus-angular` | `…/fixtures/testing-repo-quarkus-angular` | **Full-stack**: Quarkus framework detection, web-view proxy, OTEL + log observation, feature-flows, coding agent, backend git divergence. `src/main/webui` is a **submodule → `qits-fixture-angular`**. | `main`, `feature/greeting`, `feature/diverged` (each pins the matching `angular` branch). |
-| `qits-angular` *(exists)* | — (pnpm git dep) | The `@qits/angular` instrumentation **library**. Not part of this split; consumed by `qits-fixture-angular`. | — |
+| `qits-angular-integration` *(exists)* | — (pnpm git dep) | The `@qits/angular` instrumentation **library**. Not part of this split; consumed by `qits-fixture-angular`. | — |
 
 **Why the divergence follows the SPA.** Measured on the current fixture:
 
@@ -118,7 +118,7 @@ Everything else is scripted in-workspace. You only need to:
    - `wohlben/qits-fixture-angular`
    - `wohlben/qits-fixture-quarkus-angular`
 2. Confirm push access over SSH (`git@github.com:wohlben/…`) from this workspace — same key already
-   used for `qits-backend` / `qits-angular`.
+   used for `qits-backend` / `qits-angular-integration`.
 3. (Per the parent plan's rule for the sibling library) pushing these fixture repos directly is fine —
    no checkpoint needed.
 

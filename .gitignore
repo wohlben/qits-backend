@@ -43,5 +43,5 @@ PENDING_MIGRATION.sql
 target-ide/
 
 # Sibling working clone of the @qits/angular integration library (its own repository,
-# github.com/wohlben/qits-angular) — checked out here for convenience, never part of qits.
-/qits-angular/
+# github.com/wohlben/qits-angular-integration) — checked out here for convenience, never part of qits.
+/qits-angular-integration/

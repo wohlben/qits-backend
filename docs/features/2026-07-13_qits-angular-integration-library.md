@@ -1,7 +1,7 @@
 # qits Angular integration library: `provideQitsIntegration()` instead of copy-paste
 
 > **Status: implemented 2026-07-13.** The library lives in
-> [`wohlben/qits-angular`](https://github.com/wohlben/qits-angular) (commit `9be4580` ports the
+> [`wohlben/qits-angular-integration`](https://github.com/wohlben/qits-angular-integration) (commit `9be4580` ports the
 > convention; 27 unit tests across 7 spec files cover gating, exporter URL composition,
 > `ignoreUrls`, error-record shape, route/interaction stamping, and frame parsing) and the
 > fixture consumes it as a SHA-pinned git dependency (fixture commit `9b91238` — `telemetry.ts`
@@ -10,7 +10,7 @@
 > (pnpm reads it from the consumer's root manifest only) but it's a peer-warning silencer, not
 > an install blocker, so the library did *not* need to vendor the interaction wiring — every
 > consumer keeps the entry, documented in the library README; the library's `check-exports`
-> gained a `dependencies`-drift check (root and `projects/qits-angular/package.json` both carry
+> gained a `dependencies`-drift check (root and `projects/qits-angular-integration/package.json` both carry
 > the OTEL deps — one feeds the consumer's package manager, the other ng-packagr);
 > `TelemetryErrorHandler` stays unexported (provided via `provideQitsIntegration()`), keeping
 > the public API to exactly the two functions + two types. The guide's Tier 5 was rewritten in
@@ -40,7 +40,7 @@ integrated app gets them by upgrading a dependency, not by re-copying files.
 Related / dependent plans:
 
 - **Preceded by** [angular-lib-repo-bootstrap](../features/2026-07-13_angular-lib-repo-bootstrap.md)
-  — creates the standalone `wohlben/qits-angular` repository and proves the git-install
+  — creates the standalone `wohlben/qits-angular-integration` repository and proves the git-install
   distribution mechanics with a walking skeleton; this plan fills that proven shell with the
   ported convention.
 - Packages the as-built conventions of

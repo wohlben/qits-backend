@@ -115,7 +115,7 @@ Suppliers return arbitrary objects; captures must never fail because of one bad 
 
 ## As built (2026-07-14)
 
-Implemented as planned; library commit `0c49d33` in `qits-angular`, consumed by the fixture at
+Implemented as planned; library commit `0c49d33` in `qits-angular-integration`, consumed by the fixture at
 that pin. The open questions resolved to their leans: the name is **`withQitsSnapshot`**, the
 fixture's demo store shipped here, and `@ngrx/signals` became a **required peer** at `^21.0.0`
 (validated against qits' webui `^21.1.0` and the fixture, both on Angular 21). Decisions taken

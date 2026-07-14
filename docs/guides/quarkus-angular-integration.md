@@ -530,7 +530,7 @@ the agent's `telemetryTrace` MCP tool
 The convention ([spa-observability](../features/2026-07-06_spa-observability.md)): the backend
 acts as its SPA's telemetry gateway with two small resources, and the SPA exports base-relative
 to its own backend. The SPA half ships as the **[`@qits/angular`
-library](https://github.com/wohlben/qits-angular)**
+library](https://github.com/wohlben/qits-angular-integration)**
 ([qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md))
 — only the two backend resources are still copied from the fixture (they are app-agnostic;
 adjust the package):
@@ -560,11 +560,11 @@ Frontend side — install the library (git-only distribution, SHA-pinned; the fi
 `package.json` carries the current known-good pin):
 
 ```bash
-pnpm add "git+https://github.com/wohlben/qits-angular.git#<sha>"
+pnpm add "git+https://github.com/wohlben/qits-angular-integration.git#<sha>"
 ```
 
 plus two pnpm entries in the consumer's `package.json` (both required, both documented in the
-[library README](https://github.com/wohlben/qits-angular)):
+[library README](https://github.com/wohlben/qits-angular-integration)):
 
 ```jsonc
 "pnpm": {
