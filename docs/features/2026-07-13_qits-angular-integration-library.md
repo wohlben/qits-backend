@@ -56,7 +56,7 @@ Related / dependent plans:
   the reference implementation, now of the *library consumption* instead of the file copy.
 - Depended on by [spa-feature-capture](../feature-ideas/spa-feature-capture-3.md) and
   [capture-state-snapshot](../feature-ideas/capture-state-snapshot-4.md) (they are library features), and indirectly
-  by [capture-ingest-workspace](../feature-ideas/capture-ingest-workspace-2.md) (its E2E story runs through the
+  by [capture-ingest-workspace](2026-07-14_capture-ingest-workspace.md) (its E2E story runs through the
   library's capture button).
 - **Backend resources are out of scope.** `ConfigResource` / `OtelProxyResource` are Java and
   stay app-side copies for now; a Quarkus extension counterpart is a separate later idea (see
