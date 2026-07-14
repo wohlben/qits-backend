@@ -7,7 +7,7 @@ A **floaty capture button** shipped by the
 integrated app itself — not in qits' web view. Pressing it takes a **moment-in-time snapshot of
 the running SPA**: the complete rendered DOM with effective styles frozen inline, the current
 URL/route, viewport + environment metadata, and (via the
-[state snapshot integration](../feature-ideas/capture-state-snapshot-4.md)) the app's serialized state. The snapshot
+[state snapshot integration](2026-07-14_capture-state-snapshot.md)) the app's serialized state. The snapshot
 is POSTed by the browser **directly to qits' open capture ingest URL** (relayed to the SPA via
 `config.json`, CORS-open on that one path) — where the
 [capture ingest](2026-07-14_capture-ingest-workspace.md) turns it into a new branch + workspace whose goal
@@ -83,7 +83,7 @@ One JSON document, gzip-compressed on the wire (`Content-Encoding: gzip` via
     "truncated": false,
     "bytes": 812345
   },
-  "state": { … }                                   // from capture-state-snapshot-4.md, absent until it lands
+  "state": { … }                                   // registered app state (2026-07-14_capture-state-snapshot.md); absent when none
 }
 ```
 
