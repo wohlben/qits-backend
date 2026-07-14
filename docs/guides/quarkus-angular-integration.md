@@ -527,39 +527,59 @@ the agent's `telemetryTrace` MCP tool
 
 ## Tier 5 — frontend OTEL through the backend gateway
 
-qits ships **no** SPA-side code for this — it is a convention
-([spa-observability](../features/2026-07-06_spa-observability.md)): the backend acts as its
-SPA's telemetry gateway with two small resources, and the SPA exports base-relative to its own
-backend. Copy all four files from the fixture (they are app-agnostic; adjust the package):
+The convention ([spa-observability](../features/2026-07-06_spa-observability.md)): the backend
+acts as its SPA's telemetry gateway with two small resources, and the SPA exports base-relative
+to its own backend. The SPA half ships as the **[`@qits/angular`
+library](https://github.com/wohlben/qits-angular)**
+([qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md))
+— only the two backend resources are still copied from the fixture (they are app-agnostic;
+adjust the package):
 
 1. **`ConfigResource`** — `GET /api/config.json`, relays the injected OTEL identity
    (`otel.exporter.otlp.endpoint` / `otel.resource.attributes` / `otel.service.name` via
    MicroProfile Config); returns `"telemetry": null` when no endpoint is configured — the gate
-   that keeps a standalone or otel-off run dark.
+   that keeps a standalone or otel-off run dark (the library stays inert dead weight).
 2. **`OtelProxyResource`** — `POST /api/otel/v1/{traces|logs|metrics}`, byte-verbatim
    passthrough to `${endpoint}/v1/{signal}`; 404 when unconfigured, 502 on forward failure.
-3. **`src/main/webui/src/telemetry.ts`** — the whole browser SDK setup + a
-   `TelemetryErrorHandler`.
-4. **`src/main/webui/src/main.ts`** — `initTelemetry().catch(() => undefined).then(() =>
-   bootstrapApplication(App, appConfig))`.
 
 Fixture source of truth:
 `domain/src/test/resources/fixtures/testing-repo-quarkus-angular` (`main`) — including unit
-tests for both resources worth copying along.
+tests for both resources worth copying along. Its webui is the **reference consumer** of the
+library (SHA-pinned git dependency, two-line wiring).
 
-Frontend deps (versions validated 2026-07-11):
+Frontend side — install the library (git-only distribution, SHA-pinned; the fixture's
+`package.json` carries the current known-good pin):
 
 ```bash
-pnpm add @opentelemetry/api@^1.9.1 @opentelemetry/api-logs@^0.220.0 \
-  @opentelemetry/exporter-logs-otlp-proto@^0.220.0 @opentelemetry/exporter-trace-otlp-proto@^0.220.0 \
-  @opentelemetry/instrumentation@^0.220.0 @opentelemetry/instrumentation-document-load@^0.65.0 \
-  @opentelemetry/instrumentation-fetch@^0.220.0 @opentelemetry/instrumentation-user-interaction@^0.64.0 \
-  @opentelemetry/resources@^2.9.0 @opentelemetry/sdk-logs@^0.220.0 @opentelemetry/sdk-trace-web@^2.9.0
+pnpm add "git+https://github.com/wohlben/qits-angular.git#<sha>"
 ```
 
-(`instrumentation-user-interaction` declares a hard `zone.js` peer it doesn't actually need in a
-zoneless app — mark it optional via a pnpm `packageExtensions` entry in `package.json`, as the
-fixture does, so the lockfile stays zone-free.)
+plus two pnpm entries in the consumer's `package.json` (both required, both documented in the
+[library README](https://github.com/wohlben/qits-angular)):
+
+```jsonc
+"pnpm": {
+  // pnpm 10 gates lifecycle scripts; without this the git dep's prepare build is refused
+  // (ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED) and nothing installs.
+  "onlyBuiltDependencies": ["@qits/angular"],
+  // The (now transitive) user-interaction instrumentation declares a hard zone.js peer it
+  // doesn't need in a zoneless app — keep the lockfile zone-free.
+  "packageExtensions": {
+    "@opentelemetry/instrumentation-user-interaction": {
+      "peerDependenciesMeta": { "zone.js": { "optional": true } }
+    }
+  }
+}
+```
+
+Then the two-line wiring. `main.ts`:
+
+```ts
+initQitsIntegration()
+  .catch(() => undefined)
+  .then(() => bootstrapApplication(App, appConfig))
+  .catch((err) => console.error(err));
+```
 
 `app.config.ts`:
 
@@ -567,9 +587,8 @@ fixture does, so the lockfile stays zone-free.)
 providers: [
   provideBrowserGlobalErrorListeners(),
   provideRouter(routes),
-  provideRouteTelemetry(), // navigation spans + app.route.* stamping (from telemetry.ts)
+  provideQitsIntegration(), // telemetry ErrorHandler + navigation spans + app.route.* stamping
   provideHttpClient(withFetch()),
-  { provide: ErrorHandler, useClass: TelemetryErrorHandler },
 ],
 ```
 
@@ -579,55 +598,45 @@ And one more property (`application.properties`):
 quarkus.otel.traces.suppress-application-uris=${quarkus.http.root-path:/}api/otel/v1/*
 ```
 
-The traps, each one load-bearing (all encoded in the fixture's `telemetry.ts` — details in the
-[feature doc](../features/2026-07-06_spa-observability.md)):
+The traps that remain **app-side**, each one load-bearing (the rest — verbatim exporter URLs
+composed from `document.baseURI`, the `ignoreUrls` exclusion of the passthrough so exports don't
+instrument themselves, the 1 s flush that survives web-view iframe removal — moved *into* the
+library; details in the [feature doc](../features/2026-07-06_spa-observability.md)):
 
 - **`provideHttpClient(withFetch())`** — Angular's default XHR backend is invisible to
-  `FetchInstrumentation`: without it, no client span and no `traceparent`, so no full-stack
-  traces. And `initTelemetry()` must complete **before** `bootstrapApplication` — `FetchBackend`
-  captures `window.fetch` on first use, so the instrumentation has to patch it first.
-- **Exporter URLs are verbatim** in the JS proto exporters (no `/v1/<signal>` appended,
-  resolved against `location.href`, not `<base>`) — build absolute per-signal URLs from
-  `document.baseURI`.
-- **`ignoreUrls: [/\/api\/otel\/v1\//]`** on `FetchInstrumentation` — the exporters POST via
-  `fetch()`; without the exclusion every export instruments itself, recursively.
-- **Errors funnel through Angular's `ErrorHandler`**, not `window` listeners: zoneless Angular
-  catches handler exceptions before they reach `window`, and
-  `provideBrowserGlobalErrorListeners()` forwards the genuinely-global ones into `ErrorHandler`
-  anyway. (Zoneless also means **no `@opentelemetry/context-zone`** — the default stack context
-  manager is correct.)
-- **Flush fast (`scheduledDelayMillis: 1000`)** — closing the web-view floaty *removes the
-  iframe*, which fires no `pagehide`/`visibilitychange`; spans still in the default 5 s buffer
-  are silently lost. Symptom: a briefly-opened web view leaves only server spans.
+  the fetch instrumentation: without it, no client span and no `traceparent`, so no full-stack
+  traces.
+- **`initQitsIntegration()` must complete before `bootstrapApplication`** — `FetchBackend`
+  captures `window.fetch` on first use, so the instrumentation has to patch it first. The
+  library cannot hide this inside a provider; it is the one-line `main.ts` contract.
+- **Keep the scaffold's `provideBrowserGlobalErrorListeners()`** — zoneless Angular funnels
+  handler exceptions through `ErrorHandler` (which the library provides), and this is what
+  forwards the genuinely-global errors and unhandled rejections there too. (Zoneless also means
+  no `zone.js` and no `@opentelemetry/context-zone` — the library uses the default stack context
+  manager.)
 - **`suppress-application-uris`** (root-path-aware, same reason as the Quinoa prefix) — without
   it the backend mints a `POST /otel/v1/…` server span for every browser export batch.
 
 ### Meta-enrichment: route context, interactions, caller attribution
 
 The convention's second layer ([spa-telemetry-meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md)),
-all encoded in the fixture's `telemetry.ts` — three attribute families answering *where in the
-app* telemetry happened:
+now entirely inside the library — three attribute families answering *where in the app*
+telemetry happened, all for free once wired:
 
-- **`app.route.*` on every span and log record.** A `SpanProcessor.onStart` +
-  `LogRecordProcessor.onEmit` pair stamps `app.route.path` (the matched route *pattern*,
-  `greeting/:name` — groups without cardinality explosions) and `app.route.url` (the concrete
-  URL). Route changes are their own `Navigation` spans (`app.navigation.result` =
-  `success`/`cancel`/`error`/`skipped`) via `provideRouteTelemetry()` — an app initializer,
-  because router wiring needs the injector and can't live in the pre-bootstrap `initTelemetry()`.
-  They root, except that a `router.navigate` fired synchronously from a handler nests under
-  that interaction span — cause and effect in one trace.
-- **Interaction spans, named by `data-track-event`.** Clicks/submits become spans
-  (`interaction save-greeting`, `app.interaction.name`/`app.interaction.target`, plus
-  `app.component` under `ng serve` via the dev-mode `ng.getOwningComponent`). The decree is a
-  framework-free DOM attribute: put `data-track-event="<name>"` **on the event target or an
-  ancestor** — a submit event's target is the *form*, so name forms, not their buttons. The
-  enrichment seam is the instrumentation's `shouldPreventSpanCreation(eventName, element, span)`
-  hook (despite the name — return `false` and enrich).
+- **`app.route.*` on every span and log record** — `app.route.path` (the matched route
+  *pattern*, `greeting/:name` — groups without cardinality explosions) and `app.route.url` (the
+  concrete URL). Route changes are their own `Navigation` spans (`app.navigation.result` =
+  `success`/`cancel`/`error`/`skipped`). They root, except that a `router.navigate` fired
+  synchronously from a handler nests under that interaction span — cause and effect in one trace.
+- **Interaction spans** — clicks/submits become spans (`interaction save-greeting`,
+  `app.interaction.name`/`app.interaction.target`, plus `app.component` under `ng serve`).
 - **`code.*` caller attribution on fetch spans** (stable semconv: `code.function.name`,
-  `code.file.path`, `code.line.number`, `code.stacktrace` capped at 10 filtered frames). A thin
-  `window.fetch` wrapper installed **before** `FetchInstrumentation` registers executes inside
-  the fetch span's context, captures the call-site stack (`Error.stackTraceLimit` lifted — the
-  RxJS/HttpClient plumbing alone is ~50 frames), and drops vendor frames.
+  `code.file.path`, `code.line.number`, `code.stacktrace` capped at 10 filtered frames) — which
+  file/method issued the request.
+
+The one thing the app still *does* for this: name interactions with the framework-free DOM
+attribute — put `data-track-event="<name>"` **on the event target or an ancestor** — a submit
+event's target is the *form*, so name forms, not their buttons.
 
 Honest limits: the app is zoneless, so only *synchronous* handler work nests under an
 interaction span (fire the request before you `await`; a fetch behind a timer surfaces as its

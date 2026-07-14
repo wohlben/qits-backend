@@ -3,7 +3,7 @@
 ## Introduction
 
 The state dimension of [SPA feature capture](spa-feature-capture-3.md): a small registry in the
-[qits Angular integration library](qits-angular-integration-library-1.md) that apps hook their
+[qits Angular integration library](../features/2026-07-13_qits-angular-integration-library.md) that apps hook their
 state into, so a capture carries **what the app knew**, not just what it rendered. Primary
 integration is an `@ngrx/signals` custom feature — `withQitsSnapshot('name')` — because that is
 the state idiom of this repo family (qits' own webui decrees `signalStore`/`signalState`); a
@@ -29,7 +29,7 @@ Related / dependent plans:
 - **Consumed by** [spa-feature-capture](spa-feature-capture-3.md) — capture works without any
   registered state (the `state` field is just absent/empty), and this integration is testable
   without capture (the registry is a pure library seam). Strictly separable, in both directions.
-- **Ships in** [qits-angular-integration-library](qits-angular-integration-library-1.md) — hard
+- **Ships in** [qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md) — hard
   dependency on the library existing.
 - **Lands in the goal text via** [capture-ingest-workspace](capture-ingest-workspace-2.md) — the
   ingest renders registered state as fenced JSON in the workspace preamble, which is what makes
