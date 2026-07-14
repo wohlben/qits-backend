@@ -1,5 +1,40 @@
 # Fixture repos as submodules — purge the nested bare repos from history
 
+> **Status: shipped 2026-07-14.** The old bare `*.git` fixtures are purged from `main`'s history. The
+> split + submodule wiring landed earlier via
+> `docs/features/2026-07-14_fixture-repos-split-and-submodules.md`; this doc is the remaining **history
+> purge**. What actually ran, and how it diverged from the proposal below:
+>
+> - **Tag-first safety, over HTTPS.** The executing session had no GitHub SSH key, so every push went
+>   over **HTTPS** (VS Code Dev Containers credential helper). Before rewriting, the pre-purge tip
+>   `f71cab3` was tagged **`backup/pre-fixture-purge`** and **pushed to origin** on the original
+>   history — anchoring the untouched old history so the rewrite is fully reversible
+>   (`git reset --hard backup/pre-fixture-purge && git push --force origin main`).
+> - **Rewrite.** `git filter-repo --invert-paths` with two globs — `*fixtures/testing-repo.git/*` and
+>   `*fixtures/testing-repo-quarkus-angular.git/*` — in a **fresh clone**, with filter-repo installed as
+>   the **single-file script** (`raw.githubusercontent.com/newren/git-filter-repo`; no pip/pipx on the
+>   box). 18 commits carried the blobs across **two** historical prefixes —
+>   `service/src/test/resources/fixtures/testing-repo.git/` (pre-module-split) and
+>   `domain/src/test/resources/fixtures/{testing-repo,testing-repo-quarkus-angular}.git/` (after) — and
+>   both `*` globs covered them. `qits-fixture-angular` never lived as a bare in qits history, so no
+>   third glob was needed. The one commit that touched **only** the bare files
+>   (`Update testing-repo.git bare repo with new README commit`) became empty and was pruned. All SHAs
+>   from the initial commit onward changed (`f71cab3` → `ea27179`, module-split commit `f827152` →
+>   `c957522`); pack **4.61 → 3.92 MiB**.
+> - **Force-pushed `main` only — not tags.** So origin's `backup/pre-fixture-purge` still reaches the
+>   old history (and its blobs). Verified: `git log main -- '*fixtures/*.git/*'` is empty; the current
+>   tree (the seven `submodule-*.git` plain-file bares + the three submodule mounts) is **untouched** —
+>   the globs require a `.git/` path segment with children, which gitlinks and the `submodule-*.git`
+>   dirs' children didn't match in a way that removed them.
+> - **Logical purge now; physical purge deferred behind the tag.** Branch history is clean, but a full
+>   `git log --all -- '*fixtures/*.git/*'` still reaches the blobs via the backup tag — **by design**.
+>   The original plan's "delete + recreate the GitHub repo" (step 6 below) is **replaced** by: once
+>   confident, delete the anchor — `git push origin :refs/tags/backup/pre-fixture-purge` — and let
+>   GitHub gc reclaim the objects. **Not done here** (the tag is the whole point of keeping it).
+>
+> Everything below is the original proposal, kept as the record; where it says "two repos" or "delete +
+> recreate the repo," see the header above for what actually shipped.
+
 ## Introduction
 
 Extract the two committed bare git fixture repos (`domain/src/test/resources/fixtures/testing-repo.git` and `testing-repo-quarkus-angular.git`) into their own standalone GitHub repositories, integrate them back as **git submodules**, and **rewrite the qits history** so the nested bare repos never existed in it.

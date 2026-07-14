@@ -45,7 +45,9 @@ Related / dependent plans:
   (`RepositoryService` `--mirror` clone → container `git clone` from the JGit host) this extends.
 - `docs/features/2026-07-07_qits-net-devcontainer-unification.md` — the shared `qits-net` and the
   `qits` git-host alias; this is why submodule fetches can resolve **offline**, without GitHub.
-- `docs/feature-ideas/fixture-repos-as-submodules.md` — grandparent plan (history purge); unchanged.
+- `docs/features/2026-07-14_fixture-repos-history-purge.md` — grandparent plan (history purge).
+  **✅ Shipped 2026-07-14** (moved from `docs/feature-ideas/`): the old bare `*.git` blobs are purged
+  from `main`, anchored behind a `backup/pre-fixture-purge` tag.
 
 ## Motivation
 

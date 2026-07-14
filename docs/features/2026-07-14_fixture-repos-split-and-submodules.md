@@ -46,11 +46,13 @@ Related / dependent plans:
   wires each submodule via `git config submodule.<name>.url <…/git/<childId>>` before
   `submodule update` (not a clone-time `-c`). This doc's *Nested submodules in workspaces* section was
   the requirement; the shipped doc is the authoritative spec.
-- `docs/feature-ideas/fixture-repos-as-submodules.md` — the **parent** plan (fixtures-as-submodules +
-  `git filter-repo` history rewrite of the superproject). This prep doc **feeds** it: it produces the
+- `docs/features/2026-07-14_fixture-repos-history-purge.md` — the **parent** plan (fixtures-as-submodules +
+  `git filter-repo` history rewrite of the superproject). This prep doc **fed** it: it produced the
   three GitHub repos and the working submodule wiring; the parent's history-rewrite section (purging
-  the old bare `*.git` blobs from qits history) runs **after** this and is unchanged. This doc
-  supersedes the parent's "two repos" target with a **three-repo** target.
+  the old bare `*.git` blobs from qits history) ran **after** this. **✅ Shipped 2026-07-14** (moved
+  from `docs/feature-ideas/`) — the blobs are purged from `main` (`f71cab3` → `ea27179`), anchored
+  behind a `backup/pre-fixture-purge` tag so the physical removal on GitHub is deferred but reversible.
+  This doc superseded the parent's "two repos" target with a **three-repo** target.
 - `docs/features/2026-07-05_servable-quarkus-angular-fixture.md` — created the Quarkus+Angular fixture
   and the current "bare repo committed as plain files + gitignored checkout" layout being replaced.
 - `docs/features/2026-07-05_quarkus-angular-fixture-full-integration.md`,
@@ -389,7 +391,10 @@ Notes / boundaries:
 
 ## Open follow-ups (not in this prep)
 
-- The parent plan's `git filter-repo` superproject-history purge + GitHub repo recreate.
+- ~~The parent plan's `git filter-repo` superproject-history purge + GitHub repo recreate.~~ **✅ Done
+  2026-07-14** — `docs/features/2026-07-14_fixture-repos-history-purge.md`. Purged from `main`; old
+  history anchored behind a `backup/pre-fixture-purge` tag (physical GitHub gc / repo-recreate deferred
+  until the tag is deleted).
 - A dedicated `seed`/showcase or tests exercising the standalone `qits-fixture-angular` (the repo is
   created here; its qits-side consumption beyond framework-detection can follow).
 - **Submodule support depth**: this plan covers *fetch/materialize* (read path). Pushing a change made
