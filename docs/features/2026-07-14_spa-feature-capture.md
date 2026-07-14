@@ -228,6 +228,14 @@ that pin. Decisions taken during implementation:
   before the definition overlay — a user-supplied `QITS_CAPTURE_ENDPOINT` wins.
 - The library gained vitest **browser mode** (`pnpm test:browser`, headless Chromium) for the
   specs that need a real layout engine (`document-freeze`, the button gesture).
+- **The button is additionally gated by an OPTIONS availability probe** (added 2026-07-14 after
+  the initial landing): before mounting, the library sends a bare `OPTIONS` to the exact target
+  the POST would use. qits' `CaptureCorsRoute` answers 204 where the ingest exists; a backend
+  without it 404s and a browser-unreachable `ingestUrl` throws — all of which keep the button
+  hidden instead of doomed. No qits-side change was needed (the CORS route already answered
+  OPTIONS; absence already 404s) — this also softens the browser-reachability wrinkle and the
+  otel-off identity gap above: a capture that could never land now mostly hides the button
+  (identity failures still surface only on press, since OPTIONS can't see the payload).
 
 ## Open questions
 
