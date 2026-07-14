@@ -1,0 +1,9 @@
+[submodule "domain/src/test/resources/fixtures/testing-repo"]
+	path = domain/src/test/resources/fixtures/testing-repo
+	url = ../qits-fixture-testing-repo.git
+[submodule "domain/src/test/resources/fixtures/testing-repo-angular"]
+	path = domain/src/test/resources/fixtures/testing-repo-angular
+	url = ../qits-fixture-angular.git
+[submodule "domain/src/test/resources/fixtures/testing-repo-quarkus-angular"]
+	path = domain/src/test/resources/fixtures/testing-repo-quarkus-angular
+	url = ../qits-fixture-quarkus-angular.git

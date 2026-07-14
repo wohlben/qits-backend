@@ -64,12 +64,15 @@
         <testResources>
             <testResource>
                 <directory>src/test/resources</directory>
-                <!-- The fixtures dir holds the committed bare *.git repos AND local, gitignored
-                     editing checkouts beside them. Copy only the bare repos into test-classes;
-                     never the checkouts (a nested .git, and a node_modules once the servable
-                     fixture is built). -->
+                <!-- The fixtures dir holds the committed bare submodule-*.git repos AND three
+                     git-submodule working trees (testing-repo, testing-repo-angular,
+                     testing-repo-quarkus-angular). Copy only the plain bares; the submodule working
+                     trees are turned into bare *.git repos on the classpath by the
+                     derive-fixture-bares antrun step below (a working tree is not a bare, and one
+                     carries node_modules/target once built). -->
                 <excludes>
                     <exclude>fixtures/testing-repo/**</exclude>
+                    <exclude>fixtures/testing-repo-angular/**</exclude>
                     <exclude>fixtures/testing-repo-quarkus-angular/**</exclude>
                 </excludes>
             </testResource>
@@ -80,6 +83,33 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <!-- Derive the submodule-committed git fixtures into bare repos on the test classpath
+                 (scripts/derive-fixture-bares.sh). maven-antrun-plugin is runAlways in the build
+                 cache, so the bares are recreated even on a cache hit (a clean+cache-hit build would
+                 otherwise leave target/test-classes/fixtures without them). Version + the inherited
+                 dev-guard executions come from the root pom. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>derive-fixture-bares</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <exec executable="bash" failonerror="true">
+                                    <arg value="${maven.multiModuleProjectDirectory}/scripts/derive-fixture-bares.sh"/>
+                                    <arg value="${maven.multiModuleProjectDirectory}/domain/src/test/resources/fixtures"/>
+                                    <arg value="${project.build.testOutputDirectory}/fixtures"/>
+                                </exec>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

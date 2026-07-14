@@ -35,7 +35,7 @@ It is **split out of** the fixture-split prep plan as the piece that must ship *
 
 Related / dependent plans:
 
-- `docs/feature-ideas/fixture-repos-split-and-submodule-prep.md` — the **consumer**. Its
+- `docs/features/2026-07-14_fixture-repos-split-and-submodules.md` — the **consumer** (shipped). Its
   `qits-fixture-quarkus-angular` fixture makes `src/main/webui` a real submodule → `qits-fixture-angular`;
   that submodule only materializes offline (Quinoa build succeeds in a workspace) **if this capability
   exists**. The prep doc's Phase 4 in-tree swap and its "Nested submodules in workspaces" section are

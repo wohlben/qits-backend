@@ -11,6 +11,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The git test fixtures are submodules; the build derives their classpath bares from the checked-out
+# working trees. Best-effort (the host mount usually already carries them) so a submodule/credential
+# hiccup doesn't fail container creation — if they're truly absent the build below fails with a clear
+# hint from scripts/derive-fixture-bares.sh.
+echo "[postCreate] ensuring fixture submodules are initialised ..."
+git submodule update --init --recursive \
+  || echo "[postCreate] submodule init failed — fixture-derived tests/seeds may not build."
+
 echo "[postCreate] building (so the domain module is resolvable) ..."
 ./mvnw -q install -DskipTests -Dqits.dev-guard.skip=true
 

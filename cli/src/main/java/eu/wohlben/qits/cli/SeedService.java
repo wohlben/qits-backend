@@ -151,8 +151,8 @@ public class SeedService {
 
   /**
    * Resolves the testing-repo.git fixture, or honours {@code qits.seed.repo-url}. It's on the test
-   * classpath (copied next to the classes); for a real run from the repo it's on disk under the
-   * domain module.
+   * classpath (derived from the {@code testing-repo} submodule by scripts/derive-fixture-bares.sh);
+   * for a real run from the repo it's on disk under a module's {@code target/test-classes}.
    */
   private String resolveRepoUrl() {
     if (repoUrlOverride.filter(s -> !s.isBlank()).isPresent()) {
@@ -170,9 +170,9 @@ public class SeedService {
       }
     }
     String[] candidates = {
-      "domain/src/test/resources/fixtures/testing-repo.git",
-      "src/test/resources/fixtures/testing-repo.git",
-      "../domain/src/test/resources/fixtures/testing-repo.git",
+      "domain/target/test-classes/fixtures/testing-repo.git",
+      "target/test-classes/fixtures/testing-repo.git",
+      "../domain/target/test-classes/fixtures/testing-repo.git",
     };
     for (String candidate : candidates) {
       Path p = Path.of(candidate);

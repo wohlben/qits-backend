@@ -44,12 +44,14 @@
                 <directory>src/test/resources</directory>
             </testResource>
             <!-- Share the git test fixtures that live in the domain module — only the committed
-                 bare *.git repos, not the gitignored editing checkouts beside them. -->
+                 bare submodule-*.git repos. The three submodule working trees are derived into bare
+                 repos on the classpath by the derive-fixture-bares antrun step below. -->
             <testResource>
                 <directory>${project.basedir}/../domain/src/test/resources/fixtures</directory>
                 <targetPath>fixtures</targetPath>
                 <excludes>
                     <exclude>testing-repo/**</exclude>
+                    <exclude>testing-repo-angular/**</exclude>
                     <exclude>testing-repo-quarkus-angular/**</exclude>
                 </excludes>
             </testResource>
@@ -69,6 +71,30 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <!-- Derive the submodule-committed git fixtures into bare repos on the test classpath
+                 (scripts/derive-fixture-bares.sh); runAlways in the build cache. See domain/pom.xml. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>derive-fixture-bares</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <exec executable="bash" failonerror="true">
+                                    <arg value="${maven.multiModuleProjectDirectory}/scripts/derive-fixture-bares.sh"/>
+                                    <arg value="${maven.multiModuleProjectDirectory}/domain/src/test/resources/fixtures"/>
+                                    <arg value="${project.build.testOutputDirectory}/fixtures"/>
+                                </exec>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
