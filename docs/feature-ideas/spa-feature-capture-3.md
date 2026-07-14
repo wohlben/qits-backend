@@ -10,7 +10,7 @@ URL/route, viewport + environment metadata, and (via the
 [state snapshot integration](capture-state-snapshot-4.md)) the app's serialized state. The snapshot
 is POSTed by the browser **directly to qits' open capture ingest URL** (relayed to the SPA via
 `config.json`, CORS-open on that one path) — where the
-[capture ingest](capture-ingest-workspace-2.md) turns it into a new branch + workspace whose goal
+[capture ingest](../features/2026-07-14_capture-ingest-workspace.md) turns it into a new branch + workspace whose goal
 carries the captured context — and answers with the workspace's URL, **which the library
 navigates to**. The user-facing promise: *see something in the running app, press one button,
 and you are standing in a qits workspace that already knows what you were looking at.*
@@ -20,7 +20,7 @@ Related / dependent plans:
 - **Ships as a feature of** [qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md)
   (`provideQitsIntegration(withFeatureCapture())`) — hard dependency; capture is the first
   concrete payoff of having a library instead of copied files.
-- **Pairs with** [capture-ingest-workspace](capture-ingest-workspace-2.md) — the qits-side
+- **Pairs with** [capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md) — the qits-side
   receiver. Each is separately testable (this side against a stub receiver, that side with
   hand-posted payloads); only the E2E demo needs both.
 - **Extends the identity-relay convention of**
@@ -128,7 +128,7 @@ screenshot substitute — it is what the picker already banks on, and it is diff
   always ships, the *button* appears only where a qits can receive.
 - **The press is the whole gesture — no input, no dialog.** Press → spinner → snapshot → POST →
   on `201`, **navigate to the created workspace**: the ingest response carries the workspace
-  page's browser URL ([capture-ingest-workspace](capture-ingest-workspace-2.md) derives it from
+  page's browser URL ([capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md) derives it from
   the request origin) and the library goes there — `window.top.location.assign(url)`, top window
   deliberately, so a capture from inside the qits web view lands the *qits tab* on the new
   workspace instead of navigating the framed app away inside its iframe. The user finishes on
@@ -142,7 +142,7 @@ screenshot substitute — it is what the picker already banks on, and it is diff
 
 Decided (2026-07-13): **no backend passthrough.** The browser POSTs the payload directly to
 qits' ingest endpoint, which is CORS-open for any origin — *on that one path only* (the
-[ingest side](capture-ingest-workspace-2.md) owns the CORS decree). What remains app-side is pure
+[ingest side](../features/2026-07-14_capture-ingest-workspace.md) owns the CORS decree). What remains app-side is pure
 relay, one decree:
 
 **`config.json` grows a `capture` section** (null when unavailable — the gate that hides the
@@ -199,7 +199,7 @@ frame-detection fallback, no new backend mechanism.
   without the env — the gate that keeps standalone runs buttonless.
 - **qits side (this idea alone)**: one `CommandServiceTest` assertion — daemon env contains
   `QITS_CAPTURE_ENDPOINT` with the resolved host. The receiving endpoint is
-  [capture-ingest-workspace](capture-ingest-workspace-2.md)'s test surface.
+  [capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md)'s test surface.
 - **E2E (once the ingest lands)**: `seed-webapp` → web view → press capture → the qits tab
   lands on the new `feature/<ts>` workspace page with the goal populated.
 

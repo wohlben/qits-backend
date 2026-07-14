@@ -31,7 +31,7 @@ Related / dependent plans:
   without capture (the registry is a pure library seam). Strictly separable, in both directions.
 - **Ships in** [qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md) — hard
   dependency on the library existing.
-- **Lands in the goal text via** [capture-ingest-workspace](capture-ingest-workspace-2.md) — the
+- **Lands in the goal text via** [capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md) — the
   ingest renders registered state as fenced JSON in the workspace preamble, which is what makes
   "the dropdown was empty because the store's `filters` were stale" visible to the agent without
   reproduction steps.
