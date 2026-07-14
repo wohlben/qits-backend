@@ -20,60 +20,55 @@ qits/
         └── test/
             ├── java/                # Unit & integration tests (JUnit)
             └── resources/
-                └── fixtures/
-                    ├── testing-repo.git/   # ← Bare repo fixture (tracked files)
-                    └── testing-repo/       # ← Submodule (checked-out working copy)
+                └── fixtures/            # git test fixtures (under the domain module)
+                    ├── submodule-*.git/            # tiny bare repos committed as plain files
+                    ├── testing-repo/               # submodule → qits-fixture-testing-repo
+                    ├── testing-repo-angular/       # submodule → qits-fixture-angular
+                    └── testing-repo-quarkus-angular/  # submodule → qits-fixture-quarkus-angular
+                                                       #   (its src/main/webui is a nested submodule
+                                                       #    → qits-fixture-angular)
 ```
 
-## Submodules
+## Test-fixture submodules
 
-### Why `testing-repo` is a submodule
+The git test fixtures live under `domain/src/test/resources/fixtures/`. Three of them are **git
+submodules** pointing at standalone `github.com/wohlben/qits-fixture-*` repos:
 
-`service/src/test/resources/fixtures/testing-repo.git` is a **bare Git repository** committed as regular files. It provides reproducible test data for integration tests that exercise clone/pull operations.
+| Submodule dir | GitHub repo | Role |
+|---|---|---|
+| `testing-repo` | `qits-fixture-testing-repo` | pure git mechanics (clone/pull/divergence) |
+| `testing-repo-angular` | `qits-fixture-angular` | the Angular SPA on its own (Angular-only workspace) |
+| `testing-repo-quarkus-angular` | `qits-fixture-quarkus-angular` | full-stack app; `src/main/webui` is a **nested submodule** → `qits-fixture-angular` |
 
-`service/src/test/resources/fixtures/testing-repo` is a **Git submodule** pointing at `testing-repo.git`. It exists so you can:
+Tests and the seeds resolve each fixture as a *bare* repo (`/fixtures/<name>.git`). The build
+**derives** those bares from the submodule working trees into `target/test-classes/fixtures/`
+(`scripts/derive-fixture-bares.sh`, run automatically as a `runAlways` maven-antrun step — all
+offline). You never commit a bare; you bump a submodule pointer.
 
-- Inspect the fixture repository's contents easily
-- Add/modify branches, commits, or tags for new test scenarios
-- Push changes back to the bare repo (`testing-repo.git`) to update the fixture
-
-### Working with the submodule
-
-```bash
-# Navigate to the submodule
-cd service/src/test/resources/fixtures/testing-repo
-
-# The submodule is already configured with the bare repo as its origin
-git remote -v
-# origin  ../testing-repo.git (fetch)
-# origin  ../testing-repo.git (push)
-
-# Make changes and push back to the fixture
-git checkout -b new-test-scenario
-# ... add commits ...
-git push origin new-test-scenario
-```
-
-After updating `testing-repo.git`, commit the submodule pointer change in the parent repo:
+### Cloning
 
 ```bash
-cd /path/to/qits
-git add service/src/test/resources/fixtures/testing-repo
-git commit -m "Update test fixture with new scenario"
-```
-
-### Cloning this repository
-
-The submodule is optional for basic builds, but required if you want to modify test fixtures:
-
-```bash
-git clone --recurse-submodules <repo-url>
-```
-
-If you already cloned without `--recurse-submodules`:
-
-```bash
+git clone --recurse-submodules <repo-url>          # nested: pulls quarkus-angular → angular
+# already cloned without it?
 git submodule update --init --recursive
+```
+
+A build without the submodules initialised fails the fixture-derivation step with a hint to run the
+command above.
+
+### Editing a fixture
+
+Fixtures are append-only; treat a branch-tip change as deliberate. The Quarkus+Angular SPA lives in
+`qits-fixture-angular`, so a SPA change is a **two-level** round-trip:
+
+```bash
+# 1. change + push the SPA
+cd domain/src/test/resources/fixtures/testing-repo-angular   # (or the nested .../src/main/webui)
+git commit -am "..." && git push
+# 2. bump the webui gitlink in the quarkus-angular superproject, push it
+# 3. bump the fixture submodule pointer(s) in qits and commit
+git add domain/src/test/resources/fixtures/testing-repo-angular
+git commit -m "Bump angular fixture"
 ```
 
 ## Frontend

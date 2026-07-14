@@ -1,4 +1,31 @@
-# Fixture repos: split, extract the Angular SPA, compose via submodules — prep plan
+# Fixture repos: split, extract the Angular SPA, compose via submodules
+
+> **Status: shipped 2026-07-14.** The three GitHub repos exist and are populated, the in-tree fixtures
+> are git submodules, and the build derives the classpath bares from them offline. What actually
+> landed, and where it deviated from the plan below:
+>
+> - **Three repos created & pushed** — `wohlben/qits-fixture-testing-repo` (`master`/`feature`),
+>   `wohlben/qits-fixture-angular` (`main`, `feature/greeting` FF, `feature/diverged` conflict — the
+>   SPA carved out with `git subtree split`, plus a standalone README on `main`),
+>   `wohlben/qits-fixture-quarkus-angular` (`main`/`feature/greeting`/`feature/diverged`, each pinning
+>   the matching `angular` tip through a `src/main/webui` submodule with relative url
+>   `../qits-fixture-angular.git`).
+> - **Phase 3 divergence built for gitlink-only divergence** (matches *Consequences*), which the plan's
+>   naive per-branch loop would **not** have produced: `main'` = main tip + de-vendor (submodule pinned
+>   at angular `main`); `feature/greeting'` = `main'` + a gitlink bump to angular `feature/greeting` (a
+>   clean superproject FF); `feature/diverged'` = main tip + an independent de-vendor pinning angular
+>   `feature/diverged` (diverges from `main'` by the gitlink + `.gitmodules` only — backend text
+>   identical). The original early-branched `feature/diverged` backend history was intentionally dropped.
+> - **In-tree swap (Phase 4)** — the three submodules mount at the unchanged fixture dir names
+>   (`testing-repo`, `testing-repo-angular`, `testing-repo-quarkus-angular`) with **relative**
+>   `.gitmodules` urls (follow qits' own origin protocol). `scripts/derive-fixture-bares.sh`, run via a
+>   `runAlways` maven-antrun step in domain/service/cli, derives the classpath bares from each
+>   submodule's fetched refs. The angular bare is derived as **`qits-fixture-angular.git`** (not
+>   `testing-repo-angular.git`) so the quarkus-angular fixture's `../qits-fixture-angular.git` resolves
+>   to a sibling on the classpath during qits' recursive submodule import — offline.
+> - **Not done here** (unchanged from *Open follow-ups*): the parent plan's `git filter-repo`
+>   history purge of the old bare `*.git` blobs; a dedicated seed/tests for the standalone
+>   `qits-fixture-angular`; submodule *write*-path support.
 
 ## Introduction
 

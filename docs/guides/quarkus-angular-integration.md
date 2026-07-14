@@ -548,8 +548,13 @@ adjust the package):
 
 Fixture source of truth:
 `domain/src/test/resources/fixtures/testing-repo-quarkus-angular` (`main`) — including unit
-tests for both resources worth copying along. Its webui is the **reference consumer** of the
-library (SHA-pinned git dependency, two-line wiring).
+tests for both resources worth copying along. Its `src/main/webui` is now a **nested git submodule**
+(→ `qits-fixture-angular`, relative url `../qits-fixture-angular.git`), so the SPA — the **reference
+consumer** of the library (SHA-pinned git dependency, two-line wiring) — physically lives in the
+`qits-fixture-angular` repo; run `git submodule update --init` to populate it. qits materializes it
+offline by importing the submodule as a sibling repository (see
+`docs/features/2026-07-14_fixture-repos-split-and-submodules.md` and
+`docs/features/2026-07-14_workspace-submodule-support.md`).
 
 Frontend side — install the library (git-only distribution, SHA-pinned; the fixture's
 `package.json` carries the current known-good pin):

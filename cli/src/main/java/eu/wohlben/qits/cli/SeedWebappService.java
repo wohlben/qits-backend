@@ -349,8 +349,10 @@ public class SeedWebappService {
 
   /**
    * Resolves the testing-repo-quarkus-angular.git fixture, or honours {@code
-   * qits.seed.webapp-repo-url}. It's on the test classpath (copied next to the classes); for a real
-   * run from the repo it's on disk under the domain module.
+   * qits.seed.webapp-repo-url}. It's on the test classpath (derived from the {@code
+   * testing-repo-quarkus-angular} submodule by scripts/derive-fixture-bares.sh, alongside the
+   * {@code qits-fixture-angular.git} sibling its {@code .gitmodules} resolves to); for a real run
+   * from the repo it's on disk under a module's {@code target/test-classes}.
    */
   private String resolveRepoUrl() {
     if (repoUrlOverride.filter(s -> !s.isBlank()).isPresent()) {
@@ -368,9 +370,9 @@ public class SeedWebappService {
       }
     }
     String[] candidates = {
-      "domain/src/test/resources/fixtures/testing-repo-quarkus-angular.git",
-      "src/test/resources/fixtures/testing-repo-quarkus-angular.git",
-      "../domain/src/test/resources/fixtures/testing-repo-quarkus-angular.git",
+      "domain/target/test-classes/fixtures/testing-repo-quarkus-angular.git",
+      "target/test-classes/fixtures/testing-repo-quarkus-angular.git",
+      "../domain/target/test-classes/fixtures/testing-repo-quarkus-angular.git",
     };
     for (String candidate : candidates) {
       Path p = Path.of(candidate);

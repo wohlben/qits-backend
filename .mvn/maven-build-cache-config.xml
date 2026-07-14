@@ -57,12 +57,20 @@
                 <include>src/main/webui</include>
             </includes>
             <excludes>
-                <!-- Gitignored, regenerable fixture CHECKOUTS beside the committed bare *.git repos
-                     (domain module). One is ~290MB (a full Quarkus+Angular app with its own
-                     node_modules/target) — hashing it would be slow and unstable. The bare *.git
-                     repos themselves ARE the test inputs and stay hashed. -->
-                <exclude>src/test/resources/fixtures/testing-repo</exclude>
-                <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular</exclude>
+                <!-- The git fixtures are now git-submodule WORKING TREES (domain module). Their
+                     tracked source files ARE test inputs and MUST stay hashed — a submodule bump
+                     changes the checked-out content, which has to bust the cache so tests re-run
+                     against the freshly derived bares (derive-fixture-bares is runAlways, so a stale
+                     cache hit would otherwise skip tests against new fixtures). Only the regenerable
+                     build artifacts a servable fixture drops when built in place are excluded (huge
+                     and unstable). The committed submodule-*.git bares are hashed as-is. -->
+                <exclude>src/test/resources/fixtures/testing-repo-angular/node_modules</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-angular/dist</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-angular/.angular</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/target</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/src/main/webui/node_modules</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/src/main/webui/dist</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/src/main/webui/.angular</exclude>
 
                 <!-- webui/: regenerable build/tooling artifacts, none of which affect the Angular
                      production build's output. (.pi, public/, src/ ARE tracked inputs — kept.) -->
