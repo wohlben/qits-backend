@@ -3,41 +3,41 @@
 ## Introduction
 
 A **floaty capture button** shipped by the
-[qits Angular integration library](../features/2026-07-13_qits-angular-integration-library.md), rendered inside the
+[qits Angular integration library](2026-07-13_qits-angular-integration-library.md), rendered inside the
 integrated app itself — not in qits' web view. Pressing it takes a **moment-in-time snapshot of
 the running SPA**: the complete rendered DOM with effective styles frozen inline, the current
 URL/route, viewport + environment metadata, and (via the
-[state snapshot integration](capture-state-snapshot-4.md)) the app's serialized state. The snapshot
+[state snapshot integration](../feature-ideas/capture-state-snapshot-4.md)) the app's serialized state. The snapshot
 is POSTed by the browser **directly to qits' open capture ingest URL** (relayed to the SPA via
 `config.json`, CORS-open on that one path) — where the
-[capture ingest](../features/2026-07-14_capture-ingest-workspace.md) turns it into a new branch + workspace whose goal
+[capture ingest](2026-07-14_capture-ingest-workspace.md) turns it into a new branch + workspace whose goal
 carries the captured context — and answers with the workspace's URL, **which the library
 navigates to**. The user-facing promise: *see something in the running app, press one button,
 and you are standing in a qits workspace that already knows what you were looking at.*
 
 Related / dependent plans:
 
-- **Ships as a feature of** [qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md)
+- **Ships as a feature of** [qits-angular-integration-library](2026-07-13_qits-angular-integration-library.md)
   (`provideQitsIntegration(withFeatureCapture())`) — hard dependency; capture is the first
   concrete payoff of having a library instead of copied files.
-- **Pairs with** [capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md) — the qits-side
+- **Pairs with** [capture-ingest-workspace](2026-07-14_capture-ingest-workspace.md) — the qits-side
   receiver. Each is separately testable (this side against a stub receiver, that side with
   hand-posted payloads); only the E2E demo needs both.
 - **Extends the identity-relay convention of**
-  [spa-observability](../features/2026-07-06_spa-observability.md): a `capture` section in
+  [spa-observability](2026-07-06_spa-observability.md): a `capture` section in
   `/api/config.json` (the availability gate) relaying the qits ingest URL and identity. Unlike
   OTLP there is **no backend passthrough** — the browser posts straight to qits' CORS-open
   ingest endpoint (decided 2026-07-13; capture is a single explicit user gesture to one open
   URL, not a stream that must survive every topology).
 - **Complements, does not replace, the**
-  [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md): the picker is
+  [daemon web-view picker](2026-07-05_daemon-webview-picker.md): the picker is
   qits-side, element-scoped, and only exists inside qits' same-origin iframe; capture is
   app-side, whole-app-scoped, and works wherever the app runs — including deployed builds where
   no qits web view exists. The style-freeze machinery is shared lineage (below).
 - **Reuses (by adaptation)** the qits webui's `style-freeze.ts`
   (`service/src/main/webui/src/app/pattern/daemon/webview/style-freeze.ts`), generalized from
   element-scoped to document-scoped capture.
-- **Feeds on** [spa-telemetry-meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md):
+- **Feeds on** [spa-telemetry-meta-enrichment](2026-07-11_spa-telemetry-meta-enrichment.md):
   the matched route pattern (`app.route.path`) the library already computes is stamped into the
   snapshot metadata.
 
@@ -128,7 +128,7 @@ screenshot substitute — it is what the picker already banks on, and it is diff
   always ships, the *button* appears only where a qits can receive.
 - **The press is the whole gesture — no input, no dialog.** Press → spinner → snapshot → POST →
   on `201`, **navigate to the created workspace**: the ingest response carries the workspace
-  page's browser URL ([capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md) derives it from
+  page's browser URL ([capture-ingest-workspace](2026-07-14_capture-ingest-workspace.md) derives it from
   the request origin) and the library goes there — `window.top.location.assign(url)`, top window
   deliberately, so a capture from inside the qits web view lands the *qits tab* on the new
   workspace instead of navigating the framed app away inside its iframe. The user finishes on
@@ -142,7 +142,7 @@ screenshot substitute — it is what the picker already banks on, and it is diff
 
 Decided (2026-07-13): **no backend passthrough.** The browser POSTs the payload directly to
 qits' ingest endpoint, which is CORS-open for any origin — *on that one path only* (the
-[ingest side](../features/2026-07-14_capture-ingest-workspace.md) owns the CORS decree). What remains app-side is pure
+[ingest side](2026-07-14_capture-ingest-workspace.md) owns the CORS decree). What remains app-side is pure
 relay, one decree:
 
 **`config.json` grows a `capture` section** (null when unavailable — the gate that hides the
@@ -199,9 +199,35 @@ frame-detection fallback, no new backend mechanism.
   without the env — the gate that keeps standalone runs buttonless.
 - **qits side (this idea alone)**: one `CommandServiceTest` assertion — daemon env contains
   `QITS_CAPTURE_ENDPOINT` with the resolved host. The receiving endpoint is
-  [capture-ingest-workspace](../features/2026-07-14_capture-ingest-workspace.md)'s test surface.
+  [capture-ingest-workspace](2026-07-14_capture-ingest-workspace.md)'s test surface.
 - **E2E (once the ingest lands)**: `seed-webapp` → web view → press capture → the qits tab
   lands on the new `feature/<ts>` workspace page with the goal populated.
+
+## As built (2026-07-14)
+
+Implemented as planned; library commit `a49bb76` in `qits-angular`, consumed by the fixture at
+that pin. Decisions taken during implementation:
+
+- **Otel-off identity gap accepted (iteration one):** `QITS_CAPTURE_ENDPOINT` is injected for
+  every daemon, but the identity source (`OTEL_RESOURCE_ATTRIBUTES` →
+  `otel.resource.attributes`, which the fixture's `capture.resourceAttributes` reuses) only
+  exists when the daemon's `otel` toggle is on. A daemon with otel off therefore shows the
+  button, and every capture fails closed at the ingest (no resolvable repository id).
+  Doc-faithful — the plan decrees only the one env var; `seed-webapp`'s daemon runs otel-on.
+- **Button exclusion reuses `data-qits-pick-overlay`** (no new attribute): the button host
+  carries it, so the freeze drops the button from its own snapshot and qits' element picker
+  skips it when the app runs framed.
+- **The freeze core is exported now** (`freezeDocument`/`FrozenDocument`) so the qits webui can
+  eventually consume it; the webui's element-scoped `style-freeze.ts` copy is untouched
+  (accepted duplication, as planned).
+- **Route tracking when telemetry is dark:** the library's route-telemetry initializer now also
+  installs when only capture is lit — without a tracer provider its Navigation spans are global
+  no-ops, but the tracked route is what gives the payload its `routePattern`.
+- **The qits-side seam** is `OtelEnvironment.captureEndpoint()` (it already owns the host
+  resolver + port config), injected in `CommandService.prepare()` for `CommandKind.DAEMON`
+  before the definition overlay — a user-supplied `QITS_CAPTURE_ENDPOINT` wins.
+- The library gained vitest **browser mode** (`pnpm test:browser`, headless Chromium) for the
+  specs that need a real layout engine (`document-freeze`, the button gesture).
 
 ## Open questions
 

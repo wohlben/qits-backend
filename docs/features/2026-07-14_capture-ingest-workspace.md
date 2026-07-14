@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The qits-side receiver for [SPA feature capture](../feature-ideas/spa-feature-capture-3.md): an **open** endpoint
+The qits-side receiver for [SPA feature capture](2026-07-14_spa-feature-capture.md): an **open** endpoint
 (`POST /api/capture`, CORS-permissive for any origin — on this one path only) that accepts a
 snapshot posted directly by the running app's browser, resolves the **repository** it came from,
 creates a **new `feature/<date-time>` branch off the repository's main branch**, and creates a
@@ -18,7 +18,7 @@ dedicated capture artifact store + explorer UI is the named extension, not this 
 
 Related / dependent plans:
 
-- **Receives from** [spa-feature-capture](../feature-ideas/spa-feature-capture-3.md) — but was
+- **Receives from** [spa-feature-capture](2026-07-14_spa-feature-capture.md) — but was
   independently built and tested first (the payload is plain JSON; tests and curl post it). Neither
   side blocks the other; the E2E demo needs both.
 - **Reuses the creation path of**
@@ -214,5 +214,5 @@ A markdown document, structured so both humans (workspace page) and agents
 - **Auth on the endpoint** — deliberately none for now (open API, prototype phase; today's
   effective trust boundary is network reachability of qits). The later shape is a relayed token
   sent as a header — see the auth open question in
-  [spa-feature-capture](../feature-ideas/spa-feature-capture-3.md); the CORS route is where it
+  [spa-feature-capture](2026-07-14_spa-feature-capture.md); the CORS route is where it
   would be enforced.

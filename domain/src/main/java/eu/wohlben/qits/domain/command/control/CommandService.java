@@ -489,6 +489,12 @@ public class CommandService {
       // explicit user var wins, like OTEL_* above.
       env.put("QITS_PUBLIC_BASE", descriptor.publicBase());
     }
+    if (descriptor.kind() == CommandKind.DAEMON) {
+      // Unconditional for daemons (like TERM, not behind the otel toggle): the backend relays it
+      // to its SPA via config.json's capture section, and the app-side gate (env unset => capture
+      // null => no button) handles absence everywhere else. Before the overlay so a user var wins.
+      env.put("QITS_CAPTURE_ENDPOINT", otelEnvironment.captureEndpoint());
+    }
     env.putAll(descriptor.environment());
 
     return new Prepared(dto, container, descriptor.script(), env);

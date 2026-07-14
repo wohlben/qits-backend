@@ -222,6 +222,52 @@ public class CommandServiceTest {
   }
 
   @Test
+  public void daemonLaunchInjectsCaptureEndpointRegardlessOfOtelAndUserOverrideWins()
+      throws Exception {
+    String repoId = repoWithWorkspace();
+
+    // otel toggle OFF: the capture endpoint is injected unconditionally for daemons (like TERM).
+    CommandDto command =
+        commandService.launchDaemon(
+            repoId,
+            "work",
+            "capture daemon",
+            "env",
+            Map.of(),
+            false,
+            null,
+            (commandId, exitCode, terminatedManually) -> {},
+            null);
+
+    List<CommandLogLineDto> lines = awaitStableLog(command.id());
+    String env = lines.stream().map(CommandLogLineDto::content).reduce("", (a, b) -> a + "\n" + b);
+    assertTrue(
+        env.contains("QITS_CAPTURE_ENDPOINT=http://"),
+        "capture endpoint must be injected without the otel toggle: " + env);
+    assertTrue(env.contains("/api/capture"), "endpoint must point at the ingest: " + env);
+
+    // Definition overlay wins, like OTEL_* / QITS_PUBLIC_BASE.
+    CommandDto overridden =
+        commandService.launchDaemon(
+            repoId,
+            "work",
+            "capture daemon override",
+            "env",
+            Map.of("QITS_CAPTURE_ENDPOINT", "http://user-override/api/capture"),
+            false,
+            null,
+            (commandId, exitCode, terminatedManually) -> {},
+            null);
+    String overriddenEnv =
+        awaitStableLog(overridden.id()).stream()
+            .map(CommandLogLineDto::content)
+            .reduce("", (a, b) -> a + "\n" + b);
+    assertTrue(
+        overriddenEnv.contains("QITS_CAPTURE_ENDPOINT=http://user-override/api/capture"),
+        "an explicit user var must beat the injected one: " + overriddenEnv);
+  }
+
+  @Test
   public void daemonLaunchWithPublicBaseInjectsIt() throws Exception {
     String repoId = repoWithWorkspace();
 
