@@ -1,0 +1,118 @@
+# Production stack for qits on a single Linux server with Docker. The counterpart to
+# .devcontainer/docker-compose.yml: one service (qits itself) on the shared qits-net, plus the
+# workspace containers qits creates as siblings via the mounted docker socket — all reachable by DNS
+# name. The difference from the devcontainer is that this runs the PACKAGED image (docker/qits/
+# Dockerfile) instead of `quarkus:dev`: no source bind-mount, no :4200 Quinoa dev server (Quarkus
+# serves the baked Angular SPA on :8080), and the app is fronted by your forward-auth reverse proxy
+# rather than published to a host port.
+#
+# Prerequisites on the server (once). Compose creates the qits-net network + shared volumes on the
+# first `up`, and qits self-provisions them at startup too — so no manual network/volume creation.
+#   - the workspace image present:      docker pull ghcr.io/wohlben/qits-workspace:latest  (or build it)
+#   - .env next to this file with DOCKER_GID set to the host socket's gid:  stat -c %g /var/run/docker.sock
+#   - the coding-agent login (optional, after first `up`): docker/workspace/agent-login.sh
+#
+# Deploy:   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+name: qits
+
+services:
+  qits:
+    # The prebuilt image your CI pushes (server pulls this). The `build` block is for building on the
+    # server / locally instead — it needs the repo root as context and the app packaged first
+    # (./mvnw -pl service -am package -DskipTests). Pin a tag/digest in real deployments.
+    image: ${QITS_IMAGE:-ghcr.io/wohlben/qits:latest}
+    build:
+      context: .
+      dockerfile: docker/qits/Dockerfile
+    restart: unless-stopped
+    # docker-outside-of-docker: qits shells `docker` against the HOST daemon to run sibling
+    # workspaces. Grant the qits user access to the mounted socket by its host gid (set in .env;
+    # `stat -c %g /var/run/docker.sock`), without baking a machine-specific gid into the image.
+    group_add:
+      - "${DOCKER_GID:?set DOCKER_GID in .env to the gid of /var/run/docker.sock}"
+    volumes:
+      # The HOST docker daemon socket — how qits creates/execs/removes workspace containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # qits' application state: the H2 datastore + cloned bare origins. THE thing to back up.
+      - qits-data:/home/qits/.qits
+      # Shared coding-agent (Claude Code) login — the SAME volume qits mounts into every workspace
+      # container at /claude-home (qits.workspace.claude-volume). One OAuth login is shared across all.
+      - qits_shared_dot_claude:/claude-home
+      # Shared Maven + pnpm caches — the SAME named volumes qits mounts into every workspace container,
+      # so a dependency downloaded by one build is reused by all.
+      - qits_shared_m2:/caches/m2
+      - qits_shared_pnpm:/caches/pnpm
+    environment:
+      # On qits-net a container reaches qits by this alias — pin it so container->qits (git clone/push,
+      # OTLP, MCP) is plain DNS. Matches the `qits` alias below. Maps to qits.workspace.git-host.
+      QITS_WORKSPACE_GIT_HOST: qits
+      # The image every workspace container runs — the GHCR ref CI pushes. qits pulls it on first
+      # use if absent locally. NOTE: Watchtower does NOT update this (it's not a running container);
+      # after a workspace-image change, refresh the server with `docker pull` + a re-pull, or run a
+      # periodic `docker pull ghcr.io/wohlben/qits-workspace:latest`. Maps to qits.workspace.image.
+      QITS_WORKSPACE_IMAGE: ghcr.io/wohlben/qits-workspace:latest
+      # First-deploy default: skip the ~700 MB speech model download at boot (fast, offline-safe
+      # startup). Flip to true once you want server-side transcription live. Maps to
+      # qits.speech.warmup-on-start.
+      QITS_SPEECH_WARMUP_ON_START: "false"
+      # Attribute the commits qits manufactures to a real bot identity in prod.
+      QITS_GIT_AUTHOR_NAME: qits-bot
+      QITS_GIT_AUTHOR_EMAIL: qits-bot@example.com
+      # Pin the wall-clock zone (also propagated to every workspace container). Set to your server's.
+      TZ: ${TZ:-Etc/UTC}
+    # NO host-port publish: your forward-auth proxy fronts qits. Put the proxy on qits-net (or attach
+    # qits to the proxy's network too) and route it to http://qits:8080. Uncomment ONLY for local
+    # debugging on the server — never expose 8080 unauthenticated to the internet (it grants git
+    # push, MCP, and effectively the host docker daemon).
+    # ports:
+    #   - "127.0.0.1:8080:8080"
+    healthcheck:
+      # SmallRye Health readiness (quarkus-smallrye-health). curl is present in the workspace base.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/q/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    labels:
+      # Watchtower only touches containers it's told to (WATCHTOWER_LABEL_ENABLE below).
+      com.centurylinklabs.watchtower.enable: "true"
+    networks:
+      qits-net:
+        aliases:
+          - qits
+
+  # Pull-based CD: poll GHCR and, when a new qits :latest lands, pull it and recreate the qits
+  # container with the same config. Only touches labelled containers (the qits service above). If
+  # the GHCR packages are PRIVATE, mount a docker config.json with a read token at
+  # /config.json (uncomment the volume) so Watchtower can pull; public packages need no auth.
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    command: --label-enable --cleanup --interval 120
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - ./watchtower-config.json:/config.json:ro   # only if the GHCR packages are private
+    networks:
+      - qits-net
+
+networks:
+  # Compose creates this on the first `up` (pinned literal name so the sibling workspace containers
+  # DockerExecutor attaches — and qits' own startup ensureNetwork — reference the same `qits-net`).
+  # NOT external: on a fresh server compose is the sole owner, so it just works with no pre-creation.
+  # (If you ever create qits-net outside compose FIRST — e.g. run qits standalone — compose will
+  # refuse it as "not created by compose"; `docker network rm qits-net` and let compose own it.)
+  qits-net:
+    name: qits-net
+
+volumes:
+  # Application state (H2 + repositories). Persists across redeploys — back this up.
+  qits-data:
+  # Shared with the workspace containers (mounted by these literal names). Compose creates them on
+  # first `up`; qits' startup ensureVolume then finds them present (idempotent). Pinned names so the
+  # literal name — not a <project>_ -prefixed one — is what workspace containers mount.
+  qits_shared_dot_claude:
+    name: qits_shared_dot_claude
+  qits_shared_m2:
+    name: qits_shared_m2
+  qits_shared_pnpm:
+    name: qits_shared_pnpm
