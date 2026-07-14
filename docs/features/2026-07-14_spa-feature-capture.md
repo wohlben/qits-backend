@@ -79,9 +79,17 @@ One JSON document, gzip-compressed on the wire (`Content-Encoding: gzip` via
     "prefersColorScheme": "dark"
   },
   "dom": {
-    "html": "<html style=\"…\">…</html>",          // style-frozen serialization (below)
+    "html": "<!doctype html><body style=\"…\">…</body>",  // style-frozen <body> only (below)
     "truncated": false,
     "bytes": 812345
+  },
+  "selection": {                                   // the picked component (below); absent when no pick
+    "html": "<app-greeting style=\"…\">…</app-greeting>",  // style-frozen subtree
+    "truncated": false,
+    "bytes": 4210,
+    "selector": "#go",                             // CSS selector of the element actually clicked
+    "tag": "button",                               // the picked element's tag
+    "component": "app-greeting"                     // owning app-* component, or null when none
   },
   "state": { … }                                   // registered app state (2026-07-14_capture-state-snapshot.md); absent when none
 }
@@ -236,6 +244,45 @@ that pin. Decisions taken during implementation:
   OPTIONS; absence already 404s) — this also softens the browser-reachability wrinkle and the
   otel-off identity gap above: a capture that could never land now mostly hides the button
   (identity failures still surface only on press, since OPTIONS can't see the payload).
+
+## Changed 2026-07-14: pick-first capture (library `670baaf`)
+
+The button no longer captures blind. Pressing it now **arms an in-app element picker** — the
+same-realm analogue of the qits webui's cross-iframe `DomPicker`, living in the library
+(`element-picker.ts`, `pickElement(document)`): an overlay tracks the hovered element, capture-phase
+listeners keep the pick click from reaching the app, and the first click resolves the target
+(Escape / right-click cancels back to idle). The gesture is now `idle → picking → busy`.
+
+What the capture submits changed accordingly:
+
+- **The whole-page snapshot is trimmed to `<body>`.** `freezeDocument` freezes `doc.body` (not
+  `documentElement`): the `<head>` — stylesheets, scripts, meta — is dropped, since styles are
+  already inlined onto every node and scripts are inert in a frozen DOM. Output is
+  `<!doctype html>` + the frozen body.
+- **The picked component rides along as `selection`.** From the clicked element the library climbs
+  to the nearest ancestor-or-self whose tag starts with `app-` (`nearestAppComponent`) — Angular's
+  default component-selector prefix — and freezes *that* subtree via the new element-scoped
+  `freezeElement`. It is the pick plus everything around it, trimmed to the component boundary
+  (falling back to the picked element when no `app-*` encloses it). The payload's new `selection`
+  block carries the frozen subtree plus the pick's provenance (`selector`/`tag`/`component`); the
+  goal renders it as a **`## Selected component (style-frozen)`** section *before* the whole-page
+  DOM.
+- `captureNow(target?)` stays public and target-optional: a `renderButton: false` trigger can still
+  capture with no pick (whole-body snapshot, no `selection`). The backend maps `selection` through
+  `CaptureRequest → CaptureContent → CaptureGoalRenderer`, tolerant of its absence.
+
+**Fixture round-trip.** The library pin was bumped to `670baaf` across the fixture's `main` **and**
+`feature/greeting` (rebased onto the bumped main so its fast-forward-over-main invariant holds),
+in both `qits-fixture-angular` and `qits-fixture-quarkus-angular`, then both submodule gitlinks
+here. `feature/diverged` is left on the old pin — it only exercises the gitlink-conflict probe (the
+app never runs), and its conflict-with-main shape is unaffected.
+
+**Verified end-to-end** (`verify` skill, seed-webapp in the devcontainer, agent-browser): pressing
+the button in the framed fixture app armed the picker (the "Click an element to capture" hint
+showed), clicking the `<h1>` completed the pick, the capture POSTed and the qits tab navigated to a
+new `feature/<ts>` workspace whose goal carried a `## Selected component (style-frozen)` section
+(`**Picked**: \`h1\` in \`app-greeting\` — <selector>`, frozen `<app-greeting>` subtree) and a
+body-only `## Rendered DOM` (`<!doctype html><body …>`, no `<head>`).
 
 ## Open questions
 
