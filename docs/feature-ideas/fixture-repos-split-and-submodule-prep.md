@@ -10,6 +10,15 @@ of the qits-history purge.
 
 Related / dependent plans:
 
+- `docs/features/2026-07-14_workspace-submodule-support.md` — the **qits capability this prep depends
+  on**, split out to be implemented **first**: recursive import of a repo's submodules as sibling
+  repositories, materialized offline via the qits git host. **✅ Shipped 2026-07-14** (moved from
+  `docs/feature-ideas/`), so Phase 4 (the in-tree fixture swap) is now unblocked. Two things to carry
+  forward into Phase 4: materialization is **single-level** (a superproject's direct submodules — fine
+  for `webui` → leaf `angular`; a nested submodule level would not resolve offline), and the container
+  wires each submodule via `git config submodule.<name>.url <…/git/<childId>>` before
+  `submodule update` (not a clone-time `-c`). This doc's *Nested submodules in workspaces* section was
+  the requirement; the shipped doc is the authoritative spec.
 - `docs/feature-ideas/fixture-repos-as-submodules.md` — the **parent** plan (fixtures-as-submodules +
   `git filter-repo` history rewrite of the superproject). This prep doc **feeds** it: it produces the
   three GitHub repos and the working submodule wiring; the parent's history-rewrite section (purging
@@ -210,6 +219,11 @@ The parent plan's `git filter-repo` purge of the now-deleted bare `*.git` blobs 
 `angular` repo never lived in qits history as a bare).
 
 ## Nested submodules in workspaces (the qits capability this needs)
+
+> **Split out.** This capability is now specified in full in
+> `docs/feature-ideas/workspace-submodule-support.md` and is implemented **first** (Phase 4 depends on
+> it). The summary below is retained as the requirement that motivated it; the linked doc is the
+> authoritative design.
 
 qits materializes a workspace as: `RepositoryService` `git clone --mirror <fixture> origin`
 (`RepositoryService.java:74`) → container `git clone --branch <br> http://<qits-host>:<port>/git/<repoId> /workspace`
