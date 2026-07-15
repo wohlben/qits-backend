@@ -10,13 +10,13 @@ import java.util.List;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Dev-mode history-API fallback for the SPA. Quinoa registers its own SPA-routing handler (route
- * order 40000), but this app also carries quarkus-undertow (for JGit's {@code GitServlet}), whose
- * default servlet route sits at order 10000 and answers every unmatched request with the dev 404
- * page — so in {@code quarkus:dev} a deep-link navigation (refresh, bookmark) never reaches
- * Quinoa's handler. This route slots in between (order 9000): it reroutes lost HTML navigations to
- * {@code /}, which the Quinoa dev proxy forwards to the Angular dev server's index — the browser
- * URL keeps the deep link, so the Angular router lands on the right page.
+ * Dev-mode history-API fallback for the SPA. In {@code quarkus:dev} the Quinoa dev proxy (route
+ * order 1100) forwards known asset paths to the Angular dev server, but a deep-link HTML navigation
+ * (refresh/bookmark of an Angular route like {@code /projects/x}) isn't a known asset, so it falls
+ * through the proxy and 404s. This route (order 9000) reroutes such lost HTML navigations to {@code
+ * /}, which the dev proxy DOES forward to the dev server's index — the browser URL keeps the deep
+ * link, so the Angular router lands on the right page. In a PACKAGED build this isn't needed:
+ * Quinoa's own SPA-routing handler serves index.html for deep links.
  *
  * <p>Only GETs that accept {@code text/html}, don't look like a file (no dot in the last segment —
  * so a branch name containing a dot still 404s in dev; the packaged build handles it), and sit
@@ -37,9 +37,9 @@ public class DevModeSpaFallbackRoute {
     if (LaunchMode.current() != LaunchMode.DEVELOPMENT) {
       return;
     }
-    // After the Quinoa dev proxy (1100) and REST (1500), but BEFORE the undertow default servlet
-    // route (10000, pulled in by JGit's GitServlet): undertow 404s everything unmatched, so
-    // Quinoa's own SPA-routing handler (40000) never runs in this app.
+    // After the Quinoa dev proxy (1100) and REST (1500), but before the static-resources route
+    // (10000): a deep-link HTML nav the dev proxy didn't forward gets rerouted to "/" here so the
+    // proxy serves the dev server's index rather than letting it 404.
     router.get("/*").order(9000).handler(this::fallback);
   }
 

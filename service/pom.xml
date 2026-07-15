@@ -55,19 +55,16 @@
             <version>1.7.0-alpha</version>
         </dependency>
         <dependency>
-            <!-- Servlet container for the in-process JGit smart-HTTP server (QitsGitServlet at
-                 /git/*). The codebase's first servlet; in the platform BOM, so no version. -->
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-undertow</artifactId>
-        </dependency>
-        <dependency>
-            <!-- JGit's smart-HTTP server: serves the existing bare origins over the git wire
-                 protocol so workspace containers can clone/push. JGit speaks the protocol ONLY —
-                 the git CLI (GitExecutor) remains the sole mutator of repositories. Not in the
-                 platform BOM, so the version is pinned; 7.x uses the jakarta.servlet namespace that
-                 quarkus-undertow provides. Pulls org.eclipse.jgit (core) transitively. -->
+            <!-- JGit core only (UploadPack/ReceivePack + the pkt-line protocol). The in-process git
+                 smart-HTTP server (GitHostRoutes at /git/*) drives these directly from Vert.x routes,
+                 so we need NEITHER a servlet container (quarkus-undertow) NOR jgit.http.server. That
+                 matters: quarkus-undertow's presence breaks Quinoa's production static serving of the
+                 Angular SPA (see docs/issues/2026-07-15_packaged-spa-not-served.md), so the git host
+                 is kept off the servlet stack entirely. JGit speaks the wire protocol ONLY — the git
+                 CLI (GitExecutor) remains the sole mutator of repositories. Not in the platform BOM,
+                 so the version is pinned. -->
             <groupId>org.eclipse.jgit</groupId>
-            <artifactId>org.eclipse.jgit.http.server</artifactId>
+            <artifactId>org.eclipse.jgit</artifactId>
             <version>7.3.0.202506031305-r</version>
         </dependency>
         <dependency>
