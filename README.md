@@ -103,3 +103,24 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 # (Same build prerequisite as `seed` above — package the CLI app before `quarkus:run`.)
 ./mvnw -pl cli -am install -DskipTests && ./mvnw -pl cli -am quarkus:run -Dcli.args=seed-webapp
 ```
+
+## Deploying to a server (Docker)
+
+Deployment is **build-on-the-server**: a throwaway container (with the host docker socket mounted)
+clones this repo, builds the qits images from source, and brings the stack up — leaving nothing on the
+host but the images and the running stack. No registry, no push. On a Linux server with Docker:
+
+```bash
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  docker:cli sh -c '\
+    apk add --no-cache bash git curl >/dev/null && \
+    curl -fsSL https://raw.githubusercontent.com/wohlben/qits-backend/main/install.sh | bash'
+```
+
+The first run is slow (it builds the workspace toolchain image + compiles the app). When it finishes,
+qits runs on the `qits-net` network (alias `qits`, port 8080, no host port published — front it with a
+reverse/forward-auth proxy). Re-run the same command to upgrade. Pin a release with `-e QITS_REF=<tag>`.
+
+See **[`docs/guides/deployment.md`](docs/guides/deployment.md)** for the full contract (the by-hand
+equivalent, ingress/auth, config knobs, state & backups, upgrades).
