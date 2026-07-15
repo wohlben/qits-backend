@@ -21,3 +21,12 @@ service/src/main/webui/.angular
 .env
 .idea
 .vscode
+
+# Deployment scaffolding + docs — not needed to compile the app, and keeping them out of the context
+# means an edit to install.sh / the compose file / docs doesn't bust the app image's `COPY . .` layer
+# (so app-only rebuilds stay cache-fast).
+install.sh
+docker-compose*.yml
+.github
+docs
+**/*.md
