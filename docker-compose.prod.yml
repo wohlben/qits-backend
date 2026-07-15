@@ -15,8 +15,10 @@
 #   - the workspace image built locally:  docker build -t qits/workspace:latest docker/workspace
 #   - the app image built locally:        docker build -t qits/app:latest -f docker/qits/Dockerfile .
 #   - .env next to this file with DOCKER_GID = the host socket's gid:  stat -c %g /var/run/docker.sock
-# Compose creates the qits-net network + shared volumes on the first `up`; qits self-provisions them
-# at startup too — so no manual network/volume creation.
+#   - the qits-net network + qits_shared_* volumes present (install.sh's ensure step creates them if
+#     absent; they're declared `external` here so compose attaches rather than trying to own them —
+#     qits itself also creates them at startup). By hand: `docker network create qits-net` + three
+#     `docker volume create qits_shared_{dot_claude,m2,pnpm}` (all no-ops if they already exist).
 #
 # Deploy / upgrade:   docker compose -f docker-compose.prod.yml up -d   (after building the images)
 name: qits
@@ -86,23 +88,24 @@ services:
           - qits
 
 networks:
-  # Compose creates this on the first `up` (pinned literal name so the sibling workspace containers
-  # DockerExecutor attaches — and qits' own startup ensureNetwork — reference the same `qits-net`).
-  # NOT external: on a fresh server compose is the sole owner, so it just works with no pre-creation.
-  # (If you ever create qits-net outside compose FIRST — e.g. run qits standalone — compose will
-  # refuse it as "not created by compose"; `docker network rm qits-net` and let compose own it.)
+  # EXTERNAL by design. qits-net is a plain `docker network create` (unlabelled), created by whichever
+  # of three things gets there first: install.sh's ensure step, qits' own startup (ensureNetwork), or
+  # the DockerExecutor when it attaches a workspace container. If compose tried to OWN it (non-external
+  # + pinned name) it would refuse an already-existing unlabelled net as "not created by compose". So
+  # compose just ATTACHES to it here; install.sh guarantees it exists first (`docker network create`).
   qits-net:
-    name: qits-net
+    external: true
 
 volumes:
-  # Application state (H2 + repositories). Persists across redeploys — back this up.
+  # Application state (H2 + repositories). Compose-managed (project-prefixed) — qits never pre-creates
+  # it, so there's no collision. Persists across redeploys — back this up.
   qits-data:
-  # Shared with the workspace containers (mounted by these literal names). Compose creates them on
-  # first `up`; qits' startup ensureVolume then finds them present (idempotent). Pinned names so the
-  # literal name — not a <project>_ -prefixed one — is what workspace containers mount.
+  # Shared with the workspace containers, mounted by these literal names. EXTERNAL for the same reason
+  # as qits-net: qits' startup (ensureVolume) / the DockerExecutor create them as plain volumes, so
+  # compose must not try to own them. install.sh ensures they exist (`docker volume create`) first.
   qits_shared_dot_claude:
-    name: qits_shared_dot_claude
+    external: true
   qits_shared_m2:
-    name: qits_shared_m2
+    external: true
   qits_shared_pnpm:
-    name: qits_shared_pnpm
+    external: true

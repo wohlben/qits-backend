@@ -71,8 +71,9 @@ running on `qits-net` and nothing but the two images + the stack remains on the 
 
 ### By hand (equivalent, from a real checkout on the host)
 
-The `qits-net` network and the shared volumes are **created by compose on the first `up`** (and qits
-self-provisions them at startup too), so there's nothing to pre-create.
+`qits-net` and the `qits_shared_*` volumes are declared **`external`** in the compose file: qits itself
+(and the workspace containers it spawns) create them as plain `docker network/volume create` resources,
+so compose must not try to own them. Ensure they exist first — all four commands are no-ops if they do.
 
 ```bash
 git clone --depth 1 https://github.com/wohlben/qits-backend.git && cd qits-backend
@@ -85,7 +86,10 @@ docker build -t qits/app:latest -f docker/qits/Dockerfile .
 echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" > .env
 echo "TZ=$(cat /etc/timezone 2>/dev/null || echo Etc/UTC)" >> .env
 
-# 3. Up. Compose creates qits-net + the shared volumes here.
+# 3. Ensure the external network + shared volumes exist (idempotent), then up.
+docker network inspect qits-net >/dev/null 2>&1 || docker network create qits-net
+for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do
+  docker volume inspect "$v" >/dev/null 2>&1 || docker volume create "$v"; done
 docker compose -f docker-compose.prod.yml up -d
 
 # 4. One-time coding-agent (Claude Code) OAuth login onto the now-created shared volume (optional —

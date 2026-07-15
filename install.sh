@@ -16,8 +16,9 @@
 #   3. workspace  — docker build the qits/workspace toolchain image (base of the app image + every ws)
 #   4. app        — docker build the qits/app image (MULTI-STAGE: packages the fast-jar inside)
 #   5. .env       — write DOCKER_GID (the socket's gid) + TZ
-#   6. up         — docker compose up -d  (creates qits-net + shared volumes on first run)
-#   7. next steps — the optional agent login + the proxy/health reminders
+#   6. ensure     — create qits-net + the shared volumes if absent (they're `external` in compose)
+#   7. up         — docker compose up -d
+#   8. next steps — the optional agent login + the proxy/health reminders
 #
 # Re-running upgrades in place: it re-pulls the ref, rebuilds :latest, and recreates the container.
 # Overridable via env: QITS_REPO, QITS_REF (branch/tag, default main), QITS_DIR (clone target).
@@ -89,11 +90,22 @@ upsert() { # upsert KEY VALUE into .env without clobbering other keys
 upsert DOCKER_GID "$docker_gid"
 upsert TZ "$tz"
 
-# --- 6. up -------------------------------------------------------------------------------------
-log "Starting the stack (creates qits-net + shared volumes on first run)"
+# --- 6. ensure the shared network + volumes ----------------------------------------------------
+# Declared `external` in the compose file, so they must exist before `up`. Create-if-absent, exactly
+# how qits' own startup (ensureNetwork/ensureVolume) and the DockerExecutor manage them — idempotent,
+# and it means the stack comes up cleanly whether or not qits-net already exists (fresh server, a
+# prior qits run, or a devcontainer that made it first). No "network not created by compose" refusal.
+log "Ensuring qits-net + shared volumes exist (idempotent)"
+docker network inspect qits-net >/dev/null 2>&1 || docker network create qits-net >/dev/null
+for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do
+  docker volume inspect "$v" >/dev/null 2>&1 || docker volume create "$v" >/dev/null
+done
+
+# --- 7. up -------------------------------------------------------------------------------------
+log "Starting the stack"
 $COMPOSE -f "$COMPOSE_FILE" up -d
 
-# --- 7. next steps -----------------------------------------------------------------------------
+# --- 8. next steps -----------------------------------------------------------------------------
 log "Done. qits is starting on the qits-net network (alias 'qits', port 8080)."
 cat <<'EOF'
 
