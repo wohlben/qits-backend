@@ -4,20 +4,42 @@
 # workspace containers, and it must sit on the shared `qits-net` so those containers reach it back by
 # DNS name (git clone/push over /git, OTLP over /api/otel, MCP over /mcp). So this image is the
 # devcontainer minus the IDE/dev-user bits: the same `qits/workspace` toolchain base (JDK 25 + git +
-# python for the speech venv, all the tools qits shells out to) + the docker CLI, running the
-# PACKAGED fast-jar instead of `quarkus:dev`.
+# python + node/pnpm, all the tools qits shells out to) + the docker CLI, running the PACKAGED
+# fast-jar instead of `quarkus:dev`.
 #
-# The app artifact is NOT built here — it is built by Maven on the CI runner (which has the fixture
-# submodules and the shared caches) and COPYied in, exactly like the stock src/main/docker/
-# Dockerfile.jvm. Build the app first, then this image, with the REPO ROOT as the build context:
+# MULTI-STAGE: the fast-jar is built INSIDE this image (stage `build`), not on the host and COPYied
+# in. This is what lets the manual installer (install.sh) run entirely inside a throwaway container
+# with only the docker socket mounted — the source never has to land on a host path; it reaches the
+# host daemon purely as this build's context. Build from the REPO ROOT as context:
 #
-#     ./mvnw -pl service -am package -DskipTests
-#     docker build -t ghcr.io/wohlben/qits -f docker/qits/Dockerfile .
+#     docker build -t qits/app:latest -f docker/qits/Dockerfile .
 #
-# Requires the workspace image to exist as the base (build it first, and the server needs it too so
-# workspaces can start): `docker build -t qits/workspace docker/workspace`.
-FROM qits/workspace:latest
+# Requires the workspace image to exist locally as the base of BOTH stages (build it first — the
+# server needs it anyway so workspaces can start): `docker build -t qits/workspace docker/workspace`.
 
+# --- stage 1: build the packaged fast-jar --------------------------------------------------------
+# The workspace toolchain image already has everything the reactor build needs (JDK 25, the mvnw
+# wrapper's deps resolve over the network, node + pnpm for the Quinoa Angular build), so reuse it as
+# the builder rather than pulling a separate maven image.
+FROM qits/workspace:latest AS build
+USER root
+WORKDIR /src
+
+# Copy the whole checkout (the .dockerignore trims .git, target/, node_modules, dist so the context
+# stays lean). Then package just the `service` app + its `domain` dep, no tests.
+COPY . .
+
+# -DskipTests: prod jar, no test run. -Dqits.dev-guard.skip=true ALSO skips the derive-fixture-bares
+#   antrun (it inherits the root pom's plugin-level `skip`), so the build needs NO git submodules —
+#   a plain shallow clone is enough. -Dmaven.build.cache.enabled=false: the cache is empty in a fresh
+#   container and its restore machinery only adds overhead here. QUARKUS_ANALYTICS_DISABLED keeps the
+#   build non-interactive.
+ENV QUARKUS_ANALYTICS_DISABLED=true
+RUN ./mvnw -B -ntp -pl service -am package \
+      -DskipTests -Dqits.dev-guard.skip=true -Dmaven.build.cache.enabled=false
+
+# --- stage 2: the runtime image ------------------------------------------------------------------
+FROM qits/workspace:latest
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -44,14 +66,14 @@ RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
     && mkdir -p "/home/${USERNAME}/.qits" \
     && chown -R "${USER_UID}:${USER_GID}" "/home/${USERNAME}"
 
-# The packaged Quarkus fast-jar, in four layers so an app-only change re-uses the fat library layer.
-# Built by Maven beforehand (see header); the Angular UI is already baked into it by Quinoa, so there
-# is no separate frontend artifact and no :4200 dev server in prod — Quarkus serves the SPA on :8080.
+# The packaged Quarkus fast-jar, from the build stage, in four layers so an app-only change re-uses
+# the fat library layer. The Angular UI is already baked into it by Quinoa, so there is no separate
+# frontend artifact and no :4200 dev server in prod — Quarkus serves the SPA on :8080.
 WORKDIR /deployments
-COPY --chown=${USER_UID}:${USER_GID} service/target/quarkus-app/lib/     /deployments/lib/
-COPY --chown=${USER_UID}:${USER_GID} service/target/quarkus-app/*.jar    /deployments/
-COPY --chown=${USER_UID}:${USER_GID} service/target/quarkus-app/app/     /deployments/app/
-COPY --chown=${USER_UID}:${USER_GID} service/target/quarkus-app/quarkus/ /deployments/quarkus/
+COPY --from=build --chown=${USER_UID}:${USER_GID} /src/service/target/quarkus-app/lib/     /deployments/lib/
+COPY --from=build --chown=${USER_UID}:${USER_GID} /src/service/target/quarkus-app/*.jar    /deployments/
+COPY --from=build --chown=${USER_UID}:${USER_GID} /src/service/target/quarkus-app/app/     /deployments/app/
+COPY --from=build --chown=${USER_UID}:${USER_GID} /src/service/target/quarkus-app/quarkus/ /deployments/quarkus/
 
 # ~/.qits (H2 + repositories) resolves off HOME. Bind on all interfaces so the forward-auth proxy on
 # qits-net (and the sibling workspace containers) can reach the app; the effective git-host and other

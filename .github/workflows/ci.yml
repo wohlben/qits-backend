@@ -1,0 +1,51 @@
+# CI gate: on every push to main (and PRs), build + unit-test the whole reactor. There is no image
+# push and no deploy step — deployment is MANUAL and local-build (docs/guides/deployment.md): a server
+# runs install.sh, which clones this repo and builds the qits images on the server itself from source.
+# So CI's only job is to keep main green; it needs no registry and no server credentials.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Recurse: the fixture submodules (and the nested webui submodule) are needed for the build's
+      # fixture-derivation step and the unit tests. Public repos, so the default token suffices.
+      # fetch-depth: 0 = full history for the superproject AND submodules — the default shallow
+      # (--depth=1) submodule clone can't be pushed into the derived bares (derive-fixture-bares.sh),
+      # failing with "shallow update not allowed".
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      # Node + pnpm for the Quinoa Angular build (Quinoa shells the detected pnpm on PATH).
+      - name: Set up Node + pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
+
+      # Full reactor build with unit tests (extended/native ITs self-skip without docker). The
+      # dev-port guard is irrelevant in CI but harmless; QUARKUS_ANALYTICS_DISABLED keeps it non-interactive.
+      - name: Build & test
+        env:
+          QUARKUS_ANALYTICS_DISABLED: "true"
+        run: ./mvnw -B -ntp package

@@ -26,63 +26,60 @@ containers reach it back by DNS name (git clone/push over `/git`, OTLP over `/ap
 - joins `qits-net` with the network **alias `qits`**, and runs with `qits.workspace.git-host=qits`,
 - persists its state (H2 DB + cloned repositories) on a named volume.
 
+## The deployment model: local build, in a throwaway container
+
+Deployment is **manual and pull-nothing**: the server builds the images itself from a source checkout.
+There is no registry, no CI push, and no auto-updater — an upgrade is just "run the installer again".
+
+The installer runs **inside a throwaway generic container** with the host docker socket mounted, so the
+clone and the (heavy) Maven + Angular + Playwright builds all happen *in that container*. Every
+`docker build` / `docker compose` it runs talks to the **host** daemon through the mounted socket, so
+the only things left on the host afterwards are the two built images and the running qits stack (plus
+its named volumes). The source checkout, Maven/pnpm downloads, and the installer container itself
+vanish on `--rm`. Nothing leaks to the host beyond the final product.
+
 ## Artifacts
 
 | File | Role |
 |---|---|
-| `docker/qits/Dockerfile` | The prod app image: `qits/workspace` base + the docker CLI, running the packaged fast-jar. Built with the **repo root** as context; COPYies `service/target/quarkus-app/` (build the app with Maven first). |
-| `docker-compose.prod.yml` | The prod stack: the qits service on `qits-net`, socket mount, `group_add` for socket access, state + shared volumes, healthcheck. |
-| `docker/workspace/Dockerfile` | The image **every workspace** runs. Must exist on the server (`qits/workspace:latest`) or workspaces can't start. |
-
-## Continuous deployment (GHCR + Watchtower)
-
-`.github/workflows/deploy.yml` runs on every push to `main`: it builds + unit-tests the reactor, then
-builds and pushes **two** images to GHCR — `ghcr.io/wohlben/qits` (the app) and
-`ghcr.io/wohlben/qits-workspace` (the toolchain, which is also the app image's base). No server
-credentials are needed; `GITHUB_TOKEN` pushes to GHCR.
-
-The **server deploys itself**: the `watchtower` service in `docker-compose.prod.yml` polls GHCR every
-120s and, when `ghcr.io/wohlben/qits:latest` changes, pulls it and recreates the qits container with
-the same config. It only touches the labelled qits container. If the GHCR packages are **private**,
-give Watchtower a pull token (uncomment its `config.json` mount); public packages need no auth.
-
-Watchtower does **not** update the workspace image (it's used to *create* containers, not run one).
-After a `qits-workspace` change, refresh the server: `docker pull ghcr.io/wohlben/qits-workspace:latest`
-(a cron is fine — it changes rarely).
+| `docker/qits/Dockerfile` | The prod app image, **multi-stage**: a `build` stage (`FROM qits/workspace`) packages the fast-jar from source *inside the image build*; the runtime stage adds the docker CLI + a non-root `qits` user and runs it. Built with the **repo root** as context. |
+| `docker-compose.prod.yml` | The prod stack: the single qits service on `qits-net`, socket mount, `group_add` for socket access, state + shared volumes, healthcheck. Uses the locally-built `qits/app:latest` (`pull_policy: never`). |
+| `docker/workspace/Dockerfile` | The image **every workspace** runs — and the base of the app image. Built locally as `qits/workspace:latest`; must exist on the server or workspaces can't start. |
+| `install.sh` | Runs inside the throwaway container: clone → build both images → `.env` → `compose up`. |
+| `.github/workflows/ci.yml` | CI **gate only** (build + unit-test on push/PR). No image push, no deploy — the server builds from source. |
 
 ## First-time server setup
 
-### One-liner (bootstrap)
+### One-liner (the throwaway-container install)
 
-`install.sh` self-fetches the compose file, pulls the images, writes `.env`, and brings the stack up
-— no repo checkout needed. On the server:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/wohlben/qits/main/install.sh | bash
-```
-
-Overridable via env, e.g. a tag and a private-registry login beforehand:
+From the server host, launch a generic container with the docker socket mounted and pipe the installer
+into it. `docker:cli` is a fine generic image; it just needs `bash git curl` added:
 
 ```bash
-docker login ghcr.io                                   # only if the GHCR packages are private
-QITS_REF=v1.0.0 bash -c 'curl -fsSL "https://raw.githubusercontent.com/wohlben/qits/$QITS_REF/install.sh" | bash'
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  docker:cli sh -c '\
+    apk add --no-cache bash git curl >/dev/null && \
+    curl -fsSL https://raw.githubusercontent.com/wohlben/qits-backend/main/install.sh | bash'
 ```
 
-Re-running is safe (idempotent). Use `./install.sh --build` from a full `git clone` to build the
-images locally instead of pulling from GHCR. The manual steps below are the same thing by hand.
+Pin a tag/branch with `-e QITS_REF=v1.0.0` (and swap it into the raw URL). When it finishes, qits is
+running on `qits-net` and nothing but the two images + the stack remains on the host.
 
-### Manual steps
+> The build is heavy (first run pulls the JDK/Playwright/coding-agent layers and downloads Maven +
+> pnpm deps) — budget ~15 min on a cold host. Re-runs reuse the host's docker layer cache.
+
+### By hand (equivalent, from a real checkout on the host)
 
 The `qits-net` network and the shared volumes are **created by compose on the first `up`** (and qits
 self-provisions them at startup too), so there's nothing to pre-create.
 
 ```bash
-# 1. Both images present on the server. Pull from GHCR (CI publishes them)…
-docker pull ghcr.io/wohlben/qits:latest
-docker pull ghcr.io/wohlben/qits-workspace:latest
-# …or build locally: docker build -t qits/workspace docker/workspace
-#                     ./mvnw -pl service -am package -DskipTests
-#                     docker build -t ghcr.io/wohlben/qits:latest -f docker/qits/Dockerfile .
+git clone --depth 1 https://github.com/wohlben/qits-backend.git && cd qits-backend
+
+# 1. Build both images locally (no submodules needed — the app build skips tests + the fixture derive).
+docker build -t qits/workspace:latest docker/workspace
+docker build -t qits/app:latest -f docker/qits/Dockerfile .
 
 # 2. Tell compose the host docker socket's group id (so the non-root qits user can drive it).
 echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" > .env
@@ -113,6 +110,7 @@ baked Angular SPA on `:8080` — there is no separate frontend to deploy and no 
 Every `application.properties` key maps to an env var. The prod-relevant ones:
 
 - `QITS_WORKSPACE_GIT_HOST=qits` — the network alias; keep in sync with the compose alias.
+- `QITS_WORKSPACE_IMAGE=qits/workspace:latest` — the locally-built workspace image (no registry).
 - `QITS_SPEECH_WARMUP_ON_START` — `false` by default here (skips the ~700 MB model download at boot).
   Flip to `true` when you want server-side transcription live.
 - `QITS_GIT_AUTHOR_NAME` / `QITS_GIT_AUTHOR_EMAIL` — the bot identity qits' manufactured commits use.
@@ -133,14 +131,11 @@ healthcheck polls readiness. Wire the same into your orchestrator/proxy.
 
 ## Upgrades / redeploy
 
-The app upgrades **automatically** — push to `main`, CI publishes `ghcr.io/wohlben/qits:latest`,
-Watchtower on the server pulls and recreates within its poll interval. To force it manually:
-
-```bash
-docker compose -f docker-compose.prod.yml pull qits
-docker compose -f docker-compose.prod.yml up -d qits
-```
+Upgrades are **manual**: re-run the installer (the same one-liner). It re-fetches the ref, rebuilds
+`qits/workspace:latest` + `qits/app:latest`, and `compose up -d` recreates the qits container with the
+new image. To upgrade by hand from a checkout, `git pull` then repeat the two `docker build`s and
+`docker compose -f docker-compose.prod.yml up -d`.
 
 Running workspace containers are unaffected by a qits restart (they're siblings); they re-materialize
-lazily on next use. The `qits-workspace` image updates only on an explicit `docker pull` (see the CD
-section) — it changes rarely, only when the toolchain does.
+lazily on next use. The `qits-workspace` image is rebuilt by the same installer run — it changes
+rarely, only when the toolchain does.

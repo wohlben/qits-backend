@@ -6,21 +6,29 @@
 # serves the baked Angular SPA on :8080), and the app is fronted by your forward-auth reverse proxy
 # rather than published to a host port.
 #
-# Prerequisites on the server (once). Compose creates the qits-net network + shared volumes on the
-# first `up`, and qits self-provisions them at startup too — so no manual network/volume creation.
-#   - the workspace image present:      docker pull ghcr.io/wohlben/qits-workspace:latest  (or build it)
-#   - .env next to this file with DOCKER_GID set to the host socket's gid:  stat -c %g /var/run/docker.sock
-#   - the coding-agent login (optional, after first `up`): docker/workspace/agent-login.sh
+# LOCAL-BUILD model (no registry, no Watchtower): the images are BUILT ON THE SERVER from a checkout —
+# install.sh does this inside a throwaway container with the docker socket mounted, so the only things
+# left on the host are the two built images + this running stack. There is no pull and no auto-update;
+# to upgrade, re-run install.sh (it rebuilds :latest and recreates the container).
 #
-# Deploy:   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+# Prerequisites on the server (all handled by install.sh; here for the by-hand path):
+#   - the workspace image built locally:  docker build -t qits/workspace:latest docker/workspace
+#   - the app image built locally:        docker build -t qits/app:latest -f docker/qits/Dockerfile .
+#   - .env next to this file with DOCKER_GID = the host socket's gid:  stat -c %g /var/run/docker.sock
+# Compose creates the qits-net network + shared volumes on the first `up`; qits self-provisions them
+# at startup too — so no manual network/volume creation.
+#
+# Deploy / upgrade:   docker compose -f docker-compose.prod.yml up -d   (after building the images)
 name: qits
 
 services:
   qits:
-    # The prebuilt image your CI pushes (server pulls this). The `build` block is for building on the
-    # server / locally instead — it needs the repo root as context and the app packaged first
-    # (./mvnw -pl service -am package -DskipTests). Pin a tag/digest in real deployments.
-    image: ${QITS_IMAGE:-ghcr.io/wohlben/qits:latest}
+    # The locally-built app image (install.sh / the by-hand `docker build` above produce this tag).
+    # pull_policy: never — it is never in a registry; fail loudly if the local build is missing rather
+    # than reaching out to Docker Hub for a nonexistent `qits/app`. The `build` block lets
+    # `docker compose up -d --build` (re)build it in place from the repo root instead.
+    image: ${QITS_IMAGE:-qits/app:latest}
+    pull_policy: never
     build:
       context: .
       dockerfile: docker/qits/Dockerfile
@@ -46,11 +54,10 @@ services:
       # On qits-net a container reaches qits by this alias — pin it so container->qits (git clone/push,
       # OTLP, MCP) is plain DNS. Matches the `qits` alias below. Maps to qits.workspace.git-host.
       QITS_WORKSPACE_GIT_HOST: qits
-      # The image every workspace container runs — the GHCR ref CI pushes. qits pulls it on first
-      # use if absent locally. NOTE: Watchtower does NOT update this (it's not a running container);
-      # after a workspace-image change, refresh the server with `docker pull` + a re-pull, or run a
-      # periodic `docker pull ghcr.io/wohlben/qits-workspace:latest`. Maps to qits.workspace.image.
-      QITS_WORKSPACE_IMAGE: ghcr.io/wohlben/qits-workspace:latest
+      # The image every workspace container runs — built locally (docker build docker/workspace). It is
+      # NOT pulled from a registry; qits uses whatever `qits/workspace:latest` is present on the host
+      # daemon. After a workspace-image change, rebuild it (install.sh does). Maps to qits.workspace.image.
+      QITS_WORKSPACE_IMAGE: qits/workspace:latest
       # First-deploy default: skip the ~700 MB speech model download at boot (fast, offline-safe
       # startup). Flip to true once you want server-side transcription live. Maps to
       # qits.speech.warmup-on-start.
@@ -73,27 +80,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
-    labels:
-      # Watchtower only touches containers it's told to (WATCHTOWER_LABEL_ENABLE below).
-      com.centurylinklabs.watchtower.enable: "true"
     networks:
       qits-net:
         aliases:
           - qits
-
-  # Pull-based CD: poll GHCR and, when a new qits :latest lands, pull it and recreate the qits
-  # container with the same config. Only touches labelled containers (the qits service above). If
-  # the GHCR packages are PRIVATE, mount a docker config.json with a read token at
-  # /config.json (uncomment the volume) so Watchtower can pull; public packages need no auth.
-  watchtower:
-    image: containrrr/watchtower:latest
-    restart: unless-stopped
-    command: --label-enable --cleanup --interval 120
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # - ./watchtower-config.json:/config.json:ro   # only if the GHCR packages are private
-    networks:
-      - qits-net
 
 networks:
   # Compose creates this on the first `up` (pinned literal name so the sibling workspace containers
