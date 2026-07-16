@@ -216,7 +216,9 @@ workspace container runs it). Dokploy redeploys rebuild only the app image — r
 1. Project → Create Service → **Compose**, type **Docker Compose** (not Stack/Swarm — the stack
    needs `build:` and `group_add`, which swarm doesn't do).
 2. Provider: this repo (GitHub or plain Git), branch `main`; **Compose Path:**
-   `./docker-compose.dokploy.yml`.
+   `./docker-compose.dokploy.yml`. Leave **submodules off** — the fixture submodules are only
+   needed to run tests, and the app image build skips both tests and the fixture derivation
+   (same reason `install.sh` clones without them; see `docker/qits/Dockerfile`).
 3. **Environment** tab — Dokploy writes these into the `.env` next to the compose file, which the
    qits service loads via `env_file` (same mechanism as the installer):
 
