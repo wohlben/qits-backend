@@ -234,6 +234,14 @@ FROM workspace AS build
 USER root
 WORKDIR /src
 
+# Fetch the Maven distribution first, as its own layer keyed ONLY on the wrapper files: the
+# wrapper's one-shot curl (no retries) is the flakiest network step of the whole build, so a
+# transient DNS/connect blip must fail (and a retry re-run) this cheap step — not the full package
+# run below — and a source edit must not re-download Maven.
+COPY mvnw .
+COPY .mvn/wrapper/ .mvn/wrapper/
+RUN ./mvnw --version
+
 # Copy the whole checkout (the .dockerignore trims .git, target/, node_modules, dist so the context
 # stays lean). Then package just the `service` app + its `domain`/`auth` deps, no tests.
 COPY . .
