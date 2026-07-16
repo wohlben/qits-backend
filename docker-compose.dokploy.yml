@@ -1,0 +1,41 @@
+# Dokploy overlay over docker-compose.prod.yml (see the "Deploying with Dokploy" section of the
+# README). Dokploy's Compose service clones this repo and runs this file; `extends` pulls the whole
+# qits service definition from the prod compose so the two can't drift — this file only ADDS what
+# Dokploy needs:
+#
+#   - dokploy-network: Dokploy's Traefik lives there; joining it is what lets the Domains tab route
+#     your https://qits.example.com to this container's :8080. qits still joins qits-net with the
+#     `qits` alias (inherited) so workspace containers reach it back.
+#
+# Everything else comes from the prod file: the multi-stage build (QITS_VARIANT build arg), the
+# docker socket mount + group_add (set DOCKER_GID in Dokploy's Environment tab), the state volume,
+# env_file: .env (Dokploy writes its Environment tab into exactly that file), the healthcheck, and
+# NO host-port publish (Traefik routes over dokploy-network instead).
+#
+# One-time prerequisites on the server (install.sh's ensure step, done by hand here — see README):
+# the qits/workspace:latest image built locally, and the external qits-net network + qits_shared_*
+# volumes created.
+services:
+  qits:
+    extends:
+      file: docker-compose.prod.yml
+      service: qits
+    networks:
+      dokploy-network: {}
+
+networks:
+  qits-net:
+    external: true
+  dokploy-network:
+    external: true
+
+volumes:
+  # Application state (H2 + repositories) — project-scoped under Dokploy's compose project name.
+  # Migrating from an install.sh deployment means copying the old stack's qits-data volume over.
+  qits-data:
+  qits_shared_dot_claude:
+    external: true
+  qits_shared_m2:
+    external: true
+  qits_shared_pnpm:
+    external: true

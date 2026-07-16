@@ -108,19 +108,148 @@ The Angular UI lives at `service/src/main/webui/` — Quinoa's default UI direct
 
 Deployment is **build-on-the-server**: a throwaway container (with the host docker socket mounted)
 clones this repo, builds the qits images from source, and brings the stack up — leaving nothing on the
-host but the images and the running stack. No registry, no push. On a Linux server with Docker:
+host but the images and the running stack. No registry, no push — and also **no checkout, compose
+file, or `.env` on the host**: every deployment setting flows into the installer as `docker run -e`
+variables, and upgrades are "run the same command again". (Prefer editing files? Use the persistent
+checkout at the end of this section.)
+
+`QITS_VARIANT` names the **auth build variant** baked into the app image at build time — there is no
+unauthenticated build and no runtime toggle (`docs/features/2026-07-16_build-variant-auth.md`). Pick
+one of the two below. Either way: the first run is slow (it builds the workspace toolchain image +
+compiles the app); when it finishes, qits runs on the `qits-net` network (alias `qits`, port 8080, **no
+host port published** — your proxy on `qits-net` is the only way in, routing to `http://qits:8080`).
+Pin a release with `-e QITS_REF=<tag>`.
+
+### Variant `forwardauth`: your forward-auth proxy owns the login
+
+qits trusts the identity headers the proxy injects — default `Remote-User` (+ groups in
+`Remote-Groups`, Authelia's defaults) — and 401s every UI/API request that lacks them. The proxy must
+**inject those headers and strip client-supplied copies**; qits believes them unconditionally.
 
 ```bash
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  -e QITS_VARIANT=forwardauth \
   docker:cli sh -c '\
     apk add --no-cache bash git curl >/dev/null && \
     curl -fsSL https://raw.githubusercontent.com/wohlben/qits-backend/main/install.sh | bash'
 ```
 
-The first run is slow (it builds the workspace toolchain image + compiles the app). When it finishes,
-qits runs on the `qits-net` network (alias `qits`, port 8080, no host port published — front it with a
-reverse/forward-auth proxy). Re-run the same command to upgrade. Pin a release with `-e QITS_REF=<tag>`.
+Then point your forward-auth proxy (Authelia, oauth2-proxy, Traefik forwardauth, …) at
+`http://qits:8080`. Optional extra `-e` variables for the same command: different header names (e.g.
+oauth2-proxy's) via `-e QITS_AUTH_FORWARD_USER_HEADER=X-Auth-Request-User`
+`-e QITS_AUTH_FORWARD_GROUPS_HEADER=X-Auth-Request-Groups`, and a required group via
+`-e QITS_AUTH_REQUIRED_ROLE=<group>`.
+
+### Variant `oauth`: qits runs the OIDC login itself (Keycloak)
+
+qits terminates the authorization-code flow (login wall before the SPA, encrypted session cookie,
+bearer JWTs for scripts) — a plain TLS-terminating reverse proxy in front is enough, no forward-auth.
+The OIDC config is **required and passed on the same command** (the installer refuses to build
+without it, because the container would refuse to start):
+
+```bash
+docker run --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e QITS_VARIANT=oauth \
+  -e QUARKUS_OIDC_AUTH_SERVER_URL=https://keycloak.example.com/realms/myrealm \
+  -e QUARKUS_OIDC_CLIENT_ID=qits \
+  -e QUARKUS_OIDC_CREDENTIALS_SECRET=<client secret> \
+  -e QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING=true \
+  -e QUARKUS_HTTP_PROXY_ENABLE_FORWARDED_HOST=true \
+  docker:cli sh -c '\
+    apk add --no-cache bash git curl >/dev/null && \
+    curl -fsSL https://raw.githubusercontent.com/wohlben/qits-backend/main/install.sh | bash'
+```
+
+The Keycloak client is a **confidential** client with Standard flow (details incl. redirect URIs in
+the deployment guide); the two `QUARKUS_HTTP_PROXY_*` lines make redirect URIs come out as
+`https://…` behind the TLS proxy. Optional: `-e QITS_AUTH_REQUIRED_ROLE=<realm role>`.
+
+### Upgrading / switching variants
+
+Re-run the full command — **including all the `-e` variables** (nothing persists on the host, so the
+installer invocation *is* the configuration). It re-pulls the ref, rebuilds `qits/app:latest`, and
+recreates the container; state (the `qits-data` volume) is untouched. Switching variants is the same
+re-run with the other `QITS_VARIANT` and its env — remember to also switch the proxy setup
+(forward-auth ↔ plain TLS).
+
+### Alternative: persistent checkout on the host
+
+If you'd rather manage config as files, clone the repo on the server and run the installer from the
+checkout — it then builds from your working copy and keeps `.env` (which the compose service loads
+via `env_file`) next to `docker-compose.prod.yml`, so re-runs pick your values up without re-passing
+`-e`, and `docker compose -f docker-compose.prod.yml up -d` works directly:
+
+```bash
+git clone https://github.com/wohlben/qits-backend.git && cd qits-backend
+QITS_VARIANT=oauth QUARKUS_OIDC_AUTH_SERVER_URL=… QUARKUS_OIDC_CLIENT_ID=… \
+  QUARKUS_OIDC_CREDENTIALS_SECRET=… bash install.sh   # writes the values into .env
+# later: edit .env, then
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Deploying with Dokploy
+
+If the server already runs [Dokploy](https://dokploy.com), its git-driven Compose deployments +
+built-in Traefik replace the installer: Dokploy clones this repo, builds the app image, and runs the
+stack from **`docker-compose.dokploy.yml`** — a thin overlay over `docker-compose.prod.yml` that
+additionally joins qits to `dokploy-network`, which is how Dokploy's Traefik reaches it (qits still
+publishes no host port, and still sits on `qits-net` for its workspace containers).
+
+**One-time server prep** — the host-level pieces `install.sh` normally ensures (Dokploy only manages
+the stack itself). On the server:
+
+```bash
+git clone --depth 1 https://github.com/wohlben/qits-backend.git /tmp/qits-src
+docker build -t qits/workspace:latest /tmp/qits-src/docker/workspace   # slow; toolchain image
+docker network create qits-net 2>/dev/null || true
+for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do docker volume create "$v"; done
+```
+
+The `qits/workspace` image is both the app image's build base **and** a runtime dependency (every
+workspace container runs it). Dokploy redeploys rebuild only the app image — re-run that
+`docker build` by hand when `docker/workspace/` changes (rare, toolchain-only).
+
+**The Dokploy service**:
+
+1. Project → Create Service → **Compose**, type **Docker Compose** (not Stack/Swarm — the stack
+   needs `build:` and `group_add`, which swarm doesn't do).
+2. Provider: this repo (GitHub or plain Git), branch `main`; **Compose Path:**
+   `./docker-compose.dokploy.yml`.
+3. **Environment** tab — Dokploy writes these into the `.env` next to the compose file, which the
+   qits service loads via `env_file` (same mechanism as the installer):
+
+   ```bash
+   DOCKER_GID=<output of: stat -c %g /var/run/docker.sock>   # socket access for the qits user
+   QITS_VARIANT=oauth
+   TZ=Europe/Berlin
+   # oauth variant — required, the container won't start without them:
+   QUARKUS_OIDC_AUTH_SERVER_URL=https://keycloak.example.com/realms/myrealm
+   QUARKUS_OIDC_CLIENT_ID=qits
+   QUARKUS_OIDC_CREDENTIALS_SECRET=<client secret>
+   QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING=true
+   QUARKUS_HTTP_PROXY_ENABLE_FORWARDED_HOST=true
+   ```
+
+4. **Domains** tab: your domain → service `qits`, port `8080`, HTTPS on (Let's Encrypt) — Dokploy's
+   Traefik terminates TLS and routes to qits over `dokploy-network`.
+5. Deploy. The first build is the slow one (Maven + Angular inside the image build). Upgrading is
+   just Redeploy (or a webhook/auto-deploy on push) — unlike the one-liner, the env persists in
+   Dokploy. If a redeploy reuses the old image instead of rebuilding, check that the compose command
+   Dokploy runs includes `--build` (plain `compose up` won't rebuild an existing `qits/app:latest`).
+
+**Which variant under Dokploy?** `oauth` is the natural fit — Dokploy's Traefik is exactly the
+"plain TLS reverse proxy" that variant expects, and Keycloak can run as another Dokploy service.
+Choose `forwardauth` only if that same Traefik already has a forward-auth middleware (Authelia, …)
+you can attach to the qits router via Dokploy's Traefik configuration, injecting
+`Remote-User`/`Remote-Groups` and stripping client-supplied copies — without such a middleware a
+forwardauth qits answers 401 to everything.
+
+**Migrating from an installer deployment**: qits state lives in the compose project's `qits-data`
+volume, and Dokploy's compose project name differs from the installer's — so copy the old
+`qits_qits-data` volume's contents into the new project's volume before the first start (or start
+fresh; the `qits_shared_*` volumes are external and carry over as-is).
 
 See **[`docs/guides/deployment.md`](docs/guides/deployment.md)** for the full contract (the by-hand
-equivalent, ingress/auth, config knobs, state & backups, upgrades).
+equivalent, ingress/auth details incl. Keycloak client setup, config knobs, state & backups, upgrades).

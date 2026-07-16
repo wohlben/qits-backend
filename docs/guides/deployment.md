@@ -14,6 +14,9 @@ Related/dependent plans:
   socket and the shared network.
 - `QitsHostResolver` / `qits.workspace.git-host` — how workspace containers address qits.
 - `docs/features/2026-07-04_container-agent-sessions.md` — the shared Claude Code login volume.
+- `docs/features/2026-07-16_build-variant-auth.md` — auth is a BUILD variant (`forwardauth` |
+  `oauth`), selected at install time; the "Ingress / auth" section below is the deployment side of
+  that design.
 
 ## The one thing that shapes everything
 
@@ -44,11 +47,17 @@ vanish on `--rm`. Nothing leaks to the host beyond the final product.
 |---|---|
 | `docker/qits/Dockerfile` | The prod app image, **multi-stage**: a `build` stage (`FROM qits/workspace`) packages the fast-jar from source *inside the image build*; the runtime stage adds the docker CLI + a non-root `qits` user and runs it. Built with the **repo root** as context. |
 | `docker-compose.prod.yml` | The prod stack: the single qits service on `qits-net`, socket mount, `group_add` for socket access, state + shared volumes, healthcheck. Uses the locally-built `qits/app:latest` (`pull_policy: never`). |
+| `docker-compose.dokploy.yml` | Overlay for [Dokploy](https://dokploy.com)-managed deployments: `extends` the qits service from the prod file and additionally joins `dokploy-network` so Dokploy's Traefik can route to it. Full walkthrough in the README's "Deploying with Dokploy" section. |
 | `docker/workspace/Dockerfile` | The image **every workspace** runs — and the base of the app image. Built locally as `qits/workspace:latest`; must exist on the server or workspaces can't start. |
 | `install.sh` | Runs inside the throwaway container: clone → build both images → `.env` → `compose up`. |
 | `.github/workflows/ci.yml` | CI **gate only** (build + unit-test on push/PR). No image push, no deploy — the server builds from source. |
 
 ## First-time server setup
+
+Three equivalent flows: the throwaway-container one-liner (below), the by-hand checkout (below), or —
+when the server already runs Dokploy — a Dokploy Compose service on `docker-compose.dokploy.yml`
+(walkthrough in the README's "Deploying with Dokploy" section; the one-time prep there covers what
+the installer's ensure step normally creates).
 
 ### One-liner (the throwaway-container install)
 
@@ -58,13 +67,22 @@ into it. `docker:cli` is a fine generic image; it just needs `bash git curl` add
 ```bash
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  -e QITS_VARIANT=forwardauth \
   docker:cli sh -c '\
     apk add --no-cache bash git curl >/dev/null && \
     curl -fsSL https://raw.githubusercontent.com/wohlben/qits-backend/main/install.sh | bash'
 ```
 
-Pin a tag/branch with `-e QITS_REF=v1.0.0` (and swap it into the raw URL). When it finishes, qits is
-running on `qits-net` and nothing but the two images + the stack remains on the host.
+`QITS_VARIANT` is **required** — it names the auth build variant baked into the app image
+(`forwardauth` | `oauth`; see "Ingress / auth" below to choose). Because the throwaway container is
+all there is — **no checkout, compose file, or `.env` lands on the host** — every deployment setting
+travels as further `-e` variables on this same `docker run`: the installer writes the recognized
+auth vars (`QUARKUS_OIDC_*`, `QITS_AUTH_*`, `QUARKUS_HTTP_PROXY_*`) into the stack's `.env`, which
+the compose service loads via `env_file`. For `oauth` the three `QUARKUS_OIDC_*` values are
+mandatory and the installer refuses to build without them. Re-runs (upgrades) must pass the same
+`-e` set again — the invocation is the configuration. Pin a tag/branch with `-e QITS_REF=v1.0.0`
+(and swap it into the raw URL). When it finishes, qits is running on `qits-net` and nothing but the
+two images + the stack remains on the host.
 
 > The build is heavy (first run pulls the JDK/Playwright/coding-agent layers and downloads Maven +
 > pnpm deps) — budget ~15 min on a cold host. Re-runs reuse the host's docker layer cache.
@@ -79,10 +97,14 @@ so compose must not try to own them. Ensure they exist first — all four comman
 git clone --depth 1 https://github.com/wohlben/qits-backend.git && cd qits-backend
 
 # 1. Build both images locally (no submodules needed — the app build skips tests + the fixture derive).
+#    QITS_VARIANT names the auth build variant (forwardauth | oauth) — required, no default.
 docker build -t qits/workspace:latest docker/workspace
-docker build -t qits/app:latest -f docker/qits/Dockerfile .
+docker build -t qits/app:latest --build-arg QITS_VARIANT=forwardauth -f docker/qits/Dockerfile .
 
 # 2. Tell compose the host docker socket's group id (so the non-root qits user can drive it).
+#    .env doubles as the container env file (compose `env_file`): append the auth variables for
+#    your variant here too (see "Ingress / auth" below) — for oauth the QUARKUS_OIDC_* ones are
+#    required or the container won't start.
 echo "DOCKER_GID=$(stat -c %g /var/run/docker.sock)" > .env
 echo "TZ=$(cat /etc/timezone 2>/dev/null || echo Etc/UTC)" >> .env
 
@@ -99,12 +121,78 @@ bash docker/workspace/agent-login.sh
 
 ## Ingress / auth
 
-There is **no authentication in qits itself** — the app exposes git push (`/git`), MCP (`/mcp`), and
-through the mounted socket, effectively the host docker daemon. It MUST NOT be exposed
-unauthenticated. `docker-compose.prod.yml` publishes **no host port**: front qits with your
-reverse/forward-auth proxy by putting the proxy on `qits-net` (or attaching qits to the proxy's
-network) and routing it to `http://qits:8080`. The `ports:` block is commented out for local
-debugging only.
+qits exposes git push (`/git`), MCP (`/mcp`), and — through the mounted socket — effectively the
+host docker daemon. It MUST NOT be exposed unauthenticated. `docker-compose.prod.yml` publishes
+**no host port**; front qits with a proxy on `qits-net` (or attach qits to the proxy's network)
+routing to `http://qits:8080`. The `ports:` block is commented out for local debugging only.
+
+**Auth is baked into the image at build time** (`docs/features/2026-07-16_build-variant-auth.md`):
+`QITS_VARIANT` at install time picks one of the two variants below, and there is no runtime toggle —
+no build of qits runs unauthenticated.
+
+### `QITS_VARIANT=forwardauth`: trust the forward-auth proxy's identity headers
+
+Your reverse/forward-auth proxy (Authelia, oauth2-proxy, Traefik forwardauth, …) does the login and
+**injects the authenticated identity as headers**; qits verifies nothing itself and trusts them
+unconditionally. qits **401s every UI/API request that lacks the user header** — a proxy that merely
+gates traffic without injecting headers is not enough anymore.
+
+Proxy requirements:
+
+- inject the username header on every proxied request (default `Remote-User`; groups optionally in
+  `Remote-Groups`, comma-separated) — Authelia's defaults. For oauth2-proxy set
+  `QITS_AUTH_FORWARD_USER_HEADER=X-Auth-Request-User` / `QITS_AUTH_FORWARD_GROUPS_HEADER=X-Auth-Request-Groups`.
+- **strip client-supplied copies** of those headers (Authelia/oauth2-proxy setups do this by
+  default; verify — qits believes whatever arrives).
+- never route to qits unauthenticated; qits publishes no host port precisely so the proxy is the
+  only way in.
+
+Optional: `QITS_AUTH_REQUIRED_ROLE=<group>` — require that group (from the groups header) on every
+protected request.
+
+All of these are plain env vars on the qits container: pass them as `-e` on the installer one-liner
+(they land in `.env` → `env_file`), or set them in `.env` directly in a persistent checkout.
+
+### `QITS_VARIANT=oauth`: built-in OIDC against Keycloak (no forward-auth needed)
+
+qits runs SSO itself — a plain TLS-terminating reverse proxy is then enough. qits terminates the
+OIDC authorization-code flow (302 to Keycloak before the SPA loads, session in an encrypted
+`q_session` cookie, silent refresh, `/api/auth/logout` for RP-initiated logout), and requests
+carrying an `Authorization: Bearer <jwt>` are validated resource-server style instead — so
+scripts/CLI work with Keycloak-issued tokens too (`quarkus.oidc.application-type=hybrid`).
+
+Environment — **required**, the container fails startup without the OIDC values (deliberate: an
+oauth image can never run unauthenticated; the installer checks upfront, before the slow builds).
+Pass them as `-e` on the installer one-liner (they land in `.env` → `env_file`), or set them in
+`.env` directly in a persistent checkout:
+
+```bash
+QUARKUS_OIDC_AUTH_SERVER_URL=https://keycloak.example.com/realms/myrealm
+QUARKUS_OIDC_CLIENT_ID=qits
+QUARKUS_OIDC_CREDENTIALS_SECRET=<client secret>
+# Optional: require a Keycloak realm role on every protected request (unset = any user in the realm)
+QITS_AUTH_REQUIRED_ROLE=qits-user
+# Behind the TLS-terminating proxy, so redirect URIs come out as https://<public-host>/...:
+QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING=true
+QUARKUS_HTTP_PROXY_ENABLE_FORWARDED_HOST=true
+```
+
+Keycloak client setup: a **confidential** client (Client authentication ON) with **Standard flow**
+enabled, *Valid redirect URIs* `https://qits.example.com/*`, and *Valid post logout redirect URIs*
+`https://qits.example.com/` (for `/api/auth/logout`). If you must use a **public** client instead,
+set `QUARKUS_OIDC_AUTHENTICATION_PKCE_REQUIRED=true` and provide an explicit 32-char
+`QUARKUS_OIDC_TOKEN_STATE_MANAGER_ENCRYPTION_SECRET` (normally derived from the client secret).
+
+### What stays public in both variants
+
+Enforced by `QitsAuthPolicy`/`PublicPaths` (auth-core); identical for both variants because this
+traffic reaches qits directly on qits-net, bypassing any proxy: `/git/*`, `/mcp/*`, `/api/otel/*`,
+`/api/capture`, the per-command `agent-session` report hook, `/q/*` health probes, and
+`/api/auth/*`. These are the paths workspace containers and the cross-origin fixture SPA call —
+clients that cannot carry a user token. Everything else, including the SPA itself and the
+`/daemon/*` web-view proxy, requires an identity.
+
+### Either way
 
 Quarkus binds `0.0.0.0` inside the container (set in the image) and serves both the REST API and the
 baked Angular SPA on `:8080` — there is no separate frontend to deploy and no `:4200` in prod.
