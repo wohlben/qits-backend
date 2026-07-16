@@ -112,9 +112,12 @@ Missing: $v. See docs/guides/deployment.md."
   done
 fi
 
-# --- 3. workspace image (toolchain; base of the app image AND every workspace container) --------
+# --- 3. workspace image (toolchain; the image every workspace container runs) -------------------
+# The `workspace` stage of the single docker/qits/Dockerfile. The app image build below is
+# self-contained (same file, in-file stages), so this tag is purely the RUNTIME image qits spawns
+# workspace containers from.
 log "Building $WORKSPACE_IMAGE (toolchain — this is the slow one, Playwright + coding agent)"
-docker build -t "$WORKSPACE_IMAGE" docker/workspace
+docker build -t "$WORKSPACE_IMAGE" --target workspace -f docker/qits/Dockerfile .
 
 # --- 4. app image (multi-stage: packages the fast-jar inside the build) -------------------------
 log "Building $APP_IMAGE (multi-stage; runs the Maven + Angular build inside; variant: $QITS_VARIANT)"

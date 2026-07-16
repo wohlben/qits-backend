@@ -1,9 +1,9 @@
-# qits devcontainer image: the SAME toolchain image every workspace runs (docker/workspace) + the
-# docker CLI + a non-root `dev` user. The qits dev environment and the workspace execution
-# environment are therefore one image — qits runs here, on the shared qits-net, and reaches workspace
-# containers (its siblings on the host daemon, created via the mounted docker socket) by their DNS
-# name, with no host-port publishing. Build the base first:
-# `docker build -t qits/workspace docker/workspace`.
+# qits devcontainer image: the SAME toolchain image every workspace runs (the `workspace` stage of
+# docker/qits/Dockerfile) + the docker CLI + a non-root `dev` user. The qits dev environment and the
+# workspace execution environment are therefore one image — qits runs here, on the shared qits-net,
+# and reaches workspace containers (its siblings on the host daemon, created via the mounted docker
+# socket) by their DNS name, with no host-port publishing. Build the base first:
+# `docker build -t qits/workspace --target workspace -f docker/qits/Dockerfile .`
 FROM qits/workspace:latest
 
 USER root

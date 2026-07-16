@@ -11,8 +11,10 @@
 # left on the host are the two built images + this running stack. There is no pull and no auto-update;
 # to upgrade, re-run install.sh (it rebuilds :latest and recreates the container).
 #
-# Prerequisites on the server (all handled by install.sh; here for the by-hand path):
-#   - the workspace image built locally:  docker build -t qits/workspace:latest docker/workspace
+# Prerequisites on the server (all handled by install.sh; here for the by-hand path). Both images
+# are stages of the single docker/qits/Dockerfile:
+#   - the workspace image (runtime toolchain for workspace containers) built locally:
+#       docker build -t qits/workspace:latest --target workspace -f docker/qits/Dockerfile .
 #   - the app image built locally, naming the auth build variant (forwardauth | oauth — baked in at
 #     build time, no runtime toggle; docs/features/2026-07-16_build-variant-auth.md):
 #       docker build -t qits/app:latest --build-arg QITS_VARIANT=forwardauth -f docker/qits/Dockerfile .

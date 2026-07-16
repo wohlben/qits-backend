@@ -45,11 +45,10 @@ vanish on `--rm`. Nothing leaks to the host beyond the final product.
 
 | File | Role |
 |---|---|
-| `docker/qits/Dockerfile` | The prod app image, **multi-stage**: a `build` stage (`FROM qits/workspace`) packages the fast-jar from source *inside the image build*; the runtime stage adds the docker CLI + a non-root `qits` user and runs it. Built with the **repo root** as context. |
+| `docker/qits/Dockerfile` | The single Dockerfile for **both** qits images, as stages — fully self-contained, no stage resolves an external image: `workspace` (the toolchain image every workspace container runs; tag it via `--target workspace`), `build` (packages the fast-jar from source *inside* the image build), and the runtime stage (docker CLI + a non-root `qits` user). Built with the **repo root** as context. |
 | `docker-compose.prod.yml` | The prod stack: the single qits service on `qits-net`, socket mount, `group_add` for socket access, state + shared volumes, healthcheck. Uses the locally-built `qits/app:latest` (`pull_policy: never`). |
-| `docker-compose.workspace.yml` | Builds + tags `qits/workspace:latest` from source as its own tiny stack — for [Dokploy](https://dokploy.com), where it runs as a separate Compose service BEFORE the qits stack (compose builds one stack's images in parallel, so the app build's `FROM qits/workspace:latest` needs the tag pre-existing in the local store; Dokploy's pipeline ignores compose's `additional_contexts` dependent-images feature). |
-| `docker-compose.dokploy.yml` | Overlay for Dokploy-managed deployments: `extends` the qits service from the prod file and joins `dokploy-network` so Dokploy's Traefik can route to it. Deploy after the workspace stack. Full walkthrough in the README's "Deploying with Dokploy" section. |
-| `docker/workspace/Dockerfile` | The image **every workspace** runs — and the base of the app image. Built locally as `qits/workspace:latest`; must exist on the server or workspaces can't start. |
+| `docker-compose.dokploy.yml` | Overlay for [Dokploy](https://dokploy.com)-managed deployments: `extends` the qits service from the prod file, adds a `workspace-image` service (tags the Dockerfile's `workspace` stage as `qits/workspace:latest` for runtime workspace spawning), and joins `dokploy-network` so Dokploy's Traefik can route to it. Fully from source in one stack — the self-contained Dockerfile makes build order irrelevant. Full walkthrough in the README's "Deploying with Dokploy" section. |
+| `docker/workspace/` | `agent-login.sh` — the one-time coding-agent OAuth login onto the shared volume. (The workspace image's Dockerfile lives in `docker/qits/Dockerfile` as the `workspace` stage.) |
 | `install.sh` | Runs inside the throwaway container: clone → build both images → `.env` → `compose up`. |
 | `.github/workflows/ci.yml` | CI **gate only** (build + unit-test on push/PR). No image push, no deploy — the server builds from source. |
 
@@ -97,9 +96,10 @@ so compose must not try to own them. Ensure they exist first — all four comman
 ```bash
 git clone --depth 1 https://github.com/wohlben/qits-backend.git && cd qits-backend
 
-# 1. Build both images locally (no submodules needed — the app build skips tests + the fixture derive).
-#    QITS_VARIANT names the auth build variant (forwardauth | oauth) — required, no default.
-docker build -t qits/workspace:latest docker/workspace
+# 1. Build both images locally (no submodules needed — the app build skips tests + the fixture
+#    derive). Both are stages of the single docker/qits/Dockerfile; QITS_VARIANT names the auth
+#    build variant (forwardauth | oauth) — required, no default.
+docker build -t qits/workspace:latest --target workspace -f docker/qits/Dockerfile .
 docker build -t qits/app:latest --build-arg QITS_VARIANT=forwardauth -f docker/qits/Dockerfile .
 
 # 2. Tell compose the host docker socket's group id (so the non-root qits user can drive it).

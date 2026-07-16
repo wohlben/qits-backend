@@ -1,16 +1,17 @@
 # Dokploy overlay over docker-compose.prod.yml (see the "Deploying with Dokploy" section of the
 # README). Dokploy's Compose service clones this repo and runs this file; `extends` pulls the whole
-# qits service definition from the prod compose so the two can't drift — this file only ADDS what
-# Dokploy needs:
+# qits service definition from the prod compose so the two can't drift — this file only ADDS what a
+# fully-from-source Dokploy deployment needs:
 #
+#   - workspace-image: builds + tags qits/workspace:latest (--target workspace of the same
+#     docker/qits/Dockerfile) on the host daemon. qits needs that tag at RUNTIME to spawn workspace
+#     containers; the app image build itself is independent of it (the Dockerfile is fully
+#     self-contained — its stages never resolve an external image, so build order is irrelevant and
+#     nothing is ever pulled from docker.io). The service is a build vehicle, not a runtime service:
+#     it exits immediately by design (shows as stopped).
 #   - dokploy-network: Dokploy's Traefik lives there; joining it is what lets the Domains tab route
 #     your https://qits.example.com to this container's :8080. qits still joins qits-net with the
 #     `qits` alias (inherited) so workspace containers reach it back.
-#
-# PREREQUISITE: the qits/workspace:latest image must already sit in the host's local image store —
-# the app image build `FROM`s it (both stages) and it must never be pulled (it exists in no
-# registry). Under Dokploy that is the docker-compose.workspace.yml stack, deployed FIRST as its own
-# Compose service (fully from source; see that file for why it can't be a service in this stack).
 #
 # Everything else comes from the prod file: the multi-stage build (QITS_VARIANT build arg), the
 # docker socket mount + group_add (set DOCKER_GID in Dokploy's Environment tab), the state volume,
@@ -18,8 +19,19 @@
 # NO host-port publish (Traefik routes over dokploy-network instead).
 #
 # One-time prerequisites on the server (install.sh's ensure step, done by hand here — see README):
-# the external qits-net network + qits_shared_* volumes created.
+# the external qits-net network + qits_shared_* volumes created. No image prep — both images build
+# from source right here.
 services:
+  workspace-image:
+    image: qits/workspace:latest
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: docker/qits/Dockerfile
+      target: workspace
+    command: ["true"]
+    restart: "no"
+
   qits:
     extends:
       file: docker-compose.prod.yml

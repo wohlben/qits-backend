@@ -19,9 +19,9 @@ fixture breaks, this guide is stale too).
 
 ## Prerequisites
 
-- qits running (`./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true`, UI on `:8080`).
-- Docker with the workspace image built: `docker build -t qits/workspace docker/workspace`.
-- What the container guarantees your app (from `docker/workspace/Dockerfile`): Debian bookworm,
+- qits running (`./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true -Dqits.variant=forwardauth`, UI on `:8080`).
+- Docker with the workspace image built: `docker build -t qits/workspace --target workspace -f docker/qits/Dockerfile .`
+- What the container guarantees your app (the `workspace` stage of `docker/qits/Dockerfile`): Debian bookworm,
   **JDK 25** (Temurin), **Node 22 + pnpm** (corepack), git, python3, tmux, the Claude Code CLI.
   The container runs as your host uid with the workspace cloned at **`/workspace`**; `HOME` is
   the workspace, so Maven/pnpm caches land in `/workspace/.m2`, `/workspace/.cache`, … and
