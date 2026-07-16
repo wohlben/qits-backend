@@ -104,6 +104,15 @@ components:
           format: int32
         firstTimestamp:
           $ref: "#/components/schemas/Instant"
+    Available:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        url:
+          type: string
     BranchDto:
       type: object
       properties:
@@ -381,6 +390,8 @@ components:
           pattern: \S
         archetype:
           $ref: "#/components/schemas/RepositoryArchetype"
+        importSubmodules:
+          type: boolean
     CreateProjectRequest:
       type: object
       required:
@@ -1405,12 +1416,23 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Entry12"
+        available:
+          type: array
+          items:
+            $ref: "#/components/schemas/Available"
     Response63:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry12"
+    Response64:
       type: object
       properties:
         output:
           type: string
-    Response64:
+    Response65:
       type: object
       properties:
         workspaceId:
@@ -1419,7 +1441,7 @@ components:
           type: string
         commandId:
           type: string
-    Response65:
+    Response66:
       type: object
       properties:
         commitHash:
@@ -1428,7 +1450,7 @@ components:
           type: boolean
         output:
           type: string
-    Response66:
+    Response67:
       type: object
       properties:
         paths:
@@ -1441,23 +1463,18 @@ components:
             $ref: "#/components/schemas/LazyDirDto"
         generation:
           type: string
-    Response67:
+    Response68:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry13"
-    Response68:
+    Response69:
       type: object
       properties:
         output:
           type: string
-    Response69:
-      type: object
-      properties:
-        success:
-          type: boolean
     Response7:
       type: object
       properties:
@@ -1466,63 +1483,61 @@ components:
     Response70:
       type: object
       properties:
+        success:
+          type: boolean
+    Response71:
+      type: object
+      properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceDto"
-    Response71:
+    Response72:
       type: object
       properties:
         files:
           type: array
           items:
             type: string
-    Response72:
+    Response73:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
-    Response73:
+    Response74:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry14"
-    Response74:
+    Response75:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
-    Response75:
+    Response76:
       type: object
       properties:
         text:
           type: string
-    Response76:
+    Response77:
       type: object
       properties:
         trace:
           $ref: "#/components/schemas/TelemetryTraceDto"
-    Response77:
+    Response78:
       type: object
       properties:
         spans:
           type: array
           items:
             $ref: "#/components/schemas/TelemetrySpanDto"
-    Response78:
+    Response79:
       type: object
       properties:
         metrics:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryMetricDto"
-    Response79:
-      type: object
-      properties:
-        logs:
-          type: array
-          items:
-            $ref: "#/components/schemas/TelemetryLogDto"
     Response8:
       type: object
       properties:
@@ -1531,11 +1546,18 @@ components:
     Response80:
       type: object
       properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryLogDto"
+    Response81:
+      type: object
+      properties:
         groups:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryErrorGroupDto"
-    Response81:
+    Response82:
       type: object
       properties:
         variant:
@@ -2071,7 +2093,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response81"
+                $ref: "#/components/schemas/Response82"
       summary: Me
       tags:
       - Auth Controller
@@ -3090,7 +3112,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response73"
+                $ref: "#/components/schemas/Response74"
       summary: List
       tags:
       - Workspace History Controller
@@ -3120,7 +3142,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response72"
+                $ref: "#/components/schemas/Response73"
       summary: Update
       tags:
       - Workspace History Controller
@@ -3143,7 +3165,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response74"
+                $ref: "#/components/schemas/Response75"
       summary: Get
       tags:
       - Workspace History Controller
@@ -3259,7 +3281,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response67"
+                $ref: "#/components/schemas/Response68"
       summary: List
       tags:
       - Workspace Controller
@@ -3282,7 +3304,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response70"
+                $ref: "#/components/schemas/Response71"
         "400":
           description: Bad Request
       summary: Create
@@ -3435,7 +3457,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response71"
+                $ref: "#/components/schemas/Response72"
       summary: Conflicts
       tags:
       - Workspace Controller
@@ -3566,7 +3588,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response69"
+                $ref: "#/components/schemas/Response70"
         "400":
           description: Bad Request
       summary: Discard
@@ -3614,7 +3636,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response68"
+                $ref: "#/components/schemas/Response69"
       summary: Fast Forward
       tags:
       - Workspace Controller
@@ -3641,7 +3663,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response66"
+                $ref: "#/components/schemas/Response67"
       summary: List Files
       tags:
       - Workspace Controller
@@ -3720,7 +3742,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response65"
+                $ref: "#/components/schemas/Response66"
         "400":
           description: Bad Request
       summary: Merge
@@ -3776,7 +3798,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response64"
+                $ref: "#/components/schemas/Response65"
       summary: Resolve Conflict
       tags:
       - Workspace Controller
@@ -3827,7 +3849,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response80"
+                $ref: "#/components/schemas/Response81"
       summary: Errors
       tags:
       - Workspace Telemetry Controller
@@ -3863,7 +3885,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response79"
+                $ref: "#/components/schemas/Response80"
       summary: Logs
       tags:
       - Workspace Telemetry Controller
@@ -3890,7 +3912,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response78"
+                $ref: "#/components/schemas/Response79"
       summary: Metrics
       tags:
       - Workspace Telemetry Controller
@@ -3929,7 +3951,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response77"
+                $ref: "#/components/schemas/Response78"
       summary: Slow Spans
       tags:
       - Workspace Telemetry Controller
@@ -3957,7 +3979,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response76"
+                $ref: "#/components/schemas/Response77"
       summary: Trace
       tags:
       - Workspace Telemetry Controller
@@ -3980,7 +4002,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response63"
+                $ref: "#/components/schemas/Response64"
       summary: Update From Parent
       tags:
       - Workspace Controller
@@ -4138,6 +4160,24 @@ paths:
       summary: List
       tags:
       - Repository Submodule Controller
+  /api/repositories/{repositoryId}/submodules/import:
+    post:
+      parameters:
+      - name: repositoryId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response63"
+      summary: Import Submodules
+      tags:
+      - Repository Submodule Controller
   /api/speech/transcriptions:
     post:
       requestBody:
@@ -4152,7 +4192,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response75"
+                $ref: "#/components/schemas/Response76"
         "400":
           description: Bad Request
       summary: Transcribe

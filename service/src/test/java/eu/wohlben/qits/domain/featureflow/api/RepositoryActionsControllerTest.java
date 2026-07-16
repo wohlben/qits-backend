@@ -61,7 +61,7 @@ public class RepositoryActionsControllerTest {
 
     return given()
         .contentType(ContentType.JSON)
-        .body(new CreateProjectRepositoryRequest(fixtureUrl, null))
+        .body(new CreateProjectRepositoryRequest(fixtureUrl, null, null))
         .when()
         .post("/api/projects/" + projectId + "/repositories")
         .then()

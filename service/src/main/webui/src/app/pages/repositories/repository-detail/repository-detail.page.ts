@@ -10,6 +10,7 @@ import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { RepositoryDetailHeaderComponent } from '@/ui/components/repository/repository-detail-header.component';
 import { BranchListComponent } from '@/pattern/repository/branch-list.component';
+import { RepositorySubmodulesComponent } from '@/pattern/repository/repository-submodules.component';
 import { RepositorySyncComponent } from '@/pattern/repository/repository-sync.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 
@@ -19,6 +20,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
     PageLayoutComponent,
     RepositoryDetailHeaderComponent,
     BranchListComponent,
+    RepositorySubmodulesComponent,
     RepositorySyncComponent,
     ZardButtonComponent,
     RouterLink,
@@ -68,6 +70,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
 
       <div class="flex flex-col gap-6">
         <app-repository-sync [repoId]="repoId" />
+        <app-repository-submodules [repoId]="repoId" />
         <app-branch-list [repoId]="repoId" />
       </div>
     </app-page-layout>

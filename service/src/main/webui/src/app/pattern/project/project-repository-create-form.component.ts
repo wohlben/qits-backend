@@ -51,6 +51,7 @@ export class ProjectRepositoryCreateFormComponent {
     this.createMutation.mutate({
       url: data.url,
       archetype: archetype || undefined,
+      importSubmodules: data.importSubmodules,
     });
   }
 }

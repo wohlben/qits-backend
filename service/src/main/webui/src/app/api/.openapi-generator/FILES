@@ -40,6 +40,7 @@ model/agentSessionNodeDto.ts
 model/agentSessionRefDto.ts
 model/agentSessionSource.ts
 model/agentSubagentDto.ts
+model/available.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
@@ -202,6 +203,7 @@ model/response79.ts
 model/response8.ts
 model/response80.ts
 model/response81.ts
+model/response82.ts
 model/response9.ts
 model/restartPolicy.ts
 model/setMainBranchRequest.ts

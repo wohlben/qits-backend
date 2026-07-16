@@ -92,7 +92,7 @@ public class ActionConfigurationMcpToolsTest {
   private String createRepository(String projectId) {
     return given()
         .contentType(ContentType.JSON)
-        .body(new ProjectController.CreateProjectRepositoryRequest(fixtureUrl, null))
+        .body(new ProjectController.CreateProjectRepositoryRequest(fixtureUrl, null, null))
         .when()
         .post("/api/projects/" + projectId + "/repositories")
         .then()

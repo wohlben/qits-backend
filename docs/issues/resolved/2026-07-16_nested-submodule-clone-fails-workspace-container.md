@@ -4,6 +4,21 @@ First real-world hit of the boundary `docs/features/2026-07-14_workspace-submodu
 documents as a follow-up ("only single-level submodules materialize offline"): a workspace for a
 repo whose submodule itself has submodules fails to start.
 
+> **Resolved 2026-07-16**, in two steps that ended in a redesign (see the updated status note in the
+> feature doc):
+>
+> 1. Container-side: `WorkspaceService.wireSubmodules` walks the DB submodule-edge closure level by
+>    level — per level, `submodule.<name>.url` overrides then ONE non-recursive `submodule update
+>    --init` **path-scoped to the imported edges** (a missing pathspec hard-fails, and unimported
+>    submodules must stay untouched), descending only into checked-out children (`.git` marker),
+>    with branch-mismatched edges filtered via `ls-files --error-unmatch` and a depth cap as the
+>    cycle backstop. Proven by the depth-2 diamond IT over `submodule-super.git` (offline,
+>    `--network none`).
+> 2. Import-side redesign (user decision): the automatic recursive import became user-driven layer
+>    by layer — an `importSubmodules` creation toggle (direct level only) + a per-repository
+>    `POST /submodules/import` action surfaced on the detail view while unimported entries are
+>    `available`. The walk in (1) materializes exactly the imported subtree.
+
 ## Introduction
 
 Related/dependent plans:

@@ -131,7 +131,8 @@ public class SeedWebappService {
             PROJECT_NAME,
             "Servable Quarkus 3 + Angular demo (testing-repo-quarkus-angular fixture)");
     Repository repo =
-        projectService.createRepositoryUnderProject(project.id, url, RepositoryArchetype.SERVICE);
+        projectService.createRepositoryUnderProject(
+            project.id, url, RepositoryArchetype.SERVICE, true);
 
     // A web-viewable dev-server daemon: `quarkus:dev` serving the Quarkus REST API plus the Angular
     // SPA (Quinoa), live-reloaded. The web view frames the FRONTEND dev server (the topology the

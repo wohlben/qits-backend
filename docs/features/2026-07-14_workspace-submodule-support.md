@@ -1,7 +1,29 @@
 # Workspace submodule support — import a repo's submodules as sibling repositories, materialized offline
 
-> **Status: implemented (2026-07-14).** Shipped as specified with two deviations discovered during
-> implementation, plus the optional API surface:
+> **Status: implemented (2026-07-14); import model redesigned (2026-07-16).** The 2026-07-16 redesign
+> (prompted by the first prod encounter of the nested-submodule boundary — see
+> `docs/issues/resolved/2026-07-16_nested-submodule-clone-fails-workspace-container.md`) replaces the
+> automatic recursive import and lifts the single-level materialization boundary:
+>
+> - **Import is user-driven, layer by layer.** Repository creation takes an `importSubmodules` toggle
+>   (default true) that imports the DIRECT submodules only; going deeper is the user invoking
+>   `POST /api/repositories/{id}/submodules/import` on an imported child (the repository detail
+>   view's "Import submodules" action, offered while `GET …/submodules` reports `available` entries)
+>   — as far down as they care to recurse. Dedup is unchanged (children by resolved url within the
+>   project, edges by `(parent, path)`), which is also what terminates cycles now: the second,
+>   user-invoked import of a cyclic pair links back to the existing row. `RepositoryService.
+>   importDirectSubmodules` / `listUnimportedSubmodules`; the old `visitedUrls`/depth recursion is
+>   gone.
+> - **Container materialization walks the imported edges level by level — nested submodules now
+>   materialize.** git's own `--recursive` cannot be used (it derives nested urls from each child's
+>   `.gitmodules`, which no override reaches, yielding un-servable name-based `/git/...` paths), so
+>   `WorkspaceService.wireSubmodules` re-applies the override→update sequence per level over the DB
+>   edge closure, path-scoping each `submodule update --init -- <paths>` to the imported edges —
+>   unimported submodules stay uninitialized directories (the layer-by-layer contract), and edges
+>   whose gitlink is absent on the workspace's branch are filtered out (`ls-files --error-unmatch`).
+>   Depth-capped as the cycle backstop; descent is guarded on the child's `.git` marker.
+>
+> Original 2026-07-14 ship notes (still accurate where not superseded above):
 >
 > - **Materialization uses a `git config` override, not a clone-time `-c`.** `git submodule update
 >   --init` runs `submodule init`, which copies the `.gitmodules` url into `.git/config` — it does
@@ -9,20 +31,18 @@
 >   The working sequence is: **plain** `git clone` (byte-for-byte the historical argv), then one
 >   `git config submodule.<name>.url <childCloneUrl>` per edge (an **absolute** `/git/<childId>` url,
 >   which `submodule update --init` *does* respect because it never re-derives an already-set url),
->   then `git submodule update --init --recursive`. See `WorkspaceService.submoduleWiringCommands`.
-> - **Only single-level submodules materialize offline.** The overrides cover a superproject's direct
->   edges; a submodule that *itself* has sub-submodules leaves the nested urls as un-overridden names,
->   so a recursive update of that nested level fails. This matches the fixture case (`webui` → a leaf
->   `angular`) and is a documented boundary — nested container materialization is a follow-up. (The
->   host-side *import* recursion is fully general and depth/cycle-guarded; only container checkout is
->   single-level.)
-> - **Commit 6 (API/MCP surface) was included:** `GET /api/repositories/{id}/submodules` and the
->   `listSubmodules` tool on the `repository` MCP server, backed by `RepositorySubmoduleDto` +
->   `RepositorySubmoduleMapper` + `RepositoryService.listSubmodules`.
+>   then the path-scoped `git submodule update --init`. See `WorkspaceService.submoduleWiringCommands`.
+> - **API/MCP surface:** `GET /api/repositories/{id}/submodules` (now also reporting `available`
+>   unimported entries) + `POST …/submodules/import`, and the `listSubmodules` tool on the
+>   `repository` MCP server, backed by `RepositorySubmoduleDto` + `RepositorySubmoduleMapper` +
+>   `RepositoryService.listSubmodules`. The UI surfaces both: a toggle on the repository create form
+>   and the submodules section on the repository detail view
+>   (`pattern/repository/repository-submodules.component.ts`).
 >
 > New test fixtures under `domain/src/test/resources/fixtures/`: `submodule-super.git` (diamond +
 > depth over `submodule-child-a.git`, `submodule-shared.git`, `submodule-grandchild.git`),
-> `submodule-cycle-a/-b.git` (cycle guard), `submodule-simple-super.git` (single leaf, for the IT).
+> `submodule-cycle-a/-b.git` (cycle-pair linking), `submodule-simple-super.git` (single leaf, for the
+> IT; the depth-2 IT drives `submodule-super.git`).
 
 ## Introduction
 

@@ -77,7 +77,8 @@ public class SeedService {
 
     Project project = projectService.create(PROJECT_NAME, "Seeded from testing-repo fixture");
     Repository repo =
-        projectService.createRepositoryUnderProject(project.id, url, RepositoryArchetype.SERVICE);
+        projectService.createRepositoryUnderProject(
+            project.id, url, RepositoryArchetype.SERVICE, true);
 
     // A demo daemon on the repository (daemons only exist at repository scope): a Python static
     // file server with a ready pattern and a LOG_LEVEL observer — enough to watch the whole

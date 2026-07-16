@@ -13,6 +13,7 @@ import { RepositoryArchetype } from './repositoryArchetype';
 export interface CreateProjectRepositoryRequest { 
     url: string;
     archetype?: RepositoryArchetype;
+    importSubmodules?: boolean;
 }
 export namespace CreateProjectRepositoryRequest {
 }

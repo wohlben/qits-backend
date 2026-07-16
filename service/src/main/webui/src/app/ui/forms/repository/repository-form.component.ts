@@ -1,23 +1,37 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
-import { form, required, submit } from '@angular/forms/signals';
+import { form, FormField, required, submit } from '@angular/forms/signals';
 
 import { ZardButtonComponent } from '@/shared/components/button';
+import { ZardCheckboxComponent } from '@/shared/components/checkbox';
 import { RepositoryArchetypeInputComponent } from '@/ui/inputs/repositories/repository-archetype-input.component';
 import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-field-layout.component';
 
 export interface RepositoryFormData {
   url: string;
   archetype: string;
+  importSubmodules: boolean;
 }
 
 @Component({
   selector: 'app-repository-form',
-  imports: [FormFieldLayoutComponent, RepositoryArchetypeInputComponent, ZardButtonComponent],
+  imports: [
+    FormField,
+    FormFieldLayoutComponent,
+    RepositoryArchetypeInputComponent,
+    ZardButtonComponent,
+    ZardCheckboxComponent,
+  ],
   template: `
     <form (submit)="onSubmit($event)" class="flex flex-col gap-4 max-w-xl">
       <app-form-field-layout [field]="form.url" id="repository-url" label="Repository URL" autocomplete="off" />
 
       <app-repository-archetype-input [field]="form.archetype" />
+
+      <!-- One level only: the repository's DIRECT .gitmodules submodules become sibling
+           repositories. Going deeper is per-repository, via the detail view's import action. -->
+      <z-checkbox [formField]="form.importSubmodules">
+        Import submodules as sibling repositories (direct level)
+      </z-checkbox>
 
       <div class="flex items-center gap-2">
         <button z-button type="submit" [zLoading]="loading()">Save</button>
@@ -31,7 +45,7 @@ export class RepositoryFormComponent {
   readonly loading = input(false);
   readonly submitted = output<RepositoryFormData>();
 
-  readonly model = signal<RepositoryFormData>({ url: '', archetype: '' });
+  readonly model = signal<RepositoryFormData>({ url: '', archetype: '', importSubmodules: true });
   readonly form = form(this.model, (schemaPath) => {
     required(schemaPath.url, { message: 'URL is required' });
   });

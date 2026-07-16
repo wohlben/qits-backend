@@ -60,7 +60,7 @@ public class RepositoryDaemonControllerTest {
             .path("project.id");
     return given()
         .contentType(ContentType.JSON)
-        .body(new ProjectController.CreateProjectRepositoryRequest(fixtureUrl, null))
+        .body(new ProjectController.CreateProjectRepositoryRequest(fixtureUrl, null, null))
         .post("/api/projects/" + projectId + "/repositories")
         .then()
         .statusCode(200)
