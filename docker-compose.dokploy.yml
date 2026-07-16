@@ -1,19 +1,16 @@
 # Dokploy overlay over docker-compose.prod.yml (see the "Deploying with Dokploy" section of the
 # README). Dokploy's Compose service clones this repo and runs this file; `extends` pulls the whole
-# qits service definition from the prod compose so the two can't drift — this file only ADDS what a
-# fully-from-source Dokploy deployment needs:
+# qits service definition from the prod compose so the two can't drift — this file only ADDS what
+# Dokploy needs:
 #
-#   - workspace-image: builds docker/workspace as part of the SAME deploy. It is a build vehicle,
-#     not a runtime service (command true, exits immediately — expect it to show as stopped): its
-#     job is (a) tagging qits/workspace:latest on the host daemon, which qits needs at RUNTIME to
-#     spawn workspace containers, and (b) serving as the app image's base via the
-#     additional_contexts entry below. Without that entry, BuildKit would try to PULL the
-#     `FROM qits/workspace:latest` stages of docker/qits/Dockerfile from docker.io (where the image
-#     deliberately doesn't exist) — install.sh avoids this by building the two images sequentially,
-#     compose needs the explicit build dependency (requires compose v2.22+).
 #   - dokploy-network: Dokploy's Traefik lives there; joining it is what lets the Domains tab route
 #     your https://qits.example.com to this container's :8080. qits still joins qits-net with the
 #     `qits` alias (inherited) so workspace containers reach it back.
+#
+# PREREQUISITE: the qits/workspace:latest image must already sit in the host's local image store —
+# the app image build `FROM`s it (both stages) and it must never be pulled (it exists in no
+# registry). Under Dokploy that is the docker-compose.workspace.yml stack, deployed FIRST as its own
+# Compose service (fully from source; see that file for why it can't be a service in this stack).
 #
 # Everything else comes from the prod file: the multi-stage build (QITS_VARIANT build arg), the
 # docker socket mount + group_add (set DOCKER_GID in Dokploy's Environment tab), the state volume,
@@ -21,25 +18,12 @@
 # NO host-port publish (Traefik routes over dokploy-network instead).
 #
 # One-time prerequisites on the server (install.sh's ensure step, done by hand here — see README):
-# the external qits-net network + qits_shared_* volumes created. (The images need NO manual step —
-# both build from source right here.)
+# the external qits-net network + qits_shared_* volumes created.
 services:
-  workspace-image:
-    image: qits/workspace:latest
-    build:
-      context: docker/workspace
-    command: ["true"]
-    restart: "no"
-
   qits:
     extends:
       file: docker-compose.prod.yml
       service: qits
-    build:
-      additional_contexts:
-        # Resolve the Dockerfile's `FROM qits/workspace:latest` (both stages) against the image the
-        # workspace-image service builds, instead of docker.io — and let compose order the builds.
-        "qits/workspace:latest": "service:workspace-image"
     networks:
       dokploy-network: {}
 

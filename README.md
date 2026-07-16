@@ -192,14 +192,16 @@ docker compose -f docker-compose.prod.yml up -d
 ### Deploying with Dokploy
 
 If the server already runs [Dokploy](https://dokploy.com), its git-driven Compose deployments +
-built-in Traefik replace the installer: Dokploy clones this repo and builds **everything from
-source** — both the `qits/workspace` toolchain image and the app image — from
-**`docker-compose.dokploy.yml`**, an overlay over `docker-compose.prod.yml` that adds two things: a
-`workspace-image` build service wired as the app build's base via `additional_contexts`
-(`service:workspace-image`, so compose orders the builds and never tries to pull
-`qits/workspace:latest` from Docker Hub, where it deliberately doesn't exist; needs compose v2.22+),
-and membership in `dokploy-network`, which is how Dokploy's Traefik reaches qits (qits still
-publishes no host port, and still sits on `qits-net` for its workspace containers).
+built-in Traefik replace the installer, with **everything built from source** by Dokploy. It takes
+**two Compose services** from this repo, because the app image build `FROM`s the locally-built
+`qits/workspace:latest` (it exists in no registry) and compose builds a single stack's images in
+parallel with no portable ordering — so the toolchain image gets its own stack that runs first:
+
+- **`docker-compose.workspace.yml`** — builds + tags `qits/workspace:latest` (the app image's base
+  **and** the image every workspace container runs).
+- **`docker-compose.dokploy.yml`** — the qits stack: an overlay over `docker-compose.prod.yml` that
+  additionally joins `dokploy-network`, which is how Dokploy's Traefik reaches qits (qits still
+  publishes no host port, and still sits on `qits-net` for its workspace containers).
 
 **One-time server prep** — only the external network + volumes `install.sh` normally ensures
 (compose attaches to them rather than owning them, because qits itself creates them as plain
@@ -210,10 +212,16 @@ docker network create qits-net 2>/dev/null || true
 for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do docker volume create "$v"; done
 ```
 
-No image prep: both images build (and rebuild on redeploys, layer-cached) as part of the
-deployment itself.
+**Dokploy service 1 — the toolchain image** (deploy this one first):
 
-**The Dokploy service**:
+1. Project → Create Service → **Compose**, type **Docker Compose**. Provider: this repo, branch
+   `main`; **Compose Path:** `./docker-compose.workspace.yml`. Submodules off.
+2. Deploy. This is the slow build (Playwright, JDK, coding agent). The `workspace-image` service is
+   a build vehicle only — it exits immediately by design, so it showing as stopped is normal: its
+   product is the `qits/workspace:latest` tag in the server's image store.
+3. Redeploy it only when `docker/workspace/` changes (rare, toolchain-only) — then redeploy qits.
+
+**Dokploy service 2 — qits itself**:
 
 1. Project → Create Service → **Compose**, type **Docker Compose** (not Stack/Swarm — the stack
    needs `build:` and `group_add`, which swarm doesn't do).
@@ -238,12 +246,11 @@ deployment itself.
 
 4. **Domains** tab: your domain → service `qits`, port `8080`, HTTPS on (Let's Encrypt) — Dokploy's
    Traefik terminates TLS and routes to qits over `dokploy-network`.
-5. Deploy. The first build is the slow one (the workspace toolchain image + Maven + Angular, all
-   inside the build). The `workspace-image` service is a build vehicle only — it exits immediately
-   by design, so it showing as stopped is normal. Upgrading is just Redeploy (or a webhook/
-   auto-deploy on push) — unlike the one-liner, the env persists in Dokploy. If a redeploy reuses
-   the old image instead of rebuilding, check that the compose command Dokploy runs includes
-   `--build` (plain `compose up` won't rebuild an existing `qits/app:latest`).
+5. Deploy (after service 1 has finished once — otherwise the build fails trying to pull
+   `qits/workspace:latest` from Docker Hub). Upgrading is just Redeploy (or a webhook/auto-deploy
+   on push) — unlike the one-liner, the env persists in Dokploy. If a redeploy reuses the old image
+   instead of rebuilding, check that the compose command Dokploy runs includes `--build` (plain
+   `compose up` won't rebuild an existing `qits/app:latest`).
 
 **Which variant under Dokploy?** `oauth` is the natural fit — Dokploy's Traefik is exactly the
 "plain TLS reverse proxy" that variant expects, and Keycloak can run as another Dokploy service.
