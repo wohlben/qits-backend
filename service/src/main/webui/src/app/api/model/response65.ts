@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,12 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { LazyDirDto } from './lazyDirDto';
 
 
 export interface Response65 { 
-    paths?: Array<string>;
-    lazyDirs?: Array<LazyDirDto>;
-    generation?: string;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
 }
 

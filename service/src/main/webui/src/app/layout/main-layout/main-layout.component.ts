@@ -3,10 +3,11 @@ import { RouterOutlet } from '@angular/router';
 
 import { LayoutImports } from '@/shared/components/layout';
 import { MainNavigationComponent } from '../main-navigation/main-navigation.component';
+import { AuthStatusComponent } from '@/pattern/auth/auth-status.component';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [...LayoutImports, RouterOutlet, MainNavigationComponent],
+  imports: [...LayoutImports, RouterOutlet, MainNavigationComponent, AuthStatusComponent],
   template: `
     <z-layout>
       <z-sidebar zCollapsible [zWidth]="240" [zCollapsedWidth]="64" [(zCollapsed)]="collapsed">
@@ -18,6 +19,10 @@ import { MainNavigationComponent } from '../main-navigation/main-navigation.comp
           </div>
 
           <app-main-navigation />
+
+          <div class="mt-auto">
+            <app-auth-status [collapsed]="collapsed()" />
+          </div>
         </div>
       </z-sidebar>
 

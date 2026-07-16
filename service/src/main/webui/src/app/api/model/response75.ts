@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
 export interface Response75 { 
-    trace?: TelemetryTraceDto;
+    text?: string;
 }
 

@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -10,8 +10,8 @@
 
 
 export interface Response64 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    workspaceId?: string;
+    branch?: string;
+    commandId?: string;
 }
 

@@ -10,9 +10,12 @@
 # MULTI-STAGE: the fast-jar is built INSIDE this image (stage `build`), not on the host and COPYied
 # in. This is what lets the manual installer (install.sh) run entirely inside a throwaway container
 # with only the docker socket mounted — the source never has to land on a host path; it reaches the
-# host daemon purely as this build's context. Build from the REPO ROOT as context:
+# host daemon purely as this build's context. Build from the REPO ROOT as context, naming the auth
+# build variant (docs/features/2026-07-16_build-variant-auth.md — no default, an image is either
+# forward-auth-proxied or OIDC, never toggleable at runtime):
 #
-#     docker build -t qits/app:latest -f docker/qits/Dockerfile .
+#     docker build -t qits/app:latest --build-arg QITS_VARIANT=forwardauth -f docker/qits/Dockerfile .
+#     docker build -t qits/app:latest --build-arg QITS_VARIANT=oauth       -f docker/qits/Dockerfile .
 #
 # Requires the workspace image to exist locally as the base of BOTH stages (build it first — the
 # server needs it anyway so workspaces can start): `docker build -t qits/workspace docker/workspace`.
@@ -33,10 +36,13 @@ COPY . .
 #   antrun (it inherits the root pom's plugin-level `skip`), so the build needs NO git submodules —
 #   a plain shallow clone is enough. -Dmaven.build.cache.enabled=false: the cache is empty in a fresh
 #   container and its restore machinery only adds overhead here. QUARKUS_ANALYTICS_DISABLED keeps the
-#   build non-interactive.
+#   build non-interactive. -Dqits.variant: an empty/missing build arg fails the maven-enforcer check
+#   with the message listing the valid variants — there is no default.
+ARG QITS_VARIANT
 ENV QUARKUS_ANALYTICS_DISABLED=true
 RUN ./mvnw -B -ntp -pl service -am package \
-      -DskipTests -Dqits.dev-guard.skip=true -Dmaven.build.cache.enabled=false
+      -DskipTests -Dqits.dev-guard.skip=true -Dmaven.build.cache.enabled=false \
+      -Dqits.variant=${QITS_VARIANT}
 
 # --- stage 2: the runtime image ------------------------------------------------------------------
 FROM qits/workspace:latest

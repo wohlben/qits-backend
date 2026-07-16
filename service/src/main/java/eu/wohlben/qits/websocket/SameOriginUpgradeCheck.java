@@ -15,9 +15,10 @@ import org.jboss.logging.Logger;
  * (non-browser client, no ambient credentials), an origin whose authority matches the request
  * {@code Host}, or any loopback origin ({@code localhost}/{@code 127.0.0.1}/{@code ::1}, possibly
  * reached through a dev proxy or OS port-forward where {@code Host} and {@code Origin} differ). A
- * malicious internet site ({@code https://evil.example}) matches none of these and is blocked. qits
- * has no authentication layer (a local prototype); a networked deployment would add real auth on
- * top.
+ * malicious internet site ({@code https://evil.example}) matches none of these and is blocked. This
+ * guard is origin-based, not identity-based; it stays in place underneath the identity-based {@code
+ * QitsAuthPolicy} (auth-core), which additionally requires an authenticated identity on these
+ * upgrades in every auth build variant.
  */
 @ApplicationScoped
 public class SameOriginUpgradeCheck implements HttpUpgradeCheck {

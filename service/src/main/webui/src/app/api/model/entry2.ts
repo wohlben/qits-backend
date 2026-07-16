@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *

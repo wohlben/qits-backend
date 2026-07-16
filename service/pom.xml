@@ -138,6 +138,38 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
             </plugin>
+            <plugin>
+                <!-- Every service build must choose an auth variant — there is no unauthenticated
+                     qits build (docs/features/2026-07-16_build-variant-auth.md). The -D property
+                     activates the matching profile in <profiles> below AND satisfies this rule with
+                     one flag. quarkus:dev bypasses the lifecycle (so also this check) — there the
+                     ${qits.auth.variant} expansion in application.properties fails augmentation
+                     instead. -->
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>require-auth-variant</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireProperty>
+                                    <property>qits.variant</property>
+                                    <regex>oauth|forwardauth</regex>
+                                    <message>qits builds must choose an auth variant for the service app:
+  -Dqits.variant=forwardauth   trust forward-auth proxy headers (Remote-User/Remote-Groups) — the everyday dev/test variant
+  -Dqits.variant=oauth         built-in OIDC login (Keycloak); requires QUARKUS_OIDC_* env at runtime
+See docs/features/2026-07-16_build-variant-auth.md.</message>
+                                    <regexMessage>Unknown qits.variant — valid values are: forwardauth, oauth.
+See docs/features/2026-07-16_build-variant-auth.md.</regexMessage>
+                                </requireProperty>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- Derive the submodule-committed git fixtures into bare repos on the test classpath
                  (scripts/derive-fixture-bares.sh); runAlways in the build cache. See domain/pom.xml. -->
             <plugin>
@@ -185,6 +217,42 @@
     </build>
 
     <profiles>
+        <!-- Build-variant auth: -Dqits.variant=… pulls exactly one auth module onto the classpath
+             (auth-core arrives transitively). Property activation (not -P ids) so the single -D
+             flag both selects the profile and satisfies the enforcer above, invoked from the root
+             or with -pl service alike. The module's META-INF/microprofile-config.properties ships
+             the variant's config defaults, incl. the qits.auth.variant id the application.properties
+             trip-wire expands. -->
+        <profile>
+            <id>variant-oauth</id>
+            <activation>
+                <property>
+                    <name>qits.variant</name>
+                    <value>oauth</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>eu.wohlben</groupId>
+                    <artifactId>auth-oidc</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>variant-forwardauth</id>
+            <activation>
+                <property>
+                    <name>qits.variant</name>
+                    <value>forwardauth</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>eu.wohlben</groupId>
+                    <artifactId>auth-forwardauth</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
         <profile>
             <id>native</id>
             <activation>

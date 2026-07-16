@@ -11,6 +11,13 @@
 
     <modules>
         <module>domain</module>
+        <!-- Build-variant auth (docs/features/2026-07-16_build-variant-auth.md): plain library
+             jars; exactly one variant module is pulled into `service` by the profile the mandatory
+             -Dqits.variant=oauth|forwardauth flag activates. In the reactor unconditionally so
+             `-am` and dev-mode workspace-discovery resolve whichever one the profile picked. -->
+        <module>auth/core</module>
+        <module>auth/oidc</module>
+        <module>auth/forwardauth</module>
         <module>service</module>
         <module>cli</module>
     </modules>
@@ -33,6 +40,8 @@
         <spotless-plugin.version>2.44.5</spotless-plugin.version>
         <google-java-format.version>1.28.0</google-java-format.version>
         <antrun-plugin.version>3.1.0</antrun-plugin.version>
+        <jandex-plugin.version>3.4.0</jandex-plugin.version>
+        <enforcer-plugin.version>3.6.2</enforcer-plugin.version>
         <skipITs>true</skipITs>
         <!-- Dev-mode build guard (see the maven-antrun-plugin below): rebuilding the reactor while a
              `quarkus:dev` is live on this port wedges it with mass "Unsatisfied dependency for domain
@@ -57,6 +66,21 @@
             <dependency>
                 <groupId>eu.wohlben</groupId>
                 <artifactId>domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>auth-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>auth-oidc</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>auth-forwardauth</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -141,6 +165,27 @@
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <!-- For the auth/* library modules: writes META-INF/jandex.idx so Quarkus
+                         auto-discovers their beans in the consuming app — the variant modules only
+                         exist on service's classpath under the matching profile, so the usual
+                         quarkus.index-dependency entries (which can't be conditional) don't fit. -->
+                    <groupId>io.smallrye</groupId>
+                    <artifactId>jandex-maven-plugin</artifactId>
+                    <version>${jandex-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>make-index</id>
+                            <goals>
+                                <goal>jandex</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>${enforcer-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

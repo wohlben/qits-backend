@@ -45,7 +45,10 @@ jobs:
 
       # Full reactor build with unit tests (extended/native ITs self-skip without docker). The
       # dev-port guard is irrelevant in CI but harmless; QUARKUS_ANALYTICS_DISABLED keeps it non-interactive.
+      # forwardauth is the only variant the service suite runs under (docs/features/
+      # 2026-07-16_build-variant-auth.md); the oauth variant's own tests run in the auth/oidc module,
+      # which is part of the reactor either way.
       - name: Build & test
         env:
           QUARKUS_ANALYTICS_DISABLED: "true"
-        run: ./mvnw -B -ntp package
+        run: ./mvnw -B -ntp package -Dqits.variant=forwardauth

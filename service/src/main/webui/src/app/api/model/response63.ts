@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -10,8 +10,6 @@
 
 
 export interface Response63 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+    output?: string;
 }
 

@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryLogDto } from './telemetryLogDto';
+import { TelemetryMetricDto } from './telemetryMetricDto';
 
 
 export interface Response78 { 
-    logs?: Array<TelemetryLogDto>;
+    metrics?: Array<TelemetryMetricDto>;
 }
 

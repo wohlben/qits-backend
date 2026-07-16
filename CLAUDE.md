@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Quarkus 3 (Java 25) backend for managing Git repositories, workspaces, and "feature flow" configurations, with an Angular UI served via Quarkus Quinoa. Maven multi-module under group `eu.wohlben`, base package `eu.wohlben.qits`:
 
 - **`domain/`** — the shared business core as a plain library jar: entities, services (`control/`), persistence, MapStruct mappers, DTOs, custom validators, framework-free errors (`domain.error`), Flyway migrations. No web/JAX-RS deps. Consumers index its beans via `quarkus.index-dependency.domain.*`.
-- **`service/`** — the Quarkus web app: REST controllers (`<area>.api`), exception mappers (`eu.wohlben.qits.api`), `mutiny`, `health`, and the Angular UI (Quinoa). Depends on `domain`.
-- **`cli/`** — a Quarkus command-mode app (`@QuarkusMain` in `eu.wohlben.qits.cli.Main`) with no web stack. Depends on `domain`. Exposes `seed` (`SeedService`, the tiny `testing-repo` demo), `seed-webapp` (`SeedWebappService`, the servable Quarkus+Angular demo — idempotent by reset), and `generate-migration`.
+- **`service/`** — the Quarkus web app: REST controllers (`<area>.api`), exception mappers (`eu.wohlben.qits.api`), `mutiny`, `health`, and the Angular UI (Quinoa). Depends on `domain` + exactly one auth variant module (below). Contains **no auth code** itself.
+- **`auth/core`, `auth/oidc`, `auth/forwardauth`** — build-variant auth as library jars (`docs/features/2026-07-16_build-variant-auth.md`). **Every service build must name a variant with `-Dqits.variant=forwardauth|oauth`** (maven-enforcer fails it otherwise, incl. `quarkus:dev`) — the matching profile in `service/pom.xml` pulls in `auth-forwardauth` (trust forward-auth proxy headers; the everyday dev/test variant — its `%dev`/`%test` fallback identity `dev` keeps dev mode and the test suites friction-free) or `auth-oidc` (built-in Keycloak OIDC; the service test suite does NOT run under this variant — its coverage lives in `auth/oidc`'s own tests). `auth-core` (the always-on `QitsAuthPolicy`, the `PublicPaths` token-free list, `/api/auth/me`) arrives transitively. The auth modules ship config defaults in `META-INF/microprofile-config.properties` (read from dependency jars, unlike application.properties) and are bean-discovered via jandex-maven-plugin indexes, not `quarkus.index-dependency`.
+- **`cli/`** — a Quarkus command-mode app (`@QuarkusMain` in `eu.wohlben.qits.cli.Main`) with no web stack. Depends on `domain` (no auth — the variant flag is never needed for cli-only commands). Exposes `seed` (`SeedService`, the tiny `testing-repo` demo), `seed-webapp` (`SeedWebappService`, the servable Quarkus+Angular demo — idempotent by reset), and `generate-migration`.
 
 Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docker images use `ubi9/openjdk-25-runtime`; project JDK pinned via `.sdkmanrc`). Spotless (google-java-format) runs automatically on every build via the `process-sources` phase — google-java-format requires JDK 21+, so don't build on JDK 17.
 
@@ -17,51 +18,63 @@ Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docke
 All Maven commands use the wrapper.
 
 ```bash
+# EVERY build that includes the `service` module must name the auth build variant with
+# -Dqits.variant=forwardauth|oauth (docs/features/2026-07-16_build-variant-auth.md). forwardauth is
+# the everyday dev/test choice; the enforcer message reminds you if it's missing. Module-scoped
+# builds that skip service (-pl domain, -pl cli, -pl auth/…) never need the flag.
+
 # First on a fresh checkout, build so the `domain` module is resolvable from the local repo:
-./mvnw install -DskipTests
+./mvnw install -DskipTests -Dqits.variant=forwardauth
 
 # Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200). `-am` builds the domain
-# dep first (so the standalone `service` resolves it) and `workspace-discovery=true` makes dev mode
-# reactor-aware, so edits to the `domain` module live-reload too.
+# + auth deps first (so the standalone `service` resolves them) and `workspace-discovery=true` makes
+# dev mode reactor-aware, so edits to the `domain`/`auth/*` modules live-reload too. With
+# -Dqits.variant=oauth instead, Keycloak Dev Services auto-starts a Keycloak container
+# (alice/alice, bob/bob) and dev mode gets the real login wall.
 #
 # NOTE: to actually exercise workspace containers / the daemon web view, run this INSIDE the
 # `.devcontainer/` (VS Code "Reopen in Container" or `devcontainer up`), so qits sits on the shared
 # `qits-net` and reaches workspace containers by DNS name (no host-port publishing). The command is
 # the same, just in the devcontainer's terminal. See the Workspace containers section.
-./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true
+./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true -Dqits.variant=forwardauth
 
 # Full build (all modules, frontend + backend)
-./mvnw package
+./mvnw package -Dqits.variant=forwardauth
 
 # Run all unit tests for a module
 ./mvnw -pl domain test       # service/business-logic tests
-./mvnw -pl service test      # REST/controller, mutiny, health, validation, openapi tests
+./mvnw -pl service test -Dqits.variant=forwardauth   # REST/controller, mutiny, health, validation, openapi tests
+                             # (the service suite ONLY runs under forwardauth — under oauth every
+                             # @QuarkusTest fails startup for the missing auth-server-url)
 ./mvnw -pl cli test          # seed command test
+./mvnw -pl auth/core test && ./mvnw -pl auth/oidc test && ./mvnw -pl auth/forwardauth test  # auth suites
 
-# Run a single test class / method (-am also builds the domain dep it needs)
+# Run a single test class / method (-am also builds the deps it needs)
 ./mvnw -pl domain -am test -Dtest=ProjectServiceTest
-./mvnw -pl service -am test -Dtest=ProjectControllerTest#create
+./mvnw -pl service -am test -Dtest=ProjectControllerTest#create -Dqits.variant=forwardauth
 
-# Regenerate docs/openapi.yml (writes the file as a side effect — do not hand-edit openapi.yml)
-./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest
+# Regenerate docs/openapi.yml (writes the file as a side effect — do not hand-edit openapi.yml).
+# The export is variant-independent (AuthController lives in auth-core; the OpenAPI title is pinned).
+./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest -Dqits.variant=forwardauth
 
 # Native build + integration tests (failsafe; ITs are skipped by default via skipITs=true)
-./mvnw -pl service package -Dnative
+./mvnw -pl service package -Dnative -Dqits.variant=forwardauth
 
 # Extended suite: heavier, environment-dependent integration tests (JUnit `*IT`, @Tag("extended")),
 # e.g. the real-docker WorkspaceContainerIT. Skipped by every default build; opt in with -Pextended.
 # ITs self-skip when their backend (docker + the qits/workspace image) is absent, so this is safe to
 # run anywhere. Build the image first: `docker build -t qits/workspace docker/workspace`.
-./mvnw verify -Pextended                       # full spectrum: unit tests + extended ITs
-./mvnw -pl service verify -Pextended \
+./mvnw verify -Pextended -Dqits.variant=forwardauth       # full spectrum: unit tests + extended ITs
+./mvnw -pl service verify -Pextended -Dqits.variant=forwardauth \
   -Dtest=__none__ -Dsurefire.failIfNoSpecifiedTests=false   # extended ITs only (skip unit tests)
 
 # Seed demo data (project + branch tree incl. fast-forwardable/diverged workspaces) into the shared
 # H2 file. One-step command-mode run, no web server (the cli pom binds quarkus:run's program args
 # to the cli.args property). NOTE: quarkus:run executes the packaged cli/target/quarkus-app/
 # quarkus-run.jar but does not build it, and any `test` run of the cli module DELETES that dir
-# (Quarkus clears the fast-jar output during test augmentation) — so after test-only builds,
-# re-run `./mvnw install -DskipTests` first or the seed fails with "Unable to access jarfile".
+# (Quarkus clears the fast-jar output during test augmentation) — so after test-only builds, re-run
+# `./mvnw install -DskipTests -Dqits.variant=forwardauth` first (or `-pl cli -am install`, which
+# skips service and needs no variant) or the seed fails with "Unable to access jarfile".
 # Idempotent (skip-if-exists). Runs STANDALONE — seeding is pure
 # host-side data setup (rows + branch refs + host-side merges); workspace containers are
 # provisioned lazily on first use, so no docker and no running service are needed here.
@@ -77,7 +90,7 @@ All Maven commands use the wrapper.
 ./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
 
 # Generate a starter Flyway migration after changing entities (writes PENDING_MIGRATION.sql).
-./mvnw install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=generate-migration
+./mvnw -pl cli -am install -DskipTests && ./mvnw -pl cli quarkus:run -Dcli.args=generate-migration
 ```
 
 The **Maven Build Cache Extension** is enabled (`.mvn/extensions.xml` + `.mvn/maven-build-cache-config.xml`, local cache only, sibling to the local Maven repo): unchanged modules restore from cache instead of rebuilding (compile, Spotless, tests, and the Quinoa pnpm/Angular build all skipped) — a no-op `install` is ~2s, and a cli-only change restores `service` so the frontend build is skipped. Granularity is **per module**, so any change to `service` (including anything under `src/main/webui/`) rebuilds all of it. The config restores each module's `target/classes` (not just the jar) — this is **required**: Quarkus resolves reactor siblings by their `target/classes` directory, so without it a module rebuilt while `domain` is restored fails Arc with mass "Unsatisfied dependency" for the domain beans (the cache-triggered form of the "clean before test" MapStruct gotcha). If you ever suspect a stale restore, bypass with `-Dmaven.build.cache.enabled=false` or reset via `rm -rf $(./mvnw help:evaluate -Dexpression=settings.localRepository -q -DforceStdout)/../build-cache`. **All modules cache normally, including `domain`.** (A mass "Unsatisfied dependency for every domain mapper bean" at `quarkus:dev` startup was once blamed on a stale `domain` cache restore and briefly "fixed" by excluding `domain` from the cache — but the real culprit was the IDE language server clobbering `domain/target/classes`; see the IDE note below. The cache restore of `domain` is complete and correct, so the exclusion was reverted.) See `docs/features/2026-07-05_maven-build-cache.md`.
@@ -119,7 +132,7 @@ Domain areas: `project` (the aggregate root), `repository` (repos + workspaces +
 Migrations live in `domain/src/main/resources/db/migration/` and run at startup (`migrate-at-start=true`) for whichever app (service or cli) boots. **Write migrations by hand.** To get a starter, after changing entities rebuild and run the cli `generate-migration` command:
 
 ```bash
-./mvnw install -DskipTests
+./mvnw -pl cli -am install -DskipTests
 ./mvnw -pl cli quarkus:run -Dcli.args=generate-migration
 ```
 

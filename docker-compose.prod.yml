@@ -13,7 +13,9 @@
 #
 # Prerequisites on the server (all handled by install.sh; here for the by-hand path):
 #   - the workspace image built locally:  docker build -t qits/workspace:latest docker/workspace
-#   - the app image built locally:        docker build -t qits/app:latest -f docker/qits/Dockerfile .
+#   - the app image built locally, naming the auth build variant (forwardauth | oauth — baked in at
+#     build time, no runtime toggle; docs/features/2026-07-16_build-variant-auth.md):
+#       docker build -t qits/app:latest --build-arg QITS_VARIANT=forwardauth -f docker/qits/Dockerfile .
 #   - .env next to this file with DOCKER_GID = the host socket's gid:  stat -c %g /var/run/docker.sock
 #   - the qits-net network + qits_shared_* volumes present (install.sh's ensure step creates them if
 #     absent; they're declared `external` here so compose attaches rather than trying to own them —
@@ -34,12 +36,23 @@ services:
     build:
       context: .
       dockerfile: docker/qits/Dockerfile
+      args:
+        # Required for `docker compose up -d --build`: the auth build variant (forwardauth | oauth).
+        # No default — an unset value fails the in-build enforcer check with the message listing the
+        # valid variants. install.sh passes it to `docker build` directly.
+        QITS_VARIANT: ${QITS_VARIANT:-}
     restart: unless-stopped
     # docker-outside-of-docker: qits shells `docker` against the HOST daemon to run sibling
     # workspaces. Grant the qits user access to the mounted socket by its host gid (set in .env;
     # `stat -c %g /var/run/docker.sock`), without baking a machine-specific gid into the image.
     group_add:
       - "${DOCKER_GID:?set DOCKER_GID in .env to the gid of /var/run/docker.sock}"
+    # Deployment-specific auth env lands here (written by install.sh from the vars you pass into the
+    # installer with `docker run -e`, or hand-edited in a persistent checkout). env_file semantics:
+    # keys absent from .env are truly UNSET in the container, so the image defaults apply — unlike an
+    # `environment:` interpolation, which would inject empty strings. DOCKER_GID/TZ riding along is
+    # harmless (TZ is even wanted).
+    env_file: .env
     volumes:
       # The HOST docker daemon socket — how qits creates/execs/removes workspace containers.
       - /var/run/docker.sock:/var/run/docker.sock
@@ -69,10 +82,34 @@ services:
       QITS_GIT_AUTHOR_EMAIL: qits-bot@example.com
       # Pin the wall-clock zone (also propagated to every workspace container). Set to your server's.
       TZ: ${TZ:-Etc/UTC}
-    # NO host-port publish: your forward-auth proxy fronts qits. Put the proxy on qits-net (or attach
-    # qits to the proxy's network too) and route it to http://qits:8080. Uncomment ONLY for local
-    # debugging on the server — never expose 8080 unauthenticated to the internet (it grants git
-    # push, MCP, and effectively the host docker daemon).
+      # --- Auth is decided by the image's BUILD variant (docs/features/2026-07-16_build-variant-auth.md);
+      # the variant is parameterized via .env (env_file above) — pass the vars into the installer
+      # with `docker run -e` (the one-liner flow keeps no checkout to edit) or put them in .env by
+      # hand in a persistent checkout. The recognized keys, all optional unless marked:
+      #
+      # Both variants:
+      #   QITS_AUTH_REQUIRED_ROLE=qits-user   # require this role/group on every protected request
+      #
+      # forwardauth variant — qits trusts the identity headers the forward-auth proxy injects (and
+      # 401s every UI/API request that lacks them — the proxy MUST inject them and strip
+      # client-supplied copies). Defaults are Authelia's; override for e.g. oauth2-proxy:
+      #   QITS_AUTH_FORWARD_USER_HEADER=X-Auth-Request-User
+      #   QITS_AUTH_FORWARD_GROUPS_HEADER=X-Auth-Request-Groups
+      #
+      # oauth variant — qits runs the OIDC login itself (Keycloak); a plain reverse proxy (TLS only,
+      # no forward-auth) routes to http://qits:8080. REQUIRED — the container fails startup without
+      # them (intended: an oauth image can never run unauthenticated; install.sh checks upfront):
+      #   QUARKUS_OIDC_AUTH_SERVER_URL=https://keycloak.example.com/realms/myrealm
+      #   QUARKUS_OIDC_CLIENT_ID=qits
+      #   QUARKUS_OIDC_CREDENTIALS_SECRET=<client secret>
+      # Behind the TLS-terminating reverse proxy, let qits build correct https redirect URIs:
+      #   QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING=true
+      #   QUARKUS_HTTP_PROXY_ENABLE_FORWARDED_HOST=true
+    # NO host-port publish: your proxy fronts qits — forward-auth for the forwardauth variant, plain
+    # TLS reverse proxy for the oauth variant. Put the proxy on qits-net (or attach qits to the
+    # proxy's network too) and route it to http://qits:8080. Uncomment ONLY for local debugging on
+    # the server — never expose 8080 directly (a forwardauth qits would trust ANY client-supplied
+    # identity header; an exposed qits grants git push, MCP, and effectively the host docker daemon).
     # ports:
     #   - "127.0.0.1:8080:8080"
     healthcheck:

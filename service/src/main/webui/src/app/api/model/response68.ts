@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -10,6 +10,6 @@
 
 
 export interface Response68 { 
-    success?: boolean;
+    output?: string;
 }
 

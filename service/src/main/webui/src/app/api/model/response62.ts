@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Entry12 } from './entry12';
 
 
 export interface Response62 { 
-    output?: string;
+    entries?: Array<Entry12>;
 }
 

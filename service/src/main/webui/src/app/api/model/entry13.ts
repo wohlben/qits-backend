@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceHistoryDto } from './workspaceHistoryDto';
+import { WorkspaceDto } from './workspaceDto';
 
 
 export interface Entry13 { 
-    workspace?: WorkspaceHistoryDto;
+    workspace?: WorkspaceDto;
 }
 

@@ -1535,6 +1535,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryErrorGroupDto"
+    Response81:
+      type: object
+      properties:
+        variant:
+          type: string
+        username:
+          type: string
     Response9:
       type: object
       properties:
@@ -2056,6 +2063,18 @@ paths:
       summary: Delete
       tags:
       - Action Configuration Controller
+  /api/auth/me:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response81"
+      summary: Me
+      tags:
+      - Auth Controller
   /api/commands:
     get:
       parameters:
@@ -4140,5 +4159,5 @@ paths:
       tags:
       - Speech Controller
 info:
-  title: service API
+  title: qits API
   version: 1.0.0-SNAPSHOT

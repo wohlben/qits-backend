@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
+import { TelemetryLogDto } from './telemetryLogDto';
 
 
 export interface Response79 { 
-    groups?: Array<TelemetryErrorGroupDto>;
+    logs?: Array<TelemetryLogDto>;
 }
 

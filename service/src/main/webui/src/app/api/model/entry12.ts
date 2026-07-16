@@ -1,5 +1,5 @@
 /**
- * service API
+ * qits API
  *
  * 
  *
@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceDto } from './workspaceDto';
+import { RepositorySubmoduleDto } from './repositorySubmoduleDto';
 
 
 export interface Entry12 { 
-    workspace?: WorkspaceDto;
+    submodule?: RepositorySubmoduleDto;
 }
 

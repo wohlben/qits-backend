@@ -7,6 +7,7 @@ api/agentController.service.ts
 api/agentPluginController.service.ts
 api/agentSessionController.service.ts
 api/api.ts
+api/authController.service.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
 api/daemonEventController.service.ts
@@ -20,6 +21,7 @@ api/reactiveEchoController.service.ts
 api/repositoryActionsController.service.ts
 api/repositoryController.service.ts
 api/repositoryDaemonController.service.ts
+api/repositorySubmoduleController.service.ts
 api/speechController.service.ts
 api/workspaceController.service.ts
 api/workspaceDaemonController.service.ts
@@ -77,6 +79,7 @@ model/entry10.ts
 model/entry11.ts
 model/entry12.ts
 model/entry13.ts
+model/entry14.ts
 model/entry2.ts
 model/entry3.ts
 model/entry4.ts
@@ -117,6 +120,7 @@ model/reportAgentSessionRequest.ts
 model/repositoryArchetype.ts
 model/repositoryDaemonDto.ts
 model/repositoryDto.ts
+model/repositorySubmoduleDto.ts
 model/response.ts
 model/response1.ts
 model/response10.ts
@@ -196,6 +200,8 @@ model/response77.ts
 model/response78.ts
 model/response79.ts
 model/response8.ts
+model/response80.ts
+model/response81.ts
 model/response9.ts
 model/restartPolicy.ts
 model/setMainBranchRequest.ts
