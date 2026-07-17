@@ -23,7 +23,10 @@ import { Terminal } from '@xterm/xterm';
  * silently refreshes, so reconnecting IS the token renewal
  * (docs/issues/2026-07-17_idle-websocket-reaped-behind-proxy.md) — and 1006 covers network blips
  * and machine sleep. Only a clean server close (1000: the command is gone, or an explicit detach)
- * or exhausted retries print [disconnected].
+ * or exhausted retries print [disconnected] — and a spent retry budget re-arms when the tab
+ * becomes visible or the browser comes back online (a sleep/outage outlives the ~8s backoff
+ * window; the return-to-tab moment is the event to reconnect on, not a poll). Only the clean
+ * server close is truly final.
  */
 @Component({
   selector: 'app-web-terminal',
@@ -51,6 +54,23 @@ export class WebTerminalComponent implements OnDestroy {
   private retries = 0;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private destroyed = false;
+  private path?: string;
+  /** Set by a clean server close (the command is gone / explicit detach) — wake never re-opens. */
+  private finalClose = false;
+
+  /**
+   * Re-arm after the retry budget is spent: a laptop sleep or an outage longer than the ~8s
+   * backoff window exhausts the five attempts, and the natural "I'm back" signals are the tab
+   * becoming visible and the browser regaining network — reconnect then, not on a poll.
+   */
+  private readonly wakeHandler = () => {
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+    this.wake();
+  };
+
+  private readonly onlineHandler = () => this.wake();
 
   constructor() {
     // Connect once the host element has rendered. The `connected` guard keeps this a one-shot.
@@ -101,7 +121,29 @@ export class WebTerminalComponent implements OnDestroy {
     });
     this.resizeObserver.observe(el);
 
+    this.path = path;
+    document.addEventListener('visibilitychange', this.wakeHandler);
+    window.addEventListener('online', this.onlineHandler);
     this.openSocket(path, term);
+  }
+
+  /** Reconnect with a fresh retry budget if the socket is down and the server didn't end it. */
+  private wake(): void {
+    const state = this.ws?.readyState;
+    if (
+      this.destroyed ||
+      this.finalClose ||
+      !this.path ||
+      !this.term ||
+      state === WebSocket.OPEN ||
+      state === WebSocket.CONNECTING
+    ) {
+      return;
+    }
+    clearTimeout(this.reconnectTimer);
+    this.retries = 0;
+    this.term.reset();
+    this.openSocket(this.path, this.term);
   }
 
   private openSocket(path: string, term: Terminal): void {
@@ -122,7 +164,13 @@ export class WebTerminalComponent implements OnDestroy {
       // A clean close is the server's word: the command is gone (it says so in-band first) or an
       // explicit detach — final. Everything else (1008 auth expiry, 1006 network/sleep, rejected
       // handshakes) gets a bounded reconnect: re-attach replays scrollback onto a reset terminal.
-      if (event.code === 1000 || this.retries >= 5) {
+      // A spent budget isn't the end — the wake handlers re-arm on tab refocus / network-online.
+      if (event.code === 1000) {
+        this.finalClose = true;
+        term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n');
+        return;
+      }
+      if (this.retries >= 5) {
         term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n');
         return;
       }
@@ -145,6 +193,8 @@ export class WebTerminalComponent implements OnDestroy {
     // Detach only: closing the socket leaves the backend process running for re-attach.
     this.destroyed = true;
     clearTimeout(this.reconnectTimer);
+    document.removeEventListener('visibilitychange', this.wakeHandler);
+    window.removeEventListener('online', this.onlineHandler);
     this.resizeObserver?.disconnect();
     this.ws?.close();
     this.term?.dispose();

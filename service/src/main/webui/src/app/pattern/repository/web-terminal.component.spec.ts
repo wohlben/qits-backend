@@ -27,6 +27,7 @@ function stubXtermBrowserApis(): void {
 /** Records every socket the component opens and lets tests drive open/close events. */
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
+  static readonly CONNECTING = 0;
   static readonly OPEN = 1;
   readyState = 0;
   onopen: (() => void) | null = null;
@@ -122,6 +123,40 @@ describe('WebTerminalComponent', () => {
     second.serverCloses(1008);
     vi.advanceTimersByTime(300); // back to the first-retry delay
     expect(FakeWebSocket.instances).toHaveLength(3);
+  });
+
+  it('re-arms a spent retry budget when the tab refocuses or the network returns', () => {
+    createComponent();
+    // Burn the whole budget: a sleep/outage longer than the backoff window.
+    for (let i = 0; i <= 5; i++) {
+      FakeWebSocket.instances[i].serverCloses(1006);
+      vi.advanceTimersByTime(5000);
+    }
+    expect(FakeWebSocket.instances).toHaveLength(6);
+
+    // The user returns: tab visible again → one fresh attempt with a reset budget.
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(FakeWebSocket.instances).toHaveLength(7);
+
+    // The browser regains network while the last attempt already failed → another attempt.
+    FakeWebSocket.instances[6].serverCloses(1006);
+    vi.advanceTimersByTime(60000); // exhaust nothing — one failure, budget was reset
+    window.dispatchEvent(new Event('online'));
+    expect(FakeWebSocket.instances.length).toBeGreaterThan(7);
+  });
+
+  it('wake does nothing while the socket is open or after a clean final close', () => {
+    createComponent();
+    const first = FakeWebSocket.instances[0];
+    first.serverOpens();
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(FakeWebSocket.instances).toHaveLength(1); // open socket — no duplicate
+
+    first.serverCloses(1000); // the command is gone — final
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('online'));
+    vi.advanceTimersByTime(60000);
+    expect(FakeWebSocket.instances).toHaveLength(1);
   });
 
   it('never reconnects after destroy', () => {
