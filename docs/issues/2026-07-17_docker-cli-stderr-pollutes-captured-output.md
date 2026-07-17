@@ -1,5 +1,14 @@
 # Docker CLI stderr pollutes captured command output (observed: commitHash) in prod
 
+> **Root cause of the warning found 2026-07-17**: NOT `HOME` — the container env carried
+> `DOCKER_CONFIG=/root/.docker`, injected by Dokploy into the `.env` it writes (its internal
+> registry-auth setting) and forwarded into the container by compose `env_file`
+> (`docker exec <qits> env | grep -i docker` showed it; `HOME` was correct all along). Mitigated
+> in `docker-compose.prod.yml` by pinning `DOCKER_CONFIG: /home/qits/.docker` under
+> `environment:`, which beats `env_file`. **The stderr-merging bug below stays open** — captured
+> values must be immune to whatever the CLI warns about next, and finished-command transcripts
+> already persisted with the warning keep replaying it until re-run.
+
 ## Introduction
 
 Related/dependent plans:
