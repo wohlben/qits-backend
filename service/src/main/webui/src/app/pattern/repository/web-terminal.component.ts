@@ -16,6 +16,14 @@ import { Terminal } from '@xterm/xterm';
  * the socket re-attaches — replaying scrollback — and closing it only detaches; the process keeps
  * running). Pass an explicit `socketPath` to point it at a different terminal endpoint — e.g. the
  * daemon interactive-attach socket, which has no durable `commandId`.
+ *
+ * Abnormal closes auto-reconnect (reset the terminal, re-attach, let the replay repaint):
+ * websockets-next closes every authenticated socket with 1008 "Authentication expired" when the
+ * OIDC access token expires — the re-handshake carries the session cookie and quarkus-oidc
+ * silently refreshes, so reconnecting IS the token renewal
+ * (docs/issues/2026-07-17_idle-websocket-reaped-behind-proxy.md) — and 1006 covers network blips
+ * and machine sleep. Only a clean server close (1000: the command is gone, or an explicit detach)
+ * or exhausted retries print [disconnected].
  */
 @Component({
   selector: 'app-web-terminal',
@@ -40,6 +48,9 @@ export class WebTerminalComponent implements OnDestroy {
   private ws?: WebSocket;
   private resizeObserver?: ResizeObserver;
   private connected = false;
+  private retries = 0;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private destroyed = false;
 
   constructor() {
     // Connect once the host element has rendered. The `connected` guard keeps this a one-shot.
@@ -78,20 +89,9 @@ export class WebTerminalComponent implements OnDestroy {
     this.term = term;
     this.fitAddon = fitAddon;
 
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/${path}`);
-    this.ws = ws;
-
-    ws.onopen = () => {
-      this.sendResize();
-      term.focus();
-    };
-    ws.onmessage = (event) => term.write(typeof event.data === 'string' ? event.data : '');
-    ws.onclose = () => term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n');
-
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'data', data }));
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'data', data }));
       }
     });
 
@@ -100,6 +100,39 @@ export class WebTerminalComponent implements OnDestroy {
       this.sendResize();
     });
     this.resizeObserver.observe(el);
+
+    this.openSocket(path, term);
+  }
+
+  private openSocket(path: string, term: Terminal): void {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${window.location.host}/${path}`);
+    this.ws = ws;
+
+    ws.onopen = () => {
+      this.retries = 0;
+      this.sendResize();
+      term.focus();
+    };
+    ws.onmessage = (event) => term.write(typeof event.data === 'string' ? event.data : '');
+    ws.onclose = (event) => {
+      if (this.destroyed) {
+        return;
+      }
+      // A clean close is the server's word: the command is gone (it says so in-band first) or an
+      // explicit detach — final. Everything else (1008 auth expiry, 1006 network/sleep, rejected
+      // handshakes) gets a bounded reconnect: re-attach replays scrollback onto a reset terminal.
+      if (event.code === 1000 || this.retries >= 5) {
+        term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n');
+        return;
+      }
+      const delay = Math.min(250 * 2 ** this.retries, 4000);
+      this.retries++;
+      this.reconnectTimer = setTimeout(() => {
+        term.reset();
+        this.openSocket(path, term);
+      }, delay);
+    };
   }
 
   private sendResize(): void {
@@ -110,6 +143,8 @@ export class WebTerminalComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     // Detach only: closing the socket leaves the backend process running for re-attach.
+    this.destroyed = true;
+    clearTimeout(this.reconnectTimer);
     this.resizeObserver?.disconnect();
     this.ws?.close();
     this.term?.dispose();

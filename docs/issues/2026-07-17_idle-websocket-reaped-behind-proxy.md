@@ -1,10 +1,26 @@
-# Idle terminal WebSockets are reaped by the HTTPS proxy after a few minutes
+# Idle terminal WebSockets die: measured as auth expiry (1008), not proxy reaping
 
-> **RESOLVED 2026-07-17** (fix in tree, pending redeploy): enabled websockets-next's built-in
-> keepalive — `quarkus.websockets-next.server.auto-ping-interval=20s` in `application.properties`.
-> Ping/pong frames keep both directions of an untouched terminal non-idle, so the proxy never sees
-> a dead stream. Move to `resolved/` once verified in prod (open a terminal, leave it untouched
-> >5 min, type — no `[disconnected]`).
+> **RESOLVED 2026-07-17, second pass.** The first fix (websockets-next keepalive,
+> `auto-ping-interval=20s`) deployed and worked — a raw-socket probe against prod showed server
+> pings every 20s — yet the same probe was then closed BY THE SERVER at exactly 60s with close
+> code **1008** and reason "Authentication expired": websockets-next's
+> `SecuritySupport.closeConnectionWhenIdentityExpired` closes every authenticated socket when the
+> OIDC access token expires (no config switch exists to disable it), and this deployment's
+> Keycloak realm is `master`, whose default Access Token Lifespan is **1 minute**. Idleness was
+> never the trigger — time-since-token-issuance was.
+>
+> Real fix: `WebTerminalComponent` now auto-reconnects on abnormal closes (bounded backoff, five
+> attempts; terminal reset before re-attach so the scrollback replay repaints clean). The
+> re-handshake carries the `q_session` cookie and quarkus-oidc silently refreshes the token
+> server-side — reconnecting IS the renewal; the SPA never holds a token (HttpOnly encrypted
+> cookie), so there is nothing client-side to refresh directly. A clean close (1000: command gone
+> or explicit detach) stays final — no relaunch loops. The chat socket already reconnected
+> unconditionally (`command-chat.component.ts`), which is why chats never showed the symptom.
+> The 20s keepalive stays — genuine proxy idle reaping remains real for quiet-but-valid sockets.
+>
+> Operator recommendation: raise the qits client's/realm's Access Token Lifespan in Keycloak
+> (e.g. 15–30 min) — with a 60s lifespan the terminal transparently re-attaches every minute,
+> which works but costs a scrollback replay + repaint each time.
 
 ## Introduction
 
