@@ -31,6 +31,27 @@ class SameOriginUpgradeCheckTest {
   }
 
   @Test
+  void permitsSameOriginWhenTheProxyPinsTheDefaultPortOntoHost() {
+    // The prod encounter (2026-07-17, Dokploy/Traefik + oauth): with
+    // quarkus.http.proxy.enable-forwarded-host, Vert.x rewrites the request authority from
+    // X-Forwarded-Host/-Port to "<host>:443", while a browser Origin never serializes its
+    // scheme's default port — the comparison must equate the two.
+    assertTrue(SameOriginUpgradeCheck.isAllowed("https://qits.example", "qits.example:443"));
+    assertTrue(SameOriginUpgradeCheck.isAllowed("http://qits.example", "qits.example:80"));
+    assertTrue(SameOriginUpgradeCheck.isAllowed("https://qits.example:443", "qits.example"));
+    assertTrue(SameOriginUpgradeCheck.isAllowed("HTTPS://QITS.example", "qits.EXAMPLE:443"));
+  }
+
+  @Test
+  void rejectsSameHostWithMismatchedEffectivePorts() {
+    // Default-port normalization must not degrade into host-only matching.
+    assertFalse(SameOriginUpgradeCheck.isAllowed("https://qits.example", "qits.example:8443"));
+    assertFalse(SameOriginUpgradeCheck.isAllowed("https://qits.example:8443", "qits.example"));
+    assertFalse(SameOriginUpgradeCheck.isAllowed("http://qits.example", "qits.example:443"));
+    assertFalse(SameOriginUpgradeCheck.isAllowed("https://qits.example", "qits.example:garbage"));
+  }
+
+  @Test
   void rejectsForeignOrigins() {
     assertFalse(SameOriginUpgradeCheck.isAllowed("https://evil.example", "localhost:8080"));
     assertFalse(SameOriginUpgradeCheck.isAllowed("http://attacker.test:8080", "localhost:8080"));
