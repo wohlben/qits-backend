@@ -211,6 +211,13 @@ docker network create qits-net 2>/dev/null || true
 for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do docker volume create "$v"; done
 ```
 
+> **Deploying a second stack (e.g. dev next to prod) on the same server?** Give it its own
+> workspace network and alias — add `QITS_WORKSPACE_NETWORK=qits-net-dev` and
+> `QITS_WORKSPACE_GIT_HOST=qits-dev` to that stack's Environment tab and
+> `docker network create qits-net-dev` once. Two stacks on the defaults both answer to `qits` on
+> the shared network and randomly swallow each other's git/OTLP/MCP traffic — see "Running more
+> than one stack on a server" in `docs/guides/deployment.md`.
+
 **The Dokploy service**:
 
 1. Project → Create Service → **Compose**, type **Docker Compose** (not Stack/Swarm — the stack

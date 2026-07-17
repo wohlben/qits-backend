@@ -40,8 +40,14 @@ services:
       dokploy-network: {}
 
 networks:
+  # Mirrors the prod file's parameterization (extends does not merge top-level networks): the
+  # actual network is per-stack via QITS_WORKSPACE_NETWORK in the Environment tab. When one server
+  # runs several stacks (prod + dev), each MUST set its own QITS_WORKSPACE_NETWORK and
+  # QITS_WORKSPACE_GIT_HOST — two stacks answering `qits` on one shared network round-robin each
+  # other's container->qits traffic (docs/issues/2026-07-17_two-stacks-collide-on-qits-net-alias.md).
   qits-net:
     external: true
+    name: ${QITS_WORKSPACE_NETWORK:-qits-net}
   dokploy-network:
     external: true
 

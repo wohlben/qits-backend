@@ -68,9 +68,26 @@ services:
       - qits_shared_m2:/caches/m2
       - qits_shared_pnpm:/caches/pnpm
     environment:
-      # On qits-net a container reaches qits by this alias — pin it so container->qits (git clone/push,
-      # OTLP, MCP) is plain DNS. Matches the `qits` alias below. Maps to qits.workspace.git-host.
-      QITS_WORKSPACE_GIT_HOST: qits
+      # Pin the docker CLI's config dir to the qits user's own. Dokploy injects
+      # DOCKER_CONFIG=/root/.docker into the .env it writes (its internal registry-auth setting),
+      # env_file forwards it into this container, and every docker CLI call then warns
+      # "Error loading config file: /root/.docker/config.json: permission denied" — the warning
+      # leaks into terminal PTYs and captured output
+      # (docs/issues/2026-07-17_docker-cli-stderr-pollutes-captured-output.md). `environment:`
+      # beats env_file, so this holds whatever Dokploy writes. The dir need not exist; a missing
+      # config is silently skipped.
+      DOCKER_CONFIG: /home/qits/.docker
+      # On the workspace network a container reaches qits by this alias — pin it so container->qits
+      # (git clone/push, OTLP, MCP) is plain DNS. Interpolated from .env with the same default as the
+      # network alias below so the two can never drift; maps to qits.workspace.git-host. MUST be
+      # unique per stack when a server runs several (see "Running more than one stack" in
+      # docs/guides/deployment.md): the network is external and shared, so two stacks answering the
+      # same alias round-robin each other's container->qits traffic (git 404s, cross-stack OTLP/MCP).
+      QITS_WORKSPACE_GIT_HOST: ${QITS_WORKSPACE_GIT_HOST:-qits}
+      # The docker network qits creates workspace containers on (qits.workspace.network). Same value
+      # compose resolves for the external network below — one .env setting drives both. Per-stack
+      # unique on multi-stack servers, for the same reason as the alias.
+      QITS_WORKSPACE_NETWORK: ${QITS_WORKSPACE_NETWORK:-qits-net}
       # The image every workspace container runs — built locally (docker build docker/workspace). It is
       # NOT pulled from a registry; qits uses whatever `qits/workspace:latest` is present on the host
       # daemon. After a workspace-image change, rebuild it (install.sh does). Maps to qits.workspace.image.
@@ -124,16 +141,23 @@ services:
     networks:
       qits-net:
         aliases:
-          - qits
+          # The DNS name workspace containers reach qits by — same .env value (and default) as
+          # QITS_WORKSPACE_GIT_HOST above. Per-stack unique on multi-stack servers.
+          - ${QITS_WORKSPACE_GIT_HOST:-qits}
 
 networks:
-  # EXTERNAL by design. qits-net is a plain `docker network create` (unlabelled), created by whichever
-  # of three things gets there first: install.sh's ensure step, qits' own startup (ensureNetwork), or
-  # the DockerExecutor when it attaches a workspace container. If compose tried to OWN it (non-external
-  # + pinned name) it would refuse an already-existing unlabelled net as "not created by compose". So
-  # compose just ATTACHES to it here; install.sh guarantees it exists first (`docker network create`).
+  # EXTERNAL by design. The workspace network is a plain `docker network create` (unlabelled),
+  # created by whichever of three things gets there first: install.sh's ensure step, qits' own
+  # startup (ensureNetwork), or the DockerExecutor when it attaches a workspace container. If
+  # compose tried to OWN it (non-external + pinned name) it would refuse an already-existing
+  # unlabelled net as "not created by compose". So compose just ATTACHES to it here; install.sh
+  # guarantees it exists first (`docker network create`). The compose-file key stays `qits-net`;
+  # `name:` resolves the ACTUAL network per stack from the same .env value the app reads as
+  # qits.workspace.network — a second stack sets QITS_WORKSPACE_NETWORK (+ its own
+  # QITS_WORKSPACE_GIT_HOST) and creates that network once.
   qits-net:
     external: true
+    name: ${QITS_WORKSPACE_NETWORK:-qits-net}
 
 volumes:
   # Application state (H2 + repositories). Compose-managed (project-prefixed) — qits never pre-creates

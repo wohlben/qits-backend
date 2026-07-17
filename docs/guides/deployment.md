@@ -202,12 +202,40 @@ baked Angular SPA on `:8080` — there is no separate frontend to deploy and no 
 
 Every `application.properties` key maps to an env var. The prod-relevant ones:
 
-- `QITS_WORKSPACE_GIT_HOST=qits` — the network alias; keep in sync with the compose alias.
+- `QITS_WORKSPACE_GIT_HOST=qits` — the DNS name workspace containers reach qits by. One `.env`
+  value drives both the compose network alias and the runtime config (same interpolation
+  default), so they cannot drift. Per-stack unique on multi-stack servers (below).
+- `QITS_WORKSPACE_NETWORK=qits-net` — the workspace network. Same one-value-drives-both pattern:
+  compose resolves the external network's `name:` from it AND passes it to the app
+  (`qits.workspace.network`). Per-stack unique on multi-stack servers (below).
 - `QITS_WORKSPACE_IMAGE=qits/workspace:latest` — the locally-built workspace image (no registry).
 - `QITS_SPEECH_WARMUP_ON_START` — `false` by default here (skips the ~700 MB model download at boot).
   Flip to `true` when you want server-side transcription live.
 - `QITS_GIT_AUTHOR_NAME` / `QITS_GIT_AUTHOR_EMAIL` — the bot identity qits' manufactured commits use.
 - `TZ` — wall-clock zone, propagated to every workspace container.
+
+## Running more than one stack on a server (prod + dev)
+
+Each stack MUST get its own workspace network and DNS alias. The network is `external` and the
+alias defaults to `qits` — two stacks left on defaults join the SAME network and BOTH answer to
+`qits`, so Docker DNS round-robins every container→qits request (git clone/push, OTLP, MCP)
+between the stacks: repos that exist on only one stack randomly fail with `repository … not
+found`, telemetry and agent MCP calls cross stacks silently
+(`docs/issues/2026-07-17_two-stacks-collide-on-qits-net-alias.md` — the prod/dev encounter that
+surfaced this).
+
+Keep the first stack on the defaults; for each further stack set, in its `.env` / Dokploy
+Environment tab:
+
+```bash
+QITS_WORKSPACE_NETWORK=qits-net-dev    # this stack's own network (create once, see below)
+QITS_WORKSPACE_GIT_HOST=qits-dev       # this stack's own alias on that network
+```
+
+and create the network once: `docker network create qits-net-dev`. Compose resolves the external
+network's real `name:` and the alias from these same values, so one setting drives compose and
+runtime together. The `qits_shared_*` volumes staying shared across stacks is fine (they are
+caches + the agent login); `qits-data` is naturally per-stack (compose-project-scoped).
 
 ## State & backups
 
