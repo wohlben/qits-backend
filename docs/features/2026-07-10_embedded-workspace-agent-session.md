@@ -55,12 +55,19 @@ nothing launches on page load. Like the Web view's iframe, the tab latches on **
    session is actively being driven; a concurrent `--resume` of a live session is exactly the
    collision the lineage feature avoids by pinning create-only IDs.
 3. **Previous sessions exist** — any finished command of this workspace with a non-empty
-   `agentSessions` list → **resume the last session**: the newest such command (by `launchedAt`),
-   its list's *last* entry (the command's current session, per the lineage contract). Launch via
-   the existing endpoint: `POST /api/repositories/{repoId}/workspaces/{workspaceId}/agents` with
-   `{ scope: REPOSITORY, mode: INTERACTIVE, resumeSessionId }`. Chat sessions count — resuming
-   the last *chat* conversation in the terminal is deliberate continuity (resume-in-place appends
-   to the same JSONL; the mode is a launch property, not a session property).
+   `agentSessions` list → **idle on the user's explicit choice** *(changed 2026-07-17;
+   originally this step auto-resumed the last session)*: a "No agent session is running" state
+   with a **Start new session** button (launch without `resumeSessionId`), while a specific past
+   session is resumed from the session-tree list below — each row offers **Resume** (launch with
+   that row's `resumeSessionId`) whenever nothing runs for the workspace. Resuming is never
+   automatic because the recorded session id can be gone from the agent's own state (a
+   re-materialized container, pruned volume state), and `--resume` of a vanished id exits
+   instantly — the tab looked "broken on arrival"
+   (`docs/issues/2026-07-17_agent-tab-instant-exit-on-vanished-session.md`). The ended state's
+   Resume (below) remains the just-ended session's one-click continuation. Chat sessions still
+   count as history — resuming a *chat* conversation in the terminal stays deliberate continuity
+   (resume-in-place appends to the same JSONL; the mode is a launch property, not a session
+   property).
 4. **No session history** → **create one**: same launch, no `resumeSessionId` (a fresh `PINNED`
    session).
 
@@ -80,9 +87,14 @@ resolution re-runs and the next launch proceeds signed in.
 When the embedded run exits (operator `/exit`, Terminate, or a crash), the tab does **not**
 auto-relaunch (a crashing agent would loop). It shows a session-ended state with:
 
-- **Resume** — re-runs resolution, which now finds the just-ended session as the last one and
-  continues it;
+- **Resume** — explicitly continues the workspace's last session;
+- **New session** — the explicit fresh start, the fallback when the last session is gone from the
+  agent's state (its `--resume` exits instantly) or simply unwanted;
 - a link to the finished command's page for the imported transcript (the readable conversation).
+
+A sign-in REPL interrupting a launch replays the *original* launch intent (fresh vs. the chosen
+`resumeSessionId`) once the REPL exits — completing OAuth continues what the user actually asked
+for.
 
 A **Terminate** button mirrors the chat tab's while the run is live.
 

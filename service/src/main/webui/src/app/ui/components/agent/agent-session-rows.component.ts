@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 /** One rendered row of the flattened session tree: a session card or a grayed subagent sidechain. */
@@ -43,7 +43,9 @@ export function forkBranchClass(sessionId: string): string {
  * color on the left border; subagent sidechains render grayed (visually secondary to the sessions
  * an operator drove) and carry no navigation target. A session row navigates to the newest command
  * that drove it; the current session's row is highlighted, and a running (unswept) one shows a
- * "live" placeholder count. Dates render in UTC so captures stay machine-independent.
+ * "live" placeholder count. When `resumable`, every non-current session row grows a Resume button
+ * (outside the anchor — no nested interactive elements) that emits the row's session id for the
+ * smart parent to launch. Dates render in UTC so captures stay machine-independent.
  */
 @Component({
   selector: 'app-agent-session-rows',
@@ -51,10 +53,10 @@ export function forkBranchClass(sessionId: string): string {
   template: `
     <ul class="flex flex-col gap-1">
       @for (row of rows(); track row.key) {
-        <li [style.margin-left.rem]="row.depth * 1.5">
+        <li class="flex items-center gap-2" [style.margin-left.rem]="row.depth * 1.5">
           @if (row.kind === 'session') {
             <a
-              class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent"
               [class]="row.branchClass ? 'border-l-4 ' + row.branchClass : ''"
               [class.ring-2]="row.sessionId === currentSessionId()"
               [class.ring-primary]="row.sessionId === currentSessionId()"
@@ -76,9 +78,19 @@ export function forkBranchClass(sessionId: string): string {
                 }
               </span>
             </a>
+            @if (resumable() && row.sessionId && row.sessionId !== currentSessionId()) {
+              <button
+                type="button"
+                class="whitespace-nowrap rounded-md border px-3 py-2 text-sm hover:bg-accent"
+                [attr.aria-label]="'Resume session ' + row.sessionId"
+                (click)="resumeSession.emit(row.sessionId)"
+              >
+                Resume
+              </button>
+            }
           } @else {
             <div
-              class="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
               [class]="row.branchClass ? 'border-l-4 ' + row.branchClass : ''"
             >
               <span class="whitespace-nowrap">{{ row.date | date: 'MMM d, HH:mm' : 'UTC' }}</span>
@@ -99,4 +111,10 @@ export class AgentSessionRowsComponent {
 
   /** The embedded run's current session — its row is highlighted and reads "live" when unswept. */
   readonly currentSessionId = input<string | null>(null);
+
+  /** Show Resume on non-current session rows; off while a run is live (no concurrent --resume). */
+  readonly resumable = input(false);
+
+  /** The clicked row's session id — the smart parent owns the actual launch. */
+  readonly resumeSession = output<string>();
 }

@@ -32,9 +32,14 @@ import { ZardButtonComponent } from '@/shared/components/button';
  * latches on first selection (`activated`), then resolves in order: a running interactive agent
  * run re-attaches (wherever it was started from); a running chat defers to the Chat tab (its
  * session is actively being driven — a concurrent `--resume` is exactly the collision session
- * pinning avoids); previous sessions auto-resume the workspace's last one; an empty history gets a
- * fresh session. The tab group keeps hidden tabs mounted, so the socket and the process survive
- * tab switches — the same contract as chat.
+ * pinning avoids); an empty history gets a fresh session; a workspace WITH history idles on an
+ * explicit choice — "Start new session" here, or Resume on a row of the session list below.
+ * Resuming is never automatic: the recorded last session can be gone from the agent's state (a
+ * re-materialized container, pruned volume state), and an auto `--resume` of a vanished id exits
+ * instantly ("No conversation found with session ID") in a loop the user never asked for
+ * (docs/issues/2026-07-17_agent-tab-instant-exit-on-vanished-session.md). The tab group keeps
+ * hidden tabs mounted, so the socket and the process survive tab switches — the same contract as
+ * chat.
  *
  * A signed-out volume makes the launch return the sign-in REPL (a TERMINAL command with no
  * session lineage): it is a PTY like any other, so it renders here in place, and its exit re-runs
@@ -84,15 +89,28 @@ import { ZardButtonComponent } from '@/shared/components/button';
       } @else if (launchMutation.isError()) {
         <div class="flex flex-col items-start gap-2 rounded-md border px-4 py-6">
           <span class="text-sm text-destructive">Failed to launch the agent session.</span>
-          <button z-button zType="secondary" type="button" (click)="resume()">Retry</button>
+          <button z-button zType="secondary" type="button" (click)="retry()">Retry</button>
         </div>
       } @else if (endedCommandId(); as endedId) {
         <div class="flex flex-col items-start gap-3 rounded-md border px-4 py-6">
           <span class="text-sm text-muted-foreground">The session has ended.</span>
           <div class="flex items-center gap-2">
             <button z-button zType="secondary" type="button" (click)="resume()">Resume</button>
+            <button z-button zType="secondary" type="button" (click)="startNew()">
+              New session
+            </button>
             <a z-button zType="link" [routerLink]="['/commands', endedId]">View transcript</a>
           </div>
+        </div>
+      } @else if (idle()) {
+        <div class="flex flex-col items-start gap-3 rounded-md border px-4 py-6">
+          <span class="text-sm text-muted-foreground">No agent session is running.</span>
+          <button z-button zType="secondary" type="button" (click)="startNew()">
+            Start new session
+          </button>
+          <span class="text-xs text-muted-foreground">
+            Or resume one of the previous sessions from the list below.
+          </span>
         </div>
       } @else {
         <div class="rounded-md border px-4 py-6 text-sm text-muted-foreground">
@@ -131,6 +149,15 @@ export class WorkspaceAgentSessionComponent {
 
   /** One-shot: the launch side effect runs once per tab activation; attach stays live-computed. */
   private readonly resolutionLatch = signal(false);
+
+  /** Nothing runs and the workspace has history — waiting for the user's explicit choice. */
+  readonly idle = signal(false);
+
+  /**
+   * The resume id of the last launch this tab initiated (null = fresh), replayed after a sign-in
+   * REPL exit so completing OAuth continues what the user actually asked for.
+   */
+  private lastLaunchIntent: string | null = null;
 
   /** The last command this tab embedded — what the ended state refers to once nothing runs. */
   private readonly lastAttachedId = signal<string | null>(null);
@@ -254,25 +281,50 @@ export class WorkspaceAgentSessionComponent {
       this.handledLoginExits.add(endedId);
       this.launchedCommandId.set(null);
       this.lastAttachedId.set(null);
-      this.resolveAndLaunch();
+      // Replay the launch the REPL interrupted — the operator signed in to get exactly that.
+      this.launch(this.lastLaunchIntent);
     });
   }
 
   /**
    * The resolution order from the feature contract: attach a running interactive run, defer to a
-   * live chat, else launch — resuming the workspace's last session when one exists.
+   * live chat, launch fresh when the workspace has no session history — and otherwise idle on the
+   * user's explicit choice (never auto-`--resume`: the recorded session can be gone from the
+   * agent's state, and resuming a vanished id exits instantly).
    */
   private resolveAndLaunch(): void {
     if (this.attachedCommandId() || this.runningChat() || this.launchMutation.isPending()) {
       return;
     }
-    this.launchMutation.mutate(this.lastSessionId());
+    if (this.lastSessionId()) {
+      this.idle.set(true);
+      return;
+    }
+    this.launch(null);
   }
 
-  /** The ended state's Resume: re-runs resolution, which continues the just-ended session. */
+  private launch(resumeSessionId: string | null): void {
+    this.lastLaunchIntent = resumeSessionId;
+    this.idle.set(false);
+    this.launchMutation.mutate(resumeSessionId);
+  }
+
+  /** The ended state's Resume — explicitly continues the workspace's last session. */
   resume(): void {
     this.launchedCommandId.set(null);
     this.lastAttachedId.set(null);
-    this.resolveAndLaunch();
+    this.launch(this.lastSessionId());
+  }
+
+  /** The explicit fresh start — the fallback when the last session is gone or unwanted. */
+  startNew(): void {
+    this.launchedCommandId.set(null);
+    this.lastAttachedId.set(null);
+    this.launch(null);
+  }
+
+  /** The error state's Retry — repeats the launch that failed, whatever its resume intent was. */
+  retry(): void {
+    this.launch(this.lastLaunchIntent);
   }
 }

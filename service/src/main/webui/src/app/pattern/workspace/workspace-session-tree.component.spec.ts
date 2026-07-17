@@ -4,8 +4,15 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
+import { AgentControllerService } from '@/api/api/agentController.service';
 import { AgentSessionControllerService } from '@/api/api/agentSessionController.service';
+import { CommandControllerService } from '@/api/api/commandController.service';
+import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
+import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { AgentSessionNodeDto } from '@/api/model/agentSessionNodeDto';
+import { CommandDto } from '@/api/model/commandDto';
+import { CommandKind } from '@/api/model/commandKind';
+import { CommandStatus } from '@/api/model/commandStatus';
 import { forkBranchClass } from '@/ui/components/agent/agent-session-rows.component';
 import { WorkspaceSessionTreeComponent } from './workspace-session-tree.component';
 
@@ -26,11 +33,29 @@ function node(overrides: Partial<AgentSessionNodeDto>): AgentSessionNodeDto {
   };
 }
 
+/** A running interactive agent run for this workspace — resume must hide while one is live. */
+function runningAgent(): CommandDto {
+  return {
+    id: 'run-1',
+    workspaceId: 'wt-1',
+    kind: CommandKind.Terminal,
+    status: CommandStatus.Running,
+    launchedAt: '2026-07-10T10:00:00Z',
+    agentSessions: [{ sessionId: 'sess-live', source: 'PINNED' }],
+  } as CommandDto;
+}
+
 describe('WorkspaceSessionTreeComponent', () => {
   const sessionService = {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentSessionsGet: vi
       .fn()
       .mockReturnValue(of({ sessions: [] })),
+  };
+  const commandService = { apiCommandsGet: vi.fn().mockReturnValue(of({ entries: [] })) };
+  const agentService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost: vi
+      .fn()
+      .mockReturnValue(of({ command: runningAgent() })),
   };
   let queryClient: QueryClient;
 
@@ -46,12 +71,19 @@ describe('WorkspaceSessionTreeComponent', () => {
         provideRouter([]),
         provideTanStackQuery(queryClient),
         { provide: AgentSessionControllerService, useValue: sessionService },
+        { provide: CommandControllerService, useValue: commandService },
+        { provide: AgentControllerService, useValue: agentService },
       ],
     }).compileComponents();
   });
 
-  function createComponent(sessions: AgentSessionNodeDto[], currentSessionId: string | null = null) {
+  function createComponent(
+    sessions: AgentSessionNodeDto[],
+    currentSessionId: string | null = null,
+    commands: CommandDto[] = [],
+  ) {
     queryClient.setQueryData(['workspace-agent-sessions', 'repo-1', 'wt-1'], sessions);
+    queryClient.setQueryData(['commands'], commands);
     const fixture = TestBed.createComponent(WorkspaceSessionTreeComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
@@ -166,5 +198,41 @@ describe('WorkspaceSessionTreeComponent', () => {
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('sess-fresh');
+  });
+
+  it('resumes a listed session explicitly while nothing runs', async () => {
+    const fixture = createComponent([node({ sessionId: 'sess-old' })]);
+
+    const el = fixture.nativeElement as HTMLElement;
+    const resume = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Resume',
+    )!;
+    expect(resume).toBeDefined();
+    resume.click();
+    await flush();
+
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
+      'repo-1',
+      'wt-1',
+      {
+        scope: AgentMcpScope.Repository,
+        mode: AgentLaunchMode.Interactive,
+        resumeSessionId: 'sess-old',
+      },
+    );
+  });
+
+  it('hides Resume while an interactive run is live — no concurrent --resume', () => {
+    const fixture = createComponent(
+      [node({ sessionId: 'sess-old' })],
+      'sess-live',
+      [runningAgent()],
+    );
+
+    const el = fixture.nativeElement as HTMLElement;
+    const resume = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Resume',
+    );
+    expect(resume).toBeUndefined();
   });
 });

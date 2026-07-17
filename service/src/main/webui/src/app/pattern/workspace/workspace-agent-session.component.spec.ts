@@ -148,39 +148,39 @@ describe('WorkspaceAgentSessionComponent', () => {
     expect(jumped).toBe(true);
   });
 
-  it('auto-resumes the last session of the newest finished command', async () => {
+  it('idles on the explicit choice instead of auto-resuming when history exists', async () => {
+    // The recorded last session can be gone from the agent's state (re-materialized container),
+    // and an auto --resume of a vanished id exits instantly — so history never auto-launches.
     queryClient.setQueryData(
       ['commands'],
       [
         agentRun({
-          id: 'cmd-old',
-          status: CommandStatus.Exited,
-          launchedAt: '2026-07-10T09:00:00Z',
-          agentSessions: [{ sessionId: 'sess-old', source: 'PINNED' }],
-        }),
-        agentRun({
           id: 'cmd-new',
           status: CommandStatus.Exited,
           launchedAt: '2026-07-10T11:00:00Z',
-          // The command's current session is the list's LAST entry.
-          agentSessions: [
-            { sessionId: 'sess-a', source: 'PINNED' },
-            { sessionId: 'sess-b', source: 'SWITCHED' },
-          ],
+          agentSessions: [{ sessionId: 'sess-b', source: 'PINNED' }],
         }),
       ],
     );
-    createComponent();
+    const fixture = createComponent();
+    await flush();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('No agent session is running');
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).not.toHaveBeenCalled();
+
+    // The explicit fallback: a fresh session, no resumeSessionId.
+    const startNew = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Start new session',
+    )!;
+    startNew.click();
     await flush();
 
     expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
       'repo-1',
       'wt-1',
-      {
-        scope: AgentMcpScope.Repository,
-        mode: AgentLaunchMode.Interactive,
-        resumeSessionId: 'sess-b',
-      },
+      { scope: AgentMcpScope.Repository, mode: AgentLaunchMode.Interactive },
     );
   });
 
@@ -266,6 +266,31 @@ describe('WorkspaceAgentSessionComponent', () => {
         mode: AgentLaunchMode.Interactive,
         resumeSessionId: 'sess-1',
       },
+    );
+  });
+
+  it('offers a fresh start from the ended state — the vanished-session fallback', async () => {
+    queryClient.setQueryData(['commands'], [agentRun({})]);
+    const fixture = createComponent();
+    await flush();
+    fixture.detectChanges();
+
+    // The run exits — e.g. instantly, because --resume found no conversation for the session id.
+    queryClient.setQueryData(['commands'], [agentRun({ status: CommandStatus.Exited })]);
+    await flush();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const newSession = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'New session',
+    )!;
+    newSession.click();
+    await flush();
+
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
+      'repo-1',
+      'wt-1',
+      { scope: AgentMcpScope.Repository, mode: AgentLaunchMode.Interactive },
     );
   });
 
