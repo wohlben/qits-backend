@@ -1,5 +1,28 @@
 # OIDC expired session: SPA reloads in a nonstop flicker loop instead of reaching login
 
+> **RESOLVED 2026-07-18.** Two-sided fix:
+>
+> - **Backend** — `NonNavigationRequestChecker` (auth-oidc, quarkus-oidc's
+>   `JavaScriptRequestChecker` SPI; the module's first Java) widens the "answer 499, don't 302"
+>   decision from marked XHRs to every request a browser can't usefully redirect: SSE
+>   (`Accept: text/event-stream`), WebSocket upgrades (`Sec-WebSocket-Key`), and any
+>   `Sec-Fetch-Mode` other than `navigate`. Only real navigations enter the code flow now, so
+>   background transports on a dead session stop minting `q_auth` state cookies that clobber an
+>   in-flight login. (Bytecode of quarkus-oidc 3.34.6 confirmed the cookie is a single
+>   `q_auth<tenant-suffix>` per tenant — not per-flow — so the clobber race was structurally
+>   real; it also showed the checker bean *replaces* the built-in `X-Requested-With` check, which
+>   the new bean therefore re-implements.) Covered by four new `OidcAuthTest` cases.
+> - **Frontend** — `auth-session-recovery.service.ts` behind the interceptor: a per-page-life
+>   latch (a burst of 499s produces one navigation, not one each) plus a `sessionStorage` stamp
+>   surviving reloads — a second 499 within 10s of the last reload means reloading didn't recover
+>   the session, so it escapes to the app root (`appUrl('')`, base-relative) instead: a single
+>   clean document navigation with no SPA traffic racing the code flow, the same thing the manual
+>   close-tab-and-reopen workaround achieved. Covered by `auth-session.interceptor.spec.ts`.
+>
+> Not done here (still worth doing): deliberate `QueryClient` defaults and replacing the commands
+> list's 5s `refetchInterval` (suggestion 3), and the Keycloak Access Token Lifespan raise
+> (suggestion 4, an operator action already recommended by the websocket issue doc).
+
 ## Introduction
 
 Related/dependent plans:

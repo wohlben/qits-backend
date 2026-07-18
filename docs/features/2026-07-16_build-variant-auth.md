@@ -139,9 +139,15 @@ cookie reaches all three for free:
   server-side and stores the tokens in the encrypted, HttpOnly, auto-chunked `q_session` cookie (the
   cookie IS the session; no server-side store). The login wall covers the SPA itself.
 - `Authorization: Bearer <jwt>` requests are validated resource-server style — scripts/CLI work.
-- Marked XHRs (`X-Requested-With: JavaScript`, set by the SPA's interceptor) get **499 +
-  `WWW-Authenticate: OIDC`** instead of an unfollowable 302 (`java-script-auto-redirect=false`); the
-  interceptor reacts with a full-page reload → server-driven re-login (usually silent via SSO).
+- Every non-navigation request gets **499 + `WWW-Authenticate: OIDC`** instead of an unfollowable
+  302 (`java-script-auto-redirect=false` + `NonNavigationRequestChecker`, auth-oidc's
+  `JavaScriptRequestChecker` bean: marked XHRs `X-Requested-With: JavaScript`, SSE
+  `Accept: text/event-stream`, WebSocket upgrades, any `Sec-Fetch-Mode` other than `navigate`).
+  Only real navigations enter the code flow — background transports on a dead session no longer
+  mint `q_auth` state cookies that would clobber an in-flight login's state (see
+  `docs/issues/resolved/2026-07-18_oidc-expired-session-reload-loop.md`). The SPA interceptor
+  reacts to 499 with a loop-guarded full-page reload → server-driven re-login (usually silent via
+  SSO).
 - Silent refresh (`token.refresh-expired=true`, `session-age-extension=30M`); RP-initiated logout at
   `/api/auth/logout` (intercepted by quarkus-oidc, no controller).
 - Keycloak specifics: `roles.source=accesstoken` (realm roles live in the access token, not the
@@ -157,10 +163,15 @@ CSRF posture: `q_session` is HttpOnly + SameSite=Lax; all state-changing endpoin
   renders the user chip whenever an identity exists (under forwardauth in dev that's `dev`), and the
   sign-out anchor only when `variant === 'oauth'` — forwardauth has no qits-side logout, the proxy
   owns the session.
-- `shared/core/interceptors/auth-session.interceptor.ts` — the 499 marker/reload dance above; a
-  harmless header-tagger under forwardauth.
-- **Accepted edge** (oauth): SSE/WebSocket reconnects can't send the marker header, so on a dead
-  session they fail silently until the next XHR triggers the reload. Silent refresh makes this rare.
+- `shared/core/interceptors/auth-session.interceptor.ts` — the 499 marker/reload dance above,
+  delegating navigation to `auth-session-recovery.service.ts`: one navigation per incident (a burst
+  of 499s reloads once), and a sessionStorage stamp detects a reload that failed to re-login — the
+  next 499 then escapes to the app root instead of re-reloading the deep route (the loop-breaker
+  for `docs/issues/resolved/2026-07-18_oidc-expired-session-reload-loop.md`). A harmless
+  header-tagger under forwardauth.
+- SSE/WebSocket reconnects can't send the marker header, but `NonNavigationRequestChecker`
+  recognizes their shape server-side, so on a dead session they get the same 499 (no
+  state-cookie-minting 302); they fail quietly until the next XHR triggers the recovery reload.
 
 ## Dev mode & tests
 
@@ -178,7 +189,8 @@ Every build names a variant — including dev and tests; the documented commands
 - `auth/oidc`: `OidcAuthTest` + `OidcRequiredRoleTest` against `OidcWiremockTestResource` (WireMock
   OIDC stub, no real Keycloak), using a test-scope dummy JAX-RS resource + raw Vert.x routes as the
   stand-in for the service surface (this module can't depend on service — circular): 302 challenge,
-  the 499 XHR contract, bearer accept/reject, public raw route token-free, role 403/200.
+  the 499 non-navigation contract (marked XHR, SSE accept, WS upgrade, `Sec-Fetch-Mode: cors` —
+  and `navigate` still 302s), bearer accept/reject, public raw route token-free, role 403/200.
 - `auth/forwardauth`: `ForwardAuthTest` (prod posture via blanked dev-user: header → identity,
   missing header → 401 incl. on raw routes), `ForwardAuthDevFallbackTest`,
   `ForwardAuthRequiredRoleTest` (groups → roles), `ForwardAuthHeaderOverrideTest`.

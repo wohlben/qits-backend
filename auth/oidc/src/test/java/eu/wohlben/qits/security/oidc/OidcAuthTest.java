@@ -54,6 +54,54 @@ class OidcAuthTest {
   }
 
   @Test
+  void sseRequestGets499InsteadOfRedirect() {
+    // EventSource can't set X-Requested-With; NonNavigationRequestChecker keys off its Accept
+    // header so a dead session doesn't mint q_auth state cookies that race the document code flow.
+    given()
+        .header("Accept", "text/event-stream")
+        .when()
+        .get("/api/dummy")
+        .then()
+        .statusCode(499)
+        .header("WWW-Authenticate", containsString("OIDC"));
+  }
+
+  @Test
+  void websocketUpgradeGets499InsteadOfRedirect() {
+    given()
+        .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+        .when()
+        .get("/api/dummy")
+        .then()
+        .statusCode(499)
+        .header("WWW-Authenticate", containsString("OIDC"));
+  }
+
+  @Test
+  void backgroundFetchGets499InsteadOfRedirect() {
+    // Any browser-stamped non-navigation request (fetch/XHR without the app's marker included).
+    given()
+        .header("Sec-Fetch-Mode", "cors")
+        .when()
+        .get("/api/dummy")
+        .then()
+        .statusCode(499)
+        .header("WWW-Authenticate", containsString("OIDC"));
+  }
+
+  @Test
+  void browserNavigationStillGetsCodeFlowRedirect() {
+    given()
+        .header("Sec-Fetch-Mode", "navigate")
+        .redirects()
+        .follow(false)
+        .when()
+        .get("/api/dummy")
+        .then()
+        .statusCode(302);
+  }
+
+  @Test
   void bearerTokenPassesResourceServerValidation() {
     given().header("Authorization", bearer()).when().get("/api/dummy").then().statusCode(200);
   }
