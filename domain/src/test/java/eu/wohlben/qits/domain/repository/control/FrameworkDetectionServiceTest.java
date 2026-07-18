@@ -363,4 +363,13 @@ class FrameworkDetectionServiceTest {
     copy.sort(java.util.Comparator.naturalOrder());
     return copy;
   }
+
+  @Test
+  void descriptorByIdResolvesShippedKindsAndNullOtherwise() {
+    assertEquals("java-quarkus", FrameworkDetectionService.descriptorById("java-quarkus").id());
+    assertEquals("ts-angular", FrameworkDetectionService.descriptorById("ts-angular").id());
+    assertEquals("docs", FrameworkDetectionService.descriptorById("docs").id());
+    assertNull(FrameworkDetectionService.descriptorById("rust-cargo"));
+    assertNull(FrameworkDetectionService.descriptorById(null));
+  }
 }

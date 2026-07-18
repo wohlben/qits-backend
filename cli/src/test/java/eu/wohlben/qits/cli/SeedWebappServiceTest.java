@@ -23,6 +23,7 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
@@ -153,18 +154,22 @@ public class SeedWebappServiceTest {
         globalActionsNamed("build-project").isEmpty(),
         "stale global seed actions are cleaned up on reset");
 
-    // Each seed-owned action exists exactly once, owned by the (re-created) repository.
+    // Each config-ingested action exists exactly once, owned by the (re-created) repository, and
+    // carries the reserved @qits-config suffix (its origin is the fixture's .qits-config.yml).
     List<ActionConfiguration> repoActions = actionConfigurationService.listForRepository(repo.id);
     for (String name :
         List.of("build-project", "lint-backend", "lint-frontend", "run-unit-tests", "Stack info")) {
       assertEquals(
           1,
-          repoActions.stream().filter(a -> name.equals(a.name)).count(),
-          "'" + name + "' should exist exactly once, repository-scoped");
+          repoActions.stream().filter(a -> QitsConfig.configName(name).equals(a.name)).count(),
+          "'" + name + "' should be ingested exactly once, repository-scoped");
     }
     ActionConfiguration build =
-        repoActions.stream().filter(a -> "build-project".equals(a.name)).findFirst().orElseThrow();
-    assertEquals("./mvnw package", build.executeScript, "the seeded script, not the drifted one");
+        repoActions.stream()
+            .filter(a -> QitsConfig.configName("build-project").equals(a.name))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("./mvnw package", build.executeScript, "the declared script, not the drifted one");
     assertNull(build.checkScript);
     assertFalse(build.interactive);
 
@@ -182,8 +187,11 @@ public class SeedWebappServiceTest {
   private void assertObservableDaemon(String repoId) {
     List<RepositoryDaemon> daemons = repositoryDaemonService.list(repoId);
     RepositoryDaemon devServer =
-        daemons.stream().filter(d -> "Quarkus dev server".equals(d.name)).findFirst().orElse(null);
-    assertNotNull(devServer, "Quarkus dev server daemon should be defined");
+        daemons.stream()
+            .filter(d -> QitsConfig.configName("Quarkus dev server").equals(d.name))
+            .findFirst()
+            .orElse(null);
+    assertNotNull(devServer, "Quarkus dev server daemon should be ingested from .qits-config.yml");
     assertNotNull(devServer.webView, "dev server daemon should be web-viewable");
     assertEquals(
         4200, devServer.webView.port, "the web view frames the Angular dev server (:4200)");

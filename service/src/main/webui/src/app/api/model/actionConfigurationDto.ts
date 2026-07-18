@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { ActionScope } from './actionScope';
+import { Origin } from './origin';
 
 
 export interface ActionConfigurationDto { 
@@ -18,6 +19,7 @@ export interface ActionConfigurationDto {
     checkScript?: string;
     interactive?: boolean;
     scope?: ActionScope;
+    origin?: Origin;
     repositoryId?: string;
     environment?: { [key: string]: string; };
 }

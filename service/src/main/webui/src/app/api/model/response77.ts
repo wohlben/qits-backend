@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
 export interface Response77 { 
-    trace?: TelemetryTraceDto;
+    text?: string;
 }
 

@@ -1,13 +1,5 @@
 package eu.wohlben.qits.cli;
 
-import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
-import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
-import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
-import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
-import eu.wohlben.qits.domain.daemon.entity.LogObserver;
-import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
-import eu.wohlben.qits.domain.daemon.entity.LogSource;
-import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
@@ -20,6 +12,7 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
@@ -52,9 +45,10 @@ import org.jboss.logging.Logger;
  * <pre>
  *   Quarkus + Angular Demo
  *     ├─ Repository (testing-repo-quarkus-angular)
- *     │    + a web-viewable "Quarkus dev server" daemon: web view on :4200 (the Quinoa-spawned
- *     │      Angular dev server) opening at /greeting, otel=true, LOG_LEVEL + PATTERN observers,
- *     │      a FILE LogSource tailing quarkus.log
+ *     │    + the daemon and build/lint/test actions ingested from the fixture's committed
+ *     │      .qits-config.yml on clone (a web-viewable "Quarkus dev server" on :4200 → /greeting,
+ *     │      otel, LOG_LEVEL + PATTERN observers, a quarkus.log FILE source) — see
+ *     │      docs/features/2026-07-18_qits-config-in-repo-configuration.md
  *     │    main       the default workspace (created at clone time)
  *     │    greeting   a plain workspace off feature/greeting (a fast-forward over main)
  *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only)
@@ -78,8 +72,6 @@ public class SeedWebappService {
   @Inject ProjectService projectService;
 
   @Inject WorkspaceService workspaceService;
-
-  @Inject RepositoryDaemonService repositoryDaemonService;
 
   @Inject ActionConfigurationService actionConfigurationService;
 
@@ -130,117 +122,24 @@ public class SeedWebappService {
         projectService.create(
             PROJECT_NAME,
             "Servable Quarkus 3 + Angular demo (testing-repo-quarkus-angular fixture)");
+    // Cloning ingests the fixture's committed .qits-config.yml (docs/features/
+    // 2026-07-18_qits-config-in-repo-configuration.md): the web-viewable "Quarkus dev server"
+    // daemon
+    // (web view :4200 → /greeting, otel, LOG_LEVEL + PATTERN observers, a quarkus.log FILE source,
+    // Quarkus COMMAND + Angular HTTP health checks) and the build/lint/test + Stack info actions.
+    // Those rows are declared in the file, not built here — the seed only wires them into a
+    // project.
     Repository repo =
         projectService.createRepositoryUnderProject(
             project.id, url, RepositoryArchetype.SERVICE, true);
 
-    // A web-viewable dev-server daemon: `quarkus:dev` serving the Quarkus REST API plus the Angular
-    // SPA (Quinoa), live-reloaded. The web view frames the FRONTEND dev server (the topology the
-    // web-view config recommends): Quinoa spawns `ng serve` on :4200, whose start script (the
-    // fixture's package.json) binds 0.0.0.0, serves under $QITS_PUBLIC_BASE (--serve-path) and
-    // dev-proxies the app's API calls to Quarkus (proxy.conf.js) — so assets, HMR and api/greetings
-    // all stay inside the proxy prefix. Quarkus itself also serves under the base (root-path),
-    // which
-    // lets the dev proxy forward the based API path verbatim. entryPath "greeting" lands the frame
-    // straight on the greeting screen.
-    //
-    // otel=true => the supervisor injects OTEL_EXPORTER_OTLP_* (endpoint, protobuf protocol,
-    // service
-    // name, qits.* resource attributes), so the app the fixture ships (quarkus-opentelemetry)
-    // exports
-    // traces/logs/metrics to the in-process receiver, bucketed by workspace/repository.
-    //
-    // Log observers: LOG_LEVEL classifies Java stack traces / *Exception out of the box; the
-    // PATTERN
-    // observer flags Quarkus dev-mode build/startup failures as ERROR. The FILE LogSource tails the
-    // rolling quarkus.log the fixture writes (quarkus.log.file.*) into those same observers.
-    repositoryDaemonService.create(
-        repo.id,
-        "Quarkus dev server",
-        "Runs `./mvnw quarkus:dev` — the Quarkus REST API and the Angular SPA (Quinoa),"
-            + " live-reloaded and web-viewable through the qits proxy.",
-        // Quarkus does NOT read the generic OTEL_* SDK env vars, so the OTEL_EXPORTER_OTLP_ENDPOINT
-        // qits injects (otel=true) is ignored and export falls back to localhost:4317 → fails.
-        // Bridge
-        // it into the Quarkus config key here at launch. See
-        // docs/issues/resolved/2026-07-05_quarkus-otel-endpoint-not-bridged.md.
-        "./mvnw -q quarkus:dev"
-            + " -Dquarkus.http.host=0.0.0.0"
-            + " -Dquarkus.http.port=8080"
-            + " -Dquarkus.http.root-path=\"${QITS_PUBLIC_BASE:-/}\""
-            + " -Dquarkus.otel.exporter.otlp.endpoint="
-            + "\"${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}\"",
-        // The frame targets :4200, so readiness = the Angular dev server being up (Quinoa logs it
-        // once ng serve answers), not Quarkus' own earlier "Listening on:" line.
-        "(?i)dev server is up|Application bundle generation complete|Local:.*:4200",
-        "TERM",
-        RestartPolicy.ON_FAILURE,
-        true, // autoStart: the demo — starting the greeting workspace brings this dev server up
-        3,
-        true,
-        4200,
-        "greeting",
-        null,
-        null,
-        List.of(
-            new LogObserver(LogObserverKind.LOG_LEVEL, null, null),
-            new LogObserver(
-                LogObserverKind.PATTERN,
-                "(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)",
-                DaemonEventSeverity.ERROR)),
-        List.of(new LogSource("quarkus.log", "Quarkus dev log")),
-        // The reference healthchecks — the two-servers-one-daemon case this feature exists for.
-        // Quarkus serves under $QITS_PUBLIC_BASE (see -Dquarkus.http.root-path above), so its
-        // /q/health is NOT at the bare root — a COMMAND check expands the env var at probe time
-        // (the plain HTTP kind is deliberately shell-free and can't). Angular: any HTTP answer on
-        // :4200 means the dev server is serving (it may 404 bare paths under a serve-path);
-        // connection-refused while it compiles is the red-then-green demo.
-        List.of(
-            new HealthCheck(
-                "Quarkus",
-                HealthCheckKind.COMMAND,
-                null,
-                null,
-                null,
-                "curl -fsS -m 2 \"http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health\"",
-                null,
-                null,
-                null,
-                null,
-                null),
-            new HealthCheck(
-                "Angular",
-                HealthCheckKind.HTTP,
-                4200,
-                "/",
-                "2xx,3xx,4xx",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null)));
-
     // One plain feature workspace so the detail view has more than one workspace to browse and run
-    // the
-    // dev server in — no divergence manufacturing (that's testing-repo's job). feature/greeting is
-    // a
-    // fast-forward over main.
+    // the dev server in — no divergence manufacturing (that's testing-repo's job). feature/greeting
+    // is a fast-forward over main.
     workspaceService.createWorkspace(repo.id, "greeting", "feature/greeting", "greeting");
 
-    // A repository-scoped one-off beside the build/lint/test set below. Cascade-deleted with the
-    // repository, so the reset keeps this idempotent.
-    actionConfigurationService.createForRepository(
-        repo.id,
-        "Stack info",
-        "Show the Quarkus stack of this app (extensions, platform version).",
-        "./mvnw -q quarkus:info",
-        null,
-        false,
-        null);
-
     // A feature-flow configuration expressing the stack's build/lint/test actions. Blueprint only —
-    // qits does not execute these; the real run happens via daemons/commands.
+    // qits does not execute these; it binds the config-ingested actions by their declared name.
     seedFeatureFlow(project.id, repo.id);
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
@@ -265,30 +164,12 @@ public class SeedWebappService {
    * reconcile bookkeeping.
    */
   private void seedFeatureFlow(String projectId, String repositoryId) {
-    ActionConfiguration build =
-        repositoryAction(
-            repositoryId,
-            "build-project",
-            "Compile and package the app; the Angular bundle is baked into the jar.",
-            "./mvnw package");
-    ActionConfiguration lintBackend =
-        repositoryAction(
-            repositoryId,
-            "lint-backend",
-            "Check the Java sources' formatting / static analysis.",
-            "./mvnw spotless:check");
-    ActionConfiguration lintFrontend =
-        repositoryAction(
-            repositoryId,
-            "lint-frontend",
-            "Lint the Angular sources.",
-            "pnpm --dir src/main/webui lint");
-    ActionConfiguration test =
-        repositoryAction(
-            repositoryId,
-            "run-unit-tests",
-            "Run the @QuarkusTest suite for POST /api/greetings.",
-            "./mvnw test");
+    // The build/lint/test actions were ingested from the fixture's .qits-config.yml on clone (their
+    // stored names carry the reserved @qits-config suffix); bind those existing rows by id.
+    ActionConfiguration build = configAction(repositoryId, "build-project");
+    ActionConfiguration lintBackend = configAction(repositoryId, "lint-backend");
+    ActionConfiguration lintFrontend = configAction(repositoryId, "lint-frontend");
+    ActionConfiguration test = configAction(repositoryId, "run-unit-tests");
 
     FeatureFlowConfiguration config =
         featureFlowConfigurationService.createUnderProject(projectId, "Build & Verify");
@@ -310,10 +191,23 @@ public class SeedWebappService {
     featureFlowPhaseActionService.create(testStep.id, test.id, ActionType.QUALITY_GATE, 0, null);
   }
 
-  private ActionConfiguration repositoryAction(
-      String repositoryId, String name, String description, String executeScript) {
-    return actionConfigurationService.createForRepository(
-        repositoryId, name, description, executeScript, null, false, null);
+  /**
+   * The config-ingested repository action declared under {@code baseName} (stored with the reserved
+   * {@code @qits-config} suffix). Fails loudly if ingestion didn't produce it — the fixture's
+   * {@code .qits-config.yml} is the source of truth for these, so a miss means the file drifted.
+   */
+  private ActionConfiguration configAction(String repositoryId, String baseName) {
+    String stored = QitsConfig.configName(baseName);
+    return actionConfigurationService.listForRepository(repositoryId).stream()
+        .filter(a -> stored.equals(a.name))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Expected .qits-config.yml to declare action '"
+                        + baseName
+                        + "' but it was not ingested for repository "
+                        + repositoryId));
   }
 
   /**

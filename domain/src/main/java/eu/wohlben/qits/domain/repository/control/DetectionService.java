@@ -50,7 +50,14 @@ public class DetectionService {
 
   @Inject FrameworkDetectionService detector;
 
+  @Inject QitsConfigParser qitsConfigParser;
+
   @Inject WorkingTreeMarker workingTreeMarker;
+
+  @org.eclipse.microprofile.config.inject.ConfigProperty(
+      name = "qits.repositories.data-dir",
+      defaultValue = "data/repositories")
+  String dataDir;
 
   private record CachedDetection(String marker, DetectionDto detection) {}
 
@@ -92,7 +99,10 @@ public class DetectionService {
             .sorted()
             .toList();
 
-    List<DetectedProject> projects = detector.detect(paths);
+    // Consult the repository's declared frameworks first (a .qits-config.yml override/hint), then
+    // fall back to marker-based detection for everything not declared. Declared entries win on the
+    // (kind, root) they name; markers fill in the rest.
+    List<DetectedProject> projects = mergeDeclaredFrameworks(repoId, detector.detect(paths));
 
     // Content peeks, memoized per root within the request: a pom's Quarkus label and a TS project's
     // test runner. Both are one small read per detected root, not per file.
@@ -129,6 +139,69 @@ public class DetectionService {
     // The structural generation token, stamped so the client can render detection only against the
     // matching /files generation (WorkspaceTreeFingerprint.of over the same normalized path list).
     return new DetectionDto(projectDtos, frameworks, links, WorkspaceTreeFingerprint.of(paths));
+  }
+
+  /**
+   * Prepends the repository's declared {@code frameworks[]} (from {@code .qits-config.yml} on the
+   * main branch) to the marker-detected projects, deduped by {@code (kind, root)} so a declared
+   * entry supersedes an identically-keyed detected one. Read from the bare origin (container-free);
+   * an absent/invalid file or an unknown {@code kind} simply contributes nothing.
+   */
+  private List<DetectedProject> mergeDeclaredFrameworks(
+      String repoId, List<DetectedProject> detected) {
+    List<QitsConfig.FrameworkDecl> declared;
+    try {
+      var repo = repositoryRepository.findByIdOptional(repoId).orElse(null);
+      if (repo == null) {
+        return detected;
+      }
+      java.io.File origin = java.nio.file.Path.of(dataDir, repoId, "origin").toFile();
+      declared = qitsConfigParser.readConfig(origin, repo.mainBranch).frameworks();
+    } catch (RuntimeException e) {
+      // A broken file must never break detection — fall back to marker-only.
+      return detected;
+    }
+    if (declared.isEmpty()) {
+      return detected;
+    }
+
+    List<DetectedProject> merged = new ArrayList<>();
+    java.util.Set<String> seen = new java.util.HashSet<>();
+    for (QitsConfig.FrameworkDecl decl : declared) {
+      FrameworkDetectionService.Descriptor descriptor =
+          FrameworkDetectionService.descriptorById(decl.kind());
+      if (descriptor == null) {
+        continue; // unknown kind — ignored (detection is a read path with no warning surface)
+      }
+      String root = normalizeRoot(decl.root());
+      if (seen.add(descriptor.id() + " " + root)) {
+        merged.add(new DetectedProject(root, descriptor));
+      }
+    }
+    for (DetectedProject p : detected) {
+      if (seen.add(p.descriptor().id() + " " + p.root())) {
+        merged.add(p);
+      }
+    }
+    return merged;
+  }
+
+  /** Normalize a declared framework root to the detector's convention ({@code ""} = repo root). */
+  private static String normalizeRoot(String root) {
+    if (root == null) {
+      return "";
+    }
+    String r = root.trim();
+    if (r.equals(".") || r.equals("/")) {
+      return "";
+    }
+    while (r.startsWith("/")) {
+      r = r.substring(1);
+    }
+    while (r.endsWith("/")) {
+      r = r.substring(0, r.length() - 1);
+    }
+    return r;
   }
 
   /**

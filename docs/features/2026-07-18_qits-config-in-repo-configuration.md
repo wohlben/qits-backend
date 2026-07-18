@@ -189,17 +189,44 @@ workspace, bind the feature flow — and doubles as the end-to-end regression te
 Note the two-level editing round-trip for that fixture (commit in the fixture repo → bump the
 gitlink in qits) applies.
 
+## Status — implemented 2026-07-18
+
+Built and tested (`domain` + `service` suites green):
+
+- **Parser** `QitsConfigParser` (mirrors `GitSubmoduleParser`) → `QitsConfig` record tree, SnakeYAML
+  safe-load; absent file / read failure = empty, structural errors throw and surface as a warning.
+- **Reconciler** `QitsConfigReconciler.ingest/reload` — upserts declared actions/daemons into the
+  existing tables via new declarative `upsertFromConfig` methods on `ActionConfigurationService` /
+  `RepositoryDaemonService` (full-overwrite, stable ids, validation reused). Hooked into
+  `RepositoryService.cloneOne` (clone) and `pullRepository` (sync); manual
+  `POST /api/repositories/{id}/config/reload`.
+- **Repository fields** `main-branch`/`archetype` reconcile (file wins; branch re-read once).
+- **Frameworks override** merged in `DetectionService.scan` via `FrameworkDetectionService.descriptorById`.
+- **Warning** stored in new `Repository.configWarning` column (Flyway `V34`), shown in the repo
+  detail view; ingestion never fails the clone/sync.
+- **UI** — repo-detail config-warning banner + "Reload config" button; config-origin actions/daemons
+  render read-only with a `.qits-config` badge (`shared/utils/config-origin.ts`).
+- **Fixture & seed** — `testing-repo-quarkus-angular` now ships a committed `.qits-config.yml`
+  declaring the `quarkus:dev` daemon + build/lint/test + `Stack info` actions; `SeedWebappService`
+  shrank to create-project → import (ingest) → workspace → bind the feature flow (looking the
+  ingested actions up by their `@qits-config`-suffixed names). `seed-webapp` doubles as the
+  end-to-end ingestion regression (`SeedWebappServiceTest`).
+
+### Resolved decisions
+
+- **File name:** `.qits-config.yml`.
+- **`main-branch`/`archetype`:** the file wins (reconciled every sync), shown config-managed.
+- **Collision policy (changed from skip-and-warn):** declared entries are namespaced with the
+  reserved suffix **`@qits-config`** on their stored `name`; the write API rejects that suffix in
+  user-supplied names. Config and UI names can therefore never collide, and `origin` (`UI`/`CONFIG`)
+  is **derived from the name suffix** — no `origin` column on the action/daemon tables. Because
+  reconciliation is declarative and re-runs on sync, an accidental UI edit to a config-origin entry
+  self-heals on the next ingest (the UI renders them read-only regardless).
+
 ## Open questions
 
-- File name: `.qits-config.yml` (proposed, editor-friendly) vs literal extensionless
-  `.qits-config` vs a `.qits/` directory (room for future per-concern files, e.g.
-  `.qits/daemons.yml`). Single file until it hurts.
-- Should `repository.archetype`/`main-branch` in the file *win* over a UI change, or only apply
-  at first clone? Proposed: reconcile like everything else (file wins) — it's the point of the
-  feature — but the UI should then show those fields as config-managed too.
-- Collision policy alternative: let a declared entry *adopt* a same-named UI row (flip its
-  origin to `CONFIG`) so users can migrate hand-made config into the file without losing command
-  history. Nice, but adoption is surprising; start with skip-and-warn.
+- File name: `.qits-config.yml` (chosen) vs literal extensionless `.qits-config` vs a `.qits/`
+  directory (room for future per-concern files). Single file until it hurts.
 
 ## Follow-ups (not v1)
 

@@ -38,6 +38,16 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div pageActions class="flex items-center gap-2">
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'daemons']">Daemons</a>
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
+        <!-- Re-read and reconcile the repository's committed .qits-config.yml from the main branch.
+             Also runs automatically on clone and on sync; this is the manual trigger. -->
+        <button
+          z-button
+          zType="secondary"
+          (click)="reloadConfigMutation.mutate()"
+          [zLoading]="reloadConfigMutation.isPending()"
+        >
+          Reload config
+        </button>
         <!-- Launches Claude Code in the main workspace with the actions MCP scoped to this repo plus
              the repository MCP narrowed to it, so both actions and repository-owned configuration
              (daemons) can be managed from inside Claude. -->
@@ -65,6 +75,17 @@ import { ZardButtonComponent } from '@/shared/components/button';
       @if (agentError(); as error) {
         <div class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {{ error }}
+        </div>
+      }
+
+      <!-- A .qits-config.yml parse or per-entry validation problem. Ingestion "degrades loudly,
+           never blocks": the last-good declared config is kept and the problem surfaces here. -->
+      @if (configWarning(); as warning) {
+        <div
+          class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
+        >
+          <div class="font-medium">Problem in .qits-config.yml</div>
+          <pre class="mt-1 whitespace-pre-wrap font-mono text-xs">{{ warning }}</pre>
         </div>
       }
 
@@ -97,7 +118,17 @@ export class RepositoryDetailPage {
 
   readonly mainBranch = computed(() => this.repositoryQuery.data()?.mainBranch ?? null);
 
+  readonly configWarning = computed(() => this.repositoryQuery.data()?.configWarning ?? null);
+
   readonly canConfigureWithClaude = computed(() => !!this.mainBranch());
+
+  /** Manually re-reads and reconciles .qits-config.yml, then refreshes the repository (warning). */
+  readonly reloadConfigMutation = injectMutation(() => ({
+    mutationFn: () =>
+      lastValueFrom(this.repositoryService.apiRepositoriesRepoIdConfigReloadPost(this.repoId)),
+    onSuccess: () =>
+      this.queryClient.invalidateQueries({ queryKey: ['repository', this.repoId] }),
+  }));
 
   readonly deleteMutation = injectMutation(() => ({
     mutationFn: () =>

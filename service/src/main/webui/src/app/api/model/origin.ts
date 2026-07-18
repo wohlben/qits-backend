@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryLogDto } from './telemetryLogDto';
 
 
-export interface Response81 { 
-    logs?: Array<TelemetryLogDto>;
-}
+export const Origin = {
+    Ui: 'UI',
+    Config: 'CONFIG'
+} as const;
+export type Origin = typeof Origin[keyof typeof Origin];
 

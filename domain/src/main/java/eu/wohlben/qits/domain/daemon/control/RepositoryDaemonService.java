@@ -11,6 +11,7 @@ import eu.wohlben.qits.domain.daemon.mapper.RepositoryDaemonMapper;
 import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -53,6 +54,60 @@ public class RepositoryDaemonService {
       List<LogObserver> observers,
       List<LogSource> sources,
       List<HealthCheck> healthChecks) {
+    requireNotReservedName(name);
+    return upsertFromConfig(
+        repositoryId,
+        null,
+        name,
+        description,
+        startScript,
+        readyPattern,
+        stopSignal,
+        restartPolicy,
+        autoStart,
+        maxRestarts,
+        otel,
+        webViewPort,
+        webViewEntryPath,
+        webViewBasePath,
+        environment,
+        observers,
+        sources,
+        healthChecks);
+  }
+
+  /**
+   * Declarative upsert used by {@code .qits-config.yml} ingestion (and, with {@code existingId ==
+   * null}, by {@link #create}): validates the full definition and overwrites <strong>every</strong>
+   * field so the row exactly matches the declaration. Unlike {@link #update} (partial merge), a
+   * field the declaration omits is reset to its default — the file is the source of truth. Keeping
+   * the same {@code existingId} preserves the daemon id, so its run history survives a re-ingest.
+   *
+   * <p>Deliberately <strong>not</strong> {@code @Transactional}: it always runs inside a caller's
+   * transaction ({@link #create} or the config reconciler), and if it threw as its own
+   * transactional boundary a caught validation failure would still mark the reconciler's
+   * transaction rollback-only — discarding the valid entries and the warning. As a plain method its
+   * exception is an ordinary one the reconciler can catch per entry.
+   */
+  public RepositoryDaemon upsertFromConfig(
+      String repositoryId,
+      String existingId,
+      String name,
+      String description,
+      String startScript,
+      String readyPattern,
+      String stopSignal,
+      RestartPolicy restartPolicy,
+      Boolean autoStart,
+      Integer maxRestarts,
+      Boolean otel,
+      Integer webViewPort,
+      String webViewEntryPath,
+      String webViewBasePath,
+      Map<String, String> environment,
+      List<LogObserver> observers,
+      List<LogSource> sources,
+      List<HealthCheck> healthChecks) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
     }
@@ -67,13 +122,17 @@ public class RepositoryDaemonService {
     DaemonDefinitionValidator.requireValidSources(sources);
     DaemonDefinitionValidator.requireValidHealthChecks(healthChecks);
 
-    Repository repository =
-        repositoryRepository
-            .findByIdOptional(repositoryId)
-            .orElseThrow(() -> new NotFoundException("Repository not found: " + repositoryId));
-
-    RepositoryDaemon daemon = new RepositoryDaemon();
-    daemon.repository = repository;
+    RepositoryDaemon daemon;
+    if (existingId == null) {
+      Repository repository =
+          repositoryRepository
+              .findByIdOptional(repositoryId)
+              .orElseThrow(() -> new NotFoundException("Repository not found: " + repositoryId));
+      daemon = new RepositoryDaemon();
+      daemon.repository = repository;
+    } else {
+      daemon = get(repositoryId, existingId);
+    }
     daemon.name = name;
     daemon.description = description;
     daemon.startScript = startScript;
@@ -88,7 +147,9 @@ public class RepositoryDaemonService {
     daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
     daemon.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
     daemon.healthChecks = healthChecks != null ? new ArrayList<>(healthChecks) : new ArrayList<>();
-    repositoryDaemonRepository.persist(daemon);
+    if (existingId == null) {
+      repositoryDaemonRepository.persist(daemon);
+    }
 
     return daemon;
   }
@@ -144,6 +205,7 @@ public class RepositoryDaemonService {
     RepositoryDaemon daemon = get(repositoryId, daemonId);
 
     if (name != null && !name.isBlank()) {
+      requireNotReservedName(name);
       daemon.name = name;
     }
     if (description != null) {
@@ -213,5 +275,20 @@ public class RepositoryDaemonService {
 
   private static String blankToNull(String value) {
     return value == null || value.isBlank() ? null : value;
+  }
+
+  /**
+   * Rejects a user-supplied name that lands in the {@code .qits-config.yml} namespace. That suffix
+   * is reserved for config-declared daemons (written only by {@link #upsertFromConfig}); letting a
+   * user create one would make their hand-made daemon look config-managed and get deleted on the
+   * next reconcile.
+   */
+  private static void requireNotReservedName(String name) {
+    if (QitsConfig.isConfigName(name)) {
+      throw new BadRequestException(
+          "name may not use the reserved '"
+              + QitsConfig.CONFIG_NAME_SUFFIX
+              + "' suffix (it is managed by .qits-config.yml)");
+    }
   }
 }

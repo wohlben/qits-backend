@@ -4,6 +4,7 @@ import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -56,6 +57,56 @@ public class ActionConfigurationService {
         repository, name, description, executeScript, checkScript, interactive, environment);
   }
 
+  /**
+   * Declarative upsert used by {@code .qits-config.yml} ingestion: validates the required fields
+   * and overwrites <strong>every</strong> field so the repository-scoped row exactly matches the
+   * declaration (the file is the source of truth). Keeping the same {@code existingId} preserves
+   * the action id, so feature-flow bindings and command history survive a re-ingest; {@code
+   * existingId == null} inserts a fresh repository-scoped action.
+   *
+   * <p>Deliberately <strong>not</strong> {@code @Transactional}: it always runs inside a caller's
+   * transaction, and if it threw as its own transactional boundary a caught validation failure
+   * would still mark the reconciler's transaction rollback-only, discarding the valid entries and
+   * warning.
+   */
+  public ActionConfiguration upsertFromConfig(
+      String repositoryId,
+      String existingId,
+      String name,
+      String description,
+      String executeScript,
+      String checkScript,
+      boolean interactive,
+      Map<String, String> environment) {
+    if (name == null || name.isBlank()) {
+      throw new BadRequestException("name is required");
+    }
+    if (executeScript == null || executeScript.isBlank()) {
+      throw new BadRequestException("executeScript is required");
+    }
+    ActionConfiguration config;
+    if (existingId == null) {
+      Repository repository =
+          repositoryRepository
+              .findByIdOptional(repositoryId)
+              .orElseThrow(() -> new NotFoundException("Repository not found: " + repositoryId));
+      config = new ActionConfiguration();
+      config.repository = repository;
+    } else {
+      config = getForRepository(repositoryId, existingId);
+    }
+    config.name = name;
+    config.description = description;
+    config.executeScript = executeScript;
+    config.checkScript = checkScript != null && checkScript.isBlank() ? null : checkScript;
+    config.interactive = interactive;
+    config.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
+    if (existingId == null) {
+      actionConfigurationRepository.persist(config);
+    }
+    return config;
+  }
+
   private ActionConfiguration createAction(
       Repository repository,
       String name,
@@ -67,6 +118,7 @@ public class ActionConfigurationService {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
     }
+    requireNotReservedName(name);
     if (executeScript == null || executeScript.isBlank()) {
       throw new BadRequestException("executeScript is required");
     }
@@ -160,6 +212,7 @@ public class ActionConfigurationService {
       Boolean interactive,
       Map<String, String> environment) {
     if (name != null && !name.isBlank()) {
+      requireNotReservedName(name);
       config.name = name;
     }
     if (description != null) {
@@ -180,6 +233,21 @@ public class ActionConfigurationService {
     }
 
     return config;
+  }
+
+  /**
+   * Rejects a user-supplied name that lands in the {@code .qits-config.yml} namespace. That suffix
+   * is reserved for config-declared actions (written only by {@link #upsertFromConfig}); letting a
+   * user create one would make their hand-made action look config-managed and get deleted on the
+   * next reconcile.
+   */
+  private static void requireNotReservedName(String name) {
+    if (QitsConfig.isConfigName(name)) {
+      throw new BadRequestException(
+          "name may not use the reserved '"
+              + QitsConfig.CONFIG_NAME_SUFFIX
+              + "' suffix (it is managed by .qits-config.yml)");
+    }
   }
 
   @Transactional

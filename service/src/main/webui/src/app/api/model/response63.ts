@@ -8,9 +8,11 @@
  * Do not edit the class manually.
  */
 import { Entry12 } from './entry12';
+import { Available } from './available';
 
 
 export interface Response63 { 
     entries?: Array<Entry12>;
+    available?: Array<Available>;
 }
 

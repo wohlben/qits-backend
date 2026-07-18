@@ -210,6 +210,20 @@ public class FrameworkDetectionService {
   /** The framework kinds we ship, in registry order — adding a fourth is a one-entry change. */
   public static final List<Descriptor> DESCRIPTORS = List.of(JAVA_QUARKUS, TS_ANGULAR, DOCS);
 
+  /**
+   * The descriptor with the given {@link Descriptor#id()} ({@code java-quarkus}/{@code
+   * ts-angular}/{@code docs}), or {@code null} for an unknown id. Used to resolve a {@code
+   * frameworks[].kind} declared in {@code .qits-config.yml} to a real descriptor.
+   */
+  public static Descriptor descriptorById(String id) {
+    for (Descriptor descriptor : DESCRIPTORS) {
+      if (descriptor.id().equals(id)) {
+        return descriptor;
+      }
+    }
+    return null;
+  }
+
   // ---- detection -----------------------------------------------------------------------------
 
   /** Detect every project of every kind in the path list — a pure, content-free pass. */

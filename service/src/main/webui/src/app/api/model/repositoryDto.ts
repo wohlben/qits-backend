@@ -15,6 +15,7 @@ export interface RepositoryDto {
     url?: string;
     mainBranch?: string;
     archetype?: RepositoryArchetype;
+    configWarning?: string;
     projectId?: string;
 }
 export namespace RepositoryDto {

@@ -46,6 +46,13 @@
             <artifactId>mapstruct</artifactId>
         </dependency>
         <dependency>
+            <!-- Parses the repository's committed .qits-config.yml into plain config records. This is
+                 repository content, not app config, so it is read straight from the bare origin (no
+                 Quarkus config machinery). Version is managed by the Quarkus BOM. -->
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+        </dependency>
+        <dependency>
             <!-- Server-side pseudo-terminal so launched processes behave like a real TTY (echo, line
                  editing, colors, full-screen apps). The CommandRegistry owns these PTY processes;
                  the service-module websocket only attaches/detaches connections to them. -->

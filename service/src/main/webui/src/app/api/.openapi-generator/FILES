@@ -115,6 +115,7 @@ model/logSourceInput.ts
 model/mergeBranchRequest.ts
 model/mergeWorkspaceRequest.ts
 model/models.ts
+model/origin.ts
 model/projectDto.ts
 model/refinePromptRequest.ts
 model/reportAgentSessionRequest.ts
@@ -204,6 +205,7 @@ model/response8.ts
 model/response80.ts
 model/response81.ts
 model/response82.ts
+model/response83.ts
 model/response9.ts
 model/restartPolicy.ts
 model/setMainBranchRequest.ts
