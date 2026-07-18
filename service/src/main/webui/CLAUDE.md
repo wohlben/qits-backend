@@ -57,6 +57,7 @@ The root `AGENTS.md` is the authoritative style guide. Highlights:
 - Native control flow (`@if`/`@for`/`@switch`); `class`/`style` bindings, never `ngClass`/`ngStyle`. No globals like `new Date()` in templates.
 - Avoid `any` (use `unknown`); strict TS is on. Templates must pass AXE / WCAG AA.
 - Local lint rule `qits-local/no-inject-query-client`: use `inject(QueryClient)`, not `injectQueryClient()`.
+- **Base-relative URLs, never a hardcoded leading `/api`**: the app must keep working when served under a path prefix (a supervising qits' `/daemon/{ws}/{d}/` web view rebases `<base href>`; see `index.html`). The generated client gets its base via `provideApi(appBasePath())`; raw escape hatches (`EventSource`, `WebSocket`, real anchors) go through `appUrl()`/`wsUrl()` from `@/shared/utils/app-base`.
 
 Path alias: imports use `@/* → src/app/*` throughout (e.g. `@/api/...`, `@/ui/...`, `@/pattern/...`, `@/shared/...`). `tsconfig.json` also defines `$ui/*` and `$pattern/*`, but these are currently unused — prefer `@/*`.
 

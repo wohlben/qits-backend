@@ -42,6 +42,9 @@ nb-configuration.xml
 # Application data
 data/
 
+# File log (quarkus.log + rotation suffixes; the root *.log doesn't catch rotated names)
+quarkus.log*
+
 # Plugin directory
 /.quarkus/cli/plugins/
 # TLS Certificates

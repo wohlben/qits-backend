@@ -1,5 +1,6 @@
 import { computed } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
+import { withQitsSnapshot } from '@qits/angular';
 
 /**
  * The component attributed as rendering a picked element: the nearest enclosing component the
@@ -154,6 +155,8 @@ export function mergeReference(refs: CodeReference[], ref: CodeReference): CodeR
 export const PromptContextStore = signalStore(
   { providedIn: 'root' },
   withState({ snippets: [] as PickedSnippet[], references: [] as CodeReference[] }),
+  // A qits-in-qits capture of this UI carries the staged prompt context as app state.
+  withQitsSnapshot('promptContext'),
   withComputed((store) => ({
     count: computed(() => store.snippets().length),
   })),

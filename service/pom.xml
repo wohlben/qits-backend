@@ -89,6 +89,15 @@
             <artifactId>quarkus-smallrye-health</artifactId>
         </dependency>
         <dependency>
+            <!-- qits' OWN telemetry (the managed-app convention, dogfooded): traces/logs/metrics
+                 exported OTLP to a supervising qits when one injects OTEL_EXPORTER_OTLP_ENDPOINT.
+                 Dark by default — quarkus.otel.sdk.disabled=true in application.properties; the
+                 daemon start script flips it on (see docs/guides/qits-in-qits-registration.md).
+                 Distinct from opentelemetry-proto above, which serves the RECEIVER side. -->
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-opentelemetry</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-mutiny</artifactId>
         </dependency>

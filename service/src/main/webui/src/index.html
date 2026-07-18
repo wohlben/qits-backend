@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <title>QitsUi</title>
   <base href="/">
+  <script>
+    // Under a supervising qits' daemon web view the app is served at /daemon/{ws}/{daemonId}/
+    // (ng serve --serve-path "$QITS_PUBLIC_BASE"). The dev server has no --base-href, so rebase
+    // at runtime: with the prefix in <base href>, the Angular router and every base-relative
+    // URL (API client, SSE, websockets, api/config.json) stay inside the prefix.
+    (function () {
+      var match = location.pathname.match(/^\/daemon\/[^/]+\/[^/]+\//);
+      if (match) document.querySelector('base').setAttribute('href', match[0]);
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
 

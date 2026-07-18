@@ -1,5 +1,6 @@
 package eu.wohlben.qits.spa;
 
+import eu.wohlben.qits.http.RootPath;
 import io.quarkus.runtime.LaunchMode;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
@@ -33,20 +34,34 @@ public class DevModeSpaFallbackRoute {
   @ConfigProperty(name = "quarkus.quinoa.ignored-path-prefixes", defaultValue = "/api")
   List<String> ignoredPrefixes;
 
+  /**
+   * Non-{@code /} only for a qits-in-qits daemon (the start script bridges {@code
+   * -Dquarkus.http.root-path}): paths seen here are FULL paths, so the index compare, the {@code
+   * /q} check, and the reroute target all carry the prefix. The configured Quinoa prefixes are
+   * already root-path-aware in application.properties, so they compare full-path as-is.
+   */
+  @Inject
+  @ConfigProperty(name = "quarkus.http.root-path", defaultValue = "/")
+  String rootPath;
+
+  private String rootPrefix;
+
   void init(@Observes Router router) {
     if (LaunchMode.current() != LaunchMode.DEVELOPMENT) {
       return;
     }
+    rootPrefix = RootPath.prefix(rootPath);
     // After the Quinoa dev proxy (1100) and REST (1500), but before the static-resources route
-    // (10000): a deep-link HTML nav the dev proxy didn't forward gets rerouted to "/" here so the
-    // proxy serves the dev server's index rather than letting it 404.
+    // (10000): a deep-link HTML nav the dev proxy didn't forward gets rerouted to the app index
+    // here so the proxy serves the dev server's index rather than letting it 404.
     router.get("/*").order(9000).handler(this::fallback);
   }
 
   private void fallback(RoutingContext rc) {
     String path = rc.normalizedPath();
     if (Boolean.TRUE.equals(rc.get(REROUTED))
-        || "/".equals(path)
+        || (rootPrefix + "/").equals(path)
+        || rootPrefix.equals(path)
         || !acceptsHtml(rc)
         || looksLikeFile(path)
         || isBackendPath(path)) {
@@ -54,7 +69,8 @@ public class DevModeSpaFallbackRoute {
       return;
     }
     rc.put(REROUTED, true);
-    rc.reroute("/");
+    // reroute() restarts routing on the outermost router, so the target needs the full prefix.
+    rc.reroute(rootPrefix + "/");
   }
 
   private boolean acceptsHtml(RoutingContext rc) {
@@ -67,7 +83,7 @@ public class DevModeSpaFallbackRoute {
   }
 
   private boolean isBackendPath(String path) {
-    if (path.equals("/q") || path.startsWith("/q/")) {
+    if (path.equals(rootPrefix + "/q") || path.startsWith(rootPrefix + "/q/")) {
       return true;
     }
     return ignoredPrefixes.stream().anyMatch(path::startsWith);

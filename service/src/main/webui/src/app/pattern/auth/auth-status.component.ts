@@ -3,6 +3,7 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AuthControllerService } from '@/api/api/authController.service';
+import { appUrl } from '@/shared/utils/app-base';
 
 /**
  * The signed-in identity chip + sign-out link for the sidebar. Every build variant is
@@ -24,7 +25,7 @@ import { AuthControllerService } from '@/api/api/authController.service';
         }
         @if (authQuery.data()?.variant === 'oauth') {
           <a
-            href="/api/auth/logout"
+            [href]="logoutHref"
             class="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             [title]="collapsed() ? 'Sign out' : ''"
           >
@@ -38,6 +39,9 @@ import { AuthControllerService } from '@/api/api/authController.service';
 })
 export class AuthStatusComponent {
   readonly collapsed = input(false);
+
+  /** Base-relative so the server-side logout intercept still matches under a path prefix. */
+  protected readonly logoutHref = appUrl('api/auth/logout');
 
   private readonly authService = inject(AuthControllerService);
 

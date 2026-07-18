@@ -17,6 +17,7 @@ import {
   PromptContextStore,
 } from '@/shared/state/prompt-context.store';
 import { codeReferenceLabel, formatSnippetsForPrompt } from '@/shared/state/snippet-format';
+import { wsUrl } from '@/shared/utils/app-base';
 import { ChatTranscriptComponent } from './chat-transcript.component';
 import { isTurnEnd, linesToItems } from './chat-stream';
 
@@ -115,8 +116,7 @@ export class CommandChatComponent implements OnInit, OnDestroy {
       return;
     }
     this.status.set('connecting');
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/api/chat/commands/${this.commandId()}`);
+    const ws = new WebSocket(wsUrl(`api/chat/commands/${this.commandId()}`));
     this.ws = ws;
     ws.onopen = () => {
       this.status.set('open');

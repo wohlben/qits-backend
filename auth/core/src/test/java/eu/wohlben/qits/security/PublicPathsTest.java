@@ -34,6 +34,13 @@ class PublicPathsTest {
   }
 
   @Test
+  void configRelayIsPublicExactlyNotAsPrefix() {
+    assertTrue(PublicPaths.isPublic("/api/config.json"));
+    assertFalse(PublicPaths.isPublic("/api/config.json/extra"));
+    assertFalse(PublicPaths.isPublic("/api/config"));
+  }
+
+  @Test
   void authEndpointsArePublic() {
     assertTrue(PublicPaths.isPublic("/api/auth/me"));
     assertTrue(PublicPaths.isPublic("/api/auth/logout"));

@@ -546,6 +546,13 @@ adjust the package):
 2. **`OtelProxyResource`** — `POST /api/otel/v1/{traces|logs|metrics}`, byte-verbatim
    passthrough to `${endpoint}/v1/{signal}`; 404 when unconfigured, 502 on forward failure.
 
+qits itself is now a **second implementer** of this backend half
+([qits dogfooding](../features/2026-07-18_qits-dogfooding-managed-app-convention.md)): its
+`ConfigResource` is the same relay, but because qits *is* an OTLP receiver at that exact path,
+its variant of resource 2 is a **tee** (`OtelForwarder`) — store locally, forward upstream
+fire-and-forget when the endpoint is configured — rather than the fixture's pure proxy. Copy the
+fixture's form for a normal app; copy the tee only if your app is itself a telemetry sink.
+
 Fixture source of truth:
 `domain/src/test/resources/fixtures/testing-repo-quarkus-angular` (`main`) — including unit
 tests for both resources worth copying along. Its `src/main/webui` is now a **nested git submodule**

@@ -32,6 +32,15 @@ public class QitsAuthPolicy implements HttpSecurityPolicy {
   @ConfigProperty(name = "qits.auth.required-role")
   Optional<String> requiredRole;
 
+  /**
+   * Non-{@code /} only when qits itself runs as a managed daemon (the qits-in-qits start script
+   * bridges {@code -Dquarkus.http.root-path}): the request path then carries the prefix, but {@link
+   * PublicPaths} matches the app-relative shape — strip before matching. The normal deployment's
+   * {@code /} strips nothing.
+   */
+  @ConfigProperty(name = "quarkus.http.root-path", defaultValue = "/")
+  String rootPath;
+
   @Override
   public Uni<CheckResult> checkPermission(
       RoutingContext context,
@@ -39,10 +48,23 @@ public class QitsAuthPolicy implements HttpSecurityPolicy {
       AuthorizationRequestContext requestContext) {
     // normalizedPath(): dot-segments and duplicate slashes are already collapsed, so a path like
     // /api/../git/x cannot spoof its way into a public prefix.
-    if (PublicPaths.isPublic(context.normalizedPath())) {
+    if (PublicPaths.isPublic(stripRootPath(context.normalizedPath()))) {
       return CheckResult.permit();
     }
     return deferredIdentity.onItem().transform(this::decide);
+  }
+
+  private String stripRootPath(String path) {
+    if (rootPath == null || rootPath.isEmpty() || "/".equals(rootPath)) {
+      return path;
+    }
+    String prefix =
+        rootPath.endsWith("/") ? rootPath.substring(0, rootPath.length() - 1) : rootPath;
+    if (!prefix.startsWith("/")) {
+      prefix = "/" + prefix;
+    }
+    // Paths outside the prefix can't be public app paths — leave them to the deny path unchanged.
+    return path.startsWith(prefix) ? path.substring(prefix.length()) : path;
   }
 
   private CheckResult decide(SecurityIdentity identity) {

@@ -1,6 +1,8 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { QueryClient, QueryKey } from '@tanstack/angular-query-experimental';
 
+import { appUrl } from '@/shared/utils/app-base';
+
 /**
  * Keeps the workspace detail route fresh over one Server-Sent-Events channel instead of eight
  * free-running polls. The backend pushes payload-free topic hints (`daemons`, `daemon-events`,
@@ -30,7 +32,9 @@ export class WorkspaceLiveService {
     }
     const topics = this.topicKeys(repoId, workspaceId);
     const source = new EventSource(
-      `/api/repositories/${encodeURIComponent(repoId)}/workspaces/${encodeURIComponent(workspaceId)}/events`,
+      appUrl(
+        `api/repositories/${encodeURIComponent(repoId)}/workspaces/${encodeURIComponent(workspaceId)}/events`,
+      ),
     );
     this.source = source;
 

@@ -10,6 +10,8 @@ import {
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 
+import { wsUrl } from '@/shared/utils/app-base';
+
 /**
  * Smart component that renders a live PTY server-side (a process running in its workspace) over a
  * WebSocket, with xterm.js. By default it attaches to a registry command by `commandId` (opening
@@ -147,8 +149,7 @@ export class WebTerminalComponent implements OnDestroy {
   }
 
   private openSocket(path: string, term: Terminal): void {
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${proto}://${window.location.host}/${path}`);
+    const ws = new WebSocket(wsUrl(path));
     this.ws = ws;
 
     ws.onopen = () => {

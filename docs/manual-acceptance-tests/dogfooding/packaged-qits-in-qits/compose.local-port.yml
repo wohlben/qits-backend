@@ -1,0 +1,11 @@
+# Sister overlay for plan.md: publish the packaged qits on the host loopback for the local
+# acceptance walk. docker-compose.prod.yml deliberately publishes no port (a forwardauth image
+# trusts any client-supplied identity header); binding 127.0.0.1 keeps that trust boundary at
+# "this machine only". 18080 avoids colliding with a running `quarkus:dev` on :8080.
+#
+#   docker compose -f docker-compose.prod.yml \
+#     -f docs/manual-acceptance-tests/dogfooding/packaged-qits-in-qits/compose.local-port.yml up -d
+services:
+  qits:
+    ports:
+      - "127.0.0.1:18080:8080"
