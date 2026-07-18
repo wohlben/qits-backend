@@ -22,6 +22,12 @@
 >   unimported submodules stay uninitialized directories (the layer-by-layer contract), and edges
 >   whose gitlink is absent on the workspace's branch are filtered out (`ls-files --error-unmatch`).
 >   Depth-capped as the cycle backstop; descent is guarded on the child's `.git` marker.
+> - **Pull refreshes the imported children (added 2026-07-18).** `RepositoryService.pullRepository`
+>   recursively pulls the imported submodule siblings after its own successful pull (visited-set
+>   guard over the edge graph; child failures degrade loudly as `WARNING:` output lines), so a
+>   gitlink bump arriving on the superproject's main branch never points at a commit the sibling's
+>   origin can't serve — see
+>   `docs/issues/resolved/2026-07-18_pull-leaves-imported-submodule-siblings-stale.md`.
 >
 > Original 2026-07-14 ship notes (still accurate where not superseded above):
 >
