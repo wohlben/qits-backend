@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryLogDto } from './telemetryLogDto';
+import { TelemetrySpanDto } from './telemetrySpanDto';
 
 
 export interface Response81 { 
-    logs?: Array<TelemetryLogDto>;
+    spans?: Array<TelemetrySpanDto>;
 }
 

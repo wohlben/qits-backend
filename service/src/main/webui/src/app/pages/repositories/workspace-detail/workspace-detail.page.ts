@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { injectQuery } from '@tanstack/angular-query-experimental';
+import { injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
@@ -39,6 +39,7 @@ import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.compo
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
 import { WorkspacePluginsComponent } from '@/pattern/workspace/workspace-plugins.component';
+import { TechnicalProcessViewComponent } from '@/pattern/workspace/technical-process-view.component';
 import { WorkspaceSessionTreeComponent } from '@/pattern/workspace/workspace-session-tree.component';
 import {
   ZardTabComponent,
@@ -63,6 +64,12 @@ const TAB_SLUG_BY_LABEL = new Map([
 ]);
 
 const TAB_LABEL_BY_SLUG = new Map([...TAB_SLUG_BY_LABEL].map(([label, slug]) => [slug, label]));
+
+/**
+ * The transient process tab's label — deliberately NOT in {@link TAB_SLUG_BY_LABEL}: the tab is
+ * URL-unpinned ("no slug = default tab" is already supported) and unmounts when the process ends.
+ */
+const PROCESS_TAB_LABEL = 'Starting';
 
 /**
  * The workspace detail page: everything the workspace offers as one tab row — Chat, Files,
@@ -93,6 +100,7 @@ const TAB_LABEL_BY_SLUG = new Map([...TAB_SLUG_BY_LABEL].map(([label, slug]) => 
     WorkspacePluginsComponent,
     WorkspaceSessionTreeComponent,
     WorkspaceTelemetryComponent,
+    TechnicalProcessViewComponent,
     ZardTabComponent,
     ZardTabGroupComponent,
   ],
@@ -120,6 +128,13 @@ const TAB_LABEL_BY_SLUG = new Map([...TAB_SLUG_BY_LABEL].map(([label, slug]) => 
 
       <!-- Tabs are drag-reorderable; the chosen order persists per browser (localStorage). -->
       <z-tab-group zReorderKey="qits.workspace-detail.tab-order" (zTabChange)="onTabChange($event.label)">
+        <!-- Transient: mounted (pinned first, auto-selected) only while a technical process runs
+             against this workspace; unmounts when the PROCESS hint reports it gone. -->
+        @if (activeProcessId(); as processId) {
+          <z-tab [label]="processTabLabel" [zPinFirst]="true">
+            <app-technical-process-view [processId]="processId" (finished)="onProcessFinished()" />
+          </z-tab>
+        }
         <z-tab
           label="Chat"
           [indicator]="chatIndicator()"
@@ -199,7 +214,10 @@ export class WorkspaceDetailPage {
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly commandService = inject(CommandControllerService);
   private readonly daemonService = inject(WorkspaceDaemonControllerService);
+  private readonly queryClient = inject(QueryClient);
   private readonly live = inject(WorkspaceLiveService);
+
+  protected readonly processTabLabel = PROCESS_TAB_LABEL;
 
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
   readonly workspaceId = this.route.snapshot.paramMap.get('workspaceId')!;
@@ -236,6 +254,23 @@ export class WorkspaceDetailPage {
   constructor() {
     // Push freshness over one SSE channel; the child queries no longer poll (see WorkspaceLiveService).
     this.live.connect(this.repoId, this.workspaceId);
+
+    // Discovery → displayed process id, with the unmount linger described on activeProcessId.
+    effect(() => {
+      const id = this.activeProcessQuery.data() ?? null;
+      if (id) {
+        if (this.processLinger) {
+          clearTimeout(this.processLinger);
+          this.processLinger = null;
+        }
+        this.activeProcessId.set(id);
+      } else if (this.activeProcessId() !== null && !this.processLinger) {
+        this.processLinger = setTimeout(() => {
+          this.processLinger = null;
+          this.activeProcessId.set(null);
+        }, 5000);
+      }
+    });
 
     // URL → tab: resolve the `:tab` slug against the group once it is mounted *and* has made its
     // own default selection (activeLabel non-null — see its doc). Unknown slugs normalize back to
@@ -300,6 +335,28 @@ export class WorkspaceDetailPage {
   readonly workspace = computed(
     () => (this.workspacesQuery.data() ?? []).find((w) => w.workspaceId === this.workspaceId) ?? null,
   );
+
+  // Discovery for the transient process tab: the workspace's currently-running technical process.
+  // Kept fresh by the PROCESS hint on the live channel (start → id appears, done → null again).
+  readonly activeProcessQuery = injectQuery(() => ({
+    queryKey: ['workspace-active-process', this.repoId, this.workspaceId],
+    queryFn: () =>
+      lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdActiveProcessGet(
+          this.repoId,
+          this.workspaceId,
+        ),
+      ).then((r) => r.technicalProcessId ?? null),
+  }));
+
+  /**
+   * The process id the transient tab renders. Follows the discovery query, but lingers for a few
+   * seconds after the query goes null so the user can read the frozen final state (the view itself
+   * already stopped streaming on `done`) before the tab unmounts.
+   */
+  readonly activeProcessId = signal<string | null>(null);
+
+  private processLinger: ReturnType<typeof setTimeout> | null = null;
 
   private readonly tabGroup = viewChild(ZardTabGroupComponent);
   private readonly fileBrowser = viewChild(WorkspaceFileBrowserComponent);
@@ -416,6 +473,21 @@ export class WorkspaceDetailPage {
       ['/repositories', this.repoId, 'workspaces', this.workspaceId, slug],
       { queryParamsHandling: 'preserve' },
     );
+  }
+
+  /**
+   * The streamed process reached `done`: refresh the discovery query (the tab unmounts when it
+   * answers null) plus the states the start just changed. The PROCESS hint usually triggers the
+   * same refetch, but the local signal makes the handoff robust without a live SSE connection.
+   */
+  onProcessFinished(): void {
+    void this.queryClient.invalidateQueries({
+      queryKey: ['workspace-active-process', this.repoId, this.workspaceId],
+    });
+    void this.queryClient.invalidateQueries({ queryKey: ['workspaces', this.repoId] });
+    void this.queryClient.invalidateQueries({
+      queryKey: ['workspace-daemons', this.repoId, this.workspaceId],
+    });
   }
 
   /** The embedded session's deferred state jumps to the live conversation. */

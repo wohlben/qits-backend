@@ -372,6 +372,12 @@ curl -s -X POST http://localhost:8080/api/repositories/<repoId>/workspaces/main/
 curl -s -X POST http://localhost:8080/api/repositories/<repoId>/workspaces/main/ensure-container -d '{}' -H 'Content-Type: application/json'
 ```
 
+Note `ensure-container` returns **immediately** with a `technicalProcessId` and provisions in the
+background — watch the streamed segments at
+`GET /api/technical-processes/<technicalProcessId>/events` (SSE), or poll the workspace's
+`runtimeStatus` until it reads `RUNNING`
+(see [the technical-process log stream](../features/2026-07-18_technical-process-log-stream.md)).
+
 The container kill looks like a crash to the supervisor, so an `ON_FAILURE`/`ALWAYS` daemon
 auto-relaunches and — since [the relaunch now re-reads the definition](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)
 — comes back on the new `webView`; a `NEVER` daemon (or one already stopped) needs a manual

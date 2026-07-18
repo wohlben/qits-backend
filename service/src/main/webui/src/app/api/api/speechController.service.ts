@@ -17,7 +17,7 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response77 } from '../model/response77';
+import { Response79 } from '../model/response79';
 // @ts-ignore
 import { TranscribeRequest } from '../model/transcribeRequest';
 
@@ -45,9 +45,9 @@ export class SpeechControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response77>;
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response77>>;
-    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response77>>;
+    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response79>;
+    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response79>>;
+    public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response79>>;
     public apiSpeechTranscriptionsPost(transcribeRequest: TranscribeRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (transcribeRequest === null || transcribeRequest === undefined) {
             throw new Error('Required parameter transcribeRequest was null or undefined when calling apiSpeechTranscriptionsPost.');
@@ -89,7 +89,7 @@ export class SpeechControllerService extends BaseService {
 
         let localVarPath = `/api/speech/transcriptions`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response77>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response79>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: transcribeRequest,

@@ -97,6 +97,9 @@ export class WorkspaceLiveService {
         ['workspace-detection', repoId, workspaceId],
         ['workspace-file', repoId, workspaceId],
       ],
+      // A technical process (e.g. a container start) began or completed: re-fetch the discovery
+      // endpoint; the log payload itself rides the process's own SSE stream, never this channel.
+      process: [['workspace-active-process', repoId, workspaceId]],
     };
   }
 }

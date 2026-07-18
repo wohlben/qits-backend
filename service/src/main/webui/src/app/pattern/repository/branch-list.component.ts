@@ -31,6 +31,7 @@ import {
   BranchTreeNode,
   CommitsPreview,
 } from '@/ui/components/repository/branch-tree.component';
+import { TechnicalProcessViewComponent } from '@/pattern/workspace/technical-process-view.component';
 import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-field-layout.component';
 import { FormFieldSlotDirective } from '@/ui/layout/form-field-layout/form-field-slot.directive';
 import { invalidateRepository } from './invalidate-repository';
@@ -51,6 +52,7 @@ interface CreateWorkspaceForm {
     FormFieldSlotDirective,
     FormField,
     RouterLink,
+    TechnicalProcessViewComponent,
   ],
   template: `
     <div class="flex flex-col gap-4">
@@ -296,6 +298,18 @@ interface CreateWorkspaceForm {
       }
     </ng-template>
 
+    <!-- Starting workspace: the live, segmented log of the container start (docker run, clone,
+         daemon auto-start), streamed from its technical process. Closing the dialog does not stop
+         the work — reopening (or the workspace detail's transient tab) replays and resumes. -->
+    <ng-template #processTpl>
+      @if (ui().processId; as processId) {
+        <app-technical-process-view [processId]="processId" (finished)="onProcessFinished()" />
+      }
+      <div class="mt-3 flex items-center gap-2">
+        <button z-button zType="secondary" type="button" (click)="closeDialog()">Close</button>
+      </div>
+    </ng-template>
+
     <!-- Run… (pick a preconfigured action to run in the workspace) -->
     <ng-template #runTpl>
       <p class="text-sm text-muted-foreground">
@@ -358,6 +372,7 @@ export class BranchListComponent {
   private readonly deleteTpl = viewChild.required<TemplateRef<unknown>>('deleteTpl');
   private readonly resolveTpl = viewChild.required<TemplateRef<unknown>>('resolveTpl');
   private readonly runTpl = viewChild.required<TemplateRef<unknown>>('runTpl');
+  private readonly processTpl = viewChild.required<TemplateRef<unknown>>('processTpl');
 
   /** The currently-open dialog, so success/cancel handlers can close it. */
   private activeDialogRef?: ZardDialogRef<unknown>;
@@ -368,10 +383,13 @@ export class BranchListComponent {
     selected: WorkspaceDto | null;
     parent: string | null;
     branch: string | null;
+    /** The technical process the "Starting workspace" dialog streams (set on Start). */
+    processId: string | null;
   }>({
     selected: null,
     parent: null,
     branch: null,
+    processId: null,
   });
 
   readonly integrateModel = signal<{ target: string }>({ target: '' });
@@ -654,9 +672,11 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
-  // Start/recreate a workspace's container on demand (it is a recreatable cache of the branch). The
-  // error is surfaced (below) rather than swallowed, so a failed provision — e.g. the branch is gone
-  // or the git-host is unreachable — tells the user why.
+  // Start/recreate a workspace's container on demand (it is a recreatable cache of the branch).
+  // The provision runs asynchronously server-side: the response carries a technical-process id and
+  // the work streams into the "Starting workspace" dialog opened below — provision failures
+  // surface there (live, untruncated), while an HTTP-level failure (e.g. unknown workspace) still
+  // lands in the inline error above.
   readonly ensureContainerMutation = injectMutation(() => ({
     mutationFn: (workspaceId: string) =>
       lastValueFrom(
@@ -665,7 +685,13 @@ export class BranchListComponent {
           workspaceId,
         ),
       ),
-    onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+    onSuccess: (res) => {
+      invalidateRepository(this.queryClient, this.repoId());
+      if (res.technicalProcessId) {
+        patchState(this.ui, { processId: res.technicalProcessId });
+        this.openDialog('Starting workspace', this.processTpl());
+      }
+    },
   }));
 
   readonly stopContainerMutation = injectMutation(() => ({
@@ -874,7 +900,12 @@ export class BranchListComponent {
   closeDialog() {
     this.activeDialogRef?.close();
     this.activeDialogRef = undefined;
-    patchState(this.ui, { selected: null, parent: null, branch: null });
+    patchState(this.ui, { selected: null, parent: null, branch: null, processId: null });
+  }
+
+  /** The streamed start reached `done`: refresh the tree so the runtime badge shows the outcome. */
+  onProcessFinished() {
+    invalidateRepository(this.queryClient, this.repoId());
   }
 
   async onCreate(event: Event) {

@@ -142,8 +142,8 @@ describe('WorkspaceLiveService', () => {
 
     source.emitOpen();
 
-    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + files(3) = 11
-    expect(invalidate).toHaveBeenCalledTimes(11);
+    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + files(3) + process(1) = 12
+    expect(invalidate).toHaveBeenCalledTimes(12);
     const keys = invalidatedKeys();
     expect(keys).toContain(JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1']));
@@ -153,6 +153,7 @@ describe('WorkspaceLiveService', () => {
     expect(keys).toContain(JSON.stringify(['workspace-files', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-detection', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-file', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-active-process', 'repo-1', 'wt-1']));
   });
 
   it('closes the EventSource when the providing component is destroyed', () => {

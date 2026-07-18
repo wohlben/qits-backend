@@ -9,6 +9,7 @@ import {
   contentChildren,
   DestroyRef,
   DOCUMENT,
+  effect,
   type ElementRef,
   inject,
   Injector,
@@ -61,6 +62,14 @@ export class ZardTabComponent {
    */
   readonly indicator = input<ZardTabIndicator | null>(null);
   readonly indicatorLabel = input('');
+  /**
+   * Pins this tab to the front of the displayed row, ahead of any persisted reorder — for
+   * transient tabs (e.g. the workspace-start process view) that must lead while they exist and
+   * whose label deliberately never enters the saved order. Like `indicator`, a deliberate local
+   * qits extension to the zard tabs component (not upstream) — preserve it when regenerating via
+   * the zard CLI.
+   */
+  readonly zPinFirst = input(false);
   readonly contentTemplate = viewChild.required<TemplateRef<unknown>>('content');
 }
 
@@ -278,17 +287,21 @@ export class ZardTabGroupComponent implements AfterViewInit {
 
   private readonly order = linkedSignal(() => this.storedOrder());
 
-  /** Tabs in display order: saved labels first (unknown ones dropped), unsaved tabs appended. */
+  /**
+   * Tabs in display order: pinned tabs lead (in content order, exempt from the saved order), then
+   * saved labels (unknown ones dropped), then unsaved tabs appended.
+   */
   protected readonly orderedTabs = computed(() => {
-    const tabs = this.tabs();
+    const pinned = this.tabs().filter(tab => tab.zPinFirst());
+    const tabs = this.tabs().filter(tab => !tab.zPinFirst());
     const order = this.order();
     if (!order) {
-      return [...tabs];
+      return [...pinned, ...tabs];
     }
     const byLabel = new Map(tabs.map(tab => [tab.label(), tab]));
     const ordered = order.map(label => byLabel.get(label)).filter((tab): tab is ZardTabComponent => !!tab);
     const seen = new Set(ordered);
-    return [...ordered, ...tabs.filter(tab => !seen.has(tab))];
+    return [...pinned, ...ordered, ...tabs.filter(tab => !seen.has(tab))];
   });
 
   /** Display-ordered tabs paired with their content index, which pairs `tab-N` to `tabpanel-N`. */
@@ -305,6 +318,37 @@ export class ZardTabGroupComponent implements AfterViewInit {
     success: 'bg-green-500',
     warning: 'bg-amber-500',
   };
+
+  /** Pinned tabs already seen, so only a genuinely new pinned tab steals the selection. */
+  private seenPinnedTabs = new Set<ZardTabComponent>();
+
+  constructor() {
+    // A conditionally-rendered tab (e.g. the transient workspace-start process tab) can be
+    // destroyed while active; fall back to the first displayed tab so the group never shows an
+    // empty panel with no selection. A qits extension like `indicator` — preserve on regenerate.
+    effect(() => {
+      const tabs = this.tabs();
+      const active = this.activeTab();
+      if (active && !tabs.includes(active)) {
+        const first = this.orderedTabs()[0];
+        if (first) {
+          this.setActiveTab(first);
+        }
+      }
+    });
+
+    // A pinned tab that appears after init auto-selects itself (its point is to lead while it
+    // exists); the mount-time default in ngAfterViewInit covers one already present. Tracked per
+    // component instance, so re-renders of the same tab never re-steal a user's selection.
+    effect(() => {
+      const pinned = this.tabs().filter(tab => tab.zPinFirst());
+      const fresh = pinned.find(tab => !this.seenPinnedTabs.has(tab));
+      this.seenPinnedTabs = new Set(pinned);
+      if (fresh && this.activeTab() !== null) {
+        this.setActiveTab(fresh);
+      }
+    });
+  }
 
   ngAfterViewInit(): void {
     // default tab selection: the first *displayed* tab, honoring a persisted order

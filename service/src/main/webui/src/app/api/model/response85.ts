@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry14 } from './entry14';
 
 
-export interface Response77 { 
-    entries?: Array<Entry14>;
+export interface Response85 { 
+    variant?: string;
+    username?: string;
 }
 

@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceDto } from './workspaceDto';
 
 
 export interface Response72 { 
-    workspace?: WorkspaceDto;
+    success?: boolean;
 }
 

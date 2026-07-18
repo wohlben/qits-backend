@@ -1499,32 +1499,32 @@ components:
     Response71:
       type: object
       properties:
+        workspace:
+          $ref: "#/components/schemas/WorkspaceDto"
+        technicalProcessId:
+          type: string
+    Response72:
+      type: object
+      properties:
         success:
           type: boolean
-    Response72:
+    Response73:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceDto"
-    Response73:
+    Response74:
       type: object
       properties:
         files:
           type: array
           items:
             type: string
-    Response74:
-      type: object
-      properties:
-        workspace:
-          $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
     Response75:
       type: object
       properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry14"
+        technicalProcessId:
+          type: string
     Response76:
       type: object
       properties:
@@ -1533,20 +1533,20 @@ components:
     Response77:
       type: object
       properties:
-        text:
-          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry14"
     Response78:
       type: object
       properties:
-        trace:
-          $ref: "#/components/schemas/TelemetryTraceDto"
+        workspace:
+          $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
     Response79:
       type: object
       properties:
-        spans:
-          type: array
-          items:
-            $ref: "#/components/schemas/TelemetrySpanDto"
+        text:
+          type: string
     Response8:
       type: object
       properties:
@@ -1555,25 +1555,37 @@ components:
     Response80:
       type: object
       properties:
+        trace:
+          $ref: "#/components/schemas/TelemetryTraceDto"
+    Response81:
+      type: object
+      properties:
+        spans:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetrySpanDto"
+    Response82:
+      type: object
+      properties:
         metrics:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryMetricDto"
-    Response81:
+    Response83:
       type: object
       properties:
         logs:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryLogDto"
-    Response82:
+    Response84:
       type: object
       properties:
         groups:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryErrorGroupDto"
-    Response83:
+    Response85:
       type: object
       properties:
         variant:
@@ -2109,7 +2121,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response83"
+                $ref: "#/components/schemas/Response85"
       summary: Me
       tags:
       - Auth Controller
@@ -3146,7 +3158,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response75"
+                $ref: "#/components/schemas/Response77"
       summary: List
       tags:
       - Workspace History Controller
@@ -3176,7 +3188,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response74"
+                $ref: "#/components/schemas/Response76"
       summary: Update
       tags:
       - Workspace History Controller
@@ -3199,7 +3211,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response76"
+                $ref: "#/components/schemas/Response78"
       summary: Get
       tags:
       - Workspace History Controller
@@ -3338,10 +3350,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response72"
+                $ref: "#/components/schemas/Response73"
         "400":
           description: Bad Request
       summary: Create
+      tags:
+      - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/active-process:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response75"
+      summary: Active Process
       tags:
       - Workspace Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/agent-plugins:
@@ -3491,7 +3526,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response73"
+                $ref: "#/components/schemas/Response74"
       summary: Conflicts
       tags:
       - Workspace Controller
@@ -3622,7 +3657,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response71"
+                $ref: "#/components/schemas/Response72"
         "400":
           description: Bad Request
       summary: Discard
@@ -3647,7 +3682,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/WorkspaceDto"
+                $ref: "#/components/schemas/Response71"
       summary: Ensure Container
       tags:
       - Workspace Controller
@@ -3883,7 +3918,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response82"
+                $ref: "#/components/schemas/Response84"
       summary: Errors
       tags:
       - Workspace Telemetry Controller
@@ -3919,7 +3954,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response81"
+                $ref: "#/components/schemas/Response83"
       summary: Logs
       tags:
       - Workspace Telemetry Controller
@@ -3946,7 +3981,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response80"
+                $ref: "#/components/schemas/Response82"
       summary: Metrics
       tags:
       - Workspace Telemetry Controller
@@ -3985,7 +4020,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response79"
+                $ref: "#/components/schemas/Response81"
       summary: Slow Spans
       tags:
       - Workspace Telemetry Controller
@@ -4013,7 +4048,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response78"
+                $ref: "#/components/schemas/Response80"
       summary: Trace
       tags:
       - Workspace Telemetry Controller
@@ -4226,7 +4261,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response77"
+                $ref: "#/components/schemas/Response79"
         "400":
           description: Bad Request
       summary: Transcribe

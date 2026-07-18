@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryMetricDto } from './telemetryMetricDto';
+import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
 export interface Response80 { 
-    metrics?: Array<TelemetryMetricDto>;
+    trace?: TelemetryTraceDto;
 }
 
