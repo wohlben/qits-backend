@@ -1,0 +1,96 @@
+# qits' own in-repo configuration (docs/features/2026-07-18_qits-config-in-repo-configuration.md).
+# qits conforms to its own managed-app convention, so registering wohlben/qits-backend on a qits
+# deployment (qits-in-qits) ingests this file on clone — the dev-server daemon, build/test/lint
+# actions, and stack hints that docs/guides/qits-in-qits-registration.md used to describe as manual
+# UI steps. Editing qits' managed config is now a commit like any other.
+version: 1
+
+repository:
+  main-branch: main
+  archetype: SERVICE
+
+# Explicit stack hints (detection also finds these by markers): the Quarkus reactor at the root and
+# the Angular SPA under the service module's Quinoa UI dir.
+frameworks:
+  - kind: java-quarkus
+    root: .
+  - kind: ts-angular
+    root: service/src/main/webui
+
+daemons:
+  # The qits dev server: `quarkus:dev` serving the REST API on :8080 and the Angular SPA (Quinoa),
+  # live-reloaded and web-viewable through the parent qits' proxy. The web view frames QUARKUS
+  # (:8080, entry /projects) — qits' UI is SSE/websocket-heavy on /api, which Quarkus serves
+  # natively while Quinoa dev-proxies the SPA. See docs/guides/qits-in-qits-registration.md.
+  - name: qits dev server
+    description: >-
+      Runs `./mvnw -pl service -am quarkus:dev` — the qits REST API and the Angular SPA (Quinoa),
+      live-reloaded and web-viewable through the parent qits proxy.
+    # One command (folded). -Dqits.variant=forwardauth: every service build must name an auth variant
+    # (enforcer); %dev's fallback identity `dev` keeps the framed child usable. root-path serves
+    # under the web-view prefix; the OTEL flags light qits' own (dark-by-default) telemetry and
+    # bridge the injected endpoint into the Quarkus key (dev mode ignores the plain env var). The
+    # speech warmup is skipped so a demo child doesn't pull the ~700 MB model.
+    start: >-
+      ./mvnw -q -pl service -am quarkus:dev
+      -Dquarkus.bootstrap.workspace-discovery=true
+      -Dqits.variant=forwardauth
+      -Dquarkus.http.host=0.0.0.0
+      -Dquarkus.http.port=8080
+      -Dquarkus.http.root-path="${QITS_PUBLIC_BASE:-/}"
+      -Dquarkus.otel.sdk.disabled=false
+      -Dquarkus.otel.exporter.otlp.endpoint="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}"
+      -Dqits.speech.warmup-on-start=false
+    # With the Quinoa check-path fix, Quarkus prints this only after the Angular dev server answered
+    # its readiness probe — so READY implies the SPA is servable.
+    ready-pattern: "(?i)Listening on: http"
+    stop-signal: TERM
+    restart-policy: ON_FAILURE
+    auto-start: true
+    max-restarts: 3
+    otel: true
+    web-view:
+      port: 8080
+      entry-path: projects
+    observers:
+      - kind: LOG_LEVEL
+      - kind: PATTERN
+        pattern: "(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)"
+        severity: ERROR
+    sources:
+      - path: service/quarkus.log
+        label: Quarkus dev log
+    health-checks:
+      # COMMAND, not HTTP: /q/health sits under the env-expanded root path.
+      - name: Quarkus
+        kind: COMMAND
+        command: |-
+          curl -fsS -m 2 "http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health"
+      # Any HTTP answer on :4200 means ng serve is up (it may 302/404 bare paths under a serve path).
+      - name: Angular
+        kind: HTTP
+        port: 4200
+        path: /
+        expect-status: 2xx,3xx,4xx
+
+# Dogfood build/test/lint actions — the everyday qits workflow (CLAUDE.md). Every service-touching
+# build names the forwardauth variant; module-scoped domain/cli builds don't need it.
+actions:
+  - name: build
+    description: Full reactor build (frontend + backend), forwardauth variant.
+    execute: ./mvnw package -Dqits.variant=forwardauth
+  - name: test-domain
+    description: Domain service / business-logic tests.
+    execute: ./mvnw -pl domain test
+  - name: test-service
+    description: REST / mutiny / health / validation / openapi tests (forwardauth only).
+    execute: ./mvnw -pl service -am test -Dqits.variant=forwardauth
+  - name: test-cli
+    description: The seed command tests.
+    execute: ./mvnw -pl cli test
+  - name: format-check
+    description: Verify google-java-format (Spotless) formatting without rewriting.
+    execute: ./mvnw spotless:check -Dqits.variant=forwardauth
+  - name: lint-frontend
+    description: ESLint the Angular sources (TS + template a11y rules).
+    execute: pnpm --dir service/src/main/webui lint
