@@ -37,17 +37,29 @@ Related: [workspace submodule support](../features/2026-07-14_workspace-submodul
   build (`runAlways`, domain `process-test-resources`) and hard-fails when the fixture submodules
   aren't checked out, so a submodule-less clone cannot even compile.
 
-Then, on the repository detail page, run **“import submodules” once more**: the direct import
-covers `testing-repo`, `qits-fixture-angular` and `testing-repo-quarkus-angular`, but the
-quarkus-angular fixture nests `qits-fixture-angular` as its `webui` gitlink — the second pass
-imports that edge so workspace containers materialize the full closure.
+Then run **“import submodules” once on the `testing-repo-quarkus-angular` child’s detail page**:
+the creation-time import covers `testing-repo`, `qits-fixture-angular` and
+`testing-repo-quarkus-angular`, but the quarkus-angular fixture nests `qits-fixture-angular` as its
+`webui` gitlink. Import is **one level per repository, no descent**, so re-running it on the
+qits-backend parent is a no-op — the nested edge must be imported on the child that declares it, and
+it links back to the already-imported `qits-fixture-angular` sibling rather than adding a new row.
 
 ## 2. The dev-server daemon
 
-Create a daemon on the repository (UI: *Daemons → New*), fields as follows.
+**qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this daemon
+(and the build/test/lint actions), and qits ingests it on clone**
+([config-in-repo feature](../features/2026-07-18_qits-config-in-repo-configuration.md)). So after
+step 1 the daemon **already exists** — stored as **`qits dev server@qits-config`** with
+`origin: CONFIG`, rendered read-only in the UI with a `.qits-config` badge. You do **not** create it
+by hand; the fields below document what the file declares (and what to verify). To change any of
+them, edit `.qits-config.yml` in a workspace and let the next sync re-ingest — an accidental UI edit
+to a config-origin entry self-heals on the next reconcile. (A repository registered before this file
+existed, or one whose file you removed, still supports the manual *Daemons → New* path with the same
+fields.)
 
-**Name**: `qits dev server` — becomes `OTEL_SERVICE_NAME`; the browser side reports
-`qits dev server-browser`.
+**Name**: `qits dev server` — stored as `qits dev server@qits-config` (the reserved config-origin
+suffix). Becomes `OTEL_SERVICE_NAME`; the browser side reports `qits dev server@qits-config-browser`
+and the backend reports its artifact name `qits-forwardauth`.
 
 **Start script** (one line; shown wrapped):
 
@@ -113,12 +125,18 @@ Remember the two standing rules: daemon-definition changes apply on the next (re
 2. Web view renders the qits UI under `/daemon/{ws}/{d}/` — navigate, open a project, watch the
    child's own SSE-driven pages work in the frame.
 3. Parent workspace Telemetry tab: full-stack traces from the child — browser CLIENT spans
-   (`qits dev server-browser`, `app.route.*`, `code.function.name`) rooting the child's Quarkus
-   SERVER spans; no `/otel/v1/*`, `/daemon/*`, `/git/*` or `/mcp/*` self-spans (suppressed).
+   (`qits dev server@qits-config-browser`, `app.route.*`, `code.function.name`) rooting the child's
+   Quarkus SERVER spans (service `qits-forwardauth`); no `/otel/v1/*`, `/daemon/*`, `/git/*` or
+   `/mcp/*` self-spans (suppressed).
 4. Events tab: provoke a build failure (edit a `.java` file to junk via the file browser) → the
    PATTERN observer flags it; the FILE source tails the dev log.
 5. Capture: in the framed child UI, use the floaty capture button → a new workspace appears in
-   the **parent** whose goal carries the child UI snapshot including the `promptContext` state.
+   the **parent** whose goal carries the child UI snapshot (DOM + selected component). The
+   `promptContext` **state** entry rides along only if `PromptContextStore` was instantiated in the
+   session (a lazy `providedIn: 'root'` store — only the file-browser / command-chat /
+   speak-to-prompt / daemon-webview routes inject it), so it is absent from a capture off the fresh
+   Projects route — see
+   [`../issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md`](../issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md).
 
 ## Known limitations
 

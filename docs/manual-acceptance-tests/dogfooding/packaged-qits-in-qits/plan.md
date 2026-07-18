@@ -100,34 +100,36 @@ UI: *Projects → New project* → name `qits`. Then *Add repository*:
   **import submodules: ON** (without it the child build hard-fails in
   `derive-fixture-bares.sh`).
 
-Then on the repository detail page run **import submodules** once more (imports the
-quarkus-angular fixture's nested `webui` gitlink).
+Then open the **`testing-repo-quarkus-angular`** sibling's detail page and run **import
+submodules** once there (imports *its* nested `webui` gitlink). Import is one level per repository
+with no descent — running it again on the qits-backend parent is a no-op (its three direct edges
+already exist), so the nested edge must be imported on the child that declares it.
 
-*Expect:* the repository appears with a `main` workspace; the submodule import lists
+*Expect:* the repository appears with a `main` workspace; the creation-time import lists
 `testing-repo`, `qits-fixture-angular`, `testing-repo-quarkus-angular` as sibling repositories,
-and the second pass adds the nested edge.
+and the pass on the quarkus-angular child imports its `src/main/webui` edge (which links back to
+the already-imported `qits-fixture-angular` sibling rather than adding a new one).
 
-### 7. Create and start the qits dev-server daemon
+### 7. Verify the auto-provisioned daemon, then start it
 
-Create the daemon exactly per
-[the registration guide](../../../guides/qits-in-qits-registration.md) — in short: name
-`qits dev server`; otel **on**; web view port **8080**, entryPath `projects`; ready pattern
-`(?i)Listening on: http`; the start script:
+The daemon is **not created by hand any more**: qits-backend commits a root
+[`.qits-config.yml`](../../../../.qits-config.yml) that declares the `qits dev server` daemon (start
+script, otel, web view 8080/`projects`, ready pattern `(?i)Listening on: http`, LOG_LEVEL + PATTERN
+observers, the `service/quarkus.log` FILE source, both health checks) plus the build/test/lint
+actions. That file is **ingested on clone**
+([config-in-repo feature](../../../features/2026-07-18_qits-config-in-repo-configuration.md)), so
+after step 6 the daemon and actions already exist, config-managed and read-only.
 
-```bash
-./mvnw -q -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true \
-  -Dqits.variant=forwardauth -Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080 \
-  -Dquarkus.http.root-path="${QITS_PUBLIC_BASE:-/}" \
-  -Dquarkus.otel.sdk.disabled=false \
-  -Dquarkus.otel.exporter.otlp.endpoint="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}" \
-  -Dqits.speech.warmup-on-start=false
-```
+Confirm on the repository detail page (or via the API) that a daemon named **`qits dev
+server@qits-config`** is present with a `.qits-config` badge, `origin: CONFIG`, web view 8080 /
+`projects`, otel on — and that the six actions `build`, `test-domain`, `test-service`, `test-cli`,
+`format-check`, `lint-frontend` arrived with the reserved `@qits-config` name suffix. Then **start
+it on the `main` workspace** (Daemons panel → start; the workspace container materializes lazily on
+this first use).
 
-plus the LOG_LEVEL + PATTERN observers, the `service/quarkus.log` FILE source, and the two health
-checks from the guide. Start it on the `main` workspace (Daemons panel → start).
-
-*Expect:* first launch takes long (full in-container reactor + pnpm build; watch the daemon log).
-Status reaches `READY`; both health dots eventually green.
+*Expect:* the daemon and actions appear with no manual data entry (config warning empty). First
+launch takes long (full in-container reactor + pnpm build; warm shared `m2`/`pnpm` caches speed it a
+lot). Status reaches `READY`; both health dots (Quarkus COMMAND, Angular HTTP) go green.
 
 ### 8. Use the framed qits UI
 
@@ -151,9 +153,12 @@ curl -s -H 'Remote-User: tester' \
 
 *Expect:*
 
-- spans from **`qits dev server-browser`** (the child SPA: `documentLoad`, fetch/`resourceFetch`,
-  navigations) — the browser half of the relay;
-- spans from the child **backend** (Quarkus server spans, service name from its artifact);
+- spans from **`qits dev server@qits-config-browser`** (the child SPA: `documentLoad`,
+  `documentFetch`/`resourceFetch`, `Navigation`, `click`) — the browser half of the relay. The
+  service name carries the daemon's `@qits-config` suffix because the daemon was ingested from the
+  config file (§7); the `-browser` suffix is the SPA half;
+- spans from the child **backend** — Quarkus server spans under service name **`qits-forwardauth`**
+  (from its artifact): `HTTP GET`, `GET /auth/me`, `GET /projects`, …;
 - **no** spans for `/otel/v1/*`, `/daemon/*`, `/git/*`, `/mcp/*` (the suppress list);
 - the *Logs* view shows the child's log records (severity-classified).
 
@@ -161,18 +166,30 @@ curl -s -H 'Remote-User: tester' \
 
 In the framed child UI, click the floaty **Capture this page into qits** button, pick an element.
 
-*Expect:* a new `feature/<timestamp>` workspace appears in the **parent** whose goal carries the
-child-UI snapshot including the `promptContext` state entry.
+*Expect:* a new `feature/<timestamp>` workspace appears in the **parent** (capture posts same-origin
+to the parent's `/api/capture`), and the top window navigates to its `/wip` goal page; the goal
+carries the DOM snapshot + "Selected component" / "Rendered DOM" sections.
+
+The `promptContext` **state** entry only rides along if the child's `PromptContextStore` was
+instantiated during the session — a `providedIn: 'root'` signal store is created lazily on first
+injection, and only the file-browser / command-chat / speak-to-prompt / daemon-webview routes inject
+it. Captured from the fresh **Projects** route it is **absent** (no "## App state at capture"
+section); reach one of those routes first to see it. Tracked in
+[`docs/issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md`](../../../issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md).
 
 ## Acceptance checklist
 
 - [ ] Both images build from a plain checkout (no submodules).
-- [ ] Packaged container healthy on loopback; `401` without `Remote-User`, identity echoed with it.
-- [ ] qits-backend registered with two-level submodule import; workspace container materializes.
-- [ ] Daemon reaches `READY`; health dots green.
+- [ ] Packaged container healthy; `401` without `Remote-User`, identity echoed with it.
+- [ ] qits-backend registered with two-level submodule import (nested edge on the child); workspace
+      container materializes.
+- [ ] `.qits-config.yml` ingested on clone: `qits dev server@qits-config` daemon + the six
+      `@qits-config` actions present, config-managed, `configWarning` empty.
+- [ ] Daemon reaches `READY`; both health dots green.
 - [ ] Framed child UI usable through the web view, all requests under the proxy prefix.
 - [ ] Parent telemetry shows child browser **and** backend spans + logs; suppressed paths absent.
-- [ ] (Optional) Capture from the frame creates a parent workspace with `promptContext` state.
+- [ ] (Optional) Capture from the frame creates a parent workspace with the DOM/component snapshot
+      (the `promptContext` state entry only when the store was instantiated — see step 10).
 
 ## Cleanup
 
@@ -194,3 +211,14 @@ docker ps --filter name=qits-ws- -q | xargs -r docker rm -f   # siblings — rem
   container existed; recreate (stop-container → ensure-container → start).
 - **`pnpm install` fails in the child** → no GitHub reachability from workspace containers (the
   `@qits/angular` git dependency needs it).
+- **`.env`'s `QITS_WORKSPACE_GIT_HOST` seems ignored (packaged qits still answers the `qits`
+  alias)** → you are running the walk **from inside the devcontainer**, which exports
+  `QITS_WORKSPACE_GIT_HOST=qits` in the shell, and Docker Compose gives shell env precedence over
+  the `.env` file. Pass the alias inline so it wins:
+  `QITS_WORKSPACE_GIT_HOST=qits-mat docker compose -f docker-compose.prod.yml -f …/compose.local-port.yml up -d`
+  (recreate the container after fixing). Symptom otherwise is the two-stacks-on-`qits-net` alias
+  collision (`docs/issues/2026-07-17_two-stacks-collide-on-qits-net-alias.md`).
+- **`curl http://127.0.0.1:18080/…` returns nothing from inside the devcontainer** → the loopback
+  port is published on the **host** network namespace, unreachable from another container. Drive the
+  packaged qits by its qits-net DNS name instead (`http://qits-qits-1:8080`, the compose
+  service/container name). The `127.0.0.1:18080` overlay is for a human on the host.
