@@ -3,13 +3,13 @@
 ## Introduction
 
 Encountered (and fixed) while implementing
-[SPA observability](../../features/2026-07-06_spa-observability.md), whose `GET /api/config.json`
+[SPA observability](../../epics/qits-observability/features/2026-07-06_spa-observability.md), whose `GET /api/config.json`
 was the fixture SPA's first-ever GET API call. Affects the
-[servable quarkus-angular fixture](../../features/2026-07-05_servable-quarkus-angular-fixture.md)
-when framed by the [daemon web view](../../features/2026-07-06_daemon-webview-configuration.md)
+[servable quarkus-angular fixture](../../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md)
+when framed by the [daemon web view](../../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)
 (`quarkus.http.root-path=$QITS_PUBLIC_BASE`); any user app following the same integration pattern
 inherits the same trap, so the
-[Quarkus/Angular integration guide](../../feature-ideas/quarkus-angular-integration-guide.md)
+[Quarkus/Angular integration guide](../../epics/qits-integration-quarkus/features/2026-07-07_quarkus-angular-integration-guide.md)
 should carry the root-path-aware config.
 
 ## Observed

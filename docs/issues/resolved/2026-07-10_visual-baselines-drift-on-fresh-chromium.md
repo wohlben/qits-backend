@@ -3,7 +3,7 @@
 ## Introduction
 
 Encountered while adding the session-tree screenshot test for
-[embedded-workspace-agent-session](../features/2026-07-10_embedded-workspace-agent-session.md);
+[embedded-workspace-agent-session](../../epics/qits-workspace-detail/features/2026-07-10_embedded-workspace-agent-session.md);
 the visual-test setup itself is documented in `.pi/skills/screenshot-tests/SKILL.md`. Unrelated to
 that feature's change — the failing specs render components it doesn't touch.
 
@@ -51,7 +51,7 @@ Confirmed still reproducing on `main` with a clean working tree: `pnpm test:visu
 exactly the four listed baselines, each with a **small differ-ratio and no dimension change**
 (branch-tree 8448px / 0.03, commit-row 3286px / 0.05, file-viewer light+dark similar) — the
 fingerprint of pure text-rasterization drift, distinct from the earlier
-[dimension/content drift](resolved/2026-07-05_branch-tree-screenshot-baseline-drift.md) that a
+[dimension/content drift](2026-07-05_branch-tree-screenshot-baseline-drift.md) that a
 component change caused.
 
 Narrowed the root cause: `playwright` **is** already pinned by `pnpm-lock.yaml` (`1.61.0` →
@@ -73,5 +73,5 @@ Also, to keep the *next* drift diagnosable rather than mysterious:
   line whenever baselines are re-recorded.
 - Filed the durable fix (bake the Playwright cache **and** a pinned font set into `docker/workspace`
   so every environment renders identically) as a backlog idea — since **implemented 2026-07-13** as
-  [`docs/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md`](../../features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md);
+  [`docs/epics/qits-build-setup/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md`](../../epics/qits-build-setup/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md);
   the `qits/workspace` image is now the sole sanctioned baseline producer.

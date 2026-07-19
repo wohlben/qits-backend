@@ -2,7 +2,7 @@
 
 ## Introduction
 
-[Picked-element component attribution](../features/2026-07-10_picked-element-component-attribution.md)
+[Picked-element component attribution](../epics/qits-workspace-detail/features/2026-07-10_picked-element-component-attribution.md)
 shipped Angular-only, with paths-only tray chips and a two-exec working-tree cache marker. This
 parks the three follow-ups that were explicitly cut from that feature, phrased as changes to its
 **already-implemented** code (`ComponentMapService`/`AngularComponentParser` in `domain`,
@@ -10,11 +10,11 @@ parks the three follow-ups that were explicitly cut from that feature, phrased a
 
 Related / dependent plans:
 
-- `docs/features/2026-07-10_picked-element-component-attribution.md` — the landed feature every
+- `docs/epics/qits-workspace-detail/features/2026-07-10_picked-element-component-attribution.md` — the landed feature every
   item below modifies.
-- `docs/features/2026-07-03_framework-aware-file-browser.md` — the frontend framework-detection
+- `docs/epics/qits-workspace-detail/features/2026-07-03_framework-aware-file-browser.md` — the frontend framework-detection
   registry a framework-parameterized scan would consult.
-- `docs/features/2026-07-02_workspace-file-browser.md` — the file browser a tray chip would
+- `docs/epics/qits-workspace-detail/features/2026-07-02_workspace-file-browser.md` — the file browser a tray chip would
   deep-link into.
 
 ## 1. React/Vue scanner strategies
@@ -32,7 +32,7 @@ whose picks should be attributed.
 
 ## 2. Tray chip deep-link into the workspace file browser — **graduated**
 
-Shipped as `docs/features/2026-07-10_workspace-tab-url-and-picked-file-deep-link.md` (the trigger
+Shipped as `docs/epics/qits-workspace-detail/features/2026-07-10_workspace-tab-url-and-picked-file-deep-link.md` (the trigger
 fired): the speak-to-prompt rows' file paths became RouterLinks to the files tab with a `?path=`
 query param the browser resolves to the closest match. The repo/workspace ids come from
 speak-to-prompt's own inputs, so `PickedSnippet` needs no extension. Still open here: the

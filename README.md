@@ -114,7 +114,7 @@ variables, and upgrades are "run the same command again". (Prefer editing files?
 checkout at the end of this section.)
 
 `QITS_VARIANT` names the **auth build variant** baked into the app image at build time — there is no
-unauthenticated build and no runtime toggle (`docs/features/2026-07-16_build-variant-auth.md`). Pick
+unauthenticated build and no runtime toggle (`docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md`). Pick
 one of the two below. Either way: the first run is slow (it builds the workspace toolchain image +
 compiles the app); when it finishes, qits runs on the `qits-net` network (alias `qits`, port 8080, **no
 host port published** — your proxy on `qits-net` is the only way in, routing to `http://qits:8080`).

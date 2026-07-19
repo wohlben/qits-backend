@@ -29,7 +29,7 @@ import org.jboss.logging.Logger;
 /**
  * Seeds a demo project around the <b>servable</b> {@code testing-repo-quarkus-angular.git} fixture
  * (a minimal Quarkus 3 + Angular app, see {@code
- * docs/features/2026-07-05_servable-quarkus-angular-fixture.md}), so features that run real work in
+ * docs/epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md}), so features that run real work in
  * a workspace — dev-server daemons, the web-view picker, actions, the coding agent — have a
  * plausible app to point at. Sibling of {@link SeedService} (which seeds the tiny {@code
  * testing-repo} for pure git-mechanics demos); invoked from the {@code seed-webapp} command in
@@ -48,7 +48,7 @@ import org.jboss.logging.Logger;
  *     │    + the daemon and build/lint/test actions ingested from the fixture's committed
  *     │      .qits-config.yml on clone (a web-viewable "Quarkus dev server" on :4200 → /greeting,
  *     │      otel, LOG_LEVEL + PATTERN observers, a quarkus.log FILE source) — see
- *     │      docs/features/2026-07-18_qits-config-in-repo-configuration.md
+ *     │      docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md
  *     │    main       the default workspace (created at clone time)
  *     │    greeting   a plain workspace off feature/greeting (a fast-forward over main)
  *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only)
@@ -122,8 +122,9 @@ public class SeedWebappService {
         projectService.create(
             PROJECT_NAME,
             "Servable Quarkus 3 + Angular demo (testing-repo-quarkus-angular fixture)");
-    // Cloning ingests the fixture's committed .qits-config.yml (docs/features/
-    // 2026-07-18_qits-config-in-repo-configuration.md): the web-viewable "Quarkus dev server"
+    // Cloning ingests the fixture's committed .qits-config.yml (docs/epics/
+    // qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md): the
+    // web-viewable "Quarkus dev server"
     // daemon
     // (web view :4200 → /greeting, otel, LOG_LEVEL + PATTERN observers, a quarkus.log FILE source,
     // Quarkus COMMAND + Angular HTTP health checks) and the build/lint/test + Stack info actions.

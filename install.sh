@@ -24,7 +24,7 @@
 #
 # Re-running upgrades in place: it re-pulls the ref, rebuilds :latest, and recreates the container.
 # REQUIRED env: QITS_VARIANT — the auth build variant (forwardauth | oauth), baked into the app image
-# at build time (docs/features/2026-07-16_build-variant-auth.md); there is no runtime toggle.
+# at build time (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md); there is no runtime toggle.
 # Overridable via env: QITS_REPO, QITS_REF (branch/tag, default main), QITS_DIR (clone target).
 set -euo pipefail
 

@@ -3,7 +3,7 @@
 ## Introduction
 
 Observed while implementing
-[lazy workspace-container provisioning](../../features/2026-07-08_lazy-workspace-container-provisioning.md)
+[lazy workspace-container provisioning](../../epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md)
 (the failure predates that change — it reproduces identically on a clean `main` checkout). Related:
 the straggler-reap feature itself came from the orphaned forked-JVM wedge documented in the daemon
 supervision work (`DaemonSupervisor.reapStragglers`, `domain/.../daemon/control/DaemonSupervisor.java`).

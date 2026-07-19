@@ -3,9 +3,9 @@
 ## Introduction
 
 Discovered while doing the end-to-end UI verification of
-[tmux-backed daemons Increment 2](../features/2026-07-05_tmux-backed-daemons.md) (the interactive
+[tmux-backed daemons Increment 2](../../epics/qits-workspace-daemons/features/2026-07-05_tmux-backed-daemons.md) (the interactive
 terminal). Unrelated to that feature — this is a pre-existing defect in the daemon **Start/Stop**
-control buttons. Related: [daemons](../features/2026-07-04_daemons.md).
+control buttons. Related: [daemons](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md).
 
 ## Symptom
 

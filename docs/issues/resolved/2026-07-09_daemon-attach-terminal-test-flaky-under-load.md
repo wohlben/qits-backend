@@ -3,7 +3,7 @@
 ## Introduction
 
 Observed while implementing
-[lazy workspace-container provisioning](../../features/2026-07-08_lazy-workspace-container-provisioning.md)
+[lazy workspace-container provisioning](../../epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md)
 (unrelated to that change — the failing assertion concerns daemon-session teardown, which the change
 does not touch). Sibling of
 [daemon straggler-reap test fails in sandboxed env](2026-07-08_daemon-straggler-reap-test-fails-in-sandboxed-env.md):

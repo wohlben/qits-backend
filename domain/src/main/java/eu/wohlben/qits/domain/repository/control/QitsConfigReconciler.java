@@ -43,8 +43,8 @@ import org.jboss.logging.Logger;
 
 /**
  * Reconciles a repository's committed {@code .qits-config.yml} into the existing tables (see {@code
- * docs/features/2026-07-18_qits-config-in-repo-configuration.md}). Called on clone and on sync of
- * the main branch, plus via the explicit reload endpoint.
+ * docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md}).
+ * Called on clone and on sync of the main branch, plus via the explicit reload endpoint.
  *
  * <p>Declared config coexists with hand-made (UI) config: declared entries are namespaced by {@link
  * QitsConfig#CONFIG_NAME_SUFFIX}, and the write API rejects that suffix in user input, so a

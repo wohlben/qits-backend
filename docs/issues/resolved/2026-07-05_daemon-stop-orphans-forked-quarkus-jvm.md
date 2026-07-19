@@ -16,7 +16,7 @@ survives a stop, then is killed on relaunch.
 > `httpPort`) for a holder the marker can't reach. It was **removed**: it is unsafe under the test
 > fake, which runs the scan on the host, where it can SIGKILL an unrelated host process bound to that
 > port (it killed surefire's fork↔maven channel and crashed the JVM). It is also now redundant — the
-> [tmux-backed daemon model](../../features/2026-07-05_tmux-backed-daemons.md) makes daemons survive a qits
+> [tmux-backed daemon model](../../epics/qits-workspace-daemons/features/2026-07-05_tmux-backed-daemons.md) makes daemons survive a qits
 > restart, and a session qits lost track of is **re-adopted** (`adoptIfRunning`) rather than
 > collided-with, so the only markerless holders left are foreign processes qits should not be killing.
 
@@ -27,11 +27,11 @@ Verified live (before the tmux migration): the greeting dev-server daemon, previ
 ## Introduction
 
 Observed while verifying the OTEL fix for the `seed-webapp` "Quarkus dev server"
-[daemon](../features/2026-07-04_daemons.md). Concerns daemon
-[stop / process-group termination](../features/2026-07-04_daemons.md) (`DaemonSupervisor.stop` →
+[daemon](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md). Concerns daemon
+[stop / process-group termination](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) (`DaemonSupervisor.stop` →
 `CommandRegistry.signal`, `kill -s <SIG> -- -<pid>`) interacting with Quarkus dev mode, which forks a
 **second** JVM (the actual app, bound to the HTTP port) as a child of `mvnw`. Runs inside a
-[workspace container](../features/2026-07-04_workspace-containers.md).
+[workspace container](../../epics/qits-workspaces/features/2026-07-04_workspace-containers.md).
 
 ## Observed repro
 

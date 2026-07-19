@@ -3,9 +3,9 @@
 ## Introduction
 
 Found while running the full service suite for the
-[workspace bootstrap commands](../features/2026-07-18_workspace-bootstrap-commands.md) feature —
+[workspace bootstrap commands](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md) feature —
 unrelated to that change. Related: the daemon MCP tools
-([daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md)).
+([daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)).
 
 ## Observed
 

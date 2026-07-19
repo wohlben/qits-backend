@@ -4,11 +4,11 @@
 
 Related plans:
 
-- [unified-action-scope](../../features/2026-07-09_unified-action-scope.md) — the resolution.
-- [workspace-actions-tab](../../features/2026-07-09_workspace-actions-tab.md) — the surface that
+- [unified-action-scope](../../epics/qits-feature-flows/features/2026-07-09_unified-action-scope.md) — the resolution.
+- [workspace-actions-tab](../../epics/qits-workspace-detail/features/2026-07-09_workspace-actions-tab.md) — the surface that
   exposed it: the effective-actions tab shows every global action in every workspace, so the
   Maven/pnpm commands appeared under repositories they can't run in.
-- [feature-flows](../../features/2026-05-01_feature-flows.md) — the structural cause lived in its
+- [feature-flows](../../epics/qits-feature-flows/features/2026-05-01_feature-flows.md) — the structural cause lived in its
   `FeatureFlowPhaseAction` entity.
 - [seed-webapp global-action leak](2026-07-09_seed-webapp-leaks-global-actions.md) — the earlier,
   related symptom (duplicates of these same rows).
@@ -34,7 +34,7 @@ blueprint, so it was forced to create them global (`SeedWebappService.ensureGlob
 
 The two action entities were merged into one table with a nullable `repository` FK
 (`V27__unify_actions.sql`), so flows can bind actions of either scope — see
-[unified-action-scope](../../features/2026-07-09_unified-action-scope.md). The seed now creates
+[unified-action-scope](../../epics/qits-feature-flows/features/2026-07-09_unified-action-scope.md). The seed now creates
 the four as repository-scoped and its reset deletes the stale global copies earlier versions left
 behind (sparing any a user's flow still binds). Regression:
 `SeedWebappServiceTest.resetRescopesSeedActionsAndCleansStaleGlobals`.

@@ -5,7 +5,7 @@
 The `docker/workspace` image (and the `.devcontainer/` that extends it) installs a full JDK 25 that
 works for the Maven builds, but leaves `JAVA_HOME` unset. Tooling that discovers the JDK via
 `JAVA_HOME` rather than `PATH` — the VS Code Java extension (RedHat `jdtls`) and the `jdtls-lsp` Claude
-plugin from [agent-lsp-plugins](../../feature-ideas/agent-lsp-plugins.md) — then reports no Java
+plugin from [agent-lsp-plugins](../../epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md) — then reports no Java
 runtime despite Java being installed. Found while scoping the agent-LSP-plugins idea (jdtls needs
 `JAVA_HOME`), so this is a prerequisite for that feature.
 

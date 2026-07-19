@@ -149,7 +149,7 @@
             </plugin>
             <plugin>
                 <!-- Every PACKAGED service build must choose an auth variant explicitly — a shipped
-                     qits never defaults its auth (docs/features/2026-07-16_build-variant-auth.md).
+                     qits never defaults its auth (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md).
                      The -D property activates the matching profile in <profiles> below AND satisfies
                      this rule with one flag. Bound to prepare-package (not validate) on purpose:
                      pre-packaging work — quarkus:dev, test — runs flagless via the
@@ -172,9 +172,9 @@
   -Dqits.variant=forwardauth   trust forward-auth proxy headers (Remote-User/Remote-Groups) — the everyday dev/test variant
   -Dqits.variant=oauth         built-in OIDC login (Keycloak); requires QUARKUS_OIDC_* env at runtime
 (quarkus:dev and test default to forwardauth without the flag — a packaged build never defaults.)
-See docs/features/2026-07-16_build-variant-auth.md.</message>
+See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</message>
                                     <regexMessage>Unknown qits.variant — valid values are: forwardauth, oauth.
-See docs/features/2026-07-16_build-variant-auth.md.</regexMessage>
+See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</regexMessage>
                                 </requireProperty>
                             </rules>
                         </configuration>

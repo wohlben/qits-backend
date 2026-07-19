@@ -20,13 +20,13 @@ child sibling's origin does not have — and the next workspace container start 
 
 Related/dependent plans:
 
-- `docs/features/2026-07-14_workspace-submodule-support.md` — the feature this bounds: submodules
+- `docs/epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md` — the feature this bounds: submodules
   are sibling repositories; workspace containers clone them from the siblings' bare origins via the
   git host. Import materializes each sibling **once**; nothing refreshed them afterwards.
 - `docs/issues/resolved/2026-07-16_nested-submodule-clone-fails-workspace-container.md` — the
   previous encounter of this feature's boundary, in the same dogfooding setup (qits importing
   itself).
-- `docs/features/2026-07-08_lazy-workspace-container-provisioning.md` — container materialization
+- `docs/epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md` — container materialization
   (`WorkspaceService.ensureContainer` → `wireSubmodules`) is where the staleness surfaces.
 
 ## Observed (2026-07-18, qits self-import)

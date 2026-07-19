@@ -3,7 +3,7 @@
 ## Introduction
 
 Found while running the webui browser suite (`pnpm test:visual`) during the
-[daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) implementation. Unrelated
+[daemon web-view picker](../../epics/qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md) implementation. Unrelated
 to that feature — the failure reproduces on a clean checkout with no working-tree changes. No other
 plans depend on this; the other three browser specs (commit-row, file-viewer, dom-picker) pass.
 

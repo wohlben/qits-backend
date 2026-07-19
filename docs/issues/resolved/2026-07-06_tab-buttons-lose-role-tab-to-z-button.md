@@ -10,7 +10,7 @@
 ## Introduction
 
 Found while testing the workspace observation tabs
-([feature](../../features/2026-07-06_workspace-observation-tabs.md)): the `z-tab-group` tab strip is
+([feature](../../epics/qits-workspace-detail/features/2026-07-06_workspace-observation-tabs.md)): the `z-tab-group` tab strip is
 not exposed as tabs to assistive technology. Related: the zard tabs component
 (`shared/components/tabs/tabs.component.ts`) and button component
 (`shared/components/button/button.component.ts`); the webui convention "Templates must pass

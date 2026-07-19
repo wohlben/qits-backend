@@ -3,16 +3,16 @@
 ## Introduction
 
 Found while E2E-verifying
-[backend telemetry meta-enrichment](../features/2026-07-11_backend-telemetry-meta-enrichment.md).
+[backend telemetry meta-enrichment](../../epics/qits-observability/features/2026-07-11_backend-telemetry-meta-enrichment.md).
 Both that feature and its sibling
-[SPA telemetry meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md) assume
+[SPA telemetry meta-enrichment](../../epics/qits-observability/features/2026-07-11_spa-telemetry-meta-enrichment.md) assume
 "the span drill-down already renders arbitrary attributes" — richer drill-downs with zero UI
 change. That holds for the **API and the agent's MCP tools**, but not for the **Telemetry tab**:
 the trace detail displays only kind/name/duration/status per span, so `code.function.name`,
 `code.file.path`, `greeting.name`, `app.route.*` etc. never appear anywhere in the UI. Related:
-[workspace observation tabs](../features/2026-07-06_workspace-observation-tabs.md) (the tab in
+[workspace observation tabs](../../epics/qits-workspace-detail/features/2026-07-06_workspace-observation-tabs.md) (the tab in
 question), and the parked
-[picked-file deep link](../features/2026-07-10_workspace-tab-url-and-picked-file-deep-link.md)
+[picked-file deep link](../../epics/qits-workspace-detail/features/2026-07-10_workspace-tab-url-and-picked-file-deep-link.md)
 move that a `code.file.path` display could reuse for Files-tab deep links.
 
 ## Observed

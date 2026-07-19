@@ -2,11 +2,11 @@
 
 ## Introduction
 
-The `seed-webapp` demo ([servable Quarkus+Angular fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md),
-[full-feature integration](../feature-ideas/quarkus-angular-fixture-full-integration.md)) seeds a
-"Quarkus dev server" [daemon](../features/2026-07-04_daemons.md) whose `startScript` is
+The `seed-webapp` demo ([servable Quarkus+Angular fixture](../../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md),
+[full-feature integration](../../epics/qits-testing-fixtures/features/2026-07-05_quarkus-angular-fixture-full-integration.md)) seeds a
+"Quarkus dev server" [daemon](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) whose `startScript` is
 `./mvnw -q quarkus:dev …`. That daemon runs inside a
-[workspace container](../features/2026-07-04_workspace-containers.md) built from
+[workspace container](../../epics/qits-workspaces/features/2026-07-04_workspace-containers.md) built from
 `docker/workspace/Dockerfile`. Two toolchain gaps in that image stop the fixture from ever building,
 so the daemon crashes on launch. This is a fixture/image bug, **not** a daemon-supervisor or
 event-surfacing bug — the crash is correctly detected, restarted per policy, and surfaced (see below).

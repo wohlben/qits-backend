@@ -3,15 +3,15 @@
 ## Introduction
 
 Found while end-to-end-verifying the
-[workspace-detail tab consolidation](../features/2026-07-09_workspace-detail-tab-consolidation.md)
+[workspace-detail tab consolidation](../epics/qits-workspace-detail/features/2026-07-09_workspace-detail-tab-consolidation.md)
 (a pure-frontend change — this issue is backend/fixture behavior). Concerns the
-[daemons](../features/2026-07-04_daemons.md) observer pipeline (`LogLevelClassifier`,
-`ERROR_DETECTED` → DEGRADED), the [daemon web-view proxy](../features/2026-07-05_daemon-webview-picker.md)
-(`DaemonProxyRoute`), and the [servable fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)'s
+[daemons](../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) observer pipeline (`LogLevelClassifier`,
+`ERROR_DETECTED` → DEGRADED), the [daemon web-view proxy](../epics/qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md)
+(`DaemonProxyRoute`), and the [servable fixture](../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md)'s
 SPA-observability `config.json` relay. Sibling of the resolved
 [degraded-false-positive-on-quarkus-dev-output](resolved/2026-07-05_degraded-false-positive-on-quarkus-dev-output.md)
 — same "healthy demo reads as broken" symptom, different (and this time genuinely
-ERROR-classified) trigger. The [daemon-healthchecks idea](../features/2026-07-10_daemon-healthchecks.md)'s
+ERROR-classified) trigger. The [daemon-healthchecks idea](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md)'s
 deferred **auto-recovering DEGRADED** is the principled fix direction.
 
 ## Observed (devcontainer, 2026-07-09)

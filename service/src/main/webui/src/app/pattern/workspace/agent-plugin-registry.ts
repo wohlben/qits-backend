@@ -2,7 +2,7 @@
  * The curated set of coding-agent LSP plugins qits knows how to install, from the pre-registered
  * `claude-plugins-official` marketplace. This is a small static list (not fetched) joined against the
  * backend's installed-status for the shared credential volume — see the Plugins tab
- * ({@link WorkspacePluginsComponent}) and `docs/features/2026-07-07_agent-lsp-plugins.md`.
+ * ({@link WorkspacePluginsComponent}) and `docs/epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md`.
  *
  * Each entry names the framework id(s) it serves (from {@link detectFrameworks}: `java-quarkus`,
  * `ts-angular`), so the tab can float the plugins a workspace actually wants to the top — without

@@ -1,6 +1,6 @@
 # Nested (depth ≥ 2) submodules fail the workspace container clone
 
-First real-world hit of the boundary `docs/features/2026-07-14_workspace-submodule-support.md`
+First real-world hit of the boundary `docs/epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md`
 documents as a follow-up ("only single-level submodules materialize offline"): a workspace for a
 repo whose submodule itself has submodules fails to start.
 
@@ -23,13 +23,13 @@ repo whose submodule itself has submodules fails to start.
 
 Related/dependent plans:
 
-- `docs/features/2026-07-14_workspace-submodule-support.md` — the feature this bounds; its status
+- `docs/epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md` — the feature this bounds; its status
   note already names nested container materialization as the follow-up. The host-side import is
   fully recursive (edges for all levels exist in the DB); only the container-side URL wiring stops
   at depth 1.
-- `docs/features/2026-07-08_lazy-workspace-container-provisioning.md` — `provisionContainer` is
+- `docs/epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md` — `provisionContainer` is
   where the wiring happens.
-- `docs/features/2026-07-16_build-variant-auth.md` — unrelated to the failure (the git host is on
+- `docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md` — unrelated to the failure (the git host is on
   the public path list in every variant; the errors are genuine 404s, not auth denials), noted only
   because this surfaced during the first Dokploy prod deployment.
 

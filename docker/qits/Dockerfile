@@ -17,7 +17,7 @@
 #     and COPYied in — that is what lets the manual installer (install.sh) run entirely inside a
 #     throwaway container with only the docker socket mounted: the source never has to land on a
 #     host path; it reaches the host daemon purely as this build's context. Build from the REPO ROOT
-#     as context, naming the auth build variant (docs/features/2026-07-16_build-variant-auth.md — no
+#     as context, naming the auth build variant (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md — no
 #     default, an image is either forward-auth-proxied or OIDC, never toggleable at runtime):
 #
 #         docker build -t qits/app:latest --build-arg QITS_VARIANT=forwardauth -f docker/qits/Dockerfile .
@@ -114,7 +114,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # The visual baselines committed under service/src/main/webui (__screenshots__/*.png) are only
 # reproducible on the exact Chromium build AND font stack that rendered them, so both are baked
 # into this image, which is the sole sanctioned producer of baselines — see
-# docs/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md and the
+# docs/epics/qits-build-setup/features/2026-07-13_screenshot-baseline-renderer-baked-into-image.md and the
 # screenshot-tests skill. Fonts first, in their own layer (they essentially never change; the
 # browser layer below changes on playwright bumps): fontconfig + DejaVu (Chromium's default Linux
 # sans-serif fallback), Liberation (metric-compatible Arial/Helvetica/Times), Noto core + color
@@ -175,7 +175,7 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION} \
 ENV DISABLE_AUTOUPDATER=1
 
 # Language servers for the coding agent's LSP plugins (jdtls-lsp / typescript-lsp from the
-# claude-plugins-official marketplace — see docs/features/2026-07-07_agent-lsp-plugins.md). The
+# claude-plugins-official marketplace — see docs/epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md). The
 # plugins only *wire up* a language server that must already be on PATH; they do not bundle one. The
 # binaries are HOME-independent common toolchain (unlike the plugins themselves, which live on the
 # shared /claude-home volume and are installed at runtime), so they belong in the image next to the

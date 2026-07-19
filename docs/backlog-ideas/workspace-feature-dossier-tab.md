@@ -10,15 +10,15 @@ session rather than a one-shot report.
 
 Related/dependent plans:
 
-- **Extends the [workspace detail tab consolidation](../features/2026-07-09_workspace-detail-tab-consolidation.md)**
-  and [draggable tabs](../features/2026-07-09_draggable-workspace-detail-tabs.md) — one more
+- **Extends the [workspace detail tab consolidation](../epics/qits-workspace-detail/features/2026-07-09_workspace-detail-tab-consolidation.md)**
+  and [draggable tabs](../epics/qits-workspace-detail/features/2026-07-09_draggable-workspace-detail-tabs.md) — one more
   `<z-tab>` in the existing group; drag-reorder persistence already merges unknown labels
   gracefully.
-- Likely draws on the same context machinery as [chat](../features/2026-07-04_workspace-chat-dialog.md)
-  and the [coding agent harness](../features/2026-07-01_coding-agent-harness.md), since
+- Likely draws on the same context machinery as [chat](../epics/qits-workspace-detail/features/2026-07-04_workspace-chat-dialog.md)
+  and the [coding agent harness](../epics/qits-coding-agents/features/2026-07-01_coding-agent-harness.md), since
   "relevant information" (diffs, related files, prior chat context) overlaps with what the agent
   already has access to in a workspace.
-- Synergy with the [dynamic filters](../features/2026-07-03_workspace-filter-ordered-rules-and-ignorelists.md)
+- Synergy with the [dynamic filters](../epics/qits-workspace-detail/features/2026-07-03_workspace-filter-ordered-rules-and-ignorelists.md)
   machinery already built for the file browser — but in the other direction: the dossier's
   "relevant to this change" file list could feed the file browser as a *new* dynamic filter
   (e.g. a whitelist rule set derived from the dossier), so the file browser can be narrowed to

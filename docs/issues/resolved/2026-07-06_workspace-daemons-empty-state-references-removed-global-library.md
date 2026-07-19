@@ -8,8 +8,8 @@
 ## Introduction
 
 Cosmetic stale-copy bug found while walking a fresh repo through the
-[integration guide](../feature-ideas/quarkus-angular-integration-guide.md) (Tier 1). Related
-plans: [daemons](../features/2026-07-04_daemons.md) — the global daemon scope this copy refers
+[integration guide](../../epics/qits-integration-quarkus/features/2026-07-07_quarkus-angular-integration-guide.md) (Tier 1). Related
+plans: [daemons](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) — the global daemon scope this copy refers
 to was removed there (`V19__drop_global_daemon_scope.sql`).
 
 ## Observed

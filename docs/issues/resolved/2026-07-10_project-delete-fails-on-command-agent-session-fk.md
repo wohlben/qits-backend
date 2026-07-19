@@ -3,9 +3,9 @@
 ## Introduction
 
 Found while running the `seed-webapp` reset during verification of
-[daemon-healthchecks](../../features/2026-07-10_daemon-healthchecks.md) — unrelated to that feature.
+[daemon-healthchecks](../../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) — unrelated to that feature.
 Introduced by
-[chat persistence on the transcript channel](../../features/2026-07-10_chat-persistence-on-transcript.md)
+[chat persistence on the transcript channel](../../epics/qits-coding-agents/features/2026-07-10_chat-persistence-on-transcript.md)
 (V28, commit `6640fea`).
 Related: `V10__worktree_history.sql` (which established the cascade convention this FK missed).
 

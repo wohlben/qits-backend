@@ -4,7 +4,7 @@
 
 Related / dependent plans:
 
-- `docs/features/2026-07-04_container-agent-sessions.md` — the shared-credential-volume login model this bug undermined.
+- `docs/epics/qits-coding-agents/features/2026-07-04_container-agent-sessions.md` — the shared-credential-volume login model this bug undermined.
 - `docs/issues/resolved/2026-07-05_claude-auth-login-terminal-no-input.md` — the sibling login fix (wrong command); surfaced while testing this one.
 - `docker/workspace/Dockerfile` — sets `ENV HOME=/workspace`, the root of this bug.
 - The `WorkspaceContainerFactory` refactor (single container-creation seam) — where the fix lands.

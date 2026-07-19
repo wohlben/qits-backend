@@ -4,10 +4,10 @@
 
 ## Introduction
 
-A follow-on to the [qits-net devcontainer unification](../../features/2026-07-07_qits-net-devcontainer-unification.md)
-and [web-view port frozen at container creation](web-view-port-frozen-at-container-creation.md):
+A follow-on to the [qits-net devcontainer unification](../../epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md)
+and [web-view port frozen at container creation](2026-07-07_web-view-port-frozen-at-container-creation.md):
 the same move that made qits reach workspace containers by DNS name surfaced this second web-view
-regression. Related: the [daemon web-view configuration](../../features/2026-07-06_daemon-webview-configuration.md)
+regression. Related: the [daemon web-view configuration](../../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)
 feature and the [Quarkus+Angular integration guide](../../guides/quarkus-angular-integration.md)
 (whose symptom table now lists this).
 

@@ -27,7 +27,7 @@ interface PluginRow {
  * The Plugins section of the workspace detail page's Agents tab: the curated coding-agent LSP plugins
  * ({@link AGENT_PLUGIN_REGISTRY}) joined with their install status on the shared credential volume.
  * The store is global to that volume, so status is identical in every workspace and an install here
- * turns the plugin green everywhere (see `docs/features/2026-07-07_agent-lsp-plugins.md`).
+ * turns the plugin green everywhere (see `docs/epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md`).
  *
  * Plugins the workspace's detected frameworks want are floated to the top and badged "Recommended",
  * without hiding the rest — the everything-visible-surfaced-by-rules convention. Framework detection

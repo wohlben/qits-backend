@@ -8,11 +8,11 @@ Found while walking
 
 Related/dependent plans:
 
-- [`docs/features/2026-07-14_capture-state-snapshot.md`](../features/2026-07-14_capture-state-snapshot.md) —
+- [`docs/epics/qits-integration-angular/features/2026-07-14_capture-state-snapshot.md`](../epics/qits-integration-angular/features/2026-07-14_capture-state-snapshot.md) —
   the `withQitsSnapshot(key)` mechanism whose registration is lazy here.
-- [`docs/features/2026-07-14_spa-feature-capture.md`](../features/2026-07-14_spa-feature-capture.md) —
+- [`docs/epics/qits-integration-angular/features/2026-07-14_spa-feature-capture.md`](../epics/qits-integration-angular/features/2026-07-14_spa-feature-capture.md) —
   the capture payload + `CaptureGoalRenderer` "App state at capture" section that is consequently absent.
-- [`docs/features/2026-07-18_qits-dogfooding-managed-app-convention.md`](../features/2026-07-18_qits-dogfooding-managed-app-convention.md) —
+- [`docs/epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md`](../epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md) —
   qits' own `PromptContextStore` carries `withQitsSnapshot('promptContext')`; the acceptance walk
   expects a capture of the qits UI to include it.
 

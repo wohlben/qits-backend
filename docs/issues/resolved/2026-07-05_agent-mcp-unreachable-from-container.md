@@ -12,8 +12,8 @@
 
 Related / dependent plans:
 
-- `docs/features/2026-07-01_coding-agent-harness.md` — the coding agent + its scoped MCP servers (repository / actions / telemetry tools).
-- `docs/features/2026-07-04_workspace-containers.md` — the container execution model and how a container reaches the qits host.
+- `docs/epics/qits-coding-agents/features/2026-07-01_coding-agent-harness.md` — the coding agent + its scoped MCP servers (repository / actions / telemetry tools).
+- `docs/epics/qits-workspaces/features/2026-07-04_workspace-containers.md` — the container execution model and how a container reaches the qits host.
 - `docs/issues/resolved/2026-07-05_chat-hangs-setsid-tears-down-stdin.md` — the chat-hang fix; this MCP bug was visible in the same stream (`mcp=['repository:failed']`) once the chat responded.
 - Memory: WSL2 git-host resolves to the distro's eth0 IP (`host.docker.internal` isn't container-reachable on this Docker Desktop / WSL2 box).
 

@@ -17,7 +17,7 @@
 
 Related/dependent plans:
 
-- `docs/features/2026-07-16_build-variant-auth.md` — `QitsAuthPolicy` covers websockets-next
+- `docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md` — `QitsAuthPolicy` covers websockets-next
   upgrades; the oauth variant's `q_session` cookie is the credential that must ride along on the
   terminal/chat WS handshakes.
 - `docs/guides/deployment.md` — the Dokploy deployment this was observed on (Traefik terminates

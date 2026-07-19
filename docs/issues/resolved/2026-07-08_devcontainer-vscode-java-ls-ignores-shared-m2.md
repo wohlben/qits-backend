@@ -6,7 +6,7 @@ Found right after fixing the [stale-container bring-up
 failure](./2026-07-08_devcontainer-stale-container-wont-start.md): each *clean* devcontainer appeared
 to re-download every Maven dependency from Central, even though a shared `qits_shared_m2` volume was
 supposed to persist them. Related: [qits-net devcontainer
-unification](../features/2026-07-07_qits-net-devcontainer-unification.md),
+unification](../../epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md),
 [.devcontainer/docker-compose.yml](../../.devcontainer/docker-compose.yml).
 
 ## Symptom

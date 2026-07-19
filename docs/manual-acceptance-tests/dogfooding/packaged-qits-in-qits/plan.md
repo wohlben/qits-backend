@@ -8,7 +8,7 @@ own repository in it, launch the qits dev-server daemon in a workspace container
 qits UI through the web view, and verify telemetry from the child arrived in the parent.
 
 This is the acceptance walk for
-[qits dogfooding](../../../features/2026-07-18_qits-dogfooding-managed-app-convention.md); the
+[qits dogfooding](../../../epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md); the
 registration details it applies come from
 [qits-in-qits-registration](../../../guides/qits-in-qits-registration.md) and the packaged-run
 mechanics from [deployment](../../../guides/deployment.md). Sister document:
@@ -117,7 +117,7 @@ The daemon is **not created by hand any more**: qits-backend commits a root
 script, otel, web view 8080/`projects`, ready pattern `(?i)Listening on: http`, LOG_LEVEL + PATTERN
 observers, the `service/quarkus.log` FILE source, both health checks) plus the build/test/lint
 actions. That file is **ingested on clone**
-([config-in-repo feature](../../../features/2026-07-18_qits-config-in-repo-configuration.md)), so
+([config-in-repo feature](../../../epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md)), so
 after step 6 the daemon and actions already exist, config-managed and read-only.
 
 Confirm on the repository detail page (or via the API) that a daemon named **`qits dev

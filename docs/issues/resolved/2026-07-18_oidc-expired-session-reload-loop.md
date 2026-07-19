@@ -27,7 +27,7 @@
 
 Related/dependent plans:
 
-- `docs/features/2026-07-16_build-variant-auth.md` — the oauth variant whose 499-for-marked-XHR
+- `docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md` — the oauth variant whose 499-for-marked-XHR
   contract this loop rides on; its "Accepted edge" (header-less transports can't send the marker)
   is a direct contributor here.
 - `docs/issues/2026-07-17_idle-websocket-reaped-behind-proxy.md` — the 60s access-token lifespan
@@ -35,7 +35,7 @@ Related/dependent plans:
   operator recommendation (raise the lifespan) also shrinks this bug's trigger surface.
 - `service/src/main/webui/src/app/shared/core/interceptors/auth-session.interceptor.ts` — the
   sole frontend expiry handler, and the core defect.
-- `docs/features/2026-07-07_workspace-sse-live-updates.md` — the SSE channel whose auto-reconnect
+- `docs/epics/qits-workspaces/features/2026-07-07_workspace-sse-live-updates.md` — the SSE channel whose auto-reconnect
   becomes an anonymous challenge generator once the session is dead.
 
 ## Observed (prod, oauth variant, 2026-07-18)

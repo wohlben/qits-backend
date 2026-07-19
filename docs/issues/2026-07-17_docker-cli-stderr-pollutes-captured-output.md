@@ -13,7 +13,7 @@
 
 Related/dependent plans:
 
-- `docs/features/2026-07-04_workspace-containers.md` — `DockerExecutor` is the runtime whose
+- `docs/epics/qits-workspaces/features/2026-07-04_workspace-containers.md` — `DockerExecutor` is the runtime whose
   captured output this corrupts.
 - `docs/guides/deployment.md` — the Dokploy prod deployment where it was observed; the trigger is
   a deployment-side `HOME` anomaly (below).

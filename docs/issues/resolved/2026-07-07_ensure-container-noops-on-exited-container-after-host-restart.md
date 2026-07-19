@@ -3,11 +3,11 @@
 ## Introduction
 
 Found while walking a fresh starter through the
-[integration guide](../feature-ideas/quarkus-angular-integration-guide.md) (Tier 5), after a
+[integration guide](../../epics/qits-integration-quarkus/features/2026-07-07_quarkus-angular-integration-guide.md) (Tier 5), after a
 WSL2/docker restart mid-walk. Related plans:
-[workspace containers](../features/2026-07-04_workspace-containers.md) (owns
-`ensureContainer`/`ContainerRuntime`), [daemons](../features/2026-07-04_daemons.md) (the launch
-path that hits the failure), [disposable workspace containers](../features/2026-07-04_disposable-workspace-containers.md)
+[workspace containers](../../epics/qits-workspaces/features/2026-07-04_workspace-containers.md) (owns
+`ensureContainer`/`ContainerRuntime`), [daemons](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) (the launch
+path that hits the failure), [disposable workspace containers](../../epics/qits-workspaces/features/2026-07-04_disposable-workspace-containers.md)
 (the recreate semantics the fix should reuse).
 
 ## Observed repro

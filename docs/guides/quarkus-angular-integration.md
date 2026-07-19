@@ -5,7 +5,7 @@ This guide walks a **stock `code.quarkus.io` starter** (extensions `rest-jackson
 browsing, a web-viewable dev-server daemon with per-service healthchecks, log observation,
 backend OTEL, and frontend OTEL through the backend gateway. It was written by performing exactly this walk on a fresh starter
 (2026-07-06/07) and cross-checking against the reference implementation, the
-[`testing-repo-quarkus-angular` fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)
+[`testing-repo-quarkus-angular` fixture](../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md)
 — every snippet below is the validated form.
 
 It is written for two readers: a **human** integrating their own repo, and the **coding agent**
@@ -42,7 +42,7 @@ Two rules learned the hard way, used throughout:
    live workspace needs a container recreate: `POST …/stop-container` then
    `POST …/ensure-container`, then a daemon start. (After a docker/host restart, the same
    recreate sequence is currently also the fix for wedged containers — see
-   [this issue](../issues/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md).)
+   [this issue](../issues/resolved/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md).)
 
 ## Registering the app
 
@@ -160,7 +160,7 @@ target-ide/
 `${project.basedir}` resolves per-module, so each module gets its own `target-ide/`. CLI builds
 (`./mvnw …`, and `quarkus:dev`) never activate the profile and keep using `target/` — verified in
 qits itself, where this replaced an earlier, wrong "disable the build cache for the module" patch
-(see [maven-build-cache](../features/2026-07-05_maven-build-cache.md)).
+(see [maven-build-cache](../epics/qits-build-setup/features/2026-07-05_maven-build-cache.md)).
 
 **Verify:** with the `quarkus:dev` daemon running (Tier 1), edit a `.java` file and save. The
 daemon hot-reloads cleanly — no `Unresolved compilation problems`, no mass "Unsatisfied
@@ -172,7 +172,7 @@ by Maven. If the IDE still shows stale red, reload the window so the language se
 ## Tier 1 — the dev-server daemon
 
 Daemons are defined **per repository** and run **per workspace** (see
-[daemons](../features/2026-07-04_daemons.md)). Create the dev-server daemon:
+[daemons](../epics/qits-workspace-daemons/features/2026-07-04_daemons.md)). Create the dev-server daemon:
 
 ```bash
 curl -s -X POST http://localhost:8080/api/repositories/<repoId>/daemons \
@@ -225,7 +225,7 @@ dev server `:4200` — one process group, one `readyPattern`). If Angular dies o
 Quarkus stays up, the daemon still reads READY and the app is half-broken with no signal.
 Healthchecks close that gap: named probes qits runs on an interval **inside the workspace
 container**, each with its own green/red/grey dot beside the status chip. See
-[daemon healthchecks](../features/2026-07-10_daemon-healthchecks.md).
+[daemon healthchecks](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md).
 
 **qits-side only — no app changes.** Extend the daemon definition (full `PUT`, as always):
 
@@ -294,7 +294,7 @@ The trap tier. The daemon web view frames your app in an iframe served through q
 frame targets the **frontend dev server (`:4200`)** for HMR; the SPA's API calls travel
 base-relative through the ng dev-server proxy to Quarkus, which serves under the same prefix
 via `quarkus.http.root-path` (already in the Tier 1 startScript). Full design:
-[daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md).
+[daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md).
 
 ### App-side changes (five pieces, all required)
 
@@ -376,7 +376,7 @@ Note `ensure-container` returns **immediately** with a `technicalProcessId` and 
 background — watch the streamed segments at
 `GET /api/technical-processes/<technicalProcessId>/events` (SSE), or poll the workspace's
 `runtimeStatus` until it reads `RUNNING`
-(see [the technical-process log stream](../features/2026-07-18_technical-process-log-stream.md)).
+(see [the technical-process log stream](../epics/qits-technical-processes/features/2026-07-18_technical-process-log-stream.md)).
 
 The container kill looks like a crash to the supervisor, so an `ON_FAILURE`/`ALWAYS` daemon
 auto-relaunches and — since [the relaunch now re-reads the definition](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)
@@ -408,7 +408,7 @@ hot-reloads the frame; the *Pick element* DOM picker highlights and records a pi
 
 Daemon output is observed line-by-line; a rolling file gets you the full backend log even when
 `-q` quiets Maven. See
-[daemon log observation](../features/2026-07-04_daemon-log-observation-expansion.md).
+[daemon log observation](../epics/qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md).
 
 **App-side** — `application.properties`:
 
@@ -486,7 +486,7 @@ chat, the agent's `telemetryErrors`/`telemetryTrace`/`telemetrySlowSpans`/`telem
 ### Meta-enrichment: handler attribution and span depth
 
 The backend counterpart of Tier 5's meta-enrichment
-([backend-telemetry-meta-enrichment](../features/2026-07-11_backend-telemetry-meta-enrichment.md)):
+([backend-telemetry-meta-enrichment](../epics/qits-observability/features/2026-07-11_backend-telemetry-meta-enrichment.md)):
 Quarkus's automatic server spans carry HTTP semconv only — nothing names the handler, and the
 trace has no interior. Two conventions fix that, both demonstrated in the fixture:
 
@@ -527,17 +527,17 @@ themselves (`code.function.name`, `code.file.path`, `greeting.name`, and Quarkus
 `code.function.name`/`code.line.number` on log records) are on the spans/records but the tab
 renders names/durations only — check them via the workspace `telemetry/traces/{traceId}` API or
 the agent's `telemetryTrace` MCP tool
-([known gap](../issues/2026-07-11_telemetry-trace-detail-omits-span-attributes.md)).
+([known gap](../issues/resolved/2026-07-11_telemetry-trace-detail-omits-span-attributes.md)).
 
 ---
 
 ## Tier 5 — frontend OTEL through the backend gateway
 
-The convention ([spa-observability](../features/2026-07-06_spa-observability.md)): the backend
+The convention ([spa-observability](../epics/qits-observability/features/2026-07-06_spa-observability.md)): the backend
 acts as its SPA's telemetry gateway with two small resources, and the SPA exports base-relative
 to its own backend. The SPA half ships as the **[`@qits/angular`
 library](https://github.com/wohlben/qits-angular-integration)**
-([qits-angular-integration-library](../features/2026-07-13_qits-angular-integration-library.md))
+([qits-angular-integration-library](../epics/qits-integration-angular/features/2026-07-13_qits-angular-integration-library.md))
 — only the two backend resources are still copied from the fixture (they are app-agnostic;
 adjust the package):
 
@@ -546,14 +546,14 @@ adjust the package):
    MicroProfile Config); returns `"telemetry": null` when no endpoint is configured — the gate
    that keeps a standalone or otel-off run dark (the library stays inert dead weight). It also
    relays the independently-nullable `capture` section
-   ([spa-feature-capture](../features/2026-07-14_spa-feature-capture.md)):
+   ([spa-feature-capture](../epics/qits-integration-angular/features/2026-07-14_spa-feature-capture.md)):
    `{"ingestUrl": <qits.capture.endpoint>, "resourceAttributes": …}` from
    `QITS_CAPTURE_ENDPOINT`, `null` without it — the gate that hides the capture button.
 2. **`OtelProxyResource`** — `POST /api/otel/v1/{traces|logs|metrics}`, byte-verbatim
    passthrough to `${endpoint}/v1/{signal}`; 404 when unconfigured, 502 on forward failure.
 
 qits itself is now a **second implementer** of this backend half
-([qits dogfooding](../features/2026-07-18_qits-dogfooding-managed-app-convention.md)): its
+([qits dogfooding](../epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md)): its
 `ConfigResource` is the same relay, but because qits *is* an OTLP receiver at that exact path,
 its variant of resource 2 is a **tee** (`OtelForwarder`) — store locally, forward upstream
 fire-and-forget when the endpoint is configured — rather than the fixture's pure proxy. Copy the
@@ -566,8 +566,8 @@ tests for both resources worth copying along. Its `src/main/webui` is now a **ne
 consumer** of the library (SHA-pinned git dependency, two-line wiring) — physically lives in the
 `qits-fixture-angular` repo; run `git submodule update --init` to populate it. qits materializes it
 offline by importing the submodule as a sibling repository (see
-`docs/features/2026-07-14_fixture-repos-split-and-submodules.md` and
-`docs/features/2026-07-14_workspace-submodule-support.md`).
+`docs/epics/qits-testing-fixtures/features/2026-07-14_fixture-repos-split-and-submodules.md` and
+`docs/epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md`).
 
 Frontend side — install the library (git-only distribution, SHA-pinned; the fixture's
 `package.json` carries the current known-good pin):
@@ -625,7 +625,7 @@ quarkus.otel.traces.suppress-application-uris=${quarkus.http.root-path:/}api/ote
 The traps that remain **app-side**, each one load-bearing (the rest — verbatim exporter URLs
 composed from `document.baseURI`, the `ignoreUrls` exclusion of the passthrough so exports don't
 instrument themselves, the 1 s flush that survives web-view iframe removal — moved *into* the
-library; details in the [feature doc](../features/2026-07-06_spa-observability.md)):
+library; details in the [feature doc](../epics/qits-observability/features/2026-07-06_spa-observability.md)):
 
 - **`provideHttpClient(withFetch())`** — Angular's default XHR backend is invisible to
   the fetch instrumentation: without it, no client span and no `traceparent`, so no full-stack
@@ -643,7 +643,7 @@ library; details in the [feature doc](../features/2026-07-06_spa-observability.m
 
 ### Meta-enrichment: route context, interactions, caller attribution
 
-The convention's second layer ([spa-telemetry-meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md)),
+The convention's second layer ([spa-telemetry-meta-enrichment](../epics/qits-observability/features/2026-07-11_spa-telemetry-meta-enrichment.md)),
 now entirely inside the library — three attribute families answering *where in the app*
 telemetry happened, all for free once wired:
 
@@ -710,20 +710,20 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
 
 ## Related documents
 
-- Features: [daemons](../features/2026-07-04_daemons.md) ·
-  [daemon healthchecks](../features/2026-07-10_daemon-healthchecks.md) ·
-  [daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md) ·
-  [daemon log observation](../features/2026-07-04_daemon-log-observation-expansion.md) ·
-  [observability](../features/2026-07-04_observability.md) ·
-  [spa-observability](../features/2026-07-06_spa-observability.md) ·
-  [spa-telemetry-meta-enrichment](../features/2026-07-11_spa-telemetry-meta-enrichment.md) ·
-  [backend-telemetry-meta-enrichment](../features/2026-07-11_backend-telemetry-meta-enrichment.md) ·
-  [framework-aware file browser](../features/2026-07-03_framework-aware-file-browser.md) ·
-  [servable fixture](../features/2026-07-05_servable-quarkus-angular-fixture.md)
+- Features: [daemons](../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) ·
+  [daemon healthchecks](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) ·
+  [daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) ·
+  [daemon log observation](../epics/qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md) ·
+  [observability](../epics/qits-observability/features/2026-07-04_observability.md) ·
+  [spa-observability](../epics/qits-observability/features/2026-07-06_spa-observability.md) ·
+  [spa-telemetry-meta-enrichment](../epics/qits-observability/features/2026-07-11_spa-telemetry-meta-enrichment.md) ·
+  [backend-telemetry-meta-enrichment](../epics/qits-observability/features/2026-07-11_backend-telemetry-meta-enrichment.md) ·
+  [framework-aware file browser](../epics/qits-workspace-detail/features/2026-07-03_framework-aware-file-browser.md) ·
+  [servable fixture](../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md)
 - Resolved issues distilled above:
   [OTEL endpoint not bridged in dev mode](../issues/resolved/2026-07-05_quarkus-otel-endpoint-not-bridged.md) ·
   [Quinoa ignored-prefix root-path loop](../issues/resolved/2026-07-06_quinoa-ignored-prefix-root-path-loop.md)
 - Issues found while validating this guide:
   [stale daemon definition on relaunch](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md) ·
-  [ensure-container no-ops on exited containers](../issues/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md) ·
-  [daemons empty state references removed global library](../issues/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md)
+  [ensure-container no-ops on exited containers](../issues/resolved/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md) ·
+  [daemons empty state references removed global library](../issues/resolved/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md)

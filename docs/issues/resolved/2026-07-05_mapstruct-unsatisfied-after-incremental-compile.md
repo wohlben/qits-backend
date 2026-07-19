@@ -16,7 +16,7 @@
 
 Related / dependent plans:
 
-- `docs/features/2026-07-05_maven-build-cache.md` — the build-cache work that surfaced (and shares the
+- `docs/epics/qits-build-setup/features/2026-07-05_maven-build-cache.md` — the build-cache work that surfaced (and shares the
   root shape of) this bug; it flagged root-causing this fragility as a follow-up, which this resolves.
   Note the build cache also hit the *same* failure class via a different trigger (an empty
   `target/classes` on restore), fixed there by attaching `classes` to the restored outputs.

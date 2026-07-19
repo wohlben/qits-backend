@@ -12,11 +12,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end proof that the variant wiring reaches the full service surface (the service suite runs
- * under -Dqits.variant=forwardauth — see docs/features/2026-07-16_build-variant-auth.md; the
- * fine-grained mechanism coverage lives in the auth modules' own suites). The %test dev-user
- * fallback is blanked here so the real prod posture shows: protected paths 401 without the proxy
- * header — including /daemon/*, a raw router route — while the container-facing public surface (git
- * host, OTLP ingest, agent-session hook, health) stays token-free.
+ * under -Dqits.variant=forwardauth — see
+ * docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md; the fine-grained
+ * mechanism coverage lives in the auth modules' own suites). The %test dev-user fallback is blanked
+ * here so the real prod posture shows: protected paths 401 without the proxy header — including
+ * /daemon/*, a raw router route — while the container-facing public surface (git host, OTLP ingest,
+ * agent-session hook, health) stays token-free.
  */
 @QuarkusTest
 @TestProfile(ForwardAuthVariantTest.Profile.class)

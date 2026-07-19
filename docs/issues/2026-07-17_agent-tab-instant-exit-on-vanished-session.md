@@ -12,11 +12,11 @@
 
 Related/dependent plans:
 
-- `docs/features/2026-07-10_embedded-workspace-agent-session.md` — the resolution contract this
+- `docs/epics/qits-workspace-detail/features/2026-07-10_embedded-workspace-agent-session.md` — the resolution contract this
   changes (step 3: auto-resume → explicit choice).
-- `docs/features/2026-07-10_agent-session-lineage.md` — the recorded lineage the resolution reads;
+- `docs/epics/qits-coding-agents/features/2026-07-10_agent-session-lineage.md` — the recorded lineage the resolution reads;
   the lineage stays authoritative for *what* can be resumed, just not *when* it happens.
-- `docs/features/2026-07-08_lazy-workspace-container-provisioning.md` — re-materialization is one
+- `docs/epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md` — re-materialization is one
   way the agent-side session state diverges from qits' recorded lineage.
 
 ## Observed (prod, 2026-07-17)

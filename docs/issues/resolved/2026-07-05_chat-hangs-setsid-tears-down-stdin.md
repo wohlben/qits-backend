@@ -4,8 +4,8 @@
 
 Related / dependent plans:
 
-- `docs/features/2026-07-04_container-agent-sessions.md` — the stream-json chat over a container `docker exec` pipe.
-- `docs/features/2026-07-04_workspace-containers.md` — the per-workspace container execution model and the `CommandRegistry` spawn seams.
+- `docs/epics/qits-coding-agents/features/2026-07-04_container-agent-sessions.md` — the stream-json chat over a container `docker exec` pipe.
+- `docs/epics/qits-workspaces/features/2026-07-04_workspace-containers.md` — the per-workspace container execution model and the `CommandRegistry` spawn seams.
 - `docs/issues/2026-07-05_agent-mcp-unreachable-from-container.md` — a **separate** bug surfaced while diagnosing this one (the agent's MCP server is unreachable from the container).
 
 ## Symptom

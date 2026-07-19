@@ -2,8 +2,8 @@
 
 ## Introduction
 
-Fallout from the [workspace bootstrap commands](../features/2026-07-18_workspace-bootstrap-commands.md)
-reentrancy design and the [technical-process log stream](../features/2026-07-18_technical-process-log-stream.md).
+Fallout from the [workspace bootstrap commands](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)
+reentrancy design and the [technical-process log stream](../epics/qits-technical-processes/features/2026-07-18_technical-process-log-stream.md).
 Related to the `WorkspaceBootstrapRunner` in-flight guard that lets an event-triggered chain yield to
 an already-running manual run.
 

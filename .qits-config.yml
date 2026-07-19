@@ -1,4 +1,4 @@
-# qits' own in-repo configuration (docs/features/2026-07-18_qits-config-in-repo-configuration.md).
+# qits' own in-repo configuration (docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md).
 # qits conforms to its own managed-app convention, so registering wohlben/qits-backend on a qits
 # deployment (qits-in-qits) ingests this file on clone — the dev-server daemon, build/test/lint
 # actions, and stack hints that docs/guides/qits-in-qits-registration.md used to describe as manual
@@ -73,7 +73,7 @@ daemons:
         path: /
         expect-status: 2xx,3xx,4xx
 
-# The bootstrap chain (docs/features/2026-07-18_workspace-bootstrap-commands.md): ordered one-shot
+# The bootstrap chain (docs/epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md): ordered one-shot
 # steps a freshly provisioned child-qits workspace runs before the dev-server daemon auto-starts.
 # The order is load-bearing — the repo's own build guard fails any lifecycle build once something
 # listens on :8080, so `install` can never run after the daemon is up. Both cli seeds are

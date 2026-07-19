@@ -3,7 +3,7 @@
 ## Introduction
 
 qits now conforms to its own managed-app convention
-([feature doc](../features/2026-07-18_qits-dogfooding-managed-app-convention.md)): the real
+([feature doc](../epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md)): the real
 `wohlben/qits-backend` repository can be registered on a qits deployment (dev or prod) and managed
 like any other Quarkus+Angular app — framed web view, health dots, log observation, full-stack
 telemetry into the parent's Telemetry tab, and the SPA capture button. This guide is the exact
@@ -13,11 +13,11 @@ registration recipe; the general walk it specializes is
 This is a *current-state contract* document: when a feature changes the contract, update this
 guide in place.
 
-Related: [workspace submodule support](../features/2026-07-14_workspace-submodule-support.md) ·
-[daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md) ·
-[daemon healthchecks](../features/2026-07-10_daemon-healthchecks.md) ·
-[spa-feature-capture](../features/2026-07-14_spa-feature-capture.md) ·
-[workspace bootstrap commands](../features/2026-07-18_workspace-bootstrap-commands.md).
+Related: [workspace submodule support](../epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md) ·
+[daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) ·
+[daemon healthchecks](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) ·
+[spa-feature-capture](../epics/qits-integration-angular/features/2026-07-14_spa-feature-capture.md) ·
+[workspace bootstrap commands](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md).
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ Related: [workspace submodule support](../features/2026-07-14_workspace-submodul
 
 **On a packaged deployment this step is automatic.** A `NORMAL`-launch-mode qits (jar / native /
 prod image) self-seeds at startup
-([startup self-seed feature](../features/2026-07-19_startup-qits-self-seed.md)): it boots into a
+([startup self-seed feature](../epics/qits-live-deployment/features/2026-07-19_startup-qits-self-seed.md)): it boots into a
 `"qits"` project with `wohlben/qits-backend` and `wohlben/qits-angular-integration` already
 registered, the qits-backend submodules imported (including the one second-level import on the
 `testing-repo-quarkus-angular` child), and each repo's `.qits-config.yml` ingested. Nothing below is
@@ -60,7 +60,7 @@ it links back to the already-imported `qits-fixture-angular` sibling rather than
 ## 2. The bootstrap chain — the child self-bootstraps
 
 `.qits-config.yml` also declares a **`bootstrap:` chain**
-([feature doc](../features/2026-07-18_workspace-bootstrap-commands.md)) that qits runs inside a
+([feature doc](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)) that qits runs inside a
 freshly provisioned workspace container **before the dev-server daemon auto-starts**:
 
 1. `install` — `./mvnw install -DskipTests -Dqits.variant=forwardauth` (so the cli jar exists; this
@@ -81,7 +81,7 @@ daemons come up.
 
 **qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this daemon
 (and the build/test/lint actions), and qits ingests it on clone**
-([config-in-repo feature](../features/2026-07-18_qits-config-in-repo-configuration.md)). So after
+([config-in-repo feature](../epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md)). So after
 step 1 the daemon **already exists** — stored as **`qits dev server@qits-config`** with
 `origin: CONFIG`, rendered read-only in the UI with a `.qits-config` badge. You do **not** create it
 by hand; the fields below document what the file declares (and what to verify). To change any of

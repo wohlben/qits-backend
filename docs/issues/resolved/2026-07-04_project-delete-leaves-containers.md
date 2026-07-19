@@ -3,17 +3,17 @@
 ## Introduction
 
 Found during the manual E2E of
-[observability](../features/2026-07-04_observability.md): deleting the throwaway test project
+[observability](../../epics/qits-observability/features/2026-07-04_observability.md): deleting the throwaway test project
 returned 200 and removed all DB rows, but the workspace's Docker container
 (`qits-ws-otel-e2e-…`) kept running and had to be `docker rm -f`'d by hand. Not caused by the
 observability feature — it's the delete paths of
-[workspace containers](../features/2026-07-04_workspace-containers.md) predating it.
+[workspace containers](../../epics/qits-workspaces/features/2026-07-04_workspace-containers.md) predating it.
 
 Related/dependent plans:
 
-- [Workspace containers](../features/2026-07-04_workspace-containers.md) — owns the
+- [Workspace containers](../../epics/qits-workspaces/features/2026-07-04_workspace-containers.md) — owns the
   container-per-workspace lifecycle whose teardown is incomplete here.
-- [Disposable workspace containers](../features/2026-07-04_workspace-containers.md) /
+- [Disposable workspace containers](../../epics/qits-workspaces/features/2026-07-04_workspace-containers.md) /
   `WorkspaceService.stopContainer` — already has the correct removal primitive to reuse.
 
 ## Observed

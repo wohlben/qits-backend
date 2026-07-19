@@ -21,9 +21,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  * qits.workspace.claude-volume} at {@code HOME=/claude-home}, so Claude Code's plugin store under
  * {@code $CLAUDE_CONFIG_DIR/plugins} is global: installing from any workspace is visible in all of
  * them, and status is a property of the volume, not the workspace (see {@code
- * docs/features/2026-07-07_agent-lsp-plugins.md}). Endpoints therefore hang off a workspace only
- * because a workspace is what owns a container to run the op inside — any workspace acts on the
- * same global store.
+ * docs/epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md}). Endpoints therefore
+ * hang off a workspace only because a workspace is what owns a container to run the op inside — any
+ * workspace acts on the same global store.
  *
  * <p>Both ops route through {@link ContainerRuntime#exec} with {@code HOME} pointed at the shared
  * mount, exactly like {@link AgentAuthStatus}. Listing is <em>claude-binary-free</em> — it {@code

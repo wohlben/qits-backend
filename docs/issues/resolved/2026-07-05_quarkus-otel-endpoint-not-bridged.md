@@ -27,9 +27,9 @@ added for this repo (so it auto-applies without the per-daemon flag).
 
 Found while diagnosing the [DEGRADED false-positive](2026-07-05_degraded-false-positive-on-quarkus-dev-output.md)
 on the `seed-webapp` "Quarkus dev server" daemon. Concerns the
-[observability](../../features/2026-07-04_observability.md) OTLP injection
+[observability](../../epics/qits-observability/features/2026-07-04_observability.md) OTLP injection
 (`OtelEnvironment`/`QitsHostResolver`) and the
-[Quarkus+Angular fixture](../../features/2026-07-05_servable-quarkus-angular-fixture.md) app config.
+[Quarkus+Angular fixture](../../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md) app config.
 
 ## Observed
 

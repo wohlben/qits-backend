@@ -7,14 +7,14 @@ place when a change alters it.
 
 Related/dependent plans:
 
-- `.devcontainer/` (`docs/features/2026-07-07_qits-net-devcontainer-unification.md`) — the dev stack
+- `.devcontainer/` (`docs/epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md`) — the dev stack
   this deployment mirrors. The prod image is the devcontainer minus the IDE/dev-user bits.
-- `docs/features/2026-07-04_workspace-containers.md`,
-  `docs/features/2026-07-08_lazy-workspace-container-provisioning.md` — why qits needs the docker
+- `docs/epics/qits-workspaces/features/2026-07-04_workspace-containers.md`,
+  `docs/epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md` — why qits needs the docker
   socket and the shared network.
 - `QitsHostResolver` / `qits.workspace.git-host` — how workspace containers address qits.
-- `docs/features/2026-07-04_container-agent-sessions.md` — the shared Claude Code login volume.
-- `docs/features/2026-07-16_build-variant-auth.md` — auth is a BUILD variant (`forwardauth` |
+- `docs/epics/qits-coding-agents/features/2026-07-04_container-agent-sessions.md` — the shared Claude Code login volume.
+- `docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md` — auth is a BUILD variant (`forwardauth` |
   `oauth`), selected at install time; the "Ingress / auth" section below is the deployment side of
   that design.
 
@@ -127,7 +127,7 @@ host docker daemon. It MUST NOT be exposed unauthenticated. `docker-compose.prod
 **no host port**; front qits with a proxy on `qits-net` (or attach qits to the proxy's network)
 routing to `http://qits:8080`. The `ports:` block is commented out for local debugging only.
 
-**Auth is baked into the image at build time** (`docs/features/2026-07-16_build-variant-auth.md`):
+**Auth is baked into the image at build time** (`docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md`):
 `QITS_VARIANT` at install time picks one of the two variants below, and there is no runtime toggle —
 no build of qits runs unauthenticated.
 

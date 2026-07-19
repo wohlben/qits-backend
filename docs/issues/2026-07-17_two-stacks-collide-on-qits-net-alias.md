@@ -15,7 +15,7 @@ Related/dependent plans:
 
 - `docs/guides/deployment.md` / `docker-compose.prod.yml` / `docker-compose.dokploy.yml` — the
   deployment contract this breaks; the fix parameterizes them.
-- `docs/features/2026-07-07_qits-net-devcontainer-unification.md` — the design assumption ("qits
+- `docs/epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md` — the design assumption ("qits
   reaches workspace containers by DNS and vice versa over one shared network") that silently
   became "at most ONE qits per server".
 - `QitsHostResolver` / `qits.workspace.git-host`, `qits.workspace.network` (DockerExecutor) — the

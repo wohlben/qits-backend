@@ -11,10 +11,10 @@
 ## Introduction
 
 Found while walking a fresh starter through the
-[integration guide](../feature-ideas/quarkus-angular-integration-guide.md) (Tier 2, adding a
+[integration guide](../../epics/qits-integration-quarkus/features/2026-07-07_quarkus-angular-integration-guide.md) (Tier 2, adding a
 `webView` to a live daemon). Related plans:
-[daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md) (the
-recreate-container affordance this collides with), [daemons](../features/2026-07-04_daemons.md)
+[daemon web-view configuration](../../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) (the
+recreate-container affordance this collides with), [daemons](../../epics/qits-workspace-daemons/features/2026-07-04_daemons.md)
 (the supervisor's restart machinery).
 
 ## Observed repro

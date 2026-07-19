@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) serves every daemon
+The [daemon web-view picker](../epics/qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md) serves every daemon
 through the path-prefix proxy (`/daemon/{workspaceId}/{daemonId}/*`) on the qits origin: the dev
 server is launched with `QITS_PUBLIC_BASE` so it natively serves under the prefix, the proxy
 forwards bytes verbatim, the iframe is same-origin, and the picker reaches into
@@ -16,9 +16,9 @@ routing plus proxy-side picker injection.
 Related/dependent plans:
 
 - Changes the proxy and picker shipped by the
-  [daemon web-view picker](../features/2026-07-05_daemon-webview-picker.md) — this is a modification
+  [daemon web-view picker](../epics/qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md) — this is a modification
   of that code, not a parallel implementation. Everything here assumes that feature exists.
-- The proxied thing is still a [daemon](../features/2026-07-04_daemons.md) instance; the daemon
+- The proxied thing is still a [daemon](../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) instance; the daemon
   definition gains a mode field (below).
 
 ## What exists today (the code being changed)

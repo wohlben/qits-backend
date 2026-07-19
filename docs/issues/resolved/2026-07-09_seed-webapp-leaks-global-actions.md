@@ -4,12 +4,12 @@
 
 Related plans:
 
-- [seed-webapp / servable fixture](../../features/2026-07-05_servable-quarkus-angular-fixture.md) —
+- [seed-webapp / servable fixture](../../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md) —
   the command whose reset contract is broken.
-- [workspace-actions-tab](../../features/2026-07-09_workspace-actions-tab.md) — the surface that
+- [workspace-actions-tab](../../epics/qits-workspace-detail/features/2026-07-09_workspace-actions-tab.md) — the surface that
   exposed it: the new effective-actions endpoint/tab lists every global action, so the
   duplicates are now user-visible on every workspace.
-- [actions](../../features/2026-05-01_actions.md) / [feature-flows](../../features/2026-05-01_feature-flows.md)
+- [actions](../../epics/qits-feature-flows/features/2026-05-01_actions.md) / [feature-flows](../../epics/qits-feature-flows/features/2026-05-01_feature-flows.md)
   — global `ActionConfiguration` is deliberately project-independent, which is exactly why the
   project-cascade reset misses it.
 

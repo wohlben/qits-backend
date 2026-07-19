@@ -11,7 +11,7 @@
 
     <modules>
         <module>domain</module>
-        <!-- Build-variant auth (docs/features/2026-07-16_build-variant-auth.md): plain library
+        <!-- Build-variant auth (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md): plain library
              jars; exactly one variant module is pulled into `service` by the profile the mandatory
              -Dqits.variant=oauth|forwardauth flag activates. In the reactor unconditionally so
              `-am` and dev-mode workspace-discovery resolve whichever one the profile picked. -->

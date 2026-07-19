@@ -7,7 +7,7 @@ import { TelemetrySpanDto } from '@/api/model/telemetrySpanDto';
  * with the meaningful `Navigation` span, so kind can't tell them apart; we classify by name and
  * treat this family as **default-hidden** (revealable via a toggle). `Navigation` stays visible.
  *
- * @see docs/features/2026-07-06_spa-observability.md
+ * @see docs/epics/qits-observability/features/2026-07-06_spa-observability.md
  */
 export const PAGE_LOAD_SPAN_NAMES: ReadonlySet<string> = new Set([
   'resourceFetch',

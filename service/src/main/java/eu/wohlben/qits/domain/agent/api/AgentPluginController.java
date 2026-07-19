@@ -17,8 +17,9 @@ import java.util.List;
  * shared credential volume and install one. The store is <strong>global</strong> to the volume
  * (installing from any workspace flips it green in every workspace), so these hang off a workspace
  * only because a workspace owns the container the op runs inside — see {@link AgentPluginService}
- * and {@code docs/features/2026-07-07_agent-lsp-plugins.md}. The curated list of installable
- * plugins (ids, labels, framework hints) lives in the frontend and is joined against this status.
+ * and {@code docs/epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md}. The curated
+ * list of installable plugins (ids, labels, framework hints) lives in the frontend and is joined
+ * against this status.
  */
 @Path("/repositories/{repoId}/workspaces/{workspaceId}/agent-plugins")
 @Produces(MediaType.APPLICATION_JSON)

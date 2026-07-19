@@ -5,7 +5,7 @@
 Hit while trying to bring the qits devcontainer up (VS Code "Reopen in Container" /
 `devcontainer up`). Not a defect in our config — an interaction between the devcontainer CLI's
 `--no-recreate` reuse and VS Code's ephemeral, per-session GUI socket mounts on Docker Desktop / WSL2.
-Related: [qits-net devcontainer unification](../features/2026-07-07_qits-net-devcontainer-unification.md),
+Related: [qits-net devcontainer unification](../../epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md),
 [.devcontainer/docker-compose.yml](../../.devcontainer/docker-compose.yml).
 
 ## Symptom

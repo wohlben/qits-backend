@@ -4,10 +4,10 @@
 
 ## Introduction
 
-The second regression from the [qits-net devcontainer unification](../../features/2026-07-07_qits-net-devcontainer-unification.md),
+The second regression from the [qits-net devcontainer unification](../../epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md),
 found right after the [web-view host-not-allowed fix](2026-07-07_web-view-host-not-allowed-after-devcontainer-move.md).
 Touches the container→qits contract owned by [`QitsHostResolver`](../../../domain/src/main/java/eu/wohlben/qits/domain/repository/control/QitsHostResolver.java)
-and the [spa-observability](../../features/2026-07-06_spa-observability.md) / OTEL path
+and the [spa-observability](../../epics/qits-observability/features/2026-07-06_spa-observability.md) / OTEL path
 (`OtelEnvironment` → the app's `OtelProxyResource` → qits' `OtelReceiverResource`). Related guide:
 [Quarkus+Angular integration](../../guides/quarkus-angular-integration.md) Tiers 4–5.
 
