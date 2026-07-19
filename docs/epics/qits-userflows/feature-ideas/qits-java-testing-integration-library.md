@@ -10,29 +10,29 @@ prerequisite of this feature.** After implementation, the qits reactor's `userfl
 contains **exclusively actual user stories** (its `src/test` today) plus a dependency on the
 library; the framework — the `UserStory` model, the annotations, the JUnit 5 extension, the
 `Flow` step-recording facade, the report model (`userflow.json`) and its renderers *including
-the artifactory renderer* — lives in the library, consumable by **any qits-managed project**.
+the artifacts renderer* — lives in the library, consumable by **any qits-managed project**.
 
 That last clause is the point: today the [epic's](../epic.md) golden-diffing loop is only
 authorable for qits itself, because the framework is locked inside qits' reactor. With the
 library, a managed project adds one test-scoped dependency, writes stories against its own UI,
 and its workspace branches produce the `ci-userstories` goldens the
-[diff tab](qits-artifactory-workspace-userflow-diff-tab.md) compares — the epic's capability
+[diff tab](qits-artifacts-workspace-userflow-diff-tab.md) compares — the epic's capability
 becomes a property of *projects qits manages*, not of qits alone.
 
 Related/dependent plans:
 
 - **Hard dependency** — [qits-userflows](qits-userflows.md) (part 1): this is a pure
   extraction; the framework must exist first. Cleanest **after the
-  [artifactory renderer](qits-userflows-artifactory-renderer.md)** (part 2) as well, since
+  [artifacts renderer](qits-userflows-artifacts-renderer.md)** (part 2) as well, since
   that plan deliberately puts the renderer in the same `src/main` — extracting between parts
   1 and 2 would just mean the renderer lands in the library repo instead. Independent of the
-  [diff tab](qits-artifactory-workspace-userflow-diff-tab.md) (part 3).
+  [diff tab](qits-artifacts-workspace-userflow-diff-tab.md) (part 3).
 - **Shape and naming precedent** —
   [qits-angular-integration-library](../../qits-integration-angular/features/2026-07-13_qits-angular-integration-library.md):
   standalone repo under `wohlben/`, the qits fixture as reference consumer, qits' toolchain
   mirrored, a deliberately small public API. This plan is the same move one module over.
-- **Distribution route, eventually** — the `qits-artifactory-maven-repository` follow-up epic
-  ([artifactory epic](../../qits-artifactory/epic.md), Follow-ups): a qits-hosted maven
+- **Distribution route, eventually** — the `qits-artifacts-maven-repository` follow-up epic
+  ([artifacts epic](../../qits-artifacts/epic.md), Follow-ups): a qits-hosted maven
   repository is the natural long-term home for resolving this library inside workspace
   builds. Not a dependency — an interim channel ships first (Design sketch) — but this
   library becomes that epic's first first-party artifact when it lands.
@@ -44,7 +44,7 @@ Related/dependent plans:
 ## Motivation
 
 The [qits-userflows](qits-userflows.md) plan already made the framework qits-agnostic on
-purpose: no dependency on `domain`, `service`, or `artifactory`; the app under test is reached
+purpose: no dependency on `domain`, `service`, or `artifacts`; the app under test is reached
 by URL. A framework with no qits coupling that can only be used from inside qits' reactor is
 an accident of packaging, not a design. Extraction makes the boundary real — and hardens the
 plan's own `src/main`/`src/test` discipline structurally: once the framework is a separate
@@ -59,7 +59,7 @@ bump, exactly the friction that keeps plumbing out of story modules).
    toolchain: JDK 25, Spotless google-java-format, the same wrapper discipline. Maven
    coordinates `eu.wohlben.qits:qits-java-testing-integration`.
 2. **The library is today's `src/main`, whole.** Annotations, JUnit extension, `Flow` facade,
-   report model + `userflow.json` emission, the markdown renderer, the artifactory renderer
+   report model + `userflow.json` emission, the markdown renderer, the artifacts renderer
    and its uploader `main` — package root stays `eu.wohlben.qits.userflows` so story imports
    survive the move untouched. Dependency posture unchanged: Playwright (Java) + JUnit 5 (+
    `java.net.http` for the renderer), no Quarkus, no qits modules.
@@ -99,11 +99,11 @@ bump, exactly the friction that keeps plumbing out of story modules).
 
 ## Out of scope
 
-- **The maven protocol repository** — its own future epic on the artifactory backbone; this
+- **The maven protocol repository** — its own future epic on the artifacts backbone; this
   feature ships on an interim channel and merely becomes its first customer.
 - **Any framework evolution** (new `Flow` verbs, report changes, new renderers) — extraction
   is behavior-preserving by contract.
-- **qits UI/backend changes** — the diff tab already consumes artifactory metadata and never
+- **qits UI/backend changes** — the diff tab already consumes artifacts metadata and never
   knew where the framework lived.
 - **Onboarding tooling for managed projects** (a starter archetype, a "add user stories"
   action template) — natural follow-ups once a first external consumer exists.

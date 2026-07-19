@@ -34,14 +34,14 @@ class PublicPathsTest {
   }
 
   @Test
-  void artifactoryBlobStoreIsPublic() {
+  void artifactsBlobStoreIsPublic() {
     // Token-free at the session-policy layer — CI uploaders hold no session; writes are guarded by
     // the static-token filter in `service`, reads (serves) must work as a plain <img> src.
-    assertTrue(PublicPaths.isPublic("/api/artifactory"));
-    assertTrue(PublicPaths.isPublic("/api/artifactory/repositories/ci-screenshots/blobs"));
+    assertTrue(PublicPaths.isPublic("/api/artifacts"));
+    assertTrue(PublicPaths.isPublic("/api/artifacts/repositories/ci-screenshots/blobs"));
     assertTrue(
         PublicPaths.isPublic(
-            "/api/artifactory/repositories/ci-screenshots/blobs/"
+            "/api/artifacts/repositories/ci-screenshots/blobs/"
                 + "0000000000000000000000000000000000000000000000000000000000000000"));
     assertFalse(PublicPaths.isPublic("/api/artifactories")); // prefix must not bleed
   }

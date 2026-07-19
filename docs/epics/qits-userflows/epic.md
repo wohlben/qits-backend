@@ -10,8 +10,8 @@ features (a Playwright user-story framework, a publisher, a diff UI, and the fra
 extraction into a reusable library); none of them is the deliverable alone, which is why they
 are one epic.
 
-**This epic builds on the [qits-artifactory epic](../qits-artifactory/epic.md)**: the blob
-store is where goldens live between runs and across branches. Artifactory is the backbone
+**This epic builds on the [qits-artifacts epic](../qits-artifacts/epic.md)**: the blob
+store is where goldens live between runs and across branches. Artifacts is the backbone
 only — its store feature is a dependency of this epic's parts 2 and 3, not a part of this
 epic. (Part 2 extends it with the `ci-userstories` repository type — a cross-epic
 contribution using the type seam the store deliberately exposes.)
@@ -34,14 +34,14 @@ Related/dependent plans (outside the two epics):
 
 1. **[qits-userflows](feature-ideas/qits-userflows.md)** — the `userflows/` module: programmatic
    user stories that render themselves into local markdown + media reports with a canonical
-   `userflow.json`. **No dependency on artifactory** — it can be built before or in parallel
-   with the artifactory epic (its report contract is *shaped* for the future upload, but
+   `userflow.json`. **No dependency on artifacts** — it can be built before or in parallel
+   with the artifacts epic (its report contract is *shaped* for the future upload, but
    nothing more).
-2. **[qits-userflows-artifactory-renderer](feature-ideas/qits-userflows-artifactory-renderer.md)**
+2. **[qits-userflows-artifacts-renderer](feature-ideas/qits-userflows-artifacts-renderer.md)**
    — the publishing renderer: uploads a story's media, re-renders the story markdown against
    the uploaded blob URLs, stores the document in the new `ci-userstories` type. **Requires
-   part 1 and the artifactory epic's store.**
-3. **[qits-artifactory-workspace-userflow-diff-tab](feature-ideas/qits-artifactory-workspace-userflow-diff-tab.md)**
+   part 1 and the artifacts epic's store.**
+3. **[qits-artifacts-workspace-userflow-diff-tab](feature-ideas/qits-artifacts-workspace-userflow-diff-tab.md)**
    — the CI tab: backend-driven evaluation over `ci-userstories` on parent vs. workspace
    branch, side-by-side story documents in the UI. **Requires part 2** (it consumes exactly
    what the renderer publishes).
@@ -52,7 +52,7 @@ Related/dependent plans (outside the two epics):
    their code); independent of part 3. **Prerequisite: creating the new repository.**
 
 ```
-[qits-artifactory epic] ──┐
+[qits-artifacts epic] ──┐
                           ├──► 2. renderer ──┬──► 3. diff tab
 1. qits-userflows ────────┘                  └──► 4. library extraction
 ```
@@ -60,7 +60,7 @@ Related/dependent plans (outside the two epics):
 ## Done when
 
 All four parts are implemented: the chain closes end-to-end (running the userflows action on
-a parent branch and a workspace branch leaves goldens in artifactory, and the workspace's CI
+a parent branch and a workspace branch leaves goldens in artifacts, and the workspace's CI
 tab shows honest verdicts with side-by-side documents whose media render — the diff tab's
 manual acceptance walk is the epic's acceptance walk), and the framework lives in its own
 library with qits' `userflows` module reduced to stories-only, so a managed project can join
@@ -71,6 +71,6 @@ the loop by adding a dependency.
 | Part | Status |
 |---|---|
 | [qits-userflows](feature-ideas/qits-userflows.md) | idea |
-| [qits-userflows-artifactory-renderer](feature-ideas/qits-userflows-artifactory-renderer.md) | idea |
-| [qits-artifactory-workspace-userflow-diff-tab](feature-ideas/qits-artifactory-workspace-userflow-diff-tab.md) | idea |
+| [qits-userflows-artifacts-renderer](feature-ideas/qits-userflows-artifacts-renderer.md) | idea |
+| [qits-artifacts-workspace-userflow-diff-tab](feature-ideas/qits-artifacts-workspace-userflow-diff-tab.md) | idea |
 | [qits-java-testing-integration-library](feature-ideas/qits-java-testing-integration-library.md) | idea |

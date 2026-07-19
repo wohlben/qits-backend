@@ -11,9 +11,9 @@
 
     <modules>
         <module>domain</module>
-        <!-- The metadata-rich blob store (docs/epics/qits-artifactory/): a plain library jar with
+        <!-- The metadata-rich blob store (docs/epics/qits-artifacts/): a plain library jar with
              its OWN named datasource, consumed by `service` which hosts its REST boundary. -->
-        <module>artifactory</module>
+        <module>artifacts</module>
         <!-- Build-variant auth (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md): plain library
              jars; exactly one variant module is pulled into `service` by the profile the mandatory
              -Dqits.variant=oauth|forwardauth flag activates. In the reactor unconditionally so
@@ -73,7 +73,7 @@
             </dependency>
             <dependency>
                 <groupId>eu.wohlben</groupId>
-                <artifactId>artifactory</artifactId>
+                <artifactId>artifacts</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

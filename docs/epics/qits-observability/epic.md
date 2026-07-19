@@ -48,15 +48,27 @@ The base receiver first; the SPA extension and the two enrichment siblings build
   (07-11) — the browser sibling: route context (`app.route.path`), named **interaction spans**
   (`data-track-event`, owning component), and caller attribution (`code.*`) on fetch spans.
 
+## Parts (ideas)
+
+- **[standalone-telemetry-service](feature-ideas/standalone-telemetry-service.md)** *(idea)* — pull
+  the whole pipeline (receiver, decoder, store, query, REST twins, MCP tools) out of `service` into
+  its **own Quarkus-app deployable**, so telemetry runs as a separate process — for heap/ingest
+  isolation, restart independence, and the VictoriaMetrics swap-out seam. The **inverse** of the
+  [standalone-artifacts-service](../qits-artifacts/feature-ideas/standalone-artifacts-service.md)
+  split (telemetry was built in-process on purpose, so this is a refactor: extract a `telemetry/`
+  library module first, then the app on top). Also helps drive `/api/otel/*` off `service`'s shared
+  `max-body-size`.
+
 ## Done when
 
 Rolling, like any umbrella epic: current when its `feature-ideas/` is empty and every
 tracing/OTEL feature since this epic's creation has landed here. New pipeline work starts as a
-draft in this epic's `feature-ideas/`, not in the flat `docs/feature-ideas/`.
+draft in this epic's `feature-ideas/`, not in the flat `docs/feature-ideas/`. **Currently one open
+idea** (standalone-telemetry-service), so the epic is not at rest.
 
 ## Status
 
-4 parts implemented (everything under [features/](features/)); no open ideas.
+4 parts implemented (everything under [features/](features/)); 1 open idea.
 
 | Part | Status |
 |---|---|
@@ -64,3 +76,4 @@ draft in this epic's `feature-ideas/`, not in the flat `docs/feature-ideas/`.
 | [spa-observability](features/2026-07-06_spa-observability.md) | implemented |
 | [backend-telemetry-meta-enrichment](features/2026-07-11_backend-telemetry-meta-enrichment.md) | implemented |
 | [spa-telemetry-meta-enrichment](features/2026-07-11_spa-telemetry-meta-enrichment.md) | implemented |
+| [standalone-telemetry-service](feature-ideas/standalone-telemetry-service.md) | idea |

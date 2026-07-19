@@ -16,10 +16,10 @@ auth work (per-repository tokens, richer policies) lands in.
 
 Related plans (consumers of the auth decision):
 
-- **The write-surface trust model** for [qits-artifactory](../qits-artifactory/epic.md): its
+- **The write-surface trust model** for [qits-artifacts](../qits-artifacts/epic.md): its
   Open questions weigh `PublicPaths` entries vs. per-repository write tokens for CI uploaders
   that hold no session — an auth-domain decision this epic will own when it lands.
-- **Session-authed media/capture** — capture GETs and artifactory blob reads ride the resolved
+- **Session-authed media/capture** — capture GETs and artifacts blob reads ride the resolved
   session (oidc cookies / forwardauth headers) under both variants.
 - **Deployment** — the `oauth` variant runs against the real IdP in production; the
   `forwardauth` variant (dev/test default) trusts proxy headers.

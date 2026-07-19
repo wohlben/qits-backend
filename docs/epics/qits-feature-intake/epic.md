@@ -30,9 +30,9 @@ Related epics / cross-cutting concerns:
 - **Open write surface** — the `POST /api/capture` endpoint is CORS-permissive and token-free on
   that one path (posted by an app's browser, no session); its trust model is an
   [auth](../qits-authentication/epic.md) concern (`PublicPaths`).
-- **Distinct from the artifactory capture store** — the in-monolith `CaptureArtifactStore`
+- **Distinct from the artifacts capture store** — the in-monolith `CaptureArtifactStore`
   (referenced by the rendered-view idea) is workspace-lifecycle-bound, not a branch-keyed golden;
-  see [qits-artifactory](../qits-artifactory/epic.md).
+  see [qits-artifacts](../qits-artifacts/epic.md).
 
 ## Parts (implemented)
 

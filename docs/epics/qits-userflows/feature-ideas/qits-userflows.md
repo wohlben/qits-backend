@@ -18,20 +18,20 @@ abstract, no helpers, no plumbing ever lands in `src/test` — if a story needs 
 created in the same commit as the module, so every future contributor (human or agent) adding a
 story inherits the rule without reading this plan.
 
-The strategic goal is [qits-artifactory](../../qits-artifactory/feature-ideas/qits-artifactory.md)'s golden-media loop: user stories
+The strategic goal is [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md)'s golden-media loop: user stories
 are the *producers* of the by-branch screenshots/videos the
-[user-flow diff tab](qits-artifactory-workspace-userflow-diff-tab.md) compares. **The scope of this
-feature is the creation of the report — not persisting anything into an artifactory
+[user-flow diff tab](qits-artifacts-workspace-userflow-diff-tab.md) compares. **The scope of this
+feature is the creation of the report — not persisting anything into an artifacts
 repository.** The report's on-disk layout is shaped so the future upload step is a plain walk
 over `target/userstories/` (see the mapping section), but that uploader is a follow-up.
 
 Related/dependent plans:
 
-- **Produces for** [qits-artifactory](../../qits-artifactory/feature-ideas/qits-artifactory.md): the report media are the future
+- **Produces for** [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md): the report media are the future
   `ci-screenshots`/`ci-videos` uploads; the story name / step labels / definition hash map onto
   `qits.userflow.name` / `qits.display.name` / `qits.userflow.hash` (mapping below). Upload
   itself is out of scope here.
-- **Feeds, eventually, the** [user-flow diff tab](qits-artifactory-workspace-userflow-diff-tab.md) —
+- **Feeds, eventually, the** [user-flow diff tab](qits-artifacts-workspace-userflow-diff-tab.md) —
   whose NEW/CHANGED/REMOVED verdicts are only as good as the `qits.diff.hash` discipline this
   module will one day stamp on its outputs.
 - **Comparable pixels need a pinned renderer** —
@@ -45,7 +45,7 @@ Related/dependent plans:
   ancestor of the same idea.
 - **Extended-suite conventions** — the repo's `-Pextended` / self-skip-when-backend-absent
   pattern (`WorkspaceContainerIT` precedent) is reused for stories that need a running qits.
-- **Module split precedent** — [qits-artifactory](../../qits-artifactory/feature-ideas/qits-artifactory.md)'s "own module, not in
+- **Module split precedent** — [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md)'s "own module, not in
   `domain`" reasoning applies: `userflows` touches no qits code at all; it drives the app the
   way a user does, through the browser.
 - **Future extraction** —
@@ -59,7 +59,7 @@ Related/dependent plans:
 - **`userflows/`**, a new top-level reactor module — plain jar, JDK 25, Spotless, build cache,
   never needs `-Dqits.variant` for module-scoped builds. Dependencies:
   `com.microsoft.playwright:playwright` (Java), JUnit 5. **No dependency on `domain`,
-  `service`, or `artifactory`** — the app under test is reached by URL, and coupling to
+  `service`, or `artifacts`** — the app under test is reached by URL, and coupling to
   internals would let stories cheat the user's perspective.
 - **`src/main`** (`eu.wohlben.qits.userflows`): the framework —
   - the annotations (`@UserStory`, `@UserStoryDescription`),
@@ -173,19 +173,19 @@ greeting echoed back with a timestamp — the core loop of the demo app.
 - Screenshots are referenced inline right after the step block (or interleaved per step —
   see Open questions); relative links only, so the directory is portable as a bundle.
 - **Video is `.webm`** — that is what Playwright records natively; the sketch's `.mp4` would
-  cost a transcode step for no consumer that needs it (browsers and the artifactory
+  cost a transcode step for no consumer that needs it (browsers and the artifacts
   `ci-videos` type accept webm). Markdown can't inline-play video, hence the link form.
 - **Failure still reports**: a story that fails mid-run writes the report with the steps
   recorded so far, the failure appended as a final step line, and `outcome: "failed"` in the
   sidecar — a failing story's report is a debugging artifact, and the future uploader skips
   non-passing runs by reading the sidecar.
 - `user-story.md` stays the human artifact and never gains frontmatter; further renderers
-  (first: [qits-userflows-artifactory-renderer](qits-userflows-artifactory-renderer.md))
+  (first: [qits-userflows-artifacts-renderer](qits-userflows-artifacts-renderer.md))
   consume `userflow.json`, never the markdown.
 
-## Future artifactory mapping (documented now, wired later)
+## Future artifacts mapping (documented now, wired later)
 
-| Report piece | Artifactory metadata (future upload) |
+| Report piece | Artifacts metadata (future upload) |
 |---|---|
 | `@UserStory` name | `qits.userflow.name` |
 | Screenshot step label | `qits.display.name` |
@@ -195,9 +195,9 @@ greeting echoed back with a timestamp — the core loop of the demo app.
 | Media dimensions (sidecar) | `media.resolution.*` |
 
 The upload leg is its own feature idea:
-[qits-userflows-artifactory-renderer](qits-userflows-artifactory-renderer.md) — a second
+[qits-userflows-artifacts-renderer](qits-userflows-artifacts-renderer.md) — a second
 renderer over `userflow.json` that uploads the media, re-renders the story markdown against the
-uploaded blob URLs, and stores the story document itself in artifactory.
+uploaded blob URLs, and stores the story document itself in artifacts.
 
 ## Execution model
 
@@ -220,12 +220,12 @@ uploaded blob URLs, and stores the story document itself in artifactory.
 
 ## Out of scope
 
-- Uploading to artifactory (the follow-up above), and therefore everything branch-related —
+- Uploading to artifacts (the follow-up above), and therefore everything branch-related —
   this module doesn't know or care what branch it runs on; that context belongs to the future
   uploader action.
 - Any qits UI for browsing reports (`target/` artifacts are the deliverable; the diff tab
-  consumes artifactory, not this module).
-- Video diff-hash semantics (open in the artifactory plan; the sidecar just doesn't emit a
+  consumes artifacts, not this module).
+- Video diff-hash semantics (open in the artifacts plan; the sidecar just doesn't emit a
   video diff hash yet).
 - Cross-browser matrices, mobile emulation, performance timing — stories are Chromium-only
   until a concrete need appears.
