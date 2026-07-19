@@ -21,7 +21,7 @@ becomes a property of *projects qits manages*, not of qits alone.
 
 Related/dependent plans:
 
-- **Hard dependency** — [qits-userflows](qits-userflows.md) (part 1): this is a pure
+- **Hard dependency** — [qits-userflows](../features/2026-07-19_qits-userflows.md) (part 1): this is a pure
   extraction; the framework must exist first. Cleanest **after the
   [artifacts renderer](qits-userflows-artifacts-renderer.md)** (part 2) as well, since
   that plan deliberately puts the renderer in the same `src/main` — extracting between parts
@@ -43,7 +43,7 @@ Related/dependent plans:
 
 ## Motivation
 
-The [qits-userflows](qits-userflows.md) plan already made the framework qits-agnostic on
+The [qits-userflows](../features/2026-07-19_qits-userflows.md) plan already made the framework qits-agnostic on
 purpose: no dependency on `domain`, `service`, or `artifacts`; the app under test is reached
 by URL. A framework with no qits coupling that can only be used from inside qits' reactor is
 an accident of packaging, not a design. Extraction makes the boundary real — and hardens the

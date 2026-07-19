@@ -1,0 +1,37 @@
+<!doctype html>
+<!--
+  Self-contained harness page for the no-app smoke stories: it implements exactly the greeting
+  loop the authoring example walks (input[name=name] → submit → a .greeting-result appears), with
+  no network calls, so the framework itself (step recording, screenshot capture, video, report +
+  sidecar emission) has coverage on every default `./mvnw -pl userflows test`. It is NOT the qits
+  app or the fixture SPA — those are driven by extended *IT stories against a running qits.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Greeting harness</title>
+    <style>
+      body { font-family: sans-serif; margin: 2rem; }
+      .greeting-result { margin-top: 1rem; padding: 1rem; background: #eef; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Greeting</h1>
+    <form>
+      <label>Name <input name="name" /></label>
+      <button type="submit">Greet</button>
+    </form>
+    <script>
+      document.querySelector('form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var name = document.querySelector('input[name=name]').value || 'world';
+        var result = document.createElement('div');
+        result.className = 'greeting-result';
+        result.textContent = 'Hello, ' + name + '! Greeted at ' + new Date().toISOString();
+        var existing = document.querySelector('.greeting-result');
+        if (existing) existing.remove();
+        document.body.appendChild(result);
+      });
+    </script>
+  </body>
+</html>

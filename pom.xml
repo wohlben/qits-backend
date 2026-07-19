@@ -23,6 +23,10 @@
         <module>auth/forwardauth</module>
         <module>service</module>
         <module>cli</module>
+        <!-- Programmatic Playwright user stories that render themselves into local reports
+             (docs/epics/qits-userflows/): a plain jar depending on none of the other modules — it
+             drives a running qits through a real browser, by URL only. Never needs -Dqits.variant. -->
+        <module>userflows</module>
     </modules>
 
     <properties>

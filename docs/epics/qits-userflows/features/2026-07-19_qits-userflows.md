@@ -20,7 +20,7 @@ story inherits the rule without reading this plan.
 
 The strategic goal is [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md)'s golden-media loop: user stories
 are the *producers* of the by-branch screenshots/videos the
-[user-flow diff tab](qits-artifacts-workspace-userflow-diff-tab.md) compares. **The scope of this
+[user-flow diff tab](../feature-ideas/qits-artifacts-workspace-userflow-diff-tab.md) compares. **The scope of this
 feature is the creation of the report — not persisting anything into an artifacts
 repository.** The report's on-disk layout is shaped so the future upload step is a plain walk
 over `target/userstories/` (see the mapping section), but that uploader is a follow-up.
@@ -31,7 +31,7 @@ Related/dependent plans:
   `ci-screenshots`/`ci-videos` uploads; the story name / step labels / definition hash map onto
   `qits.userflow.name` / `qits.display.name` / `qits.userflow.hash` (mapping below). Upload
   itself is out of scope here.
-- **Feeds, eventually, the** [user-flow diff tab](qits-artifacts-workspace-userflow-diff-tab.md) —
+- **Feeds, eventually, the** [user-flow diff tab](../feature-ideas/qits-artifacts-workspace-userflow-diff-tab.md) —
   whose NEW/CHANGED/REMOVED verdicts are only as good as the `qits.diff.hash` discipline this
   module will one day stamp on its outputs.
 - **Comparable pixels need a pinned renderer** —
@@ -49,7 +49,7 @@ Related/dependent plans:
   `domain`" reasoning applies: `userflows` touches no qits code at all; it drives the app the
   way a user does, through the browser.
 - **Future extraction** —
-  [qits-java-testing-integration-library](qits-java-testing-integration-library.md) (part 4 of
+  [qits-java-testing-integration-library](../feature-ideas/qits-java-testing-integration-library.md) (part 4 of
   the epic) later moves everything except the stories out of this module into a standalone
   library, so qits-managed projects can author stories too: the `src/main`/`src/test` split
   drawn here is also the future repository boundary.
@@ -105,7 +105,9 @@ void createGreeting(Flow flow) {
   no built-in step notion (that's a JS-test-runner feature), so the facade *is* the step
   mechanism — which is also why stories must not bypass it: an escape hatch
   (`flow.page()`) exists for genuinely exotic interactions but leaves no step record and the
-  CLAUDE.md says so.
+  CLAUDE.md says so. Every step carries an explicit string **id** (machine `step-NN`, or an
+  author id via `flow.click("…").as("open-project")`); a screenshot links to its step **by that
+  id**, never by position, so the media↔step coupling is stable and self-describing.
 - The **step log doubles as the flow's fingerprint**: hashing the recorded step lines
   (verbs + selectors + labels, no dynamic values) yields a deterministic definition hash —
   the natural future `qits.userflow.hash`, computed from what the story *does* rather than
@@ -133,16 +135,26 @@ consuming it:
   "story": "Create a greeting",
   "slug": "create-a-greeting",
   "description": "A visitor opens the greeting page, …",   // the annotation markdown, verbatim
-  "steps": ["navigate /", "waitFor input[name=name]", "…"],
-  "definitionHash": "sha256:…",                              // hash of the step lines
+  "steps": [                                                 // each step has an EXPLICIT string id
+    { "id": "step-00", "line": "navigate /" },
+    { "id": "step-01", "line": "waitFor input[name=name]" }
+    // …
+  ],
+  "definitionHash": "sha256:…",                              // hash of the step lines (value-free)
   "screenshots": [
     { "path": "step-05-greeting-result.png", "label": "greeting result",
+      "step": "step-05",                                     // by-name link to the step id above
       "width": 640, "height": 220, "contentHash": "sha256:…" }
   ],
-  "video": { "path": "recording.webm", "durationSeconds": 12.4, "width": 1280, "height": 720 },
+  "video": { "path": "recording.webm", "width": 1280, "height": 720 },
   "outcome": "passed"
 }
 ```
+
+Each **step carries an explicit string `id`** (`step-00`, `step-01`, … — the same prefix the
+screenshot file uses), and a screenshot links to its step **by that id** (`"step": "step-05"`),
+never by a positional index — so the coupling is stable and self-describing, and a renderer can
+interleave a mid-story screenshot under exactly its step.
 
 `user-story.md` follows the sketched shape — description, steps, media inline:
 
@@ -180,7 +192,7 @@ greeting echoed back with a timestamp — the core loop of the demo app.
   sidecar — a failing story's report is a debugging artifact, and the future uploader skips
   non-passing runs by reading the sidecar.
 - `user-story.md` stays the human artifact and never gains frontmatter; further renderers
-  (first: [qits-userflows-artifacts-renderer](qits-userflows-artifacts-renderer.md))
+  (first: [qits-userflows-artifacts-renderer](../feature-ideas/qits-userflows-artifacts-renderer.md))
   consume `userflow.json`, never the markdown.
 
 ## Future artifacts mapping (documented now, wired later)
@@ -195,7 +207,7 @@ greeting echoed back with a timestamp — the core loop of the demo app.
 | Media dimensions (sidecar) | `media.resolution.*` |
 
 The upload leg is its own feature idea:
-[qits-userflows-artifacts-renderer](qits-userflows-artifacts-renderer.md) — a second
+[qits-userflows-artifacts-renderer](../feature-ideas/qits-userflows-artifacts-renderer.md) — a second
 renderer over `userflow.json` that uploads the media, re-renders the story markdown against the
 uploaded blob URLs, and stores the story document itself in artifacts.
 

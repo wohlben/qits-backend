@@ -3,7 +3,7 @@
 ## Introduction
 
 The piece that finally combines the [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md) and
-[qits-userflows](qits-userflows.md) plans: a **second renderer** over the userflows module's
+[qits-userflows](../features/2026-07-19_qits-userflows.md) plans: a **second renderer** over the userflows module's
 canonical `userflow.json` output. Where the default renderer writes a local markdown bundle
 into `target/userstories/`, this renderer **publishes**: it first uploads the story's
 screenshots and video to their artifacts repositories (obtaining content-addressed blob
@@ -20,7 +20,7 @@ is reachable.
 
 Related/dependent plans:
 
-- **Hard dependency (producer side)** — [qits-userflows](qits-userflows.md): this is the
+- **Hard dependency (producer side)** — [qits-userflows](../features/2026-07-19_qits-userflows.md): this is the
   renderer that plan's report model exists for; it consumes `userflow.json` (story,
   description, steps, screenshot paths + labels + content hashes, video path, definition
   hash, outcome) and **never parses the default markdown**. The renderer SPI framing there

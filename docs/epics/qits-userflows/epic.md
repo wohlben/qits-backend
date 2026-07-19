@@ -32,7 +32,7 @@ Related/dependent plans (outside the two epics):
 
 ## Parts, in implementation order
 
-1. **[qits-userflows](feature-ideas/qits-userflows.md)** — the `userflows/` module: programmatic
+1. **[qits-userflows](features/2026-07-19_qits-userflows.md)** — the `userflows/` module: programmatic
    user stories that render themselves into local markdown + media reports with a canonical
    `userflow.json`. **No dependency on artifacts** — it can be built before or in parallel
    with the artifacts epic (its report contract is *shaped* for the future upload, but
@@ -70,7 +70,7 @@ the loop by adding a dependency.
 
 | Part | Status |
 |---|---|
-| [qits-userflows](feature-ideas/qits-userflows.md) | idea |
+| [qits-userflows](features/2026-07-19_qits-userflows.md) | implemented 2026-07-19 |
 | [qits-userflows-artifacts-renderer](feature-ideas/qits-userflows-artifacts-renderer.md) | idea |
 | [qits-artifacts-workspace-userflow-diff-tab](feature-ideas/qits-artifacts-workspace-userflow-diff-tab.md) | idea |
 | [qits-java-testing-integration-library](feature-ideas/qits-java-testing-integration-library.md) | idea |

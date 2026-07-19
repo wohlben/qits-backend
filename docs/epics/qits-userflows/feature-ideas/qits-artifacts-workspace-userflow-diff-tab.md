@@ -3,7 +3,7 @@
 ## Introduction
 
 The consumer that closes the [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md) →
-[qits-userflows](qits-userflows.md) →
+[qits-userflows](../features/2026-07-19_qits-userflows.md) →
 [renderer](qits-userflows-artifacts-renderer.md) chain: a new **CI tab** on the workspace
 detail route showing, per **user story**, how the workspace branch compares against the parent
 branch's goldens — **NEW / CHANGED / REMOVED / unchanged** badges on collapsed expanders, and
@@ -33,7 +33,7 @@ Related/dependent plans:
   compares; the renderer's base-relative media URLs are what makes the documents render inside
   the qits UI with zero URL rewriting). This plan lifts the renderer's "displaying
   `ci-userstories` documents" out-of-scope item.
-- **Producer** — [qits-userflows](qits-userflows.md) stories, run via
+- **Producer** — [qits-userflows](../features/2026-07-19_qits-userflows.md) stories, run via
   [actions](../../qits-feature-flows/features/2026-05-01_actions.md) on the parent branch once and on the workspace
   branch per change; without both sides the tab is honestly empty, not broken.
 - **One more `<z-tab>`** in the group owned by

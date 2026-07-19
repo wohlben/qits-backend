@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>eu.wohlben</groupId>
+        <artifactId>qits</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- Programmatic user stories that render themselves into reports (docs/epics/qits-userflows/).
+         A plain jar that drives a running qits through a REAL browser (Playwright-Java) and, per run,
+         emits target/userstories/<slug>/ (user-story.md + inline screenshots + recording.webm + the
+         canonical userflow.json). Deliberately depends on NEITHER `domain`/`service`/`artifacts` NOR
+         any `auth/*` module — it reaches the app by URL only, so coupling to internals can never let a
+         story cheat the user's perspective. src/main is the framework; src/test is stories ONLY (see
+         this module's CLAUDE.md). Never needs -Dqits.variant for module-scoped builds. -->
+    <artifactId>userflows</artifactId>
+
+    <properties>
+        <!-- Match the JS `playwright@1.61.0` baked into docker/qits/Dockerfile's `workspace` stage
+             (Chromium rev 1228) so the Java driver finds the pinned browser at
+             PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright instead of downloading its own. Not managed by
+             quarkus-bom, so pinned here; bump in lockstep with the Dockerfile's ARG PLAYWRIGHT_VERSION. -->
+        <playwright.version>1.61.0</playwright.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>${playwright.version}</version>
+        </dependency>
+        <dependency>
+            <!-- The canonical userflow.json is written with Jackson; version comes from quarkus-bom. -->
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <!-- JUnit 5 aggregator (api + engine + params); version managed by quarkus-bom's junit-bom
+                 import, so this module gets JUnit 5 without pulling in Quarkus itself. -->
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <!-- Stories that drive a running qits are `*IT` classes gated behind -Pextended (root
+                 profile flips skipITs=false) and self-skip when nothing answers on the base URL —
+                 exactly like service's WorkspaceContainerIT. Failsafe binds per-IT-hosting-module
+                 (service is the only other one), so bind it here too. -->
+            <plugin>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <argLine>@{argLine}</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
