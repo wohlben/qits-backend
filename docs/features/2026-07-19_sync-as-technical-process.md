@@ -22,9 +22,10 @@ Related/dependent plans:
 - **Reuses the SSE + view unchanged** from the
   [technical-process log stream](2026-07-18_technical-process-log-stream.md).
 - **Benefits from**
-  [repository-pull-active-process-discovery](../feature-ideas/repository-pull-active-process-discovery.md) — once
-  repo-scoped processes are discoverable, a sync reattaches after navigation for free, and the same
-  concurrency guard prevents a pull and a sync racing the same origin.
+  [repository-pull-active-process-discovery](2026-07-19_repository-pull-active-process-discovery.md)
+  (**implemented**) — repo-scoped processes are now discoverable, so a sync reattaches after
+  navigation for free, and the same concurrency guard prevents a pull and a sync racing the same
+  origin.
 
 ## What exists today (the code being changed)
 

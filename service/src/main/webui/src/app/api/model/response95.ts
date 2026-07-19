@@ -9,9 +9,8 @@
  */
 
 
-export interface Response76 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+export interface Response95 { 
+    variant?: string;
+    username?: string;
 }
 

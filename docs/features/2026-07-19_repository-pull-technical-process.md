@@ -84,7 +84,8 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
   the id keeps working across dialog close/reopen within the done-TTL. (A repo-level
   `active-process` endpoint + hint topic — the "transient tab" treatment for a browser that
   navigated away mid-pull — is spun out as
-  [`repository-pull-active-process-discovery`](../feature-ideas/repository-pull-active-process-discovery.md).)
+  [`repository-pull-active-process-discovery`](2026-07-19_repository-pull-active-process-discovery.md).
+  **Implemented.**)
 - **`RepositoryService.beginPullRepository(repoId)`**: validate the repo exists in-request (so
   an unknown id is still a plain 404, not a process), register the process, then run
   `pullRepository(repoId, visited, process)` on a worker thread. The recursion gains an optional
@@ -117,10 +118,10 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
 Each deferral above is captured as its own feature idea rather than left as a note:
 
 - **Active-process discovery, reattach, and a concurrency guard** —
-  [`repository-pull-active-process-discovery`](../feature-ideas/repository-pull-active-process-discovery.md):
+  [`repository-pull-active-process-discovery`](2026-07-19_repository-pull-active-process-discovery.md):
   the repo-scoped `active-process` endpoint + hint topic so a reload / second tab / navigate-away
   reattaches, plus disabling Pull/Sync (and a server-side single-flight) while a pull is live so a
-  closed-dialog user can't start a second walk racing git on the same origin.
+  closed-dialog user can't start a second walk racing git on the same origin. **Implemented.**
 - **`sync` as a process** —
   [`sync-as-technical-process`](2026-07-19_sync-as-technical-process.md): the pull segments
   plus a final `push` segment. **Implemented.**

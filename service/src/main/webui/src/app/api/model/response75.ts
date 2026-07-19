@@ -10,8 +10,6 @@
 
 
 export interface Response75 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+    output?: string;
 }
 

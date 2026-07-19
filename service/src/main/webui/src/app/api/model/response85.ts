@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceHistoryDetailDto } from './workspaceHistoryDetailDto';
 
 
 export interface Response85 { 
-    workspace?: WorkspaceHistoryDetailDto;
+    technicalProcessId?: string;
 }
 

@@ -13,10 +13,13 @@ function flush(): Promise<void> {
 }
 
 describe('RepositorySyncComponent', () => {
-  function setup() {
+  function setup(options: { activeProcessId?: string | null } = {}) {
     const repositoryService = {
       apiRepositoriesRepoIdSyncStatusGet: vi.fn().mockReturnValue(of({ branch: 'main' })),
       apiRepositoriesRepoIdBranchesGet: vi.fn().mockReturnValue(of({ branches: [] })),
+      apiRepositoriesRepoIdActiveProcessGet: vi
+        .fn()
+        .mockReturnValue(of({ technicalProcessId: options.activeProcessId ?? undefined })),
       apiRepositoriesRepoIdPullPost: vi
         .fn()
         .mockReturnValue(of({ technicalProcessId: 'proc-1' })),
@@ -40,11 +43,17 @@ describe('RepositorySyncComponent', () => {
       ],
     });
 
+    // Seed the reattach query synchronously so the discovery effect sees a running process on mount
+    // (the injectQuery fetch is async; the seeded value drives the on-load reattach deterministically).
+    if (options.activeProcessId !== undefined) {
+      queryClient.setQueryData(['repository-active-process', 'repo-1'], options.activeProcessId);
+    }
+
     const fixture = TestBed.createComponent(RepositorySyncComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    return { fixture, component, repositoryService, dialog, invalidateSpy };
+    return { fixture, component, queryClient, repositoryService, dialog, invalidateSpy };
   }
 
   it('opens the "Pulling repository" dialog on pull success without invalidating yet', async () => {
@@ -97,5 +106,37 @@ describe('RepositorySyncComponent', () => {
     // The technical-process view emits (finished) at `done`.
     component.onProcessFinished();
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reattaches to a running process discovered on mount (reload / second tab)', async () => {
+    const { component, fixture, dialog } = setup({ activeProcessId: 'proc-9' });
+    await flush();
+    fixture.detectChanges();
+
+    // The active-process query rediscovered a running pull → the dialog reopens on its stream.
+    expect(component.processActive()).toBe(true);
+    expect(component.processId()).toBe('proc-9');
+    expect(dialog.create).toHaveBeenCalledTimes(1);
+    expect(dialog.create.mock.calls[0][0]).toMatchObject({ zTitle: 'Repository sync' });
+  });
+
+  it('engages the guard on pull and keeps it engaged after the dialog is closed', async () => {
+    const { component, queryClient } = setup();
+    await flush();
+    const guardKey = ['repository-active-process', 'repo-1'];
+    expect(queryClient.getQueryData(guardKey)).toBeFalsy();
+
+    // Pull seeds the active-process guard immediately (before the SSE hint's refetch) — so no window
+    // exists in which a second Pull/Sync could start a competing walk. `processActive` derives from
+    // this cache value (proven reactive by the reattach test + the sync-bar spec).
+    component.pullMutation.mutate();
+    await flush();
+    expect(queryClient.getQueryData(guardKey)).toBe('proc-1');
+
+    // Closing the dialog must not clear the guard while the pull is still running (invalidate is a
+    // no-op here — the mocked queryClient never refetches, so the running id survives the close).
+    component.closeDialog();
+    await flush();
+    expect(queryClient.getQueryData(guardKey)).toBe('proc-1');
   });
 });

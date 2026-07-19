@@ -17,9 +17,9 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response72 } from '../model/response72';
-// @ts-ignore
 import { Response73 } from '../model/response73';
+// @ts-ignore
+import { Response74 } from '../model/response74';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -45,9 +45,9 @@ export class RepositorySubmoduleControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response72>;
-    public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response72>>;
-    public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response72>>;
+    public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response73>;
+    public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response73>>;
+    public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response73>>;
     public apiRepositoriesRepositoryIdSubmodulesGet(repositoryId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repositoryId === null || repositoryId === undefined) {
             throw new Error('Required parameter repositoryId was null or undefined when calling apiRepositoriesRepositoryIdSubmodulesGet.');
@@ -80,7 +80,7 @@ export class RepositorySubmoduleControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/submodules`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response72>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response73>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -101,9 +101,9 @@ export class RepositorySubmoduleControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response73>;
-    public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response73>>;
-    public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response73>>;
+    public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response74>;
+    public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response74>>;
+    public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response74>>;
     public apiRepositoriesRepositoryIdSubmodulesImportPost(repositoryId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repositoryId === null || repositoryId === undefined) {
             throw new Error('Required parameter repositoryId was null or undefined when calling apiRepositoriesRepositoryIdSubmodulesImportPost.');
@@ -136,7 +136,7 @@ export class RepositorySubmoduleControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/submodules/import`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response73>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response74>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,

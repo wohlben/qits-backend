@@ -192,6 +192,7 @@ export * from './response91';
 export * from './response92';
 export * from './response93';
 export * from './response94';
+export * from './response95';
 export * from './restartPolicy';
 export * from './setMainBranchRequest';
 export * from './spanEvent';

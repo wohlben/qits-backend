@@ -94,4 +94,18 @@ describe('RepositorySyncBarComponent', () => {
     fixture.componentInstance.onSelect('main');
     expect(chosen).toBeUndefined();
   });
+
+  it('stays locked while a repo process is active (guard survives a closed dialog)', () => {
+    const fixture = TestBed.createComponent(RepositorySyncBarComponent);
+    fixture.componentRef.setInput('branch', 'main');
+    // No mutation is pending — only a live pull/sync process, discovered via active-process.
+    fixture.componentRef.setInput('processActive', true);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const buttons = Array.from(el.querySelectorAll('button'));
+    for (const label of ['Pull', 'Sync', 'Push']) {
+      expect(buttons.find((b) => b.textContent?.includes(label))!.disabled).toBe(true);
+    }
+  });
 });

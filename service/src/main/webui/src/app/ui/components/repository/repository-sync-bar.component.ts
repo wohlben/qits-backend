@@ -71,6 +71,8 @@ export class RepositorySyncBarComponent {
   readonly syncPending = input(false);
   readonly pushPending = input(false);
   readonly mainBranchPending = input(false);
+  /** A pull/sync process is live for the repo (survives the dialog closing) — keeps the bar locked. */
+  readonly processActive = input(false);
 
   readonly mainBranchChange = output<string>();
   readonly pull = output<void>();
@@ -79,7 +81,12 @@ export class RepositorySyncBarComponent {
 
   /** Any in-flight git/config operation blocks the controls to avoid overlapping commands. */
   readonly busy = computed(
-    () => this.pullPending() || this.syncPending() || this.pushPending() || this.mainBranchPending(),
+    () =>
+      this.processActive() ||
+      this.pullPending() ||
+      this.syncPending() ||
+      this.pushPending() ||
+      this.mainBranchPending(),
   );
 
   onSelect(value: string | string[]) {

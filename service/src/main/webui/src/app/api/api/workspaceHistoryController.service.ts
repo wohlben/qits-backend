@@ -17,11 +17,11 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response85 } from '../model/response85';
-// @ts-ignore
 import { Response86 } from '../model/response86';
 // @ts-ignore
 import { Response87 } from '../model/response87';
+// @ts-ignore
+import { Response88 } from '../model/response88';
 // @ts-ignore
 import { UpdateHistoryRequest } from '../model/updateHistoryRequest';
 
@@ -49,9 +49,9 @@ export class WorkspaceHistoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdHistoryGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response86>;
-    public apiRepositoriesRepoIdHistoryGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response86>>;
-    public apiRepositoriesRepoIdHistoryGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response86>>;
+    public apiRepositoriesRepoIdHistoryGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response87>;
+    public apiRepositoriesRepoIdHistoryGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response87>>;
+    public apiRepositoriesRepoIdHistoryGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response87>>;
     public apiRepositoriesRepoIdHistoryGet(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdHistoryGet.');
@@ -84,7 +84,7 @@ export class WorkspaceHistoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/history`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response86>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response87>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -106,9 +106,9 @@ export class WorkspaceHistoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response87>;
-    public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response87>>;
-    public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response87>>;
+    public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response88>;
+    public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response88>>;
+    public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response88>>;
     public apiRepositoriesRepoIdHistoryIdGet(id: number, repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiRepositoriesRepoIdHistoryIdGet.');
@@ -144,7 +144,7 @@ export class WorkspaceHistoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/history/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response87>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response88>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -167,9 +167,9 @@ export class WorkspaceHistoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response85>;
-    public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response85>>;
-    public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response85>>;
+    public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response86>;
+    public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response86>>;
+    public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response86>>;
     public apiRepositoriesRepoIdHistoryIdPatch(id: number, repoId: string, updateHistoryRequest: UpdateHistoryRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiRepositoriesRepoIdHistoryIdPatch.');
@@ -217,7 +217,7 @@ export class WorkspaceHistoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/history/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response85>('patch', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response86>('patch', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateHistoryRequest,
