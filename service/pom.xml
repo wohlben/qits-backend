@@ -18,6 +18,14 @@
             <artifactId>domain</artifactId>
         </dependency>
         <dependency>
+            <!-- The metadata-rich blob store (docs/epics/qits-artifactory/): a plain library jar this
+                 module hosts the REST boundary for (eu.wohlben.qits.artifactory.api). Indexed for Arc +
+                 its own persistence unit via quarkus.index-dependency.artifactory.* in
+                 application.properties. -->
+            <groupId>eu.wohlben</groupId>
+            <artifactId>artifactory</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>

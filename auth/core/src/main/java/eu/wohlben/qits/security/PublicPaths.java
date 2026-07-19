@@ -26,6 +26,9 @@ public final class PublicPaths {
         || path.startsWith("/mcp/") // the coding agent's MCP servers, called in-container
         || path.startsWith("/api/otel/") // OTLP ingest from containers and fixture SPAs
         || path.equals("/api/capture") // cross-origin capture ingest (own CORS route)
+        || path.startsWith(
+            "/api/artifactory/") // blob store: CI uploaders (writes token-guarded) + <img> serves
+        || path.equals("/api/artifactory")
         || path.equals("/api/config.json") // the SPA identity relay, fetched pre-bootstrap
         || path.startsWith("/api/auth/") // /api/auth/me + the oauth variant's logout path
         || AGENT_SESSION.matcher(path).matches();

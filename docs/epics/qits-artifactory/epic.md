@@ -23,24 +23,36 @@ Related/dependent plans:
 
 ## Parts, in implementation order
 
-1. **[qits-artifactory](feature-ideas/qits-artifactory.md)** — the blob core (content-addressed
+1. **[qits-artifactory](features/2026-07-19_qits-artifactory.md)** — the blob core (content-addressed
    immutable blobs + flat metadata map + query API) in its own module, plus the first two
    repository types, `ci-screenshots` and `ci-videos`. No dependencies inside or outside this
-   epic.
+   epic. **Implemented 2026-07-19.**
+2. **[standalone-artifactory-service](feature-ideas/standalone-artifactory-service.md)** *(idea)* —
+   split the artifactory REST boundary out of `service` into its own small Quarkus-app module, so
+   artifactory runs as its own server with its own `max-body-size` (executing the split the backbone
+   was designed for, and the clean resolution of the shared-body-limit issue). Depends on part 1.
 
-A single part today, deliberately: the epic is the *extension point*. New repository types
-that serve this epic's own deliverable (a generic, split-deployment-ready store) land here as
-new parts; types that serve another deliverable (e.g. `ci-userstories`) belong to the epic
-that needs them.
+The epic is the *extension point*: new repository types that serve this epic's own deliverable (a
+generic, split-deployment-ready store) land here as new parts; types that serve another deliverable
+(e.g. `ci-userstories`) belong to the epic that needs them. Part 2 realizes the "split-deployment"
+half of that deliverable.
 
 ## Done when
 
 The store feature is implemented: repositories can be created, blobs uploaded with validated
 metadata, queried with the `latest` collapse, and served immutably — proven by the acceptance
-walk in the part's testing sketch.
+walk in the part's testing sketch. **Met 2026-07-19** — the module, its own datasource/Flyway
+lineage, the upload/query/serve/ensure API, the static-token write guard, and startup self-seed of
+`ci-screenshots`/`ci-videos` all landed with unit + boundary test coverage; the manual acceptance
+walk is scripted at
+[docs/manual-acceptance-tests/artifactory/golden-upload/plan.md](../../manual-acceptance-tests/artifactory/golden-upload/plan.md).
+The three protocol-type follow-up epics are stubbed (see Future consumers). The **split-deployment**
+half of the deliverable — running artifactory as its own server (part 2) — remains an idea; the epic
+is fully done only once that lands.
 
 ## Status
 
 | Part | Status |
 |---|---|
-| [qits-artifactory](feature-ideas/qits-artifactory.md) | idea |
+| [qits-artifactory](features/2026-07-19_qits-artifactory.md) | implemented |
+| [standalone-artifactory-service](feature-ideas/standalone-artifactory-service.md) | idea |
