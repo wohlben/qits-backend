@@ -83,7 +83,8 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
   Discovery is not needed in v1: the pull dialog gets its process id from the HTTP response and
   the id keeps working across dialog close/reopen within the done-TTL. (A repo-level
   `active-process` endpoint + hint topic — the "transient tab" treatment for a browser that
-  navigated away mid-pull — is a follow-up, parked until the pull is slow enough to want it.)
+  navigated away mid-pull — is spun out as
+  [`repository-pull-active-process-discovery`](../feature-ideas/repository-pull-active-process-discovery.md).)
 - **`RepositoryService.beginPullRepository(repoId)`**: validate the repo exists in-request (so
   an unknown id is still a plain 404, not a process), register the process, then run
   `pullRepository(repoId, visited, process)` on a worker thread. The recursion gains an optional
@@ -95,8 +96,10 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
   split it into lines and append to the segment when each command returns. That is the
   `FakeContainerRuntime` fidelity level and is fine here — the segment-open frame already
   provides the live "now fetching X" signal, and per-repo fetch output is small. A streaming
-  `exec(..., Consumer<String> onLine)` overload on `GitExecutor` (mirroring
-  `ContainerRuntime`'s) is an optional later refinement for very slow fetches.
+  `exec(..., Consumer<String> onLine)` overload on `GitExecutor` (mirroring `ContainerRuntime`'s)
+  is spun out as
+  [`streaming-gitexecutor-exec`](../feature-ideas/streaming-gitexecutor-exec.md) for very slow
+  fetches (it also stops the idle reaper from false-failing a long fetch).
 
 ## Frontend design
 
@@ -109,12 +112,22 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
 - The pull button's `pullPending` flag flips only for the brief POST; the dialog carries the
   actual progress. Sync/Push keep their current synchronous behavior.
 
-## Follow-up (out of scope, same shape)
+## Follow-up (out of scope, spun out as feature ideas)
 
-- **`sync` as a process**: pull segments + a final `push` segment — trivial once pull is
-  process-shaped; do it when someone actually watches a slow sync.
-- **Repo-level active-process discovery** (hint topic + endpoint) for reattaching after
-  navigation, as noted above.
+Each deferral above is captured as its own feature idea rather than left as a note:
+
+- **Active-process discovery, reattach, and a concurrency guard** —
+  [`repository-pull-active-process-discovery`](../feature-ideas/repository-pull-active-process-discovery.md):
+  the repo-scoped `active-process` endpoint + hint topic so a reload / second tab / navigate-away
+  reattaches, plus disabling Pull/Sync (and a server-side single-flight) while a pull is live so a
+  closed-dialog user can't start a second walk racing git on the same origin.
+- **`sync` as a process** —
+  [`sync-as-technical-process`](../feature-ideas/sync-as-technical-process.md): the pull segments
+  plus a final `push` segment.
+- **Streaming `GitExecutor.exec`** —
+  [`streaming-gitexecutor-exec`](../feature-ideas/streaming-gitexecutor-exec.md): live per-line
+  fetch output (replacing the post-hoc delivery above), which also stops the idle reaper from
+  false-failing a genuinely slow single fetch.
 
 ## Testing
 
