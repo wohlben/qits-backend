@@ -53,22 +53,30 @@ Three plain library-jar modules under `auth/` (reactor members like `domain`), e
 `application.properties` at 250 and env at 300), unlike `application.properties`, which is only read
 from the app module itself.
 
-## Selection: one mandatory flag, enforced twice
+## Selection: one flag, defaulted pre-packaging, mandatory for artifacts
 
 `service/pom.xml` has two property-activated profiles (`variant-oauth` / `variant-forwardauth`);
 `-Dqits.variant=…` activates the matching one, which adds the single variant-module dependency
 (`auth-core` arrives transitively). `service` itself contains **zero auth code** — its only
 auth-adjacent line is config (the trip-wire below).
 
-- **maven-enforcer** (`requireProperty qits.variant`, bound to `validate` in `service`) fails any
-  build — including `quarkus:dev`, whose mojo runs the early lifecycle phases — that didn't name a
-  variant, with a message listing the valid values.
+- **Flagless pre-packaging default**: a third profile (`variant-default-forwardauth`, activated on
+  `!qits.variant` — a separate profile because Maven allows one activation property each) pulls
+  `auth-forwardauth` when no flag is given, so `quarkus:dev` and `test` run flagless with the
+  everyday variant (whose `%dev`/`%test` fallback identity `dev` means effectively no auth). Any
+  explicit `-Dqits.variant` deactivates it.
+- **maven-enforcer** (`requireProperty qits.variant`, bound to **`prepare-package`** in `service`)
+  fails any flagless build that produces an artifact — `package`/`install`/`verify` — with a message
+  listing the valid values: a shipped qits never defaults its auth. Pre-packaging phases never reach
+  the rule, which is what lets dev/test run flagless.
 - **Augmentation trip-wire**: `quarkus.application.name=qits-${qits.auth.variant}` in service's
   `application.properties`. The expansion source only exists in a variant module's shipped config, so
-  any build path that somehow skipped the enforcer fails fast at augmentation ("Could not expand
-  value qits.auth.variant") instead of booting an unprotected qits. Because `application.name` would
-  otherwise leak into the exported OpenAPI title, `quarkus.smallrye-openapi.info-title=qits API` pins
-  the doc (and the generated Angular client) variant-independent.
+  any build that ends up with no auth module on the classpath — e.g. a **typo'd** `-Dqits.variant`,
+  which deactivates the flagless default without matching a real variant — fails fast at augmentation
+  ("Could not expand value qits.auth.variant") instead of booting an unprotected qits. Because
+  `application.name` would otherwise leak into the exported OpenAPI title,
+  `quarkus.smallrye-openapi.info-title=qits API` pins the doc (and the generated Angular client)
+  variant-independent.
 
 The prod image build (`docker/qits/Dockerfile`) takes `--build-arg QITS_VARIANT=…` (no default) and
 passes it through; `install.sh` requires `QITS_VARIANT` in the environment. The deleted knobs:
@@ -175,11 +183,11 @@ CSRF posture: `q_session` is HttpOnly + SameSite=Lax; all state-changing endpoin
 
 ## Dev mode & tests
 
-Every build names a variant — including dev and tests; the documented commands in `CLAUDE.md` carry
-`-Dqits.variant=forwardauth` as the everyday choice:
+Dev and tests run flagless — the `variant-default-forwardauth` profile supplies the everyday
+variant; only artifact-producing builds must name one explicitly:
 
 ```bash
-./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true -Dqits.variant=forwardauth
+./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true
 # → /api/auth/me: {"variant":"forwardauth","username":"dev"} — the %dev fallback identity
 ./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true -Dqits.variant=oauth
 # → Keycloak Dev Services auto-starts a Keycloak container (users alice/alice, bob/bob) → real login wall

@@ -8,7 +8,7 @@ A Quarkus 3 (Java 25) backend for managing Git repositories, workspaces, and "fe
 
 - **`domain/`** — the shared business core as a plain library jar: entities, services (`control/`), persistence, MapStruct mappers, DTOs, custom validators, framework-free errors (`domain.error`), Flyway migrations. No web/JAX-RS deps. Consumers index its beans via `quarkus.index-dependency.domain.*`.
 - **`service/`** — the Quarkus web app: REST controllers (`<area>.api`), exception mappers (`eu.wohlben.qits.api`), `mutiny`, `health`, and the Angular UI (Quinoa). Depends on `domain` + exactly one auth variant module (below). Contains **no auth code** itself.
-- **`auth/core`, `auth/oidc`, `auth/forwardauth`** — build-variant auth as library jars (`docs/features/2026-07-16_build-variant-auth.md`). **Every service build must name a variant with `-Dqits.variant=forwardauth|oauth`** (maven-enforcer fails it otherwise, incl. `quarkus:dev`) — the matching profile in `service/pom.xml` pulls in `auth-forwardauth` (trust forward-auth proxy headers; the everyday dev/test variant — its `%dev`/`%test` fallback identity `dev` keeps dev mode and the test suites friction-free) or `auth-oidc` (built-in Keycloak OIDC; the service test suite does NOT run under this variant — its coverage lives in `auth/oidc`'s own tests). `auth-core` (the always-on `QitsAuthPolicy`, the `PublicPaths` token-free list, `/api/auth/me`) arrives transitively. The auth modules ship config defaults in `META-INF/microprofile-config.properties` (read from dependency jars, unlike application.properties) and are bean-discovered via jandex-maven-plugin indexes, not `quarkus.index-dependency`.
+- **`auth/core`, `auth/oidc`, `auth/forwardauth`** — build-variant auth as library jars (`docs/features/2026-07-16_build-variant-auth.md`). **Every service build that produces an artifact must name a variant with `-Dqits.variant=forwardauth|oauth`** (maven-enforcer at `prepare-package` fails flagless `package`/`install`/`verify`); flagless **pre-packaging** work — `quarkus:dev`, `test` — defaults to forwardauth via the `variant-default-forwardauth` profile (activated on `!qits.variant`), i.e. effectively no auth in dev — the matching profile in `service/pom.xml` pulls in `auth-forwardauth` (trust forward-auth proxy headers; the everyday dev/test variant — its `%dev`/`%test` fallback identity `dev` keeps dev mode and the test suites friction-free) or `auth-oidc` (built-in Keycloak OIDC; the service test suite does NOT run under this variant — its coverage lives in `auth/oidc`'s own tests). `auth-core` (the always-on `QitsAuthPolicy`, the `PublicPaths` token-free list, `/api/auth/me`) arrives transitively. The auth modules ship config defaults in `META-INF/microprofile-config.properties` (read from dependency jars, unlike application.properties) and are bean-discovered via jandex-maven-plugin indexes, not `quarkus.index-dependency`.
 - **`cli/`** — a Quarkus command-mode app (`@QuarkusMain` in `eu.wohlben.qits.cli.Main`) with no web stack. Depends on `domain` (no auth — the variant flag is never needed for cli-only commands). Exposes `seed` (`SeedService`, the tiny `testing-repo` demo), `seed-webapp` (`SeedWebappService`, the servable Quarkus+Angular demo — idempotent by reset), and `generate-migration`.
 
 Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docker images use `ubi9/openjdk-25-runtime`; project JDK pinned via `.sdkmanrc`). Spotless (google-java-format) runs automatically on every build via the `process-sources` phase — google-java-format requires JDK 21+, so don't build on JDK 17.
@@ -18,44 +18,46 @@ Build and runtime both target **JDK 25** (`maven.compiler.release=25`; JVM Docke
 All Maven commands use the wrapper.
 
 ```bash
-# EVERY build that includes the `service` module must name the auth build variant with
-# -Dqits.variant=forwardauth|oauth (docs/features/2026-07-16_build-variant-auth.md). forwardauth is
-# the everyday dev/test choice; the enforcer message reminds you if it's missing. Module-scoped
-# builds that skip service (-pl domain, -pl cli, -pl auth/…) never need the flag.
+# Auth build variant (docs/features/2026-07-16_build-variant-auth.md): builds that PACKAGE the
+# `service` module (package/install/verify) must name it with -Dqits.variant=forwardauth|oauth —
+# the enforcer message reminds you if it's missing. Flagless quarkus:dev and test default to
+# forwardauth (dev fallback identity, effectively no auth). Module-scoped builds that skip service
+# (-pl domain, -pl cli, -pl auth/…) never need the flag.
 
 # First on a fresh checkout, build so the `domain` module is resolvable from the local repo:
 ./mvnw install -DskipTests -Dqits.variant=forwardauth
 
 # Run dev mode (live-reload for Java + Angular, Quinoa dev server on :4200). `-am` builds the domain
 # + auth deps first (so the standalone `service` resolves them) and `workspace-discovery=true` makes
-# dev mode reactor-aware, so edits to the `domain`/`auth/*` modules live-reload too. With
-# -Dqits.variant=oauth instead, Keycloak Dev Services auto-starts a Keycloak container
-# (alice/alice, bob/bob) and dev mode gets the real login wall.
+# dev mode reactor-aware, so edits to the `domain`/`auth/*` modules live-reload too. Flagless runs
+# default to forwardauth (dev identity `dev`, effectively no auth); with -Dqits.variant=oauth,
+# Keycloak Dev Services auto-starts a Keycloak container (alice/alice, bob/bob) and dev mode gets
+# the real login wall.
 #
 # NOTE: to actually exercise workspace containers / the daemon web view, run this INSIDE the
 # `.devcontainer/` (VS Code "Reopen in Container" or `devcontainer up`), so qits sits on the shared
 # `qits-net` and reaches workspace containers by DNS name (no host-port publishing). The command is
 # the same, just in the devcontainer's terminal. See the Workspace containers section.
-./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true -Dqits.variant=forwardauth
+./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true
 
 # Full build (all modules, frontend + backend)
 ./mvnw package -Dqits.variant=forwardauth
 
 # Run all unit tests for a module
 ./mvnw -pl domain test       # service/business-logic tests
-./mvnw -pl service test -Dqits.variant=forwardauth   # REST/controller, mutiny, health, validation, openapi tests
-                             # (the service suite ONLY runs under forwardauth — under oauth every
-                             # @QuarkusTest fails startup for the missing auth-server-url)
+./mvnw -pl service test      # REST/controller, mutiny, health, validation, openapi tests — flagless
+                             # defaults to forwardauth, the ONLY variant the suite runs under (under
+                             # oauth every @QuarkusTest fails startup for the missing auth-server-url)
 ./mvnw -pl cli test          # seed command test
 ./mvnw -pl auth/core test && ./mvnw -pl auth/oidc test && ./mvnw -pl auth/forwardauth test  # auth suites
 
 # Run a single test class / method (-am also builds the deps it needs)
 ./mvnw -pl domain -am test -Dtest=ProjectServiceTest
-./mvnw -pl service -am test -Dtest=ProjectControllerTest#create -Dqits.variant=forwardauth
+./mvnw -pl service -am test -Dtest=ProjectControllerTest#create
 
 # Regenerate docs/openapi.yml (writes the file as a side effect — do not hand-edit openapi.yml).
 # The export is variant-independent (AuthController lives in auth-core; the OpenAPI title is pinned).
-./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest -Dqits.variant=forwardauth
+./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest
 
 # Native build + integration tests (failsafe; ITs are skipped by default via skipITs=true)
 ./mvnw -pl service package -Dnative -Dqits.variant=forwardauth

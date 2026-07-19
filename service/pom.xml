@@ -148,17 +148,18 @@
                 <artifactId>maven-surefire-plugin</artifactId>
             </plugin>
             <plugin>
-                <!-- Every service build must choose an auth variant — there is no unauthenticated
-                     qits build (docs/features/2026-07-16_build-variant-auth.md). The -D property
-                     activates the matching profile in <profiles> below AND satisfies this rule with
-                     one flag. quarkus:dev bypasses the lifecycle (so also this check) — there the
-                     ${qits.auth.variant} expansion in application.properties fails augmentation
-                     instead. -->
+                <!-- Every PACKAGED service build must choose an auth variant explicitly — a shipped
+                     qits never defaults its auth (docs/features/2026-07-16_build-variant-auth.md).
+                     The -D property activates the matching profile in <profiles> below AND satisfies
+                     this rule with one flag. Bound to prepare-package (not validate) on purpose:
+                     pre-packaging work — quarkus:dev, test — runs flagless via the
+                     variant-default-forwardauth profile below; only producing an artifact
+                     (package/install/verify) reaches this rule. -->
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <executions>
                     <execution>
                         <id>require-auth-variant</id>
-                        <phase>validate</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>enforce</goal>
                         </goals>
@@ -167,9 +168,10 @@
                                 <requireProperty>
                                     <property>qits.variant</property>
                                     <regex>oauth|forwardauth</regex>
-                                    <message>qits builds must choose an auth variant for the service app:
+                                    <message>Packaging qits requires an explicit auth variant for the service app:
   -Dqits.variant=forwardauth   trust forward-auth proxy headers (Remote-User/Remote-Groups) — the everyday dev/test variant
   -Dqits.variant=oauth         built-in OIDC login (Keycloak); requires QUARKUS_OIDC_* env at runtime
+(quarkus:dev and test default to forwardauth without the flag — a packaged build never defaults.)
 See docs/features/2026-07-16_build-variant-auth.md.</message>
                                     <regexMessage>Unknown qits.variant — valid values are: forwardauth, oauth.
 See docs/features/2026-07-16_build-variant-auth.md.</regexMessage>
@@ -253,6 +255,27 @@ See docs/features/2026-07-16_build-variant-auth.md.</regexMessage>
                 <property>
                     <name>qits.variant</name>
                     <value>forwardauth</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>eu.wohlben</groupId>
+                    <artifactId>auth-forwardauth</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- Local pre-packaging default: with NO -Dqits.variant flag, dev mode and tests get
+             forwardauth (whose %dev/%test fallback identity `dev` means effectively no auth), so
+             `./mvnw -pl service -am quarkus:dev …` works flagless. Deliberately NOT a default for
+             real artifacts: the prepare-package enforcer above still fails any flagless
+             package/install/verify, so a shipped build always names its variant explicitly.
+             (A separate profile because Maven allows one activation property per profile — this is
+             the `!qits.variant` twin of variant-forwardauth; any explicit flag deactivates it.) -->
+        <profile>
+            <id>variant-default-forwardauth</id>
+            <activation>
+                <property>
+                    <name>!qits.variant</name>
                 </property>
             </activation>
             <dependencies>

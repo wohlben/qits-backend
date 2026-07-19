@@ -19,7 +19,7 @@ fixture breaks, this guide is stale too).
 
 ## Prerequisites
 
-- qits running (`./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true -Dqits.variant=forwardauth`, UI on `:8080`).
+- qits running (`./mvnw -pl service -am quarkus:dev -Dquarkus.bootstrap.workspace-discovery=true`, UI on `:8080` — flagless dev defaults to the forwardauth variant).
 - Docker with the workspace image built: `docker build -t qits/workspace --target workspace -f docker/qits/Dockerfile .`
 - What the container guarantees your app (the `workspace` stage of `docker/qits/Dockerfile`): Debian bookworm,
   **JDK 25** (Temurin), **Node 22 + pnpm** (corepack), git, python3, tmux, the Claude Code CLI.
