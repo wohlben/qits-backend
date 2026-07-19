@@ -23,9 +23,12 @@
         <module>auth/forwardauth</module>
         <module>service</module>
         <module>cli</module>
-        <!-- Programmatic Playwright user stories that render themselves into local reports
-             (docs/epics/qits-userflows/): a plain jar depending on none of the other modules — it
-             drives a running qits through a real browser, by URL only. Never needs -Dqits.variant. -->
+        <!-- Playwright userflows (docs/epics/qits-userflows/), split into the reusable FRAMEWORK
+             (`qits-userflows`) and the STORIES that consume it (`userflows`) ahead of the framework's
+             eventual extraction into a standalone repo. Both depend on none of the other modules —
+             they drive a running qits through a real browser, by URL only. Never need -Dqits.variant.
+             `qits-userflows` is listed first: `userflows` depends on it. -->
+        <module>qits-userflows</module>
         <module>userflows</module>
     </modules>
 
@@ -93,6 +96,11 @@
             <dependency>
                 <groupId>eu.wohlben</groupId>
                 <artifactId>auth-forwardauth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>qits-userflows</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

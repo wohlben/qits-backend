@@ -20,10 +20,14 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ConditionEvaluationResult;
+import org.junit.jupiter.api.extension.ExecutionCondition;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
@@ -44,7 +48,8 @@ import org.junit.jupiter.api.extension.TestExecutionExceptionHandler;
  * the no-app harness stories) pass through.
  */
 public final class UserStoryExtension
-    implements BeforeEachCallback,
+    implements ExecutionCondition,
+        BeforeEachCallback,
         ParameterResolver,
         TestExecutionExceptionHandler,
         AfterEachCallback {
@@ -63,6 +68,37 @@ public final class UserStoryExtension
 
   /** JVM-wide slug → story-name registry: two <i>different</i> stories slugging alike fail fast. */
   private static final Map<String, String> EMITTED_SLUGS = new ConcurrentHashMap<>();
+
+  /**
+   * JVM-wide set of slugs whose story ran and PASSED — what {@link UserflowPrecondition} checks.
+   */
+  private static final Set<String> PASSED_SLUGS = ConcurrentHashMap.newKeySet();
+
+  /**
+   * The single {@link UserflowContext} shared across all stories in the run (dependency handoff).
+   */
+  private static final UserflowContext CONTEXT = new UserflowContext();
+
+  @Override
+  public ConditionEvaluationResult evaluateExecutionCondition(ExtensionContext context) {
+    Optional<Method> method = context.getTestMethod();
+    if (method.isEmpty()) {
+      return ConditionEvaluationResult.enabled("not a story method");
+    }
+    UserflowPrecondition preconditions = method.get().getAnnotation(UserflowPrecondition.class);
+    if (preconditions == null) {
+      return ConditionEvaluationResult.enabled("no precondition");
+    }
+    // Evaluated before beforeEach, so a skipped dependent never launches Chromium.
+    for (Class<?> producer : preconditions.value()) {
+      String slug = storySlug(producer);
+      if (!PASSED_SLUGS.contains(slug)) {
+        return ConditionEvaluationResult.disabled(
+            "precondition '" + producer.getSimpleName() + "' (" + slug + ") did not pass");
+      }
+    }
+    return ConditionEvaluationResult.enabled("all preconditions passed");
+  }
 
   @Override
   public void beforeEach(ExtensionContext context) throws Exception {
@@ -124,12 +160,16 @@ public final class UserStoryExtension
   @Override
   public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext context)
       throws ParameterResolutionException {
-    return parameterContext.getParameter().getType() == Flow.class;
+    Class<?> type = parameterContext.getParameter().getType();
+    return type == Flow.class || type == UserflowContext.class;
   }
 
   @Override
   public Object resolveParameter(ParameterContext parameterContext, ExtensionContext context)
       throws ParameterResolutionException {
+    if (parameterContext.getParameter().getType() == UserflowContext.class) {
+      return CONTEXT;
+    }
     return state(context).flow;
   }
 
@@ -160,6 +200,11 @@ public final class UserStoryExtension
     if (state.expectFailure && !UserflowReport.FAILED.equals(state.outcome)) {
       throw new AssertionError(
           "@ExpectedFailure story '" + state.name + "' was expected to fail but passed");
+    }
+    // Record the pass only now, so a failed / @ExpectedFailure story never satisfies a
+    // precondition.
+    if (UserflowReport.PASSED.equals(state.outcome)) {
+      PASSED_SLUGS.add(state.slug);
     }
   }
 
@@ -251,6 +296,73 @@ public final class UserStoryExtension
     } catch (IOException e) {
       return false;
     }
+  }
+
+  /**
+   * The slug of the single {@code @UserStory} on {@code storyClass}; used to key the passed set.
+   */
+  static String storySlug(Class<?> storyClass) {
+    Method storyMethod = null;
+    for (Method method : storyClass.getDeclaredMethods()) {
+      if (method.isAnnotationPresent(UserStory.class)) {
+        if (storyMethod != null) {
+          throw new IllegalStateException(
+              storyClass.getName()
+                  + " has multiple @UserStory methods; a precondition class must have exactly one");
+        }
+        storyMethod = method;
+      }
+    }
+    if (storyMethod == null) {
+      throw new IllegalStateException(
+          storyClass.getName()
+              + " has no @UserStory method — it cannot be a @UserflowPrecondition");
+    }
+    return Slugs.slug(storyMethod.getAnnotation(UserStory.class).value());
+  }
+
+  /**
+   * The precondition classes declared on {@code storyClass}'s story method; empty if none / not a
+   * story class (lenient, so the orderer can scan every test class). Gating: each must pass.
+   */
+  static Class<?>[] preconditionsOf(Class<?> storyClass) {
+    Method storyMethod = storyMethodOf(storyClass);
+    UserflowPrecondition precondition =
+        storyMethod == null ? null : storyMethod.getAnnotation(UserflowPrecondition.class);
+    return precondition == null ? new Class<?>[0] : precondition.value();
+  }
+
+  /** The ordering-only ({@link UserflowRunsAfter}) predecessor classes; empty if none. */
+  static Class<?>[] runsAfterOf(Class<?> storyClass) {
+    Method storyMethod = storyMethodOf(storyClass);
+    UserflowRunsAfter runsAfter =
+        storyMethod == null ? null : storyMethod.getAnnotation(UserflowRunsAfter.class);
+    return runsAfter == null ? new Class<?>[0] : runsAfter.value();
+  }
+
+  /** Every class that must be ordered before {@code storyClass} — preconditions plus runs-after. */
+  static Class<?>[] orderingPredecessorsOf(Class<?> storyClass) {
+    Class<?>[] preconditions = preconditionsOf(storyClass);
+    Class<?>[] runsAfter = runsAfterOf(storyClass);
+    if (runsAfter.length == 0) {
+      return preconditions;
+    }
+    if (preconditions.length == 0) {
+      return runsAfter;
+    }
+    Class<?>[] all = new Class<?>[preconditions.length + runsAfter.length];
+    System.arraycopy(preconditions, 0, all, 0, preconditions.length);
+    System.arraycopy(runsAfter, 0, all, preconditions.length, runsAfter.length);
+    return all;
+  }
+
+  private static Method storyMethodOf(Class<?> storyClass) {
+    for (Method method : storyClass.getDeclaredMethods()) {
+      if (method.isAnnotationPresent(UserStory.class)) {
+        return method;
+      }
+    }
+    return null;
   }
 
   private static void checkForCollision(String slug, String name) {

@@ -1,8 +1,8 @@
 # userflows/
 
-Programmatic **user stories** that end-to-end-test qits through a real browser (Playwright-Java)
-and render themselves into local **reports**. A story is a named, described, step-recorded walk
-through the UI; running one produces more than a green check — it writes a markdown document
+The qits **user stories** — programmatic, end-to-end walks through qits' UI in a real browser
+(Playwright-Java) that render themselves into local **reports**. A story is a named, described,
+step-recorded walk; running one produces more than a green check — it writes a markdown document
 interleaving the story's description, its recorded steps, and inline screenshots, plus a video of
 the run and a canonical `userflow.json`, into `target/userstories/<slug>/`.
 
@@ -10,21 +10,47 @@ This module is the automated sibling of `docs/manual-acceptance-tests/` — a st
 form of a plan.md's scripted walk. It is **part 1** of the
 [qits-userflows epic](../docs/epics/qits-userflows/epic.md): the reports it produces are shaped to
 become the by-branch golden screenshots/videos a future diff tab compares (the artifacts upload
-itself is a follow-up part, out of scope here). It depends on **none** of the other qits modules —
-it reaches the app by URL only, so a story can never cheat the user's perspective by touching
-internals. `-pl userflows` builds never need `-Dqits.variant`.
+itself is a follow-up part, out of scope here). It depends on **none** of the app modules — it
+reaches qits by URL only, so a story can never cheat the user's perspective by touching internals.
+`-pl userflows` builds never need `-Dqits.variant`.
 
-## The absolute rule: `src/main` is the framework, `src/test` is stories only
+## This module is stories only; the framework is `qits-userflows`
 
-- **`src/main`** (`eu.wohlben.qits.userflows`) holds the *framework* and nothing else: the
-  annotations, the JUnit 5 extension, the `Flow` recording facade, the report model + renderers, and
-  every shared utility (`ReportAssertions`, `HarnessResources`, `UserflowTarget`, …).
-- **`src/test`** holds **user stories only** — one `@UserStory` method per story, plus a lean
-  `@AfterAll` companion that only *calls into* `src/main` helpers. Nothing abstract, no plumbing, no
-  reusable helper ever lands in `src/test`. **If a story needs a helper, it moves to `src/main`.**
+- **This module** (`userflows`) holds **user stories only** — `src/test` classes, one `@UserStory`
+  method per class, plus a lean `@AfterAll` companion that only *calls into* framework helpers.
+  Nothing abstract, no plumbing, no reusable helper ever lands here. **If a story needs a helper, it
+  goes in the framework**, not here.
+- **The framework** (annotations, the `Flow` facade, the JUnit 5 extension + class orderer, the
+  shared `UserflowContext`, the report model/renderers, and utilities like `ReportAssertions` /
+  `HarnessResources` / `UserflowTarget`) lives in the sibling **[`qits-userflows`](../qits-userflows/CLAUDE.md)**
+  module, on this module's test classpath.
 
-This split is also the future repository boundary: part 4 of the epic extracts everything except the
-stories into a standalone library, so qits-managed projects can author their own stories.
+This module boundary is the **future repository boundary**: the framework split out here is a
+temporary step ahead of part 4 of the epic extracting `qits-userflows` into a standalone library, so
+qits-managed projects can author their own stories.
+
+## Conventions: folder structure & naming
+
+Stories are organized **by domain/epic**, never dumped in one flat package — so the suite stays
+navigable as it grows. All under the package root `eu.wohlben.qits.userflows`:
+
+```
+eu.wohlben.qits.userflows.project              <- Browse/Create/Edit/DeleteProjectIT
+eu.wohlben.qits.userflows.projectrepository    <- BrowseDemoProjectIT, Create/DeleteRepositoryIT
+eu.wohlben.qits.userflows.workspace.webview    <- a sub-area of a domain nests (workspace → web view)
+```
+
+A dependent chain may span domains (a repository needs a project): `CreateRepositoryIT`
+(`.projectrepository`) has `@UserflowPrecondition(CreateProjectIT.class)` from `.project`. That
+cross-package reference just means the referenced class/keys are `public`.
+
+- **One package per domain**; nest a sub-package for a sub-area (`workspace.webview`). Put a new
+  story in the package that matches what it exercises; add a package when a new domain/area appears.
+- **Naming**: `<Action><Domain>IT` — e.g. `CreateProjectIT`, `EditProjectIT`, `DeleteProjectIT`,
+  `BrowseDemoProjectIT`. **No `Flow` suffix.** App stories end in `IT` (they're extended
+  integration tests; see below).
+- **One `@UserStory` method per class** — the display name in the annotation is what the report
+  directory is slugged from; the class name is for humans and for `@UserflowPrecondition` references.
 
 ## Authoring a story
 
@@ -67,28 +93,71 @@ void browseDemoProject(Flow flow) {
 - The recorded step lines are hashed (verbs + selectors + labels, no typed values) into the
   deterministic `definitionHash` in the sidecar — the future `qits.userflow.hash`.
 
-## Kinds of story
+## Stories here are app stories
 
-- **Harness stories** (`*Test`, run in every default build): drive a **static HTML page bundled as a
-  test resource** via `HarnessResources.classpathUrl(...)`, so they need no running app and give the
-  framework itself coverage. `GreetingHarnessTest` is the reference; `FailingHarnessTest`
-  (`@ExpectedFailure`) proves the failure path stays green while reporting `outcome: "failed"`.
-- **App stories** (`*IT`, `@Tag("extended")`): drive a running qits. They read the target from
-  `qits.userflows.base-url` (default `http://localhost:8080`) and **self-skip** via
-  `assumeTrue(UserflowTarget.isReachable())` when nothing answers — safe in every default build
-  (mirrors `WorkspaceContainerIT`). Expected state is the idempotent `seed-webapp` fixture.
+The stories in **this** module are **app stories** (`*IT`, `@Tag("extended")`): they drive a running
+qits. They read the target from `qits.userflows.base-url` (default `http://localhost:8080`) and
+**self-skip** via `assumeTrue(UserflowTarget.isReachable())` when nothing answers — safe in every
+default build (mirrors `WorkspaceContainerIT`). Expected state is the idempotent `seed-webapp`
+fixture. Reference: `BrowseDemoProjectIT` and the `CreateProjectIT` → `EditProjectIT` →
+`DeleteProjectIT` chain.
+
+> The framework's own **harness stories** — `*Test` classes that drive a bundled static page (no
+> running app) to cover the framework machinery (step recording, the failure path, the
+> ordering/skip/runs-after dependency logic) — live in the **`qits-userflows`** module's `src/test`,
+> not here. Don't add framework-coverage stories to this module.
+
+## Dependent flows
+
+Stories are e2e tests against one shared qits, so a story can **build on state a previous story
+produced** instead of setting up its own. Declare it on the `@UserStory` method:
+
+```java
+@UserStory("Edit the project")
+@UserflowPrecondition(CreateProjectIT.class)         // depends on that story CLASS
+void editProject(Flow flow, UserflowContext context) { // inject the shared context
+  String id = context.require("project.id", String.class);
+  flow.navigate("/projects/{}/edit", id);                // templated → stable definitionHash
+  …
+}
+```
+
+- **Ordering + skip**: predecessors always run first (topological `UserflowClassOrderer`), and a
+  dependent is **skipped before its browser launches** if a **precondition** didn't pass (a failed,
+  `@ExpectedFailure`, or itself-skipped precondition doesn't satisfy; skip is transitive).
+- **Two edge kinds**: `@UserflowPrecondition(X.class)` = run after X **and** require X to pass (else
+  skip). `@UserflowRunsAfter(X.class)` = run after X **only** (ordering; runs whether X passed,
+  failed, or was skipped) — the **cleanup** edge. Combine them: a delete flow is
+  `@UserflowPrecondition(create)` + `@UserflowRunsAfter(edit)`, so it still cleans up when edit
+  fails but is skipped when create fails.
+- **Handoff**: the producer stashes references (`context.put("project.id", Urls.lastPathSegment(
+  flow.currentUrl()))`); dependents `require(...)` them. Namespace keys by the producing flow. Each
+  story gets a fresh browser, so the *state* lives in qits — the context passes ids/URLs, not the
+  state itself.
+- **Dynamic ids**: use `flow.navigate("/projects/{}/edit", id)` (templated) so the fingerprint keeps
+  `{}` and the hash stays stable per run; keep constant selectors (not per-run names) in
+  `waitFor`/`click`.
+- **`@UserflowPrecondition` references a class** — one `@UserStory` per class (already the rule).
+- **Constraints**: one sequential test JVM (surefire default; **no parallel execution**); a chain's
+  producer and dependents must be the **same kind** (all `*Test` or all `*IT` — surefire and failsafe
+  are separate JVMs); running a dependent **alone** skips it (its precondition never ran). The class
+  orderer is registered in `src/test/resources/junit-platform.properties`.
+
+Reference chain: `CreateProjectIT` → `EditProjectIT` → `DeleteProjectIT` (project
+lifecycle, sharing the created id). See `docs/epics/qits-userflows/features/2026-07-19_dependent-userflows.md`.
 
 ## Running stories
 
 ```bash
-# Harness stories only (no app needed) — runs in every default build:
-./mvnw -pl userflows test
-
-# App stories too — start qits + seed first, then run the extended ITs:
+# The app stories here are extended ITs — start qits + seed first, then run them
+# (they self-skip if nothing is on :8080):
 ./mvnw install -DskipTests
 ./mvnw -pl service -am quarkus:dev                       # serves the UI on :8080
 ./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
 ./mvnw -pl userflows verify -Pextended -Dqits.dev-guard.skip=true   # dev holds :8080
+
+# The framework's own harness self-tests (no app) run in the framework module's default build:
+./mvnw -pl qits-userflows test
 
 # Point at a different app:
 ./mvnw -pl userflows verify -Pextended -Dqits.userflows.base-url=https://qits.example.eu

@@ -1,4 +1,4 @@
-package eu.wohlben.qits.userflows.stories;
+package eu.wohlben.qits.userflows.harness;
 
 import eu.wohlben.qits.userflows.Flow;
 import eu.wohlben.qits.userflows.HarnessResources;

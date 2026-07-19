@@ -9,39 +9,28 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <!-- Programmatic user stories that render themselves into reports (docs/epics/qits-userflows/).
-         A plain jar that drives a running qits through a REAL browser (Playwright-Java) and, per run,
-         emits target/userstories/<slug>/ (user-story.md + inline screenshots + recording.webm + the
-         canonical userflow.json). Deliberately depends on NEITHER `domain`/`service`/`artifacts` NOR
-         any `auth/*` module — it reaches the app by URL only, so coupling to internals can never let a
-         story cheat the user's perspective. src/main is the framework; src/test is stories ONLY (see
-         this module's CLAUDE.md). Never needs -Dqits.variant for module-scoped builds. -->
+    <!-- The qits user STORIES (docs/epics/qits-userflows/) — one @UserStory per class, driving a
+         running qits through the `qits-userflows` framework and emitting target/userstories/<slug>/.
+         This module holds src/test stories ONLY: the framework (annotations, Flow, extension, report)
+         lives in the sibling `qits-userflows` module, and if a story needs a new helper it goes there,
+         not here (see this module's CLAUDE.md). Depends on none of the app modules — it reaches qits
+         by URL only. Never needs -Dqits.variant for module-scoped builds. -->
     <artifactId>userflows</artifactId>
-
-    <properties>
-        <!-- Match the JS `playwright@1.61.0` baked into docker/qits/Dockerfile's `workspace` stage
-             (Chromium rev 1228) so the Java driver finds the pinned browser at
-             PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright instead of downloading its own. Not managed by
-             quarkus-bom, so pinned here; bump in lockstep with the Dockerfile's ARG PLAYWRIGHT_VERSION. -->
-        <playwright.version>1.61.0</playwright.version>
-    </properties>
 
     <dependencies>
         <dependency>
-            <groupId>com.microsoft.playwright</groupId>
-            <artifactId>playwright</artifactId>
-            <version>${playwright.version}</version>
+            <!-- The userflows framework. Test-scoped: this module has no src/main — only stories under
+                 src/test — so the framework (and its transitive Playwright/JUnit/Jackson) only need to
+                 be on the test classpath. -->
+            <groupId>eu.wohlben</groupId>
+            <artifactId>qits-userflows</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
-            <!-- The canonical userflow.json is written with Jackson; version comes from quarkus-bom. -->
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <!-- JUnit 5 aggregator (api + engine + params); version managed by quarkus-bom's junit-bom
-                 import, so this module gets JUnit 5 without pulling in Quarkus itself. -->
+            <!-- Stories use JUnit directly (@Tag, @AfterAll, Assertions, Assumptions). -->
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

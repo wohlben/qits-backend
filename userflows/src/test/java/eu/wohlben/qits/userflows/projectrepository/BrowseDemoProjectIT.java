@@ -1,4 +1,4 @@
-package eu.wohlben.qits.userflows.stories;
+package eu.wohlben.qits.userflows.projectrepository;
 
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 

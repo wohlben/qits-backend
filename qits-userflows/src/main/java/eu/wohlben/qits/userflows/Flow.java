@@ -2,6 +2,7 @@ package eu.wohlben.qits.userflows;
 
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.PlaywrightAssertions;
+import com.microsoft.playwright.options.WaitForSelectorState;
 import eu.wohlben.qits.userflows.report.Hashing;
 import eu.wohlben.qits.userflows.report.Slugs;
 import eu.wohlben.qits.userflows.report.UserflowReport;
@@ -64,6 +65,18 @@ public final class Flow {
     return record("navigate " + urlOrPath, "navigate " + urlOrPath);
   }
 
+  /**
+   * Navigate to a path with {@code {}} placeholders filled by {@code args} — for dependent flows
+   * that visit a dynamic id (e.g. {@code navigate("/projects/{}/edit", id)}). The recorded step
+   * shows the real URL, but the <b>fingerprint keeps the template</b>, so the {@link
+   * #definitionHash()} stays stable across runs even though the id changes.
+   */
+  public Flow navigate(String pathTemplate, Object... args) {
+    String actual = applyTemplate(pathTemplate, args);
+    page.navigate(resolve(actual));
+    return record("navigate " + actual, "navigate " + pathTemplate);
+  }
+
   /** Wait for {@code selector} to appear (Playwright's default timeout). */
   public Flow waitFor(String selector) {
     page.waitForSelector(selector);
@@ -74,6 +87,13 @@ public final class Flow {
   public Flow waitFor(String selector, double timeoutMillis) {
     page.waitForSelector(selector, new Page.WaitForSelectorOptions().setTimeout(timeoutMillis));
     return record("waitFor " + selector, "waitFor " + selector);
+  }
+
+  /** Wait until no element matches {@code selector} (passes immediately if already absent). */
+  public Flow expectAbsent(String selector) {
+    page.waitForSelector(
+        selector, new Page.WaitForSelectorOptions().setState(WaitForSelectorState.DETACHED));
+    return record("expectAbsent " + selector, "expectAbsent " + selector);
   }
 
   /** Click the first element matching {@code selector}. */
@@ -151,6 +171,15 @@ public final class Flow {
     return page;
   }
 
+  /**
+   * The current page URL — a read that records no step. Use it to extract produced state for a
+   * dependent flow (e.g. the id in {@code /projects/<id>}), typically via {@link
+   * Urls#lastPathSegment}.
+   */
+  public String currentUrl() {
+    return page.url();
+  }
+
   // --- consumed by the extension to build the report -----------------------------------------
 
   List<UserflowReport.Step> steps() {
@@ -222,6 +251,18 @@ public final class Flow {
     } catch (IOException e) {
       return null; // dimensions fall back to 0; the file is still written
     }
+  }
+
+  private static String applyTemplate(String template, Object... args) {
+    StringBuilder out = new StringBuilder();
+    int arg = 0;
+    int from = 0;
+    int at;
+    while ((at = template.indexOf("{}", from)) >= 0) {
+      out.append(template, from, at).append(arg < args.length ? String.valueOf(args[arg++]) : "{}");
+      from = at + 2;
+    }
+    return out.append(template.substring(from)).toString();
   }
 
   private String resolve(String urlOrPath) {

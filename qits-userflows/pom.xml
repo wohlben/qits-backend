@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>eu.wohlben</groupId>
+        <artifactId>qits</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- The userflows FRAMEWORK (docs/epics/qits-userflows/): the @UserStory/@UserflowPrecondition/
+         @UserflowRunsAfter annotations, the Flow recording facade, the JUnit 5 extension + class
+         orderer, the shared UserflowContext, and the report model/renderers — everything except the
+         stories themselves, which live in the sibling `userflows` module. A plain library jar
+         depending on none of the other qits modules (it drives the app by URL only). This split is
+         deliberate and TEMPORARY: it keeps the framework separate from the stories ahead of its
+         eventual extraction into a standalone repo (epic part 4). Never needs -Dqits.variant. -->
+    <artifactId>qits-userflows</artifactId>
+
+    <properties>
+        <!-- Match the JS `playwright@1.61.0` baked into docker/qits/Dockerfile's `workspace` stage
+             (Chromium rev 1228) so the Java driver finds the pinned browser at
+             PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright instead of downloading its own. Not managed by
+             quarkus-bom, so pinned here; bump in lockstep with the Dockerfile's ARG PLAYWRIGHT_VERSION. -->
+        <playwright.version>1.61.0</playwright.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>${playwright.version}</version>
+        </dependency>
+        <dependency>
+            <!-- The canonical userflow.json is written with Jackson; version comes from quarkus-bom. -->
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <!-- JUnit 5 aggregator: the framework references the JUnit API directly (@UserStory is a
+                 meta-@Test, the extension implements JUnit SPIs, ReportAssertions uses Assertions), so
+                 it's a COMPILE dependency. Version managed by quarkus-bom's junit-bom import. -->
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <!-- Runs the framework's own self-test harness stories (src/test, *Test): they drive a
+                 bundled static page (no running qits) and cover step recording, the failure path, and
+                 the ordering/skip/runs-after dependency machinery on every default build. -->
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

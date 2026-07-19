@@ -18,6 +18,12 @@ abstract, no helpers, no plumbing ever lands in `src/test` — if a story needs 
 created in the same commit as the module, so every future contributor (human or agent) adding a
 story inherits the rule without reading this plan.
 
+> **Update (post-split):** that main/test boundary has since been realized as a **module** boundary
+> ahead of schedule — the framework moved to a sibling **`qits-userflows`** module and the
+> **`userflows`** module now holds the stories only (its `src/test`). It's a temporary step toward
+> part 4's extraction into a standalone repo; the authoring rule is unchanged (a story needing a
+> helper puts it in the framework module). See `qits-userflows/CLAUDE.md` and `userflows/CLAUDE.md`.
+
 The strategic goal is [qits-artifacts](../../qits-artifacts/feature-ideas/qits-artifacts.md)'s golden-media loop: user stories
 are the *producers* of the by-branch screenshots/videos the
 [user-flow diff tab](../feature-ideas/qits-artifacts-workspace-userflow-diff-tab.md) compares. **The scope of this
