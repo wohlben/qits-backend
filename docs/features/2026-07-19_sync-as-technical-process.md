@@ -2,9 +2,9 @@
 
 ## Introduction
 
-The [streamed repository pull](../features/2026-07-19_repository-pull-technical-process.md) turned
+The [streamed repository pull](2026-07-19_repository-pull-technical-process.md) turned
 `POST /api/repositories/{repoId}/pull` into a segmented [technical
-process](../features/2026-07-18_technical-process-log-stream.md) — one segment per pulled
+process](2026-07-18_technical-process-log-stream.md) — one segment per pulled
 repository, watched live over SSE. Its sibling `POST /api/repositories/{repoId}/sync` (pull then
 push) stayed **synchronous**: it blocks on the whole recursive walk plus the push and returns one
 concatenated `output` blob the UI discards, showing only a spinner. This feature makes sync
@@ -15,14 +15,14 @@ the user watches a slow sync repo-by-repo and sees precisely whether the pull or
 Related/dependent plans:
 
 - **Reuses the pull feature's plumbing** —
-  [repository-pull-technical-process](../features/2026-07-19_repository-pull-technical-process.md):
+  [repository-pull-technical-process](2026-07-19_repository-pull-technical-process.md):
   the repo-scoped `TechnicalProcess`, the `beginPullRepository` worker pattern, and the streamed
   `pullRepository(..., process, ...)` recursion are already there; sync wraps them and appends one
   push segment.
 - **Reuses the SSE + view unchanged** from the
-  [technical-process log stream](../features/2026-07-18_technical-process-log-stream.md).
+  [technical-process log stream](2026-07-18_technical-process-log-stream.md).
 - **Benefits from**
-  [repository-pull-active-process-discovery](repository-pull-active-process-discovery.md) — once
+  [repository-pull-active-process-discovery](../feature-ideas/repository-pull-active-process-discovery.md) — once
   repo-scoped processes are discoverable, a sync reattaches after navigation for free, and the same
   concurrency guard prevents a pull and a sync racing the same origin.
 

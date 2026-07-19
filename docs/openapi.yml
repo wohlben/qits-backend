@@ -1520,7 +1520,7 @@ components:
     Response61:
       type: object
       properties:
-        output:
+        technicalProcessId:
           type: string
     Response62:
       type: object

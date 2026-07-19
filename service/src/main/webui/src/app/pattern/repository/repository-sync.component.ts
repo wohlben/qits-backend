@@ -23,11 +23,12 @@ import { invalidateRepository } from './invalidate-repository';
  * branch list, and owns the Pull / Sync / Push and main-branch mutations. Sync / Push / main-branch
  * invalidate the sync status (and branch tree) on success so the header reflects the new state.
  *
- * Pull is asynchronous: the POST registers a technical process and returns its id immediately, so
- * `onSuccess` opens a "Pulling repository" dialog around the streamed, segmented log (one segment
- * per pulled repository, incl. imported submodules). Invalidation fires when that process reaches
- * `done` — not on the POST, which returns before anything was pulled. Closing the dialog does not
- * stop the pull.
+ * Pull and Sync are asynchronous: the POST registers a technical process and returns its id
+ * immediately, so `onSuccess` opens a "Pulling repository" / "Syncing repository" dialog around the
+ * streamed, segmented log (one segment per pulled repository, incl. imported submodules; sync
+ * appends a final push segment). Invalidation fires when that process reaches `done` — not on the
+ * POST, which returns before anything ran. Closing the dialog does not stop the process. Push stays
+ * synchronous.
  */
 @Component({
   selector: 'app-repository-sync',
@@ -48,9 +49,10 @@ import { invalidateRepository } from './invalidate-repository';
       (push)="pushMutation.mutate()"
     />
 
-    <!-- Pulling repository: the live, segmented log of the recursive pull (one segment per repo,
-         imported submodules included), streamed from its technical process. Closing the dialog does
-         not stop the pull — reopening within the retention window replays and resumes. -->
+    <!-- Pull / Sync: the live, segmented log of the recursive pull (one segment per repo, imported
+         submodules included; sync appends a push segment), streamed from its technical process.
+         Closing the dialog does not stop the process — reopening within the retention window replays
+         and resumes. -->
     <ng-template #processTpl>
       @if (processId(); as pid) {
         <app-technical-process-view [processId]="pid" (finished)="onProcessFinished()" />
@@ -103,7 +105,7 @@ export class RepositorySyncComponent {
       // The pull runs asynchronously — invalidation happens on the process's `done`, not here.
       if (res.technicalProcessId) {
         this.processId.set(res.technicalProcessId);
-        this.openDialog();
+        this.openDialog('Pulling repository');
       }
     },
   }));
@@ -117,7 +119,13 @@ export class RepositorySyncComponent {
   readonly syncMutation = injectMutation(() => ({
     mutationFn: () =>
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncPost(this.repoId())),
-    onSuccess: () => this.onMutationSuccess(),
+    onSuccess: (res) => {
+      // Like pull, sync runs asynchronously — invalidation happens on the process's `done`, not here.
+      if (res.technicalProcessId) {
+        this.processId.set(res.technicalProcessId);
+        this.openDialog('Syncing repository');
+      }
+    },
   }));
 
   readonly setMainBranchMutation = injectMutation(() => ({
@@ -133,10 +141,10 @@ export class RepositorySyncComponent {
     invalidateRepository(this.queryClient, this.repoId());
   }
 
-  /** Open the pull-process dialog; hides the built-in footer (the template owns its Close button). */
-  private openDialog() {
+  /** Open the process dialog; hides the built-in footer (the template owns its Close button). */
+  private openDialog(title: string) {
     this.activeDialogRef = this.dialog.create({
-      zTitle: 'Pulling repository',
+      zTitle: title,
       zContent: this.processTpl(),
       zHideFooter: true,
     });

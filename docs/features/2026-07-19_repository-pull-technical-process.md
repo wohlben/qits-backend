@@ -122,8 +122,8 @@ Each deferral above is captured as its own feature idea rather than left as a no
   reattaches, plus disabling Pull/Sync (and a server-side single-flight) while a pull is live so a
   closed-dialog user can't start a second walk racing git on the same origin.
 - **`sync` as a process** —
-  [`sync-as-technical-process`](../feature-ideas/sync-as-technical-process.md): the pull segments
-  plus a final `push` segment.
+  [`sync-as-technical-process`](2026-07-19_sync-as-technical-process.md): the pull segments
+  plus a final `push` segment. **Implemented.**
 - **Streaming `GitExecutor.exec`** —
   [`streaming-gitexecutor-exec`](../feature-ideas/streaming-gitexecutor-exec.md): live per-line
   fetch output (replacing the post-hoc delivery above), which also stops the idle reaper from
