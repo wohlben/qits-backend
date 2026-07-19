@@ -99,8 +99,9 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
   provides the live "now fetching X" signal, and per-repo fetch output is small. A streaming
   `exec(..., Consumer<String> onLine)` overload on `GitExecutor` (mirroring `ContainerRuntime`'s)
   is spun out as
-  [`streaming-gitexecutor-exec`](../feature-ideas/streaming-gitexecutor-exec.md) for very slow
-  fetches (it also stops the idle reaper from false-failing a long fetch).
+  [`streaming-gitexecutor-exec`](2026-07-19_streaming-gitexecutor-exec.md) for very slow
+  fetches (it also stops the idle reaper from false-failing a long fetch). **Implemented** — the
+  fetch now streams live per-line; the other pull verbs stay post-hoc.
 
 ## Frontend design
 
@@ -126,9 +127,9 @@ Each deferral above is captured as its own feature idea rather than left as a no
   [`sync-as-technical-process`](2026-07-19_sync-as-technical-process.md): the pull segments
   plus a final `push` segment. **Implemented.**
 - **Streaming `GitExecutor.exec`** —
-  [`streaming-gitexecutor-exec`](../feature-ideas/streaming-gitexecutor-exec.md): live per-line
+  [`streaming-gitexecutor-exec`](2026-07-19_streaming-gitexecutor-exec.md): live per-line
   fetch output (replacing the post-hoc delivery above), which also stops the idle reaper from
-  false-failing a genuinely slow single fetch.
+  false-failing a genuinely slow single fetch. **Implemented.**
 
 ## Testing
 
