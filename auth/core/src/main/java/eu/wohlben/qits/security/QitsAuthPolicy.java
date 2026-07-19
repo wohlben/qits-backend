@@ -10,11 +10,12 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * The single authorization decision, shared by every auth build variant (see
- * docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md). A <em>global</em> {@link HttpSecurityPolicy}
- * ({@code name()} stays {@code null}): Quarkus mounts the authentication/authorization handlers on
- * the main Vert.x router ahead of every user route, so this covers the JAX-RS tree under {@code
- * /api}, the raw router routes ({@code /git} host, {@code /daemon} proxy), the MCP servers, the
- * websockets-next upgrades, and Quinoa's static/SPA serving alike.
+ * docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md). A <em>global</em>
+ * {@link HttpSecurityPolicy} ({@code name()} stays {@code null}): Quarkus mounts the
+ * authentication/authorization handlers on the main Vert.x router ahead of every user route, so
+ * this covers the JAX-RS tree under {@code /api}, the raw router routes ({@code /git} host, {@code
+ * /daemon} proxy), the MCP servers, the websockets-next upgrades, and Quinoa's static/SPA serving
+ * alike.
  *
  * <p>Always enforcing — there is no runtime off switch; an unauthenticated qits exists only as a
  * build that includes no auth module, which the build setup forbids. The paths workspace containers

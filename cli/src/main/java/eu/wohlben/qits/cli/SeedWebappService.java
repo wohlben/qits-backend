@@ -29,11 +29,11 @@ import org.jboss.logging.Logger;
 /**
  * Seeds a demo project around the <b>servable</b> {@code testing-repo-quarkus-angular.git} fixture
  * (a minimal Quarkus 3 + Angular app, see {@code
- * docs/epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md}), so features that run real work in
- * a workspace — dev-server daemons, the web-view picker, actions, the coding agent — have a
- * plausible app to point at. Sibling of {@link SeedService} (which seeds the tiny {@code
- * testing-repo} for pure git-mechanics demos); invoked from the {@code seed-webapp} command in
- * {@link Main}.
+ * docs/epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md}), so
+ * features that run real work in a workspace — dev-server daemons, the web-view picker, actions,
+ * the coding agent — have a plausible app to point at. Sibling of {@link SeedService} (which seeds
+ * the tiny {@code testing-repo} for pure git-mechanics demos); invoked from the {@code seed-webapp}
+ * command in {@link Main}.
  *
  * <p>It drives the real domain services (not raw SQL), so it always matches the current model. This
  * fixture is the <b>stack-specific</b> substrate (the counterpart to {@code testing-repo}, which

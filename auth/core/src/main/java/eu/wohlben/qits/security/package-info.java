@@ -1,6 +1,7 @@
 /**
- * Shared core of qits' build-variant auth (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md). The
- * {@code service} app never carries auth code itself; a Maven profile selected via {@code
+ * Shared core of qits' build-variant auth
+ * (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md). The {@code service}
+ * app never carries auth code itself; a Maven profile selected via {@code
  * -Dqits.variant=oauth|forwardauth} adds exactly one variant module, and this module arrives
  * transitively with the always-on {@link eu.wohlben.qits.security.QitsAuthPolicy}, the {@link
  * eu.wohlben.qits.security.PublicPaths} token-free allowlist, and the {@code /api/auth/me}
