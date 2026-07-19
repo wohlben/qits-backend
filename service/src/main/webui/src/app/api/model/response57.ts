@@ -10,9 +10,6 @@
 
 
 export interface Response57 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
-    cleanedUp?: boolean;
+    success?: boolean;
 }
 

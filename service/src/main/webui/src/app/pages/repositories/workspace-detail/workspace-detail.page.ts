@@ -13,8 +13,10 @@ import { injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { WorkspaceBootstrapControllerService } from '@/api/api/workspaceBootstrapController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
+import { BootstrapOutcome } from '@/api/model/bootstrapOutcome';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
@@ -26,6 +28,7 @@ import {
   newestRunningChat,
   newestRunningInteractiveAgent,
 } from '@/pattern/command/running-chat';
+import { WorkspaceBootstrapComponent } from '@/pattern/bootstrap/workspace-bootstrap.component';
 import { DaemonWebviewComponent } from '@/pattern/daemon/webview/daemon-webview.component';
 import {
   DaemonEventFileAnchor,
@@ -57,6 +60,7 @@ const TAB_SLUG_BY_LABEL = new Map([
   ['Chat', 'chat'],
   ['Files', 'files'],
   ['Daemons', 'daemons'],
+  ['Bootstrap', 'bootstrap'],
   ['Actions', 'actions'],
   ['Web view', 'web-view'],
   ['Telemetry', 'telemetry'],
@@ -92,6 +96,7 @@ const PROCESS_TAB_LABEL = 'Starting';
     DaemonWebviewComponent,
     PageLayoutComponent,
     WorkspaceActionsComponent,
+    WorkspaceBootstrapComponent,
     WorkspaceAgentSessionComponent,
     WorkspaceChatComponent,
     WorkspaceDaemonEventsComponent,
@@ -167,6 +172,13 @@ const PROCESS_TAB_LABEL = 'Starting';
           </div>
         </z-tab>
         <z-tab
+          label="Bootstrap"
+          [indicator]="bootstrapIndicator()"
+          [indicatorLabel]="bootstrapIndicatorLabel()"
+        >
+          <app-workspace-bootstrap [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
+        <z-tab
           label="Actions"
           [indicator]="actionsIndicator()"
           indicatorLabel="A command is running"
@@ -214,6 +226,7 @@ export class WorkspaceDetailPage {
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly commandService = inject(CommandControllerService);
   private readonly daemonService = inject(WorkspaceDaemonControllerService);
+  private readonly bootstrapService = inject(WorkspaceBootstrapControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly live = inject(WorkspaceLiveService);
 
@@ -439,6 +452,39 @@ export class WorkspaceDetailPage {
     this.daemonIndicator() === 'warning'
       ? 'A daemon is degraded or restarting'
       : 'A daemon is running',
+  );
+
+  // Same key AND shape as the Bootstrap tab panel's query, so both share one cache entry.
+  readonly workspaceBootstrapQuery = injectQuery(() => ({
+    queryKey: ['workspace-bootstrap', this.repoId, this.workspaceId],
+    queryFn: () =>
+      lastValueFrom(
+        this.bootstrapService.apiRepositoriesRepoIdWorkspacesWorkspaceIdBootstrapCommandsGet(
+          this.repoId,
+          this.workspaceId,
+        ),
+      ),
+  }));
+
+  /** Chain running (dot) or a failed last run (warning) on the Bootstrap tab label. */
+  readonly bootstrapIndicator = computed<ZardTabIndicator | null>(() => {
+    const data = this.workspaceBootstrapQuery.data();
+    if (!data) {
+      return null;
+    }
+    if (data.chainRunning) {
+      return 'primary';
+    }
+    const failed = (data.entries ?? []).some(
+      (e) => e.lastRun?.outcome === BootstrapOutcome.Failed,
+    );
+    return failed ? 'warning' : null;
+  });
+
+  readonly bootstrapIndicatorLabel = computed(() =>
+    this.bootstrapIndicator() === 'warning'
+      ? 'A bootstrap command failed'
+      : 'The bootstrap chain is running',
   );
 
   /** Latched on the Web view tab's first selection; gates the iframe (see DaemonWebviewComponent). */

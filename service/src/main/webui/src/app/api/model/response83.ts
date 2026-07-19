@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryLogDto } from './telemetryLogDto';
 
 
 export interface Response83 { 
-    logs?: Array<TelemetryLogDto>;
+    files?: Array<string>;
 }
 

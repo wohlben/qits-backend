@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
 
 
 export interface Response84 { 
-    groups?: Array<TelemetryErrorGroupDto>;
+    technicalProcessId?: string;
 }
 

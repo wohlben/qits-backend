@@ -10,6 +10,6 @@
 
 
 export interface Response79 { 
-    text?: string;
+    output?: string;
 }
 

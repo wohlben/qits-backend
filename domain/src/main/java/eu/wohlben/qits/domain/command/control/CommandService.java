@@ -76,8 +76,13 @@ public class CommandService {
 
   @Inject OtelEnvironment otelEnvironment;
 
-  /** The outcome of a non-interactive run: combined output and exit code. */
-  public record RunOutcome(String actionId, String actionName, int exitCode, String output) {}
+  /**
+   * The outcome of a non-interactive run: combined output and exit code. {@code commandId} is the
+   * persisted audit row (callers link logs/history by it); {@code actionId} is null for runs not
+   * backed by an action (bootstrap commands, ad-hoc scripts).
+   */
+  public record RunOutcome(
+      String commandId, String actionId, String actionName, int exitCode, String output) {}
 
   /** Reconcile orphaned RUNNING rows from a previous JVM before anything new is launched. */
   void onStart(@Observes StartupEvent event) {
@@ -406,8 +411,48 @@ public class CommandService {
               + action.name()
               + "' is interactive — run it from the terminal, not as a one-off command.");
     }
-    Prepared p = prepare(repoId, workspaceId, LaunchDescriptor.of(action));
+    return awaitDescriptor(
+        repoId,
+        workspaceId,
+        LaunchDescriptor.of(action),
+        TimeUnit.MINUTES.toMillis(AWAIT_TIMEOUT_MINUTES));
+  }
+
+  /**
+   * Launch an ad-hoc non-interactive script (not backed by an action — the bootstrap runner's path)
+   * and block for its result. Persisted and registry-tracked exactly like an action run: {@code
+   * actionId} stays null and {@code name} is the display name on the Commands list. {@code
+   * extraSinks} tap the live output (e.g. a {@code SegmentLineSink} streaming a technical-process
+   * segment) alongside the accumulated result.
+   */
+  public RunOutcome launchScriptAndAwait(
+      String repoId,
+      String workspaceId,
+      String name,
+      String script,
+      Map<String, String> environment,
+      long timeoutMillis,
+      CommandOutputSink... extraSinks) {
+    return awaitDescriptor(
+        repoId,
+        workspaceId,
+        new LaunchDescriptor(
+            null, name, script, false, environment, CommandKind.TERMINAL, false, null, null, null),
+        timeoutMillis,
+        extraSinks);
+  }
+
+  private RunOutcome awaitDescriptor(
+      String repoId,
+      String workspaceId,
+      LaunchDescriptor descriptor,
+      long timeoutMillis,
+      CommandOutputSink... extraSinks) {
+    Prepared p = prepare(repoId, workspaceId, descriptor);
     AccumulatingSink sink = new AccumulatingSink();
+    CommandOutputSink[] sinks = new CommandOutputSink[extraSinks.length + 1];
+    sinks[0] = sink;
+    System.arraycopy(extraSinks, 0, sinks, 1, extraSinks.length);
     int exitCode =
         registry.spawnAndAwait(
             p.dto().id(),
@@ -416,9 +461,14 @@ public class CommandService {
             p.env(),
             this::onExit,
             commandLogService,
-            TimeUnit.MINUTES.toMillis(AWAIT_TIMEOUT_MINUTES),
-            sink);
-    return new RunOutcome(action.id(), action.name(), exitCode, sink.text().stripTrailing());
+            timeoutMillis,
+            sinks);
+    return new RunOutcome(
+        p.dto().id(),
+        descriptor.actionId(),
+        descriptor.name(),
+        exitCode,
+        sink.text().stripTrailing());
   }
 
   /**

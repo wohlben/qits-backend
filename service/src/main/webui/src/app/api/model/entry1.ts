@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { BootstrapCommandDto } from './bootstrapCommandDto';
 
 
 export interface Entry1 { 
-    daemon?: RepositoryDaemonDto;
+    command?: BootstrapCommandDto;
 }
 

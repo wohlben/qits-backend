@@ -142,10 +142,12 @@ describe('WorkspaceLiveService', () => {
 
     source.emitOpen();
 
-    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + files(3) + process(1) = 12
-    expect(invalidate).toHaveBeenCalledTimes(12);
+    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + bootstrap(1) + files(3)
+    // + process(1) = 13
+    expect(invalidate).toHaveBeenCalledTimes(13);
     const keys = invalidatedKeys();
     expect(keys).toContain(JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-bootstrap', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['telemetry-logs', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['commands']));

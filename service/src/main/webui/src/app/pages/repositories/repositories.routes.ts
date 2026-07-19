@@ -48,6 +48,27 @@ export const repositoriesRoutes: Routes = [
       ),
   },
   {
+    path: ':repoId/bootstrap',
+    loadComponent: () =>
+      import('./repository-bootstrap/repository-bootstrap.page').then(
+        (m) => m.RepositoryBootstrapPage,
+      ),
+  },
+  {
+    path: ':repoId/bootstrap/new',
+    loadComponent: () =>
+      import('./repository-bootstrap-form/repository-bootstrap-form.page').then(
+        (m) => m.RepositoryBootstrapFormPage,
+      ),
+  },
+  {
+    path: ':repoId/bootstrap/:commandId/edit',
+    loadComponent: () =>
+      import('./repository-bootstrap-form/repository-bootstrap-form.page').then(
+        (m) => m.RepositoryBootstrapFormPage,
+      ),
+  },
+  {
     path: ':repoId/branch/:branchName/commits',
     loadComponent: () =>
       import('./branch-commits/branch-commits.page').then((m) => m.BranchCommitsPage),

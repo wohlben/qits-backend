@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { CommandLogLineDto } from './commandLogLineDto';
 
 
 export interface Response14 { 
-    daemon?: RepositoryDaemonDto;
+    lines?: Array<CommandLogLineDto>;
 }
 

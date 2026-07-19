@@ -7,10 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonInstanceDto } from './daemonInstanceDto';
+import { BootstrapCommandDto } from './bootstrapCommandDto';
+import { BootstrapRunDto } from './bootstrapRunDto';
 
 
 export interface Entry2 { 
-    instance?: DaemonInstanceDto;
+    command?: BootstrapCommandDto;
+    lastRun?: BootstrapRunDto;
 }
 

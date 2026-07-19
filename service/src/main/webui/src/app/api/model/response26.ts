@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Entry5 } from './entry5';
 
 
 export interface Response26 { 
-    success?: boolean;
+    entries?: Array<Entry5>;
 }
 

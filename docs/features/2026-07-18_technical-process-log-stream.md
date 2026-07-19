@@ -90,9 +90,11 @@ Two lifetime guards in `TechnicalProcessRegistry`:
 - **Post-`done` retention** (`qits.process.done-ttl-ms`, default 60 s): a completed process stays
   subscribable — full replay + immediate `done` — so "close the dialog, reopen a beat later"
   doesn't race into a 404; then it evicts.
-- **Max lifetime** (`qits.process.max-lifetime-ms`, default 15 min): a process that never
-  converges (e.g. a ready pattern that never matches) is force-finished `done failed` without
-  settling its open segments.
+- **Idle backstop** (`qits.process.max-idle-ms`, default 15 min): a process idle this long — no
+  emitted frame — is force-finished `done failed` without settling its open segments. An idle
+  window, not a total-lifetime cap, so a legitimately long-but-active process (a provision spanning
+  a multi-command bootstrap chain) is never cut mid-run while it keeps streaming, but one that never
+  converges (e.g. a ready pattern that never matches) is still reaped.
 
 ## Backend design
 

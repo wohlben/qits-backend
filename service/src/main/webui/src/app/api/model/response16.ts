@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonInstanceDto } from './daemonInstanceDto';
+import { CommandDto } from './commandDto';
 
 
 export interface Response16 { 
-    instance?: DaemonInstanceDto;
+    command?: CommandDto;
 }
 

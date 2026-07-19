@@ -1,5 +1,8 @@
 package eu.wohlben.qits.domain.repository.control;
 
+import eu.wohlben.qits.domain.bootstrap.control.BootstrapCommandService;
+import eu.wohlben.qits.domain.bootstrap.entity.BootstrapCommand;
+import eu.wohlben.qits.domain.bootstrap.persistence.BootstrapCommandRepository;
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
@@ -13,6 +16,7 @@ import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
 import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.ActionDecl;
+import eu.wohlben.qits.domain.repository.control.QitsConfig.BootstrapDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.DaemonDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.HealthCheckDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.ObserverDecl;
@@ -27,11 +31,13 @@ import jakarta.transaction.Transactional;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -69,6 +75,10 @@ public class QitsConfigReconciler {
   @Inject RepositoryDaemonService repositoryDaemonService;
 
   @Inject RepositoryDaemonRepository repositoryDaemonRepository;
+
+  @Inject BootstrapCommandService bootstrapCommandService;
+
+  @Inject BootstrapCommandRepository bootstrapCommandRepository;
 
   @ConfigProperty(name = "qits.repositories.data-dir", defaultValue = "data/repositories")
   String dataDir;
@@ -113,6 +123,7 @@ public class QitsConfigReconciler {
 
     reconcileActions(repo, config.actions(), warnings);
     reconcileDaemons(repo, config.daemons(), warnings);
+    reconcileBootstrap(repo, config.bootstrap(), warnings);
 
     repo.configWarning = warnings.isEmpty() ? null : String.join("\n", warnings);
   }
@@ -123,13 +134,25 @@ public class QitsConfigReconciler {
     ingest(repoId);
   }
 
-  private void reconcileActions(Repository repo, List<ActionDecl> declared, List<String> warnings) {
-    Map<String, ActionConfiguration> existing = new LinkedHashMap<>();
-    for (ActionConfiguration a : actionConfigurationRepository.listByRepositoryId(repo.id)) {
-      if (QitsConfig.isConfigName(a.name)) {
-        existing.put(a.name, a);
+  /**
+   * The repository's config-origin rows of one kind (those whose name carries the {@code
+   * @qits-config} suffix), keyed by stored name in list order — the shared first step of every
+   * reconcile section.
+   */
+  private static <T> Map<String, T> configOrigin(List<T> rows, Function<T, String> nameOf) {
+    Map<String, T> existing = new LinkedHashMap<>();
+    for (T row : rows) {
+      String name = nameOf.apply(row);
+      if (QitsConfig.isConfigName(name)) {
+        existing.put(name, row);
       }
     }
+    return existing;
+  }
+
+  private void reconcileActions(Repository repo, List<ActionDecl> declared, List<String> warnings) {
+    Map<String, ActionConfiguration> existing =
+        configOrigin(actionConfigurationRepository.listByRepositoryId(repo.id), a -> a.name);
 
     Set<String> declaredNames = new LinkedHashSet<>();
     for (ActionDecl d : declared) {
@@ -175,12 +198,8 @@ public class QitsConfigReconciler {
   }
 
   private void reconcileDaemons(Repository repo, List<DaemonDecl> declared, List<String> warnings) {
-    Map<String, RepositoryDaemon> existing = new LinkedHashMap<>();
-    for (RepositoryDaemon d : repositoryDaemonRepository.findByRepositoryId(repo.id)) {
-      if (QitsConfig.isConfigName(d.name)) {
-        existing.put(d.name, d);
-      }
-    }
+    Map<String, RepositoryDaemon> existing =
+        configOrigin(repositoryDaemonRepository.findByRepositoryId(repo.id), d -> d.name);
 
     Set<String> declaredNames = new LinkedHashSet<>();
     for (DaemonDecl d : declared) {
@@ -224,6 +243,74 @@ public class QitsConfigReconciler {
     for (Map.Entry<String, RepositoryDaemon> e : existing.entrySet()) {
       if (!declaredNames.contains(e.getKey())) {
         repositoryDaemonRepository.delete(e.getValue());
+      }
+    }
+  }
+
+  private void reconcileBootstrap(
+      Repository repo, List<BootstrapDecl> declared, List<String> warnings) {
+    List<BootstrapCommand> allOrdered =
+        bootstrapCommandRepository.findByRepositoryIdOrdered(repo.id);
+    Map<String, BootstrapCommand> existing = configOrigin(allOrdered, c -> c.name);
+    // Fresh slots for newly-declared config commands go after everything (config + UI) currently in
+    // the chain, so they never collide with an existing index.
+    int nextFreeSlot = allOrdered.isEmpty() ? 0 : allOrdered.getLast().orderIndex + 1;
+
+    Set<String> declaredNames = new LinkedHashSet<>();
+    List<BootstrapCommand> declaredInFileOrder = new ArrayList<>();
+    for (BootstrapDecl d : declared) {
+      String stored = QitsConfig.configName(d.name());
+      if (!declaredNames.add(stored)) {
+        warnings.add(
+            "bootstrap command '" + d.name() + "': duplicate name, only the first is applied");
+        continue;
+      }
+      BootstrapCommand current = existing.get(stored);
+      // orderIndex is (re)assigned below. Deliberately NOT a flat 0..n stamp from file position:
+      // config and UI commands share one index space, so a flat stamp collides with UI commands the
+      // user reordered ahead of the config block (two commands claiming one slot → undefined
+      // order).
+      // Keep an existing command's current slot for now; give a new one a fresh slot.
+      int slot = current == null ? nextFreeSlot : current.orderIndex;
+      try {
+        declaredInFileOrder.add(
+            bootstrapCommandService.upsertFromConfig(
+                repo.id,
+                current == null ? null : current.id,
+                stored,
+                d.description(),
+                d.execute(),
+                d.check(),
+                d.environment(),
+                slot));
+        if (current == null) {
+          nextFreeSlot++; // consume the fresh slot only once the new command actually landed
+        }
+      } catch (DomainException e) {
+        warnings.add("bootstrap command '" + d.name() + "': " + e.getMessage());
+      }
+    }
+
+    // Re-sequence the config block within the slots it already occupies: sort those slots and hand
+    // them out in file position order. The block keeps its positions in the overall chain (so a
+    // UI command the user moved ahead of it stays ahead) and is only reordered among itself to
+    // match the file; every index stays unique because the config block's slots are disjoint from
+    // the UI commands' slots.
+    List<Integer> slots = new ArrayList<>();
+    for (BootstrapCommand c : declaredInFileOrder) {
+      slots.add(c.orderIndex);
+    }
+    Collections.sort(slots);
+    for (int i = 0; i < declaredInFileOrder.size(); i++) {
+      declaredInFileOrder.get(i).orderIndex = slots.get(i);
+    }
+
+    // Delete config-origin bootstrap commands no longer declared. Deleted through the Panache
+    // repository (not the @Transactional service method) so a failure never marks the reconciler's
+    // transaction rollback-only.
+    for (Map.Entry<String, BootstrapCommand> e : existing.entrySet()) {
+      if (!declaredNames.contains(e.getKey())) {
+        bootstrapCommandRepository.delete(e.getValue());
       }
     }
   }

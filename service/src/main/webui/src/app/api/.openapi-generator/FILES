@@ -8,6 +8,7 @@ api/agentPluginController.service.ts
 api/agentSessionController.service.ts
 api/api.ts
 api/authController.service.ts
+api/bootstrapCommandController.service.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
 api/daemonEventController.service.ts
@@ -23,6 +24,7 @@ api/repositoryController.service.ts
 api/repositoryDaemonController.service.ts
 api/repositorySubmoduleController.service.ts
 api/speechController.service.ts
+api/workspaceBootstrapController.service.ts
 api/workspaceController.service.ts
 api/workspaceDaemonController.service.ts
 api/workspaceHistoryController.service.ts
@@ -41,6 +43,9 @@ model/agentSessionRefDto.ts
 model/agentSessionSource.ts
 model/agentSubagentDto.ts
 model/available.ts
+model/bootstrapCommandDto.ts
+model/bootstrapOutcome.ts
+model/bootstrapRunDto.ts
 model/branchDto.ts
 model/cleanupBranchRequest.ts
 model/commandDto.ts
@@ -56,6 +61,7 @@ model/componentMapDto.ts
 model/componentMapEntryDto.ts
 model/componentSelectorDto.ts
 model/createActionConfigurationRequest.ts
+model/createBootstrapCommandRequest.ts
 model/createFeatureFlowPhaseActionRequest.ts
 model/createFeatureFlowPhaseRequest.ts
 model/createFeatureFlowPhaseStepRequest.ts
@@ -81,6 +87,9 @@ model/entry11.ts
 model/entry12.ts
 model/entry13.ts
 model/entry14.ts
+model/entry15.ts
+model/entry16.ts
+model/entry17.ts
 model/entry2.ts
 model/entry3.ts
 model/entry4.ts
@@ -115,6 +124,7 @@ model/logSourceInput.ts
 model/mergeBranchRequest.ts
 model/mergeWorkspaceRequest.ts
 model/models.ts
+model/orderBootstrapCommandsRequest.ts
 model/origin.ts
 model/projectDto.ts
 model/refinePromptRequest.ts
@@ -208,7 +218,16 @@ model/response82.ts
 model/response83.ts
 model/response84.ts
 model/response85.ts
+model/response86.ts
+model/response87.ts
+model/response88.ts
+model/response89.ts
 model/response9.ts
+model/response90.ts
+model/response91.ts
+model/response92.ts
+model/response93.ts
+model/response94.ts
 model/restartPolicy.ts
 model/setMainBranchRequest.ts
 model/spanEvent.ts
@@ -222,6 +241,7 @@ model/testLinkDto.ts
 model/traceResponse.ts
 model/transcribeRequest.ts
 model/updateActionConfigurationRequest.ts
+model/updateBootstrapCommandRequest.ts
 model/updateFeatureFlowConfigurationRequest.ts
 model/updateFeatureFlowPhaseActionRequest.ts
 model/updateFeatureFlowPhaseRequest.ts

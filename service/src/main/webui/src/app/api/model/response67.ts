@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { RepositoryDto } from './repositoryDto';
 
 
 export interface Response67 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    repository?: RepositoryDto;
 }
 

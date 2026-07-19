@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceDto } from './workspaceDto';
+import { BranchDto } from './branchDto';
 
 
 export interface Response71 { 
-    workspace?: WorkspaceDto;
-    technicalProcessId?: string;
+    branches?: Array<BranchDto>;
 }
 

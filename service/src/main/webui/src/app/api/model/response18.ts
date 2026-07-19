@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ActionConfigurationDto } from './actionConfigurationDto';
+import { DaemonEventDto } from './daemonEventDto';
 
 
 export interface Response18 { 
-    actionConfiguration?: ActionConfigurationDto;
+    events?: Array<DaemonEventDto>;
 }
 

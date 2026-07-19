@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry2 } from './entry2';
+import { CommandDto } from './commandDto';
 
 
 export interface Response17 { 
-    entries?: Array<Entry2>;
+    command?: CommandDto;
 }
 

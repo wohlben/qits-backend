@@ -10,6 +10,6 @@
 
 
 export interface Response74 { 
-    files?: Array<string>;
+    output?: string;
 }
 

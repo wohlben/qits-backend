@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetrySpanDto } from './telemetrySpanDto';
 
 
 export interface Response81 { 
-    spans?: Array<TelemetrySpanDto>;
+    success?: boolean;
 }
 

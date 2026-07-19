@@ -73,6 +73,24 @@ daemons:
         path: /
         expect-status: 2xx,3xx,4xx
 
+# The bootstrap chain (docs/features/2026-07-18_workspace-bootstrap-commands.md): ordered one-shot
+# steps a freshly provisioned child-qits workspace runs before the dev-server daemon auto-starts.
+# The order is load-bearing — the repo's own build guard fails any lifecycle build once something
+# listens on :8080, so `install` can never run after the daemon is up. Both cli seeds are
+# idempotent by design (skip-if-exists / reset), so re-provisions and manual re-runs are safe.
+bootstrap:
+  - name: install
+    description: Build the reactor so the cli jar exists (skip tests; forwardauth variant).
+    execute: ./mvnw install -DskipTests -Dqits.variant=forwardauth
+  - name: seed-demo-data
+    description: Seed the tiny testing-repo demo (idempotent, skip-if-exists).
+    execute: ./mvnw -pl cli quarkus:run -Dcli.args=seed
+    # Skip once the shared H2 file exists — the seed itself also skips, this just saves the JVM.
+    check: test ! -f ~/.qits/data/h2/qits.mv.db
+  - name: seed-webapp-demo
+    description: Seed the servable Quarkus+Angular demo (idempotent by reset).
+    execute: ./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp
+
 # Dogfood build/test/lint actions — the everyday qits workflow (CLAUDE.md). Every service-touching
 # build names the forwardauth variant; module-scoped domain/cli builds don't need it.
 actions:

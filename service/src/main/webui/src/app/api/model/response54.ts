@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDto } from './repositoryDto';
+import { Entry13 } from './entry13';
 
 
 export interface Response54 { 
-    repository?: RepositoryDto;
+    entries?: Array<Entry13>;
 }
 

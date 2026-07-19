@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryMetricDto } from './telemetryMetricDto';
+import { WorkspaceDto } from './workspaceDto';
 
 
 export interface Response82 { 
-    metrics?: Array<TelemetryMetricDto>;
+    workspace?: WorkspaceDto;
 }
 

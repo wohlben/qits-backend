@@ -16,7 +16,8 @@ guide in place.
 Related: [workspace submodule support](../features/2026-07-14_workspace-submodule-support.md) ·
 [daemon web-view configuration](../features/2026-07-06_daemon-webview-configuration.md) ·
 [daemon healthchecks](../features/2026-07-10_daemon-healthchecks.md) ·
-[spa-feature-capture](../features/2026-07-14_spa-feature-capture.md).
+[spa-feature-capture](../features/2026-07-14_spa-feature-capture.md) ·
+[workspace bootstrap commands](../features/2026-07-18_workspace-bootstrap-commands.md).
 
 ## Prerequisites
 
@@ -44,7 +45,27 @@ the creation-time import covers `testing-repo`, `qits-fixture-angular` and
 qits-backend parent is a no-op — the nested edge must be imported on the child that declares it, and
 it links back to the already-imported `qits-fixture-angular` sibling rather than adding a new row.
 
-## 2. The dev-server daemon
+## 2. The bootstrap chain — the child self-bootstraps
+
+`.qits-config.yml` also declares a **`bootstrap:` chain**
+([feature doc](../features/2026-07-18_workspace-bootstrap-commands.md)) that qits runs inside a
+freshly provisioned workspace container **before the dev-server daemon auto-starts**:
+
+1. `install` — `./mvnw install -DskipTests -Dqits.variant=forwardauth` (so the cli jar exists; this
+   is the heavy first build the prerequisites warn about).
+2. `seed-demo-data` — `./mvnw -pl cli quarkus:run -Dcli.args=seed` (check-guarded on the shared H2
+   file; the seed itself is also skip-if-exists).
+3. `seed-webapp-demo` — `./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp` (idempotent by reset).
+
+So opening the child's first workspace yields a child qits with the demo fixtures **already
+seeded** — there are no manual install/seed steps in this walk. The ordering is load-bearing: qits'
+own build guard fails any lifecycle build once something listens on `:8080`, so the install could
+never run after the daemon is up. Watch the chain as `bootstrap:*` segments of the workspace Start
+process (or on the workspace's **Bootstrap** tab, which also offers re-runs); a failed chain skips
+daemon auto-start by design — fix, then "Run all" from the Bootstrap tab, and on success the
+daemons come up.
+
+## 3. The dev-server daemon
 
 **qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this daemon
 (and the build/test/lint actions), and qits ingests it on clone**
@@ -119,18 +140,20 @@ to `quarkus.log` if the dev JVM ran from the repo root).
 Remember the two standing rules: daemon-definition changes apply on the next (re)launch, and
 `webView.port` changes need a container recreate (stop-container → ensure-container → start).
 
-## 3. Acceptance walk
+## 4. Acceptance walk
 
-1. Daemon → `READY`; both health dots green.
-2. Web view renders the qits UI under `/daemon/{ws}/{d}/` — navigate, open a project, watch the
+1. First workspace Start: the `bootstrap:*` segments run (install → seeds) and settle green, then
+   the daemon phase begins; the Bootstrap tab shows `SUCCEEDED`/`SKIPPED` per command.
+2. Daemon → `READY`; both health dots green.
+3. Web view renders the qits UI under `/daemon/{ws}/{d}/` — navigate, open a project, watch the
    child's own SSE-driven pages work in the frame.
-3. Parent workspace Telemetry tab: full-stack traces from the child — browser CLIENT spans
+4. Parent workspace Telemetry tab: full-stack traces from the child — browser CLIENT spans
    (`qits dev server@qits-config-browser`, `app.route.*`, `code.function.name`) rooting the child's
    Quarkus SERVER spans (service `qits-forwardauth`); no `/otel/v1/*`, `/daemon/*`, `/git/*` or
    `/mcp/*` self-spans (suppressed).
-4. Events tab: provoke a build failure (edit a `.java` file to junk via the file browser) → the
+5. Events tab: provoke a build failure (edit a `.java` file to junk via the file browser) → the
    PATTERN observer flags it; the FILE source tails the dev log.
-5. Capture: in the framed child UI, use the floaty capture button → a new workspace appears in
+6. Capture: in the framed child UI, use the floaty capture button → a new workspace appears in
    the **parent** whose goal carries the child UI snapshot (DOM + selected component). The
    `promptContext` **state** entry rides along only if `PromptContextStore` was instantiated in the
    session (a lazy `providedIn: 'root'` store — only the file-browser / command-chat /

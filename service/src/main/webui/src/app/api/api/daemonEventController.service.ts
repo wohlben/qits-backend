@@ -19,7 +19,7 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { DaemonEventSeverity } from '../model/daemonEventSeverity';
 // @ts-ignore
-import { Response9 } from '../model/response9';
+import { Response18 } from '../model/response18';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -51,9 +51,9 @@ export class DaemonEventControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response9>;
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response9>>;
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response9>>;
+    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response18>;
+    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response18>>;
+    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response18>>;
     public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
@@ -148,7 +148,7 @@ export class DaemonEventControllerService extends BaseService {
 
         let localVarPath = `/api/daemon-events`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response9>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response18>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),

@@ -7,12 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry12 } from './entry12';
-import { Available } from './available';
+import { RepositoryDto } from './repositoryDto';
 
 
 export interface Response63 { 
-    entries?: Array<Entry12>;
-    available?: Array<Available>;
+    repository?: RepositoryDto;
 }
 

@@ -10,8 +10,9 @@
 
 
 export interface Response66 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
+    cleanedUp?: boolean;
 }
 

@@ -37,6 +37,9 @@ import { ZardButtonComponent } from '@/shared/components/button';
 
       <div pageActions class="flex items-center gap-2">
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'daemons']">Daemons</a>
+        <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'bootstrap']">
+          Bootstrap
+        </a>
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
         <!-- Re-read and reconcile the repository's committed .qits-config.yml from the main branch.
              Also runs automatically on clone and on sync; this is the manual trigger. -->

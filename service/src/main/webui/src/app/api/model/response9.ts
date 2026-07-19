@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonEventDto } from './daemonEventDto';
 
 
 export interface Response9 { 
-    events?: Array<DaemonEventDto>;
+    started?: boolean;
 }
 

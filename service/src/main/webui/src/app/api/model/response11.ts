@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry1 } from './entry1';
+import { Entry2 } from './entry2';
 
 
 export interface Response11 { 
-    entries?: Array<Entry1>;
+    chainRunning?: boolean;
+    entries?: Array<Entry2>;
 }
 

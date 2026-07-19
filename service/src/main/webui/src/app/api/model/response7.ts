@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { CommandDto } from './commandDto';
 
 
 export interface Response7 { 
-    command?: CommandDto;
+    success?: boolean;
 }
 
