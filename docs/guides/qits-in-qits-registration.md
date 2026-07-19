@@ -28,9 +28,20 @@ Related: [workspace submodule support](../features/2026-07-14_workspace-submodul
 - Patience and memory for the first build: the full reactor + pnpm install is heavy, and the
   parent's dev servers run alongside the child's.
 
-## 1. Register the repository — submodule import is REQUIRED
+## 1. Register the repository
 
-*Projects → New project* ("qits") *→ Add repository*:
+**On a packaged deployment this step is automatic.** A `NORMAL`-launch-mode qits (jar / native /
+prod image) self-seeds at startup
+([startup self-seed feature](../features/2026-07-19_startup-qits-self-seed.md)): it boots into a
+`"qits"` project with `wohlben/qits-backend` and `wohlben/qits-angular-integration` already
+registered, the qits-backend submodules imported (including the one second-level import on the
+`testing-repo-quarkus-angular` child), and each repo's `.qits-config.yml` ingested. Nothing below is
+needed there — pick up at step 2 (the workspace / first-build walk). The seed is reconciled
+additively on every boot and can be turned off with `qits.startup-seed.enabled=false` or redirected
+with `qits.startup-seed.repo-url` (mirror/fork/air-gap).
+
+**On a dev instance (`quarkus:dev`), or to register it by hand,** do the manual walk — submodule
+import is REQUIRED. *Projects → New project* ("qits") *→ Add repository*:
 
 - URL: `https://github.com/wohlben/qits-backend.git`
 - Archetype: `SERVICE`
@@ -44,6 +55,7 @@ the creation-time import covers `testing-repo`, `qits-fixture-angular` and
 `webui` gitlink. Import is **one level per repository, no descent**, so re-running it on the
 qits-backend parent is a no-op — the nested edge must be imported on the child that declares it, and
 it links back to the already-imported `qits-fixture-angular` sibling rather than adding a new row.
+(This is exactly the walk the packaged deployment automates at startup.)
 
 ## 2. The bootstrap chain — the child self-bootstraps
 
@@ -142,6 +154,12 @@ Remember the two standing rules: daemon-definition changes apply on the next (re
 
 ## 4. Acceptance walk
 
+0. **Packaged deployment only** — boot a packaged image (with outbound HTTPS to GitHub): with no UI
+   steps, a `"qits"` project appears holding `qits-backend` + `qits-angular-integration`, the
+   qits-backend submodule siblings imported (incl. the second-level `webui` edge), and the
+   `qits dev server@qits-config` daemon + build/test/lint actions + `bootstrap:` chain ingested from
+   `.qits-config.yml`. No workspace is provisioned (lazy by design). A second boot is a fast
+   all-present no-op. (On a dev instance you did steps 1–3 by hand instead.)
 1. First workspace Start: the `bootstrap:*` segments run (install → seeds) and settle green, then
    the daemon phase begins; the Bootstrap tab shows `SUCCEEDED`/`SKIPPED` per command.
 2. Daemon → `READY`; both health dots green.

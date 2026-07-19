@@ -118,7 +118,14 @@ Related/dependent plans:
   `qits.startup-seed.repo-url` (a mirror/fork override) changes the identity of the
   qits-backend entry — a deployment that flips the override after first seed would get a second
   repository. Acceptable for an escape hatch, but worth a note in the config docs; matching by
-  a manifest-assigned stable key (e.g. repo name) instead of URL would dodge it.
+  a manifest-assigned stable key (e.g. repo name) instead of URL would dodge it. (The override is
+  trimmed to match the stored url, so surrounding whitespace does not by itself split identity.)
+
+- **Concurrent replicas.** Matching is check-then-create with no unique constraint or lock, so two
+  packaged instances sharing one database that reconcile at the same moment (a rolling redeploy /
+  horizontal scale-out) could each create the `qits` project or a duplicate repo. The single-node
+  prod deployment (Dokploy) doesn't hit this, and the sibling cli seeds share the pattern; a
+  distributed guard is out of scope for now. Cleanup, if it ever happens, stays manual.
 
 ## Testing
 
@@ -132,3 +139,46 @@ Related/dependent plans:
   honored.
 - The real-deployment walk moves into the registration guide's acceptance section (packaged
   image boots → "qits" project appears with daemons/actions ingested, no UI steps).
+
+## Status — implemented 2026-07-19
+
+Built and tested (`domain` + `service` suites green):
+
+- **Reconcile logic** `SelfSeedService` (new `eu.wohlben.qits.domain.seeding.control` area) — holds
+  the in-code manifest (a `List<SeedRepository>`: url, archetype, `importSubmodules`, `deepImport`)
+  and the additive, per-item-idempotent reconcile loop: ensure-project (matched by name `"qits"`) →
+  for each entry, ensure-repository (matched by clone url within the project, created via
+  `ProjectService.createRepositoryUnderProject` if absent) → deep-import. `@ActivateRequestContext`
+  (not `@Transactional`) so the non-transactional reads work on a worker thread while the delegated
+  service calls own their transactions — the cli-seed pattern. Each entry reconciles in its own
+  try/catch, so one failing clone is non-fatal and retried next boot.
+- **Deep import descends one level into every direct child** (`listSubmodules(root)` →
+  `importDirectSubmodules(edge.child.id)`) rather than name-matching a specific child. This is
+  override-independent and idempotent — a no-op on childless siblings (`testing-repo`,
+  `qits-fixture-angular`) and, on the `testing-repo-quarkus-angular` child, it links the nested
+  `webui` gitlink back to the already-imported `qits-fixture-angular` sibling: exactly the manual
+  second-level import the registration guide required.
+- **Startup gate** `StartupSelfSeed` (`service` module, `eu.wohlben.qits.seeding`) — an
+  `@Observes StartupEvent` bean that seeds only when `LaunchMode.current() == NORMAL` and
+  `qits.startup-seed.enabled` (default `true`), dispatching the reconcile to a virtual thread (the
+  `TranscriptionService` warmup precedent) so readiness never blocks. Lives in `service` so it fires
+  only when the web app boots — the `cli` command-mode app never self-seeds. The gate predicate is a
+  pure `static shouldSeed(LaunchMode, boolean)` for direct unit-testing.
+- **Config** — `qits.startup-seed.enabled` (default `true`), `qits.startup-seed.repo-url` (default
+  `https://github.com/wohlben/qits-backend.git`), and `qits.startup-seed.angular-integration-url`
+  (default `https://github.com/wohlben/qits-angular-integration.git`, the second override added so
+  the domain test can seed both manifest repos offline).
+- **Tests** — `SelfSeedServiceTest` (domain, fixtures redirect the qits-backend slot to
+  `submodule-super.git` — its `child-a → grandchild` depth stands in for the quarkus-angular
+  `webui` edge — and the angular slot to plain `testing-repo.git`): project + both repos + siblings
+  + the nested deep-import edge, re-run is a full no-op, a half-seeded state is completed, and a
+  user-added repo under the project is untouched. `StartupSelfSeedGateTest` (service): the gate
+  predicate, and a TEST-mode boot leaving no `qits` project.
+
+### Resolved decisions
+
+- **Deep import is a blanket one-level descend** over the imported direct children, not a
+  path/url-matched single import — simpler, override-independent, and idempotent (childless children
+  are no-ops).
+- **Second url override** (`qits.startup-seed.angular-integration-url`) added beyond the doc's
+  single `repo-url`, so both manifest repos are redirectable to fixtures for the offline test.
