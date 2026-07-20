@@ -166,6 +166,7 @@ describe('WorkspaceDetailPage', () => {
     expect(tabLabels).toEqual([
       'Chat',
       'Files',
+      'Sketch',
       'Daemons',
       'Bootstrap',
       'Actions',
@@ -173,6 +174,7 @@ describe('WorkspaceDetailPage', () => {
       'Telemetry',
       'Agents',
     ]);
+    expect(el.querySelector('[role="tabpanel"] app-workspace-sketch')).not.toBeNull();
     // Chat, daemons and web view live in tab panels — not in the header, not floating.
     expect(el.querySelector('[role="tabpanel"] app-workspace-chat')).not.toBeNull();
     expect(el.querySelector('[role="tabpanel"] app-workspace-daemons')).not.toBeNull();
@@ -205,6 +207,7 @@ describe('WorkspaceDetailPage', () => {
       'Chat',
       'Web view',
       'Files',
+      'Sketch',
       'Daemons',
       'Bootstrap',
       'Actions',

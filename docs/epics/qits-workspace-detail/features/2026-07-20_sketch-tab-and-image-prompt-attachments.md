@@ -1,5 +1,38 @@
 # Sketch tab + image prompt attachments: draw a rough sketch, hand it to the coding agent
 
+## Implementation notes (as shipped 2026-07-20)
+
+The whole feature landed across the three-plan chain in `docs/implementation-plan.md`. The compose
+store slice, server attachment rows, sync `attachImage(..., 'sketch')` path, `blobToAttachment`
+encode helper, Chat-tab thumbnail rows, clipboard-paste handler, and MCP `taskPrompt` delivery all
+shipped in the earlier steps (see steps 4–6 there); this doc's remaining part — **the Sketch tab
+itself** — shipped as step 7:
+
+- **`atrament`** (this doc's pick) added as a dependency; it ships no types, so a minimal
+  `service/src/main/webui/src/app/shared/types/atrament.d.ts` declares the surface used.
+- **`WorkspaceSketchComponent`** (`pattern/workspace/workspace-sketch.component.ts`) — standalone,
+  OnPush, signals. Wraps atrament like `web-terminal.component.ts` wraps xterm (host `<canvas>` via
+  `viewChild`, one-shot `effect` init guard, `ngOnDestroy` teardown). Our toolbar: pen/eraser
+  toggle, black/red/blue, three widths, undo, clear, "Attach to prompt". **Undo** is a `toDataURL`
+  snapshot stack pushed on atrament's `strokeend` event (atrament has none). The canvas is
+  white-backfilled; **attach** composites the canvas onto a white-backed export canvas in a single
+  PNG encode (`exportSketch`, reusing the shared `scaledDimensions`/`stripDataUrlPrefix` — so an
+  erased region, a transparent hole atrament's eraser punches, never reaches the agent as a black
+  rectangle) → `PromptDraftSyncService.attachImage(dataBase64, mime, 'sketch')`, the exact path a
+  pasted screenshot takes. So **no store/sync/backend change was needed**. A defensive guard skips
+  atrament init when the canvas has no 2D context (keeps jsdom/host tests from crashing).
+- **Tab wiring** — `workspace-detail.page.ts`: `WorkspaceSketchComponent` in `imports`,
+  `['Sketch','sketch']` in `TAB_SLUG_BY_LABEL` (URL-pinned/shareable; the route matcher already
+  accepts any non-`wip` slug), and a `<z-tab label="Sketch">` after Files. Panel stays mounted while
+  hidden, so a half-finished drawing survives tab switches.
+- Tests: `workspace-sketch.component.spec.ts` (atrament mocked via `vi.hoisted`; jsdom canvas
+  stubbed) covers the toolbar state machine, undo/clear snapshot stack, the `'sketch'` attach +
+  confirmation flash, surfaced attach errors, and teardown; the page spec's tab-row assertions were
+  extended. Full frontend suite green, lint clean; backend untouched.
+
+The `Attach twice = two revisions` / "Attached ✓" flash, the a11y (canvas + toolbar labels, colour
+`aria-pressed`), and the "napkin not whiteboard" non-goals below all shipped as designed.
+
 ## Introduction
 
 Sometimes the fastest way to describe a change is a picture: "move this panel here", a rough

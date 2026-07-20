@@ -107,7 +107,46 @@ Post-review hardening (high-effort `/code-review`, all findings resolved):
   unreachable MCP) got a diagnostic WARN and an issue doc
   (`docs/issues/2026-07-20_fetch-model-prompt-delivery-robustness.md`); a full fix is deferred there.
 
-### 7. `sketch-tab-and-image-prompt-attachments` — the Sketch tab itself
+### 7. `sketch-tab-and-image-prompt-attachments` — the Sketch tab itself ✅ shipped 2026-07-20
 
 The atrament canvas + toolbar + "Attach to prompt". Deliberately last: by now the pipeline is
 proven, so this is pure compose-side UX.
+
+Implementation notes (as shipped):
+
+- **`atrament` dependency** (the doc's pick — vanilla-JS canvas lib, no shipped types, so a minimal
+  `shared/types/atrament.d.ts` module declaration rides along).
+- **`WorkspaceSketchComponent`** (`pattern/workspace/workspace-sketch.component.ts`), standalone
+  OnPush, wraps atrament the way `web-terminal.component.ts` wraps xterm: grab the host `<canvas>`
+  via `viewChild`, init once in a one-shot `effect` guard, tear down in `ngOnDestroy`. Toolbar
+  (pen/eraser, three colours, three widths, undo, clear) is ours (`z-button` + Tailwind).
+  **Undo** is a `toDataURL` snapshot stack pushed on atrament's `strokeend` event (atrament has no
+  built-in undo). The canvas is white-backfilled, and "Attach to prompt" exports via
+  `canvas.toBlob` → the existing `blobToAttachment` (white background + downscale) →
+  `PromptDraftSyncService.attachImage(dataBase64, mime, 'sketch')` — the *same* path a pasted
+  screenshot takes, so no store/sync/backend change was needed (step 6 already wired the `'sketch'`
+  source). A defensive guard skips atrament init when the canvas has no 2D context (jsdom/tests).
+- **Tab wiring** (`workspace-detail.page.ts`): added `WorkspaceSketchComponent` to `imports`,
+  `['Sketch','sketch']` to `TAB_SLUG_BY_LABEL` (URL-pinned/shareable; the route matcher already
+  accepts any non-`wip` slug), and a `<z-tab label="Sketch">` after Files. The panel stays mounted
+  while hidden, so a half-finished drawing survives tab switches.
+- Tests: `workspace-sketch.component.spec.ts` (atrament mocked via `vi.hoisted`; jsdom canvas
+  stubbed) covers the toolbar state machine, undo/clear snapshot stack, the `'sketch'` attach call +
+  confirmation flash, surfaced attach errors, and teardown. `workspace-detail.page.spec.ts` tab-row
+  assertions updated. Full suite green (backend untouched; frontend 520 specs, lint clean).
+
+Post-review hardening (high-effort `/code-review`):
+
+- **Undo baseline fix**: `pushSnapshot`'s cap evicted the blank baseline (`history[0]`) after 30
+  strokes, so undo could no longer reach a clean canvas — it now evicts the oldest *stroke* (index 1)
+  and keeps the baseline pinned (regression test added).
+- **Repaint race**: `undo()` advanced `history` synchronously but repainted via async `Image.onload`;
+  a `repaintSeq` generation stamp now makes a superseded repaint bail, so the last-requested snapshot
+  always wins (rapid double-undo can't leave the canvas out of sync with `history`).
+- **Single-encode export**: attach previously round-tripped `canvas.toBlob` → `blobToAttachment`
+  (decode + white-fill + re-encode); it now composites the canvas onto a white-backed export canvas
+  once (`exportSketch`, reusing the shared `scaledDimensions`/`stripDataUrlPrefix`), keeping the same
+  white-backfill + downscale result without the extra decode.
+
+The whole three-plan chain (steps 1–7) is now complete: a user can attach a drawing (or any image)
+to the coding agent, delivered to every launch shape via the `taskPrompt` MCP fetch.

@@ -107,6 +107,9 @@ Chronology within each group is the implementation order; the groups themselves 
   Metrics sub-tabs.
 - [telemetry-page-load-span-hiding](features/2026-07-12_telemetry-page-load-span-hiding.md)
   (07-12) — default-hide browser page-load spans in the Traces list.
+- [sketch-tab-and-image-prompt-attachments](features/2026-07-20_sketch-tab-and-image-prompt-attachments.md)
+  (07-20) — a Sketch tab (atrament canvas + toolbar) whose "Attach to prompt" adds the drawing as a
+  `'sketch'` image attachment; delivered to every launch shape via the `taskPrompt` MCP fetch.
 
 ## Open parts
 
@@ -117,12 +120,6 @@ Chronology within each group is the implementation order; the groups themselves 
   coding-agents
   [mcp-task-prompt-delivery](../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
   idea, which requires its server-readable split (serialized prompt + attachment rows).
-- **[sketch-tab-and-image-prompt-attachments](feature-ideas/sketch-tab-and-image-prompt-attachments.md)**
-  — a Sketch tab (minimal canvas) + image attachments as a third structured prompt-context
-  kind. Builds on the prompt-context conventions (picked elements, code references) above.
-  Delivery to the agent (incl. the must-have interactive PTY session) is resolved to the MCP
-  fetch (see the doc's 2026-07-20 resolution) — this epic keeps the compose-side UX; the
-  backend legs live in the two docs above.
 
 ## Done when
 
@@ -133,9 +130,8 @@ as a part here. New workspace-detail frontend work starts as a draft in this epi
 
 ## Status
 
-24 parts implemented (everything under [features/](features/), grouped above); 2 open ideas:
+25 parts implemented (everything under [features/](features/), grouped above); 1 open idea:
 
 | Open part | Status |
 |---|---|
 | [refresh-resilient-prompt-building](feature-ideas/refresh-resilient-prompt-building.md) | idea |
-| [sketch-tab-and-image-prompt-attachments](feature-ideas/sketch-tab-and-image-prompt-attachments.md) | idea |

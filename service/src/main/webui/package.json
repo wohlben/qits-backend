@@ -47,6 +47,7 @@
     "@tanstack/angular-query-experimental": "^5.100.8",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "atrament": "^5.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff2html": "^3.4.56",

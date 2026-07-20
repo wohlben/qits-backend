@@ -67,6 +67,9 @@ importers:
       '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
+      atrament:
+        specifier: ^5.1.0
+        version: 5.1.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2221,6 +2224,9 @@ packages:
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
+
+  atrament@5.1.0:
+    resolution: {integrity: sha512-HCwK0o6pqtMN8yjBr3gUiOQKDsPomaz99HhUrWp2r+Lhb8j3uAklbbWlkYkKNiBW5S2OL0ohapWeiEddSG5Beg==}
 
   axios@1.15.2:
     resolution: {integrity: sha512-wLrXxPtcrPTsNlJmKjkPnNPK2Ihe0hn0wGSaTEiHRPxwjvJwT3hKmXF4dpqxmPO9SoNb2FsYXj/xEo0gHN+D5A==}
@@ -6352,6 +6358,8 @@ snapshots:
       tslib: 2.8.1
 
   asynckit@0.4.0: {}
+
+  atrament@5.1.0: {}
 
   axios@1.15.2:
     dependencies:

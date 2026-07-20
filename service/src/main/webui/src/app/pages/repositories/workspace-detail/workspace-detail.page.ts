@@ -45,6 +45,7 @@ import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.se
 import { WorkspacePluginsComponent } from '@/pattern/workspace/workspace-plugins.component';
 import { TechnicalProcessViewComponent } from '@/pattern/workspace/technical-process-view.component';
 import { WorkspaceSessionTreeComponent } from '@/pattern/workspace/workspace-session-tree.component';
+import { WorkspaceSketchComponent } from '@/pattern/workspace/workspace-sketch.component';
 import {
   ZardTabComponent,
   ZardTabGroupComponent,
@@ -60,6 +61,7 @@ import {
 const TAB_SLUG_BY_LABEL = new Map([
   ['Chat', 'chat'],
   ['Files', 'files'],
+  ['Sketch', 'sketch'],
   ['Daemons', 'daemons'],
   ['Bootstrap', 'bootstrap'],
   ['Actions', 'actions'],
@@ -105,6 +107,7 @@ const PROCESS_TAB_LABEL = 'Starting';
     WorkspaceFileBrowserComponent,
     WorkspacePluginsComponent,
     WorkspaceSessionTreeComponent,
+    WorkspaceSketchComponent,
     WorkspaceTelemetryComponent,
     TechnicalProcessViewComponent,
     ZardTabComponent,
@@ -154,6 +157,9 @@ const PROCESS_TAB_LABEL = 'Starting';
         </z-tab>
         <z-tab label="Files">
           <app-workspace-file-browser [repoId]="repoId" [workspaceId]="workspaceId" />
+        </z-tab>
+        <z-tab label="Sketch">
+          <app-workspace-sketch [repoId]="repoId" [workspaceId]="workspaceId" />
         </z-tab>
         <z-tab
           label="Daemons"
