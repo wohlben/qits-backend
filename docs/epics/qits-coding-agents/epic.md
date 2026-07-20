@@ -66,6 +66,15 @@ Related epics / cross-cutting concerns:
   image path for the interactive PTY — spike-proven 2026-07-20). Depends on the workspace-detail
   [refresh-resilient-prompt-building](../qits-workspace-detail/feature-ideas/refresh-resilient-prompt-building.md)
   persistence, which it promotes to a necessity.
+- **[kimi-code-harness](feature-ideas/kimi-code-harness.md)** — a second, peer coding-agent
+  harness for the interactive TUI + autonomous `-p` shapes: `AgentType.KIMI` behind the global
+  `qits.agent.type` switch, with unpinned hook-reported session identity (no `--session-id`),
+  per-launch `mcp.json` delivery of the scoped MCP servers (mktemp `KIMI_CODE_HOME` symlink farm),
+  device-code login on the shared volume, and `wire.jsonl` transcript import. Excludes native chat.
+- **[kimi-code-acp-chat](feature-ideas/kimi-code-acp-chat.md)** — the native in-UI chat for kimi
+  over ACP (`kimi acp`, JSON-RPC over stdio): the ACP driver normalized into the existing chat
+  envelope, scoped `mcpServers` on `session/new`/`session/load`, and the shared re-attach
+  uuid-minting contract. **Depends on [kimi-code-harness](feature-ideas/kimi-code-harness.md).**
 
 ## Done when
 
@@ -84,3 +93,5 @@ epic's creation has landed here.
 | [chat-persistence-on-transcript](features/2026-07-10_chat-persistence-on-transcript.md) | implemented |
 | [agent-lsp-plugins](features/2026-07-07_agent-lsp-plugins.md) | implemented |
 | [mcp-task-prompt-delivery](feature-ideas/mcp-task-prompt-delivery.md) | idea |
+| [kimi-code-harness](feature-ideas/kimi-code-harness.md) | idea |
+| [kimi-code-acp-chat](feature-ideas/kimi-code-acp-chat.md) | idea |
