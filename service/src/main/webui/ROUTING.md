@@ -113,7 +113,7 @@ FeatureFlowDetailPage
 
 ## File Structure Example
 
-Pages are thin shells; the smart components they embed live in `pattern/`, presentational pieces in `ui/` (see `CLAUDE.md` for the full layering):
+Pages are thin shells; the smart components they embed live in `pattern/`, presentational pieces in `ui/` (see `AGENTS.md` for the full layering):
 
 ```
 src/app/

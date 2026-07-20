@@ -28,8 +28,9 @@ allure-results/
 *.db-shm
 *.db-wal
 
-# Misc
-.claude/
+# Misc — agent tool config is local, but skills are shared team content and tracked
+**/.claude/*
+!**/.claude/skills/
 
 # Starter migration scratch file — written to the repo root by `cli generate-migration`
 # as a reminder/template; turn it into a hand-written db/migration/V#__name.sql, then delete it.
