@@ -11,6 +11,7 @@ import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
+import eu.wohlben.qits.domain.repository.control.WorkspacePromptDraftService;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
@@ -46,6 +47,17 @@ public class AgentLaunchService {
 
   /** Workspace ids are path segments, so they must be strict slugs (mirrors WorkspaceService). */
   private static final Pattern WORKSPACE_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+
+  /**
+   * The one-sentence bootstrap turn pushed in place of the composed prompt: it carries the user's
+   * authority ("do this"), while the {@code taskPrompt} MCP tool carries the content (the refined
+   * markdown + attached images). Trivially deliverable in every launch shape — argv for interactive
+   * and autonomous, a stream-json turn for chat — which is the whole point of the push→fetch
+   * inversion (an image can't ride an argv or a PTY keystroke, but it rides a tool result).
+   */
+  static final String TASK_PROMPT_BOOTSTRAP =
+      "Fetch the current task prompt for this workspace with the taskPrompt tool, then implement what"
+          + " it describes.";
 
   /**
    * The read-only tools of the {@code actions} MCP server, pre-approved so the session can
@@ -88,6 +100,8 @@ public class AgentLaunchService {
   @Inject AgentAuthStatus agentAuthStatus;
 
   @Inject WorkspaceService workspaceService;
+
+  @Inject WorkspacePromptDraftService promptDraftService;
 
   @Inject QitsHostResolver qitsHostResolver;
 
@@ -138,7 +152,7 @@ public class AgentLaunchService {
    */
   public CommandDto launchChat(
       String repoId, String workspaceId, AgentMcpScope scope, String initialContext) {
-    return launchChat(repoId, workspaceId, scope, initialContext, null, false);
+    return launchChat(repoId, workspaceId, scope, initialContext, null, false, false);
   }
 
   /**
@@ -146,6 +160,11 @@ public class AgentLaunchService {
    * session (it must belong to this workspace); {@code fork} additionally branches it into a fresh
    * qits-pinned id. With neither, a fresh session id is pinned. Every launch records its first
    * {@link AgentSessionRef} on the command row and carries the session-report hook.
+   *
+   * <p>When {@code deliverTaskPrompt} is set and the workspace has a composed draft, the seed is
+   * the one-sentence {@link #TASK_PROMPT_BOOTSTRAP} (the agent fetches the real prompt over MCP)
+   * rather than the caller's {@code initialContext}, and the run is recorded on the draft. With it
+   * unset the legacy literal push of {@code initialContext} is unchanged.
    */
   public CommandDto launchChat(
       String repoId,
@@ -153,7 +172,8 @@ public class AgentLaunchService {
       AgentMcpScope scope,
       String initialContext,
       String resumeSessionId,
-      boolean fork) {
+      boolean fork,
+      boolean deliverTaskPrompt) {
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -194,11 +214,14 @@ public class AgentLaunchService {
             chatTranscriptSweep());
     // The live transcript import: the durable head a mid-run re-attach replays from.
     transcriptTailService.startTail(command.id());
-    if (initialContext != null && !initialContext.isBlank()) {
+    boolean deliverBootstrap = shouldDeliverBootstrap(deliverTaskPrompt, repoId, workspaceId);
+    String seed = deliverBootstrap ? TASK_PROMPT_BOOTSTRAP : initialContext;
+    if (seed != null && !seed.isBlank()) {
       // Seed the conversation as the first user turn. A stream-json chat only speaks over stdin,
       // so the seed can't be a CLI argument; the pipe buffers it until claude starts reading.
-      commandRegistry.chatSend(command.id(), initialContext);
+      commandRegistry.chatSend(command.id(), seed);
     }
+    recordDelivery(deliverBootstrap, repoId, workspaceId, command.id());
     // Daemon events that fired while no chat was running land in the new session right after the
     // seed prompt, so the agent starts with the workspace's recent daemon history.
     List<String> spooledEvents = daemonEventSpool.drain(repoId, workspaceId);
@@ -209,24 +232,31 @@ public class AgentLaunchService {
   }
 
   /**
-   * Spawns an autonomous, one-shot Claude run over {@code prompt} — no MCP server, permission
-   * prompts skipped ({@code claude -p '…' --dangerously-skip-permissions}) — watched in a terminal.
-   * Used by composed flows such as conflict resolution. Returns the spawned command.
+   * Spawns an autonomous, one-shot Claude run ({@code claude -p '…'
+   * --dangerously-skip-permissions}) that <strong>fetches</strong> its task over MCP: the narrowed
+   * repository server is attached and the argv prompt is the {@link #TASK_PROMPT_BOOTSTRAP} turn,
+   * so the run reads the workspace's composed draft (which the caller must persist first) via
+   * {@code taskPrompt}. Used by composed flows such as conflict resolution. Returns the spawned
+   * command.
    */
-  public CommandDto launchAutonomous(
-      String repoId, String workspaceId, String name, String prompt) {
+  public CommandDto launchAutonomous(String repoId, String workspaceId, String name) {
     PinnedSession pinned = pinSession(repoId, workspaceId, null, false);
-    LaunchSpec spec = renderAutonomous(prompt, pinned);
-    return commandService.launchAgent(
-        repoId,
-        workspaceId,
-        name,
-        spec.script(),
-        true,
-        spec.environment(),
-        pinned.commandId(),
-        pinned.ref(),
-        transcriptSweep());
+    LaunchSpec spec = renderAutonomous(repoId, workspaceId, AgentMcpScope.REPOSITORY, pinned);
+    CommandDto command =
+        commandService.launchAgent(
+            repoId,
+            workspaceId,
+            name,
+            spec.script(),
+            true,
+            spec.environment(),
+            pinned.commandId(),
+            pinned.ref(),
+            transcriptSweep());
+    // Autonomous always renders the bootstrap turn; recordRun is a no-op when the workspace has no
+    // draft row, so it needs no separate deliverability probe (the resolution caller persists one).
+    recordDelivery(true, repoId, workspaceId, command.id());
+    return command;
   }
 
   /**
@@ -242,7 +272,8 @@ public class AgentLaunchService {
       AgentMcpScope scope,
       String initialContext,
       String resumeSessionId,
-      boolean fork) {
+      boolean fork,
+      boolean deliverTaskPrompt) {
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -257,18 +288,26 @@ public class AgentLaunchService {
       return launchLogin(repoId, workspaceId);
     }
 
+    // Decide the seed before rendering: the argv prompt is either the bootstrap turn (agent fetches
+    // over MCP) when a draft exists, or the caller's literal initialContext.
+    boolean deliverBootstrap = shouldDeliverBootstrap(deliverTaskPrompt, repoId, workspaceId);
+    String seed = deliverBootstrap ? TASK_PROMPT_BOOTSTRAP : initialContext;
+
     PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork);
-    LaunchSpec spec = renderInteractive(repoId, workspaceId, scope, initialContext, pinned);
-    return commandService.launchAgent(
-        repoId,
-        workspaceId,
-        interactiveNameFor(scope),
-        spec.script(),
-        true,
-        spec.environment(),
-        pinned.commandId(),
-        pinned.ref(),
-        transcriptSweep());
+    LaunchSpec spec = renderInteractive(repoId, workspaceId, scope, seed, pinned);
+    CommandDto command =
+        commandService.launchAgent(
+            repoId,
+            workspaceId,
+            interactiveNameFor(scope),
+            spec.script(),
+            true,
+            spec.environment(),
+            pinned.commandId(),
+            pinned.ref(),
+            transcriptSweep());
+    recordDelivery(deliverBootstrap, repoId, workspaceId, command.id());
+    return command;
   }
 
   /**
@@ -353,6 +392,28 @@ public class AgentLaunchService {
             resumeSessionId, AgentSessionSource.RESUMED, null, null, Instant.now()));
   }
 
+  /**
+   * Whether this launch should push the bootstrap turn: the caller asked ({@code
+   * deliverTaskPrompt}) and the workspace actually has a draft {@code taskPrompt} would serve. The
+   * single decision point for chat and interactive, so the seed choice can't drift between them.
+   */
+  private boolean shouldDeliverBootstrap(
+      boolean deliverTaskPrompt, String repoId, String workspaceId) {
+    return deliverTaskPrompt && promptDraftService.hasDeliverablePrompt(repoId, workspaceId);
+  }
+
+  /**
+   * Records, after a delivering launch, which draft version the run was handed — keyed by the
+   * command that owns its session. No-op when {@code delivered} is false; {@code recordRun} itself
+   * is a no-op when the workspace has no draft row.
+   */
+  private void recordDelivery(
+      boolean delivered, String repoId, String workspaceId, String commandId) {
+    if (delivered) {
+      promptDraftService.recordRun(repoId, workspaceId, commandId);
+    }
+  }
+
   /** Configures the agent's session flags + report hook from the pinned identity. */
   private CodingAgent withSession(CodingAgent agent, PinnedSession pinned) {
     AgentSessionRef ref = pinned.ref();
@@ -413,11 +474,32 @@ public class AgentLaunchService {
     return withSession(withAgentHome(agent), pinned).skipPermissions().chat();
   }
 
-  /** Renders the one-shot autonomous run over {@code prompt}, with the same credential overlay. */
-  LaunchSpec renderAutonomous(String prompt, PinnedSession pinned) {
-    return withSession(
-            withAgentHome(CodingAgentFactory.ofType(AgentType.CLAUDE).skipPermissions()), pinned)
-        .run(prompt);
+  /**
+   * Renders the one-shot autonomous run: the {@code scope} MCP servers attached (so {@code
+   * taskPrompt} is reachable), the credential overlay, skip-permissions, and the bootstrap turn as
+   * the {@code -p} argv. Package-visible so the MCP attachment is assertable without a container.
+   */
+  LaunchSpec renderAutonomous(
+      String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
+    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
+      // Unattended run under skip-permissions: mark the server read-only so
+      // ReadOnlyRepositoryToolFilter (service module) hides the mutating repository tools
+      // (createWorkspace/integrateBranch/…). The run still gets taskPrompt + the read-only tools;
+      // its
+      // own git work happens inside its container, not via host-side MCP mutations.
+      agent.mcpServer(server.key(), McpServers.httpMcp(readOnlyMarked(server.url())));
+    }
+    return withSession(withAgentHome(agent), pinned).skipPermissions().run(TASK_PROMPT_BOOTSTRAP);
+  }
+
+  /**
+   * Appends the read-only marker query parameter to an MCP URL. The name must match {@code
+   * ReadOnlyRepositoryToolFilter.READ_ONLY_PARAM} in the {@code service} module (the domain module
+   * can't reference it).
+   */
+  private static String readOnlyMarked(String url) {
+    return url + (url.contains("?") ? "&" : "?") + "agentReadOnly=true";
   }
 
   /**

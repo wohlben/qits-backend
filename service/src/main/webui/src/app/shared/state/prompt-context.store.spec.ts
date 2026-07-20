@@ -241,6 +241,77 @@ describe('PromptContextStore — draft persistence surface', () => {
     expect(s.revision()).toBe(rev); // a save is not an edit
   });
 
+  it('markSaved keeps dirty when a newer edit landed while the save was in flight', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('first');
+    const dispatched = s.revision(); // the save captures the revision it serialized
+    s.setPromptText('second'); // a newer edit lands before the PUT resolves
+
+    s.markSaved('t1', dispatched);
+    // The older save recorded its timestamp, but the newer edit is still unsaved — dirty must stay.
+    expect(s.dirty()).toBe(true);
+    expect(s.lastSavedUpdatedAt()).toBe('t1');
+  });
+
+  it('markSaved clears dirty when no edit landed during the save (revision matches)', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('only');
+
+    s.markSaved('t1', s.revision());
+    expect(s.dirty()).toBe(false);
+  });
+
+  it('merges a server draft with an early local edit on the first load (loses neither)', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    // A quick local pick lands before the initial draft GET resolves (dirty, never-saved).
+    s.add(pick());
+    // The prior server composition (text + a reference) arrives.
+    s.hydrateFromContent(
+      'A',
+      JSON.stringify({
+        promptText: 'earlier idea',
+        snippets: [],
+        references: [{ path: 'a.ts', startLine: 1, endLine: 2 }],
+      }),
+      't1',
+    );
+
+    // Server text is adopted (local text was empty), and the local pick + server reference both live.
+    expect(s.promptText()).toBe('earlier idea');
+    expect(s.count()).toBe(1);
+    expect(s.references()).toEqual([{ path: 'a.ts', startLine: 1, endLine: 2 }]);
+    // The union is dirty, so it autosaves — persisting the merge, not just the lone pick.
+    expect(s.dirty()).toBe(true);
+  });
+
+  it('local prompt text wins over the server draft when both are set on the initial merge', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('typed during load');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'server text' }), 't1');
+    expect(s.promptText()).toBe('typed during load');
+  });
+
+  it('a remote edit after the first save is skipped, not merged (mid-typing not clobbered)', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('x');
+    s.markSaved('t1'); // a server row is now known (lastSavedUpdatedAt set)
+    s.setPromptText('mid-typing'); // dirty again
+
+    // An SSE remote edit arrives while typing — with a known row this stays a local-wins skip.
+    s.hydrateFromContent(
+      'A',
+      JSON.stringify({ promptText: 'remote', references: [{ path: 'b.ts', startLine: 1, endLine: 1 }] }),
+      't2',
+    );
+    expect(s.promptText()).toBe('mid-typing');
+    expect(s.references()).toEqual([]); // the remote reference was NOT merged
+  });
+
   it('bumps the revision on user mutations only, not on hydrate/markSaved/setActiveWorkspace', () => {
     const s = store();
     s.setActiveWorkspace('A');

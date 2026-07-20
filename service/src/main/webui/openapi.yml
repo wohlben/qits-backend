@@ -975,6 +975,8 @@ components:
           type: string
         fork:
           type: boolean
+        deliverTaskPrompt:
+          type: boolean
     LaunchCommandRequest:
       type: object
       required:
@@ -2225,6 +2227,16 @@ components:
         content:
           type: string
         serializedPrompt:
+          type: string
+        promptVersion:
+          type: integer
+          format: int64
+        lastRunAt:
+          $ref: "#/components/schemas/Instant"
+        lastRunPromptVersion:
+          type: integer
+          format: int64
+        lastRunCommandId:
           type: string
         updatedAt:
           $ref: "#/components/schemas/Instant"

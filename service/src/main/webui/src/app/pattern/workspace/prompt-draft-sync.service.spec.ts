@@ -115,6 +115,48 @@ describe('PromptDraftSyncService', () => {
     expect(store.lastSavedUpdatedAt()).toBe('t-new');
   });
 
+  it('flushNow persists a dirty edit immediately, bypassing the debounce', async () => {
+    // A launch that switches to the fetch model flushes first so the agent reads the latest draft
+    // via taskPrompt — the just-typed edit must not sit in the ~1.5s debounce window.
+    configure();
+    const { service, store } = makeService();
+    service.connect('repo-1', 'wt-1');
+
+    store.setPromptText('do the thing');
+    await service.flushNow();
+
+    const put = draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut;
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][2].serializedPrompt).toBe('do the thing');
+    expect(store.dirty()).toBe(false);
+  });
+
+  it('flushNow is a no-op when nothing is dirty', async () => {
+    configure();
+    const { service } = makeService();
+    service.connect('repo-1', 'wt-1');
+
+    await service.flushNow();
+    expect(
+      draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('flushNow rejects when the save fails, leaving the bucket dirty (the launch aborts)', async () => {
+    // Unlike the debounced loop, flushNow must NOT swallow a failed PUT — the launch relies on the
+    // rejection to abort rather than fetch a stale/absent prompt.
+    configure();
+    draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut.mockReturnValue(
+      throwError(() => ({ status: 500 })),
+    );
+    const { service, store } = makeService();
+    service.connect('repo-1', 'wt-1');
+    store.setPromptText('do the thing');
+
+    await expect(service.flushNow()).rejects.toBeDefined();
+    expect(store.dirty()).toBe(true); // still unsaved, so a later edit retries
+  });
+
   it('coalesces a burst of edits into one in-flight save (last write wins)', async () => {
     vi.useFakeTimers();
     configure();

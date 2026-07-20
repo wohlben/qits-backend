@@ -17,6 +17,7 @@ export interface LaunchAgentRequest {
     mode?: AgentLaunchMode;
     resumeSessionId?: string;
     fork?: boolean;
+    deliverTaskPrompt?: boolean;
 }
 export namespace LaunchAgentRequest {
 }

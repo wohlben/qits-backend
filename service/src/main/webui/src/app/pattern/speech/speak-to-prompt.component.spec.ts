@@ -9,6 +9,7 @@ import { PromptRefinementControllerService } from '@/api/api/promptRefinementCon
 import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { SpeakToPromptComponent } from './speak-to-prompt.component';
 
@@ -26,6 +27,8 @@ describe('SpeakToPromptComponent', () => {
       .fn()
       .mockReturnValue(of({ command: { id: 'cmd-1' } })),
   };
+  // The launch flushes the draft first (the agent fetches it via taskPrompt); a mock that resolves.
+  const promptDraftSync = { flushNow: vi.fn().mockResolvedValue(undefined) };
   // The template's RouterLinks need a real router (a bare `{ navigate }` mock can't satisfy
   // them); the launch-navigation assertions spy on the real instance instead.
   let router: Router;
@@ -40,6 +43,7 @@ describe('SpeakToPromptComponent', () => {
         { provide: SpeechControllerService, useValue: speechService },
         { provide: PromptRefinementControllerService, useValue: refinementService },
         { provide: AgentControllerService, useValue: agentService },
+        { provide: PromptDraftSyncService, useValue: promptDraftSync },
       ],
     }).compileComponents();
     router = TestBed.inject(Router);
@@ -68,33 +72,49 @@ describe('SpeakToPromptComponent', () => {
     expect(fixture.componentInstance.launchSectionVisible()).toBe(true);
   });
 
-  it('launches the agent with the refined prompt as initial context and opens its command', async () => {
+  it('flushes the draft then launches a fetch-model chat and opens its command', async () => {
     const fixture = createComponent();
     TestBed.inject(PromptContextStore).setPromptText('do the thing');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
+    // The composed prompt is persisted first (the agent fetches it via taskPrompt), so the launch
+    // carries no initialContext — only the deliver flag and mode.
+    expect(promptDraftSync.flushNow).toHaveBeenCalled();
     expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
       'repo-1',
       'wt-1',
-      { scope: AgentMcpScope.Repository, initialContext: 'do the thing', mode: AgentLaunchMode.Chat },
+      { scope: AgentMcpScope.Repository, mode: AgentLaunchMode.Chat, deliverTaskPrompt: true },
     );
     expect(router.navigate).toHaveBeenCalledWith(['/commands', 'cmd-1']);
   });
 
-  it('launches the interactive terminal session when asked', async () => {
+  it('aborts the launch and flags the failure when the pre-launch draft flush fails', async () => {
+    // A failed flush means the agent would fetch a stale/absent prompt — abort rather than proceed.
+    promptDraftSync.flushNow.mockRejectedValueOnce(new Error('save failed'));
+    const fixture = createComponent();
+    TestBed.inject(PromptContextStore).setPromptText('do the thing');
+    await fixture.componentInstance.launch(AgentLaunchMode.Chat);
+    await fixture.whenStable();
+
+    expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.saveFailed()).toBe(true);
+  });
+
+  it('launches the interactive terminal session in the fetch model', async () => {
     const fixture = createComponent();
     TestBed.inject(PromptContextStore).setPromptText('do the thing');
     fixture.componentInstance.launch(AgentLaunchMode.Interactive);
     await fixture.whenStable();
 
+    expect(promptDraftSync.flushNow).toHaveBeenCalled();
     expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
       'repo-1',
       'wt-1',
       {
         scope: AgentMcpScope.Repository,
-        initialContext: 'do the thing',
         mode: AgentLaunchMode.Interactive,
+        deliverTaskPrompt: true,
       },
     );
   });
@@ -124,7 +144,10 @@ describe('SpeakToPromptComponent', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('appends picked snippets from the prompt-context store to the initial context', async () => {
+  it('carries no initialContext even with picked snippets — the draft is fetched instead', async () => {
+    // Picked elements/references ride the persisted draft now (serialized into serialized_prompt by
+    // the draft-sync service, tested there), not the launch payload — so the launch stays
+    // prompt-free and just flushes then sets the deliver flag.
     const store = TestBed.inject(PromptContextStore);
     store.add({
       html: '<button class="cta">Go</button>',
@@ -138,12 +161,11 @@ describe('SpeakToPromptComponent', () => {
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
+    expect(promptDraftSync.flushNow).toHaveBeenCalled();
     const [, , body] =
       agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
-    expect(body.scope).toBe(AgentMcpScope.Repository);
-    expect(body.initialContext).toContain('fix this button');
-    expect(body.initialContext).toContain('Picked element <button>');
-    expect(body.initialContext).toContain('<button class="cta">Go</button>');
+    expect(body.initialContext).toBeUndefined();
+    expect(body.deliverTaskPrompt).toBe(true);
     store.clear();
   });
 
@@ -265,26 +287,6 @@ describe('SpeakToPromptComponent', () => {
     store.clear();
   });
 
-  it('keeps the excerpt out of the launched prompt — only the path:lines label rides along', async () => {
-    const store = TestBed.inject(PromptContextStore);
-    store.addReference({
-      path: 'src/App.java',
-      startLine: 10,
-      endLine: 12,
-      excerpt: 'int secret = 42;',
-    });
-    const fixture = createComponent();
-    TestBed.inject(PromptContextStore).setPromptText('fix this');
-    fixture.componentInstance.launch(AgentLaunchMode.Chat);
-    await fixture.whenStable();
-
-    const [, , body] =
-      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
-    expect(body.initialContext).toBe('fix this\n\nSelected code:\n- src/App.java:10-12');
-    expect(body.initialContext).not.toContain('int secret = 42;');
-    store.clear();
-  });
-
   it('removes a reference row via its Remove button', () => {
     const store = TestBed.inject(PromptContextStore);
     store.addReference({ path: 'src/App.java', startLine: 3, endLine: 3 });
@@ -301,43 +303,9 @@ describe('SpeakToPromptComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Selected code');
   });
 
-  it('appends the references block after the snippets block in the initial context', async () => {
-    const store = TestBed.inject(PromptContextStore);
-    store.add({
-      html: '<button class="cta">Go</button>',
-      selector: '#root > button',
-      url: 'http://localhost/daemon/wt/d/',
-      tag: 'button',
-      textPreview: 'Go',
-    });
-    store.addReference({ path: 'src/App.java', startLine: 10, endLine: 12 });
-    const fixture = createComponent();
-    TestBed.inject(PromptContextStore).setPromptText('fix this');
-    fixture.componentInstance.launch(AgentLaunchMode.Chat);
-    await fixture.whenStable();
-
-    const [, , body] =
-      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
-    expect(body.initialContext).toContain('Selected code:\n- src/App.java:10-12');
-    expect(body.initialContext.indexOf('Picked element')).toBeLessThan(
-      body.initialContext.indexOf('Selected code:'),
-    );
-    store.clear();
-  });
-
-  it('appends the references block even when no elements are picked', async () => {
-    const store = TestBed.inject(PromptContextStore);
-    store.addReference({ path: 'src/App.java', startLine: 7, endLine: 7 });
-    const fixture = createComponent();
-    TestBed.inject(PromptContextStore).setPromptText('fix this');
-    fixture.componentInstance.launch(AgentLaunchMode.Chat);
-    await fixture.whenStable();
-
-    const [, , body] =
-      agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost.mock.calls[0];
-    expect(body.initialContext).toBe('fix this\n\nSelected code:\n- src/App.java:7');
-    store.clear();
-  });
+  // The launch-context serialization (prompt text + picked-element block + selected-code block, and
+  // their ordering) now lives in buildSerializedPrompt and is persisted as the draft's
+  // serialized_prompt — covered by snippet-format.spec.ts, not through the launch payload here.
 
   it('uploads the recording and appends the server transcript', async () => {
     const fixture = createComponent();

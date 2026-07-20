@@ -18,9 +18,10 @@ import { PromptRefinementControllerService } from '@/api/api/promptRefinementCon
 import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
-import { buildSerializedPrompt, codeReferenceLabel } from '@/shared/state/snippet-format';
+import { codeReferenceLabel } from '@/shared/state/snippet-format';
 import { WavRecorder } from './wav-recorder';
 
 /**
@@ -264,6 +265,12 @@ import { WavRecorder } from './wav-recorder';
               Launch as terminal session
             </button>
           </div>
+          @if (saveFailed()) {
+            <div class="text-sm text-destructive">
+              Couldn't save the prompt, so the agent wasn't launched. Check your connection and try
+              again.
+            </div>
+          }
           @if (launchMutation.isError()) {
             <div class="text-sm text-destructive">Failed to launch the agent</div>
           }
@@ -287,6 +294,8 @@ export class SpeakToPromptComponent {
   private readonly agentService = inject(AgentControllerService);
   private readonly router = inject(Router);
   protected readonly promptContext = inject(PromptContextStore);
+  /** Route-scoped draft sync (provided by the host page) — flushed before a fetch-model launch. */
+  private readonly promptDraftSync = inject(PromptDraftSyncService);
   /** Template alias: the `path:start[-end]` label a reference renders (and tracks) as. */
   protected readonly refLabel = codeReferenceLabel;
 
@@ -388,12 +397,15 @@ export class SpeakToPromptComponent {
   protected readonly AgentLaunchMode = AgentLaunchMode;
 
   readonly launchMutation = injectMutation(() => ({
-    mutationFn: ({ prompt, mode }: { prompt: string; mode: AgentLaunchMode }) =>
+    mutationFn: (mode: AgentLaunchMode) =>
       lastValueFrom(
         this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           this.repoId(),
           this.workspaceId(),
-          { scope: AgentMcpScope.Repository, initialContext: prompt, mode },
+          // Fetch model: the agent pulls the composed prompt (text + any images) from the persisted
+          // draft via the taskPrompt MCP tool, so no initialContext rides the launch. The bootstrap
+          // turn is synthesized server-side.
+          { scope: AgentMcpScope.Repository, mode, deliverTaskPrompt: true },
         ),
       ),
     onSuccess: (res) => {
@@ -407,16 +419,24 @@ export class SpeakToPromptComponent {
     },
   }));
 
-  launch(mode: AgentLaunchMode) {
+  /** A pre-launch draft flush failed — the launch was aborted rather than fetch a stale prompt. */
+  readonly saveFailed = signal(false);
+
+  async launch(mode: AgentLaunchMode) {
     if (!this.promptContext.promptText().trim()) return;
-    // Same serializer (and same untrimmed store inputs) the draft autosave uses for
-    // `serializedPrompt`, so what the agent receives here is byte-identical to what the taskPrompt
-    // MCP tool would serve. Launch does not clear the draft.
-    const prompt = buildSerializedPrompt(
-      this.promptContext.promptText(),
-      this.promptContext.snippets(),
-      this.promptContext.references(),
-    );
-    this.launchMutation.mutate({ prompt, mode });
+    // Persist the draft synchronously before launching: the agent fetches serialized_prompt back via
+    // taskPrompt, so the debounced autosave must be flushed or a just-typed edit would race the
+    // launch and the tool would serve stale/absent text. The draft's serializer is byte-identical to
+    // the old inline push. Launch does not clear the draft.
+    this.saveFailed.set(false);
+    try {
+      await this.promptDraftSync.flushNow();
+    } catch {
+      // The draft did not persist; launching now would fetch stale/absent instructions, so abort and
+      // surface the error instead of proceeding silently.
+      this.saveFailed.set(true);
+      return;
+    }
+    this.launchMutation.mutate(mode);
   }
 }

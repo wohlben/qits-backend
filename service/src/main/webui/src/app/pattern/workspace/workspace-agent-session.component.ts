@@ -10,10 +10,12 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
-import { lastValueFrom } from 'rxjs';
+import { catchError, lastValueFrom, of } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
+import { WorkspacePromptDraftDto } from '@/api/model/workspacePromptDraftDto';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { CommandDto } from '@/api/model/commandDto';
@@ -23,6 +25,7 @@ import {
   newestRunningChat,
   newestRunningInteractiveAgent,
 } from '@/pattern/command/running-chat';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 
@@ -133,6 +136,9 @@ export class WorkspaceAgentSessionComponent {
 
   private readonly agentService = inject(AgentControllerService);
   private readonly commandService = inject(CommandControllerService);
+  private readonly draftService = inject(WorkspacePromptDraftControllerService);
+  /** Route-scoped, shared with the compose tab — flushed before a fresh launch (see {@link launch}). */
+  private readonly promptDraftSync = inject(PromptDraftSyncService);
   private readonly queryClient = inject(QueryClient);
 
   // Same key AND shape as the page's commands query, so both share one cache entry.
@@ -143,6 +149,53 @@ export class WorkspaceAgentSessionComponent {
         (r) => r.entries?.map((e) => e.command!).filter((c): c is CommandDto => !!c) ?? [],
       ),
   }));
+
+  /**
+   * The workspace's persisted prompt draft, keyed identically to {@code PromptDraftSyncService} so
+   * this shares the page's already-hydrated cache entry (no extra fetch on tab open). Drives whether
+   * a fresh auto-launch delivers the composed prompt. 404 (never saved) maps to `null`.
+   */
+  readonly draftQuery = injectQuery(() => ({
+    queryKey: ['workspace-prompt-draft', this.repoId(), this.workspaceId()],
+    queryFn: (): Promise<WorkspacePromptDraftDto | null> =>
+      lastValueFrom(
+        this.draftService
+          .apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet(this.repoId(), this.workspaceId())
+          .pipe(
+            catchError((err: unknown) => {
+              if (err && typeof err === 'object' && (err as { status?: number }).status === 404) {
+                return of(null);
+              }
+              throw err;
+            }),
+          ),
+      ),
+  }));
+
+  /**
+   * Whether the workspace has a composed prompt that hasn't been handed to an agent at its current
+   * version — a non-blank {@code serializedPrompt} whose {@code promptVersion} is newer than the
+   * last delivered one. A fresh auto-launch delivers it once; re-attaching an already-run version
+   * does not (the backend's run-tracking is the source of truth this reads back). {@link launch}
+   * refetches the draft before reading this, so it reflects a just-saved edit.
+   *
+   * <p>NOTE: the backend's {@code hasDeliverablePrompt} also delivers an <em>attachments-only</em>
+   * draft (image, no text), which this deliberately does not detect — the DTO carries no attachment
+   * signal and no UI creates such a draft yet. Aligning the two (an attachment-count field feeding
+   * this check) is part of the sketch/image-attachment work (steps 6–7), where attachments first
+   * become composable.
+   */
+  readonly hasUnrunDraft = computed(() =>
+    WorkspaceAgentSessionComponent.isUnrunDraft(this.draftQuery.data()),
+  );
+
+  /** The un-run predicate, shared by {@link hasUnrunDraft} and the fresh refetch result in launch. */
+  private static isUnrunDraft(draft: WorkspacePromptDraftDto | null | undefined): boolean {
+    if (!draft || !draft.serializedPrompt || draft.serializedPrompt.trim() === '') {
+      return false;
+    }
+    return (draft.promptVersion ?? 0) > (draft.lastRunPromptVersion ?? -1);
+  }
 
   /** Bridges the invalidation gap between launching from this tab and the registry reporting it. */
   readonly launchedCommandId = signal<string | null>(null);
@@ -218,7 +271,13 @@ export class WorkspaceAgentSessionComponent {
   });
 
   readonly launchMutation = injectMutation(() => ({
-    mutationFn: (resumeSessionId: string | null) =>
+    mutationFn: ({
+      resumeSessionId,
+      deliverTaskPrompt,
+    }: {
+      resumeSessionId: string | null;
+      deliverTaskPrompt: boolean;
+    }) =>
       lastValueFrom(
         this.agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost(
           this.repoId(),
@@ -227,6 +286,7 @@ export class WorkspaceAgentSessionComponent {
             scope: AgentMcpScope.Repository,
             mode: AgentLaunchMode.Interactive,
             ...(resumeSessionId ? { resumeSessionId } : {}),
+            ...(deliverTaskPrompt ? { deliverTaskPrompt: true } : {}),
           },
         ),
       ),
@@ -282,7 +342,7 @@ export class WorkspaceAgentSessionComponent {
       this.launchedCommandId.set(null);
       this.lastAttachedId.set(null);
       // Replay the launch the REPL interrupted — the operator signed in to get exactly that.
-      this.launch(this.lastLaunchIntent);
+      void this.launch(this.lastLaunchIntent);
     });
   }
 
@@ -300,31 +360,50 @@ export class WorkspaceAgentSessionComponent {
       this.idle.set(true);
       return;
     }
-    this.launch(null);
+    void this.launch(null);
   }
 
-  private launch(resumeSessionId: string | null): void {
+  private async launch(resumeSessionId: string | null): Promise<void> {
     this.lastLaunchIntent = resumeSessionId;
     this.idle.set(false);
-    this.launchMutation.mutate(resumeSessionId);
+    // A fresh session picks up an un-run composed draft (the agent fetches it via taskPrompt); a
+    // resume continues an existing conversation, so it never re-delivers the prompt.
+    let deliverTaskPrompt = false;
+    if (resumeSessionId === null) {
+      // Persist any pending compose-tab edit (the sync service is shared and route-scoped), then
+      // refresh the draft so the un-run check reads the just-saved promptVersion — otherwise an edit
+      // still inside the ~1.5s autosave debounce, or a draft GET that hadn't resolved yet, would let
+      // a fresh session start without picking the prompt up.
+      try {
+        await this.promptDraftSync.flushNow();
+      } catch {
+        // A failed flush leaves the draft unpersisted; launch without delivery rather than deliver
+        // stale text — the compose tab surfaces its own save error.
+      }
+      // Read the fresh data straight off the refetch result — the query's data() signal updates a
+      // microtask later than the promise resolves, so the computed could still be stale here.
+      const refetched = await this.draftQuery.refetch();
+      deliverTaskPrompt = WorkspaceAgentSessionComponent.isUnrunDraft(refetched.data);
+    }
+    this.launchMutation.mutate({ resumeSessionId, deliverTaskPrompt });
   }
 
   /** The ended state's Resume — explicitly continues the workspace's last session. */
   resume(): void {
     this.launchedCommandId.set(null);
     this.lastAttachedId.set(null);
-    this.launch(this.lastSessionId());
+    void this.launch(this.lastSessionId());
   }
 
   /** The explicit fresh start — the fallback when the last session is gone or unwanted. */
   startNew(): void {
     this.launchedCommandId.set(null);
     this.lastAttachedId.set(null);
-    this.launch(null);
+    void this.launch(null);
   }
 
   /** The error state's Retry — repeats the launch that failed, whatever its resume intent was. */
   retry(): void {
-    this.launch(this.lastLaunchIntent);
+    void this.launch(this.lastLaunchIntent);
   }
 }

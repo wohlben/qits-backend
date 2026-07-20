@@ -209,11 +209,60 @@ public class AgentLaunchServiceTest {
   }
 
   @Test
-  public void autonomousLaunchPointsHomeAtTheSharedCredentialVolume() {
-    LaunchSpec spec = agentLaunchService.renderAutonomous("resolve the conflict", freshPin());
+  public void autonomousLaunchFetchesViaBootstrapWithTheRepositoryServerAndCredentialVolume() {
+    // Autonomous is now a fetch-model run: the -p arg is the one-sentence bootstrap turn (the real
+    // prompt lives in the workspace draft), and the narrowed repository server is attached —
+    // without
+    // it taskPrompt would be unreachable. HOME still points at the shared credential volume.
+    String projectId = "aaaaaaaa-0000-0000-0000-0000000000c1";
+    String repoId = "aaaaaaaa-0000-0000-0000-0000000000c2";
+    seedRepository(projectId, repoId);
+
+    LaunchSpec spec =
+        agentLaunchService.renderAutonomous(repoId, "work", AgentMcpScope.REPOSITORY, freshPin());
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
-    assertTrue(spec.script().startsWith("claude -p 'resolve the conflict'"), spec.script());
+    assertTrue(
+        spec.script().startsWith("claude -p '" + AgentLaunchService.TASK_PROMPT_BOOTSTRAP + "'"),
+        spec.script());
+    assertTrue(
+        spec.script()
+            .contains(
+                "/mcp/repository?projectId="
+                    + projectId
+                    + "&repositoryId="
+                    + repoId
+                    + "&workspaceId=work"),
+        spec.script());
+    assertTrue(spec.script().contains("--dangerously-skip-permissions"), spec.script());
+    // Unattended run: the repository server is marked read-only so ReadOnlyRepositoryToolFilter
+    // fences the mutating repository tools.
+    assertTrue(spec.script().contains("agentReadOnly=true"), spec.script());
+  }
+
+  @Test
+  public void onlyTheAutonomousRunMarksTheRepositoryServerReadOnly() {
+    String projectId = "aaaaaaaa-0000-0000-0000-0000000000d1";
+    String repoId = "aaaaaaaa-0000-0000-0000-0000000000d2";
+    seedRepository(projectId, repoId);
+
+    // Autonomous marks read-only; chat and interactive keep the full (unmarked) repository tool
+    // set.
+    assertTrue(
+        agentLaunchService
+            .renderAutonomous(repoId, "work", AgentMcpScope.REPOSITORY, freshPin())
+            .script()
+            .contains("agentReadOnly=true"));
+    assertFalse(
+        agentLaunchService
+            .renderChat(repoId, "work", AgentMcpScope.REPOSITORY, freshPin())
+            .script()
+            .contains("agentReadOnly"));
+    assertFalse(
+        agentLaunchService
+            .renderInteractive(repoId, "work", AgentMcpScope.REPOSITORY, "look", freshPin())
+            .script()
+            .contains("agentReadOnly"));
   }
 
   @Test
@@ -229,7 +278,8 @@ public class AgentLaunchServiceTest {
     assertTrue(chat.script().contains("--session-id " + pinned.ref().sessionId), chat.script());
     assertTrue(chat.script().contains(reportPath), chat.script());
 
-    LaunchSpec autonomous = agentLaunchService.renderAutonomous("go", pinned);
+    LaunchSpec autonomous =
+        agentLaunchService.renderAutonomous(repoId, "work", AgentMcpScope.REPOSITORY, pinned);
     assertTrue(
         autonomous.script().contains("--session-id " + pinned.ref().sessionId),
         autonomous.script());

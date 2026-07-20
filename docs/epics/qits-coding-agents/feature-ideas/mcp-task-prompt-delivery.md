@@ -125,6 +125,44 @@ Delivery now depends on the model making the call — first-turn reliable for a 
 the session; if not, the UI can show a warning chip instead of silently proceeding. A pushed
 prompt could fail silently in more ways than this.
 
+## Implementation notes (as shipped, 2026-07-20)
+
+The `taskPrompt` tool (step 4) and this bootstrap-turn rewiring (step 5) both landed. Where the
+implementation pins down or deviates from the idea above:
+
+- **Delivery is explicit, gated on a real draft.** `LaunchAgentRequest` gained a `deliverTaskPrompt`
+  flag; when set, `AgentLaunchService` delivers the bootstrap turn over the shape's transport
+  (`chatSend` for chat, argv for interactive/autonomous) **iff** `WorkspacePromptDraftService
+  .hasDeliverablePrompt` is true (a non-blank `serializedPrompt` or ≥1 attachment). No draft ⇒ no
+  turn (idle session, unchanged). `initialContext` stays a supported literal push; the
+  workspace-detail frontend simply stops sending it.
+- **Autonomous was rewired too** (not deferred): `ResolveConflictService` now persists its composed
+  (injection-fenced) prompt as the resolution workspace's draft and calls the prompt-less
+  `launchAutonomous(repoId, workspaceId, name)`, which attaches the narrowed `repository` MCP server
+  (previously autonomous attached none) and runs the bootstrap via `claude -p`.
+- **Run-tracking + versioning** (per product direction): `WorkspacePromptDraft` gained a monotonic
+  `prompt_version` (bumped per content-changing upsert) and `last_run_at` / `last_run_prompt_version`
+  / `last_run_command_id`, written by `recordRun` after a delivered launch (migration `V38`). The
+  Agents-tab auto-launch delivers only an **un-run** draft (`promptVersion >
+  lastRunPromptVersion`), so re-attaching never silently re-runs an already-delivered prompt; the
+  compose-side launch buttons deliver unconditionally.
+- **Same-tab currency** is closed by a synchronous flush: `PromptDraftSyncService.flushNow()` PUTs
+  the pending draft before the launch fires, so `taskPrompt` never serves stale/absent text. The
+  `PROMPT_DRAFT` SSE frame stays payload-free by design; cross-tab freshness rides the existing
+  refetch + `updatedAt` echo-dedup.
+- **Acceptance gate**: `TaskPromptDeliveryIT` (extended, `@QuarkusIntegrationTest`) drives the real
+  `taskPrompt` tool from a real `claude` container — a `-p` leg and a tmux PTY leg both read back a
+  text nonce (serialized-prompt block) and an in-image nonce (attached PNG), proving mixed
+  text+image delivery end-to-end.
+- **Review hardening** (post-review pass): the autonomous run connects the repository server
+  read-only (`agentReadOnly=true` marker → `ReadOnlyRepositoryToolFilter` hides the mutating
+  repository tools), since an unattended skip-permissions run must not drive host-side cross-repo
+  mutations; `flushNow()` now *rejects* on a failed save so the compose-tab launch aborts (and the
+  Agents-tab auto-launch flushes + refetches the draft before deciding delivery) rather than fetch a
+  stale prompt; and two pre-existing prompt-store races were fixed — `markSaved` clears `dirty` only
+  when no edit landed mid-save, and the initial-load hydrate merges a server draft with an early
+  local edit instead of dropping one.
+
 ## Open questions
 
 - **Live draft vs snapshot-on-send**: serving the live draft admits a benign race (user keeps

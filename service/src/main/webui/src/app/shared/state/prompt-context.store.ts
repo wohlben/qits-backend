@@ -173,6 +173,44 @@ export function isPromptContextEmpty(
 }
 
 /**
+ * Parses the opaque draft `content` blob into its known slices plus any unknown passthrough keys.
+ * Returns null when the blob is not a JSON object (malformed / not-yet-a-draft), so callers can
+ * record the row timestamp without applying a composition. Shared by the pristine replace and the
+ * initial-load merge paths of {@link PromptContextStore.hydrateFromContent}.
+ */
+function parseDraftContent(
+  content: string,
+): {
+  promptText: string;
+  snippets: PickedSnippet[];
+  references: CodeReference[];
+  passthrough: Record<string, unknown>;
+} | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) {
+    return null;
+  }
+  const passthrough: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+  const promptText = typeof passthrough['promptText'] === 'string' ? passthrough['promptText'] : '';
+  const snippets = Array.isArray(passthrough['snippets'])
+    ? (passthrough['snippets'] as PickedSnippet[])
+    : [];
+  const references = Array.isArray(passthrough['references'])
+    ? (passthrough['references'] as CodeReference[])
+    : [];
+  delete passthrough['v'];
+  delete passthrough['promptText'];
+  delete passthrough['snippets'];
+  delete passthrough['references'];
+  return { promptText, snippets, references, passthrough };
+}
+
+/**
  * The prompt-context store: the composition state for one workspace's next agent launch — the
  * editable prompt text, elements picked from a daemon web view, and code references selected in the
  * Files tab. Root-scoped so it outlives its collecting components and navigation, but the state it
@@ -343,13 +381,55 @@ export const PromptContextStore = signalStore(
         content: string | null,
         updatedAt: string | null,
       ): void {
-        if (workspaceId !== store.activeWorkspaceId() || store.dirty()) {
+        if (workspaceId !== store.activeWorkspaceId()) {
           return;
         }
         // Our own save echoes back over SSE with the timestamp we already recorded — ignore it, so
         // an autosave never re-raises the "Restored draft" hint. A genuine remote edit carries a
         // newer timestamp and falls through.
         if (content !== null && updatedAt !== null && updatedAt === store.lastSavedUpdatedAt()) {
+          return;
+        }
+        if (store.dirty()) {
+          // Unsaved local edits exist. Once we have seen a server row (lastSavedUpdatedAt set) this
+          // is our own echo or a remote edit arriving mid-typing — local wins, skip so typing is
+          // never clobbered. If we have NOT yet (the very first load raced a quick local edit), a
+          // null server draft leaves the local edit untouched, but a real server draft must be MERGED
+          // with it — otherwise the previously-composed draft is silently overwritten by the autosave
+          // of the lone local edit.
+          if (store.lastSavedUpdatedAt() !== null || content === null) {
+            return;
+          }
+          const parsed = parseDraftContent(content);
+          if (!parsed) {
+            patchState(store, { lastSavedUpdatedAt: updatedAt });
+            return;
+          }
+          // Union the server draft with the in-flight local edits: local prompt text wins when the
+          // user actually typed, snippets union by identity, references merge, passthrough favours
+          // local keys. dirty stays set (+revision bump) so the merged draft autosaves.
+          const localSnippets = store.snippets();
+          const mergedSnippets = [
+            ...parsed.snippets,
+            ...localSnippets.filter(
+              (l) => !parsed.snippets.some((s) => s.selector === l.selector && s.url === l.url),
+            ),
+          ];
+          let mergedReferences = parsed.references;
+          for (const ref of store.references()) {
+            mergedReferences = mergeReference(mergedReferences, ref);
+          }
+          const localText = store.promptText();
+          patchState(store, (state) => ({
+            promptText: localText.trim() ? localText : parsed.promptText,
+            snippets: mergedSnippets,
+            references: mergedReferences,
+            passthrough: { ...parsed.passthrough, ...store.passthrough() },
+            lastSavedUpdatedAt: updatedAt,
+            justRestored: true,
+            dirty: true,
+            revision: state.revision + 1,
+          }));
           return;
         }
         if (content === null) {
@@ -363,42 +443,37 @@ export const PromptContextStore = signalStore(
           });
           return;
         }
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(content);
-        } catch {
+        const parsed = parseDraftContent(content);
+        if (!parsed) {
           patchState(store, { lastSavedUpdatedAt: updatedAt, justRestored: false });
           return;
         }
-        if (typeof parsed !== 'object' || parsed === null) {
-          patchState(store, { lastSavedUpdatedAt: updatedAt, justRestored: false });
-          return;
-        }
-        const passthrough: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
-        const promptText = typeof passthrough['promptText'] === 'string' ? passthrough['promptText'] : '';
-        const snippets = Array.isArray(passthrough['snippets'])
-          ? (passthrough['snippets'] as PickedSnippet[])
-          : [];
-        const references = Array.isArray(passthrough['references'])
-          ? (passthrough['references'] as CodeReference[])
-          : [];
-        delete passthrough['v'];
-        delete passthrough['promptText'];
-        delete passthrough['snippets'];
-        delete passthrough['references'];
-        const empty = isPromptContextEmpty(promptText, snippets, references, passthrough);
+        const empty = isPromptContextEmpty(
+          parsed.promptText,
+          parsed.snippets,
+          parsed.references,
+          parsed.passthrough,
+        );
         patchState(store, {
-          promptText,
-          snippets,
-          references,
-          passthrough,
+          ...parsed,
           lastSavedUpdatedAt: updatedAt,
           justRestored: !empty,
         });
       },
-      /** Record a completed save (PUT → the new `updatedAt`, DELETE → null); clears the dirty flag. */
-      markSaved(updatedAt: string | null): void {
-        patchState(store, { dirty: false, lastSavedUpdatedAt: updatedAt });
+      /**
+       * Record a completed save (PUT → the new `updatedAt`, DELETE → null). Clears {@link dirty}
+       * <em>only</em> when no newer edit landed while the save was in flight: the caller passes the
+       * {@link revision} captured when it dispatched the request, and if the store has advanced past
+       * it a later edit is still unsaved, so dirty must stay set (its own debounced save then
+       * persists it). Without this guard an edit made during the round-trip would have its dirty flag
+       * wiped by the completing older save and be lost on navigation.
+       */
+      markSaved(updatedAt: string | null, savedAtRevision?: number): void {
+        patchState(store, (state) => ({
+          lastSavedUpdatedAt: updatedAt,
+          dirty:
+            savedAtRevision !== undefined && state.revision !== savedAtRevision ? state.dirty : false,
+        }));
       },
     };
   }),

@@ -52,9 +52,9 @@ export function formatSnippetsForPrompt(snippets: PickedSnippet[]): string {
 /**
  * The launch-ready prompt: the editable prompt text, then the picked-element block and the
  * selected-code block, each appended only when non-empty, joined by blank lines. This is the single
- * source of truth for prompt serialization — `speak-to-prompt.launch()` sends it as the agent's
- * `initialContext`, and the draft autosave persists it as `serializedPrompt` (what the `taskPrompt`
- * MCP tool serves), so the two are byte-identical.
+ * source of truth for prompt serialization — the draft autosave persists it as `serializedPrompt`,
+ * which the `taskPrompt` MCP tool serves verbatim to the agent (the agent now fetches its prompt
+ * rather than receiving it as a launch-time `initialContext`).
  */
 export function buildSerializedPrompt(
   promptText: string,

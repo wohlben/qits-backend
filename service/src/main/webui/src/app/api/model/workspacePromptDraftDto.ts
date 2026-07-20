@@ -12,6 +12,10 @@
 export interface WorkspacePromptDraftDto { 
     content?: string;
     serializedPrompt?: string;
+    promptVersion?: number;
+    lastRunAt?: string;
+    lastRunPromptVersion?: number;
+    lastRunCommandId?: string;
     updatedAt?: string;
 }
 

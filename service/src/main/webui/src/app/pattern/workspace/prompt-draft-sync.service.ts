@@ -1,7 +1,16 @@
 import { DestroyRef, Injectable, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { injectQuery } from '@tanstack/angular-query-experimental';
-import { EMPTY, Observable, catchError, debounceTime, lastValueFrom, of, switchMap, tap } from 'rxjs';
+import {
+  EMPTY,
+  Observable,
+  catchError,
+  debounceTime,
+  lastValueFrom,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 
 import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
 import { WorkspacePromptDraftDto } from '@/api/model/workspacePromptDraftDto';
@@ -91,6 +100,34 @@ export class PromptDraftSyncService {
     this.destroyRef.onDestroy(() => this.flush());
   }
 
+  /**
+   * Persist the current draft synchronously, resolving once it has hit the backend (or immediately
+   * when nothing is dirty). Used before a launch that switches to the fetch model: the agent reads
+   * the draft back via {@code taskPrompt}, so the debounced autosave must be flushed first or a
+   * just-typed edit would race the launch and the tool would serve stale/absent text.
+   *
+   * <p>Unlike the debounced {@code saveNow()} loop, this <strong>does not swallow</strong> a failed
+   * PUT/DELETE — the returned promise <em>rejects</em>, so the launch can abort and surface the error
+   * instead of silently proceeding to fetch a stale or absent prompt. No-op (resolves) when nothing
+   * is dirty.
+   */
+  flushNow(): Promise<void> {
+    const pending = this.pendingRequest();
+    if (!pending) {
+      return Promise.resolve();
+    }
+    return lastValueFrom(
+      pending.request.pipe(
+        tap((res) =>
+          this.store.markSaved(
+            pending.kind === 'put' ? (res.updatedAt ?? null) : null,
+            pending.revision,
+          ),
+        ),
+      ),
+    ).then(() => undefined);
+  }
+
   /** Point the store + queries at a workspace; call once from the page constructor. */
   connect(repoId: string, workspaceId: string): void {
     this.store.setActiveWorkspace(workspaceId);
@@ -108,18 +145,26 @@ export class PromptDraftSyncService {
   private pendingRequest(): {
     kind: 'put' | 'delete';
     request: Observable<{ updatedAt?: string }>;
+    /**
+     * The store {@link revision} captured when this request's body was built. {@code markSaved} uses
+     * it to clear {@code dirty} only if no newer edit landed while the save was in flight, so an edit
+     * made during the round-trip is not lost (see the store's markSaved).
+     */
+    revision: number;
   } | null {
     const repoId = this.repoId();
     const workspaceId = this.workspaceId();
     if (!this.store.dirty() || !repoId || !workspaceId) {
       return null;
     }
+    const revision = this.store.revision();
     if (this.store.isEmpty()) {
       if (this.store.lastSavedUpdatedAt() === null) {
         return null; // empty and never saved — nothing to delete
       }
       return {
         kind: 'delete',
+        revision,
         request: this.draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftDelete(
           repoId,
           workspaceId,
@@ -128,6 +173,7 @@ export class PromptDraftSyncService {
     }
     return {
       kind: 'put',
+      revision,
       request: this.draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(
         repoId,
         workspaceId,
@@ -154,7 +200,12 @@ export class PromptDraftSyncService {
       return EMPTY;
     }
     return pending.request.pipe(
-      tap((res) => this.store.markSaved(pending.kind === 'put' ? (res.updatedAt ?? null) : null)),
+      tap((res) =>
+        this.store.markSaved(
+          pending.kind === 'put' ? (res.updatedAt ?? null) : null,
+          pending.revision,
+        ),
+      ),
       catchError(() => EMPTY),
     );
   }

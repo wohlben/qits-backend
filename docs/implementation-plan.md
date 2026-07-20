@@ -48,12 +48,16 @@ Tool bean on the existing `repository` MCP server + `TaskPromptToolFilter` (mirr
 text block plus the attachment rows as `ImageContent` blocks. Unit-testable with
 `quarkus-mcp-server-test`, no frontend needed — reads what steps 1–2 persist.
 
-### 5. `mcp-task-prompt-delivery` — bootstrap-turn rewiring
+### 5. `mcp-task-prompt-delivery` — bootstrap-turn rewiring ✅ shipped 2026-07-20
 
-The push→fetch switch in `AgentLaunchService`, per launch shape. Do the **interactive PTY leg
-first** (it's the must-have that motivated all this), then chat and autonomous. The acceptance gate
-is the new IT against the real `taskPrompt` tool from step 4. Chat's existing inline push keeps
-working until this adopts it, so this is incremental, not a big-bang cutover.
+The push→fetch switch in `AgentLaunchService`, per launch shape (interactive, chat, autonomous).
+Delivery is gated on a real persisted draft via a `deliverTaskPrompt` launch flag; autonomous
+(conflict resolution) was rewired to persist its prompt as the resolution workspace's draft + attach
+the `repository` MCP server. Added a monotonic `prompt_version` + `last_run_*` run-tracking on the
+draft (migration V38) so the Agents tab picks up an un-run draft exactly once, and a synchronous
+`flushNow()` before launch closes the same-tab autosave race. Acceptance gate: the extended
+`TaskPromptDeliveryIT` against the real `taskPrompt` tool (print + tmux-PTY nonce read-back). See the
+"Implementation notes (as shipped)" in the feature doc.
 
 ### 6. `sketch-tab-and-image-prompt-attachments` — store slice + paste handler
 

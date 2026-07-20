@@ -8,6 +8,7 @@ import { CommandControllerService } from '@/api/api/commandController.service';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { WorkspaceChatComponent } from './workspace-chat.component';
 
 /** Cache updates and mutation callbacks land on the next macrotask; flush before asserting. */
@@ -61,6 +62,9 @@ describe('WorkspaceChatComponent', () => {
         provideRouter([]),
         provideTanStackQuery(queryClient),
         { provide: CommandControllerService, useValue: commandService },
+        // The nested speak-to-prompt flushes the draft before a launch; the page provides this
+        // route-scoped service in production, so mock it here.
+        { provide: PromptDraftSyncService, useValue: { flushNow: () => Promise.resolve() } },
       ],
     }).compileComponents();
     router = TestBed.inject(Router);

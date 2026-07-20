@@ -32,14 +32,19 @@ public class AgentController {
   /**
    * {@code mode} picks chat (default when null) or the interactive TUI. {@code resumeSessionId}
    * continues an existing agent session of this workspace; {@code fork} additionally branches it
-   * into a fresh session.
+   * into a fresh session. {@code deliverTaskPrompt} switches the launch to the fetch model: instead
+   * of pushing {@code initialContext}, the agent is seeded with a one-sentence bootstrap turn and
+   * fetches the workspace's composed prompt (text + images) over MCP via {@code taskPrompt}. The
+   * caller should persist the current draft (a synchronous save) before launching so the tool
+   * serves the latest composition.
    */
   public static record LaunchAgentRequest(
       @NotNull AgentMcpScope scope,
       String initialContext,
       AgentLaunchMode mode,
       String resumeSessionId,
-      Boolean fork) {
+      Boolean fork,
+      Boolean deliverTaskPrompt) {
     public record Response(CommandDto command) {}
   }
 
@@ -52,6 +57,7 @@ public class AgentController {
     if (fork && (request.resumeSessionId() == null || request.resumeSessionId().isBlank())) {
       throw new BadRequestException("fork requires resumeSessionId");
     }
+    boolean deliverTaskPrompt = Boolean.TRUE.equals(request.deliverTaskPrompt());
     CommandDto command =
         request.mode() == AgentLaunchMode.INTERACTIVE
             ? agentLaunchService.launchInteractive(
@@ -60,14 +66,16 @@ public class AgentController {
                 request.scope(),
                 request.initialContext(),
                 request.resumeSessionId(),
-                fork)
+                fork,
+                deliverTaskPrompt)
             : agentLaunchService.launchChat(
                 repoId,
                 workspaceId,
                 request.scope(),
                 request.initialContext(),
                 request.resumeSessionId(),
-                fork);
+                fork,
+                deliverTaskPrompt);
     return new LaunchAgentRequest.Response(command);
   }
 }

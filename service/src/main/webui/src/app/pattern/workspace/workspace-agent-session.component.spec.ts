@@ -6,6 +6,8 @@ import { vi } from 'vitest';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
+import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { CommandDto } from '@/api/model/commandDto';
@@ -66,10 +68,21 @@ describe('WorkspaceAgentSessionComponent', () => {
       .fn()
       .mockImplementation(() => of({ command: agentRun({ id: 'launched-1' }) })),
   };
+  // No draft by default; individual tests override the GET to exercise auto-pickup. A fresh launch
+  // flushes then refetches the draft before deciding delivery, so the GET (not just seeded cache) is
+  // the source of truth.
+  const draftService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet: vi.fn().mockReturnValue(of(null)),
+  };
+  // The launch flushes the shared route-scoped sync service first; a mock that resolves.
+  const promptDraftSync = { flushNow: vi.fn().mockResolvedValue(undefined) };
   let queryClient: QueryClient;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // clearAllMocks resets call history but not implementations — restore the per-test defaults.
+    draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet.mockReturnValue(of(null));
+    promptDraftSync.flushNow.mockResolvedValue(undefined);
     // The embedded terminal opens a PTY socket; keep it out of jsdom.
     vi.stubGlobal(
       'WebSocket',
@@ -90,6 +103,8 @@ describe('WorkspaceAgentSessionComponent', () => {
         provideTanStackQuery(queryClient),
         { provide: CommandControllerService, useValue: commandService },
         { provide: AgentControllerService, useValue: agentService },
+        { provide: WorkspacePromptDraftControllerService, useValue: draftService },
+        { provide: PromptDraftSyncService, useValue: promptDraftSync },
       ],
     }).compileComponents();
   });
@@ -194,6 +209,48 @@ describe('WorkspaceAgentSessionComponent', () => {
       'wt-1',
       { scope: AgentMcpScope.Repository, mode: AgentLaunchMode.Interactive },
     );
+  });
+
+  it('flushes then delivers the composed prompt on a fresh auto-launch when the draft is un-run', async () => {
+    // A prompt was composed and hasn't been handed to an agent at its current version — opening the
+    // Agents tab flushes any pending edit, refetches, and picks it up once (fetched via taskPrompt).
+    draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet.mockReturnValue(
+      of({ content: '{}', serializedPrompt: 'do the thing', promptVersion: 3, lastRunPromptVersion: 1 }),
+    );
+    queryClient.setQueryData(['commands'], []);
+    createComponent();
+
+    // The fresh launch awaits flushNow + a draft refetch before deciding delivery — wait for the
+    // resulting mutation rather than a single macrotask.
+    await vi.waitFor(() => {
+      expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
+        'repo-1',
+        'wt-1',
+        {
+          scope: AgentMcpScope.Repository,
+          mode: AgentLaunchMode.Interactive,
+          deliverTaskPrompt: true,
+        },
+      );
+    });
+    expect(promptDraftSync.flushNow).toHaveBeenCalled();
+  });
+
+  it('does not re-deliver a draft whose current version was already run', async () => {
+    draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet.mockReturnValue(
+      of({ content: '{}', serializedPrompt: 'do the thing', promptVersion: 2, lastRunPromptVersion: 2 }),
+    );
+    queryClient.setQueryData(['commands'], []);
+    createComponent();
+
+    // No deliver flag — the fresh session starts idle, exactly as with no draft at all.
+    await vi.waitFor(() => {
+      expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledWith(
+        'repo-1',
+        'wt-1',
+        { scope: AgentMcpScope.Repository, mode: AgentLaunchMode.Interactive },
+      );
+    });
   });
 
   it('launches nothing until the tab is first selected', async () => {
