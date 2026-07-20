@@ -39,6 +39,22 @@ components:
       enum:
       - PREREQUISITE
       - QUALITY_GATE
+    AddAttachmentRequest:
+      type: object
+      required:
+      - mimeType
+      - label
+      - source
+      - dataBase64
+      properties:
+        mimeType:
+          type: string
+        label:
+          type: string
+        source:
+          type: string
+        dataBase64:
+          type: string
     AgentLaunchMode:
       type: string
       enum:
@@ -1720,42 +1736,47 @@ components:
     Response90:
       type: object
       properties:
-        text:
+        id:
           type: string
     Response91:
       type: object
       properties:
+        text:
+          type: string
+    Response92:
+      type: object
+      properties:
         trace:
           $ref: "#/components/schemas/TelemetryTraceDto"
-    Response92:
+    Response93:
       type: object
       properties:
         spans:
           type: array
           items:
             $ref: "#/components/schemas/TelemetrySpanDto"
-    Response93:
+    Response94:
       type: object
       properties:
         metrics:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryMetricDto"
-    Response94:
+    Response95:
       type: object
       properties:
         logs:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryLogDto"
-    Response95:
+    Response96:
       type: object
       properties:
         groups:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryErrorGroupDto"
-    Response96:
+    Response97:
       type: object
       properties:
         variant:
@@ -2320,7 +2341,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response96"
+                $ref: "#/components/schemas/Response97"
       summary: Me
       tags:
       - Auth Controller
@@ -4179,6 +4200,61 @@ paths:
       summary: Delete
       tags:
       - Workspace Prompt Draft Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft/attachments:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAttachmentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response90"
+        "400":
+          description: Bad Request
+      summary: Add Attachment
+      tags:
+      - Workspace Prompt Draft Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft/attachments/{attachmentId}:
+    delete:
+      parameters:
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete Attachment
+      tags:
+      - Workspace Prompt Draft Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-refinements:
     post:
       parameters:
@@ -4280,7 +4356,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response95"
+                $ref: "#/components/schemas/Response96"
       summary: Errors
       tags:
       - Workspace Telemetry Controller
@@ -4316,7 +4392,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response94"
+                $ref: "#/components/schemas/Response95"
       summary: Logs
       tags:
       - Workspace Telemetry Controller
@@ -4343,7 +4419,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response93"
+                $ref: "#/components/schemas/Response94"
       summary: Metrics
       tags:
       - Workspace Telemetry Controller
@@ -4382,7 +4458,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response92"
+                $ref: "#/components/schemas/Response93"
       summary: Slow Spans
       tags:
       - Workspace Telemetry Controller
@@ -4410,7 +4486,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response91"
+                $ref: "#/components/schemas/Response92"
       summary: Trace
       tags:
       - Workspace Telemetry Controller
@@ -4767,7 +4843,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response90"
+                $ref: "#/components/schemas/Response91"
         "400":
           description: Bad Request
       summary: Transcribe
