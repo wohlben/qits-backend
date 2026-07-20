@@ -153,6 +153,26 @@ export function mergeReference(refs: CodeReference[], ref: CodeReference): CodeR
 const DRAFT_CONTENT_VERSION = 1;
 
 /**
+ * The single "nothing worth persisting" rule: no prompt text, no picks, no references, and no
+ * passthrough slices. Shared by the {@code isEmpty} computed (which the sync service reads to pick
+ * PUT vs DELETE vs no-op) and {@code hydrateFromContent} (which uses it to decide whether a restored
+ * draft raises the "Restored draft" hint) so the two can never diverge.
+ */
+export function isPromptContextEmpty(
+  promptText: string,
+  snippets: PickedSnippet[],
+  references: CodeReference[],
+  passthrough: Record<string, unknown>,
+): boolean {
+  return (
+    promptText.trim() === '' &&
+    snippets.length === 0 &&
+    references.length === 0 &&
+    Object.keys(passthrough).length === 0
+  );
+}
+
+/**
  * The prompt-context store: the composition state for one workspace's next agent launch — the
  * editable prompt text, elements picked from a daemon web view, and code references selected in the
  * Files tab. Root-scoped so it outlives its collecting components and navigation, but the state it
@@ -199,12 +219,8 @@ export const PromptContextStore = signalStore(
      * An empty bucket that already has a server row autosaves as a DELETE; one that never had a row
      * is a no-op.
      */
-    isEmpty: computed(
-      () =>
-        store.promptText().trim() === '' &&
-        store.snippets().length === 0 &&
-        store.references().length === 0 &&
-        Object.keys(store.passthrough()).length === 0,
+    isEmpty: computed(() =>
+      isPromptContextEmpty(store.promptText(), store.snippets(), store.references(), store.passthrough()),
     ),
   })),
   withMethods((store) => {
@@ -370,11 +386,7 @@ export const PromptContextStore = signalStore(
         delete passthrough['promptText'];
         delete passthrough['snippets'];
         delete passthrough['references'];
-        const empty =
-          promptText.trim() === '' &&
-          snippets.length === 0 &&
-          references.length === 0 &&
-          Object.keys(passthrough).length === 0;
+        const empty = isPromptContextEmpty(promptText, snippets, references, passthrough);
         patchState(store, {
           promptText,
           snippets,

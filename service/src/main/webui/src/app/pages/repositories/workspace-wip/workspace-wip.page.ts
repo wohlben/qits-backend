@@ -7,6 +7,7 @@ import { WorkspaceControllerService } from '@/api/api/workspaceController.servic
 import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { WorkspacePromptPanelComponent } from '@/pattern/speech/workspace-prompt-panel.component';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 
 /**
  * The "work in progress" page of a workspace: decide what to do in it by speaking. Speech is
@@ -16,6 +17,11 @@ import { WorkspacePromptPanelComponent } from '@/pattern/speech/workspace-prompt
 @Component({
   selector: 'app-workspace-wip-page',
   imports: [PageLayoutComponent, WorkspacePromptPanelComponent],
+  // Route-scoped, same as the workspace detail page: the speak-to-prompt panel reads the
+  // root-scoped PromptContextStore, so this page must scope/reset it to its own workspace (and
+  // hydrate its persisted draft) — otherwise the store still holds whatever workspace was last
+  // active and this route would show, and launch, another workspace's prompt.
+  providers: [PromptDraftSyncService],
   template: `
     <app-page-layout
       [request]="workspacesQuery"
@@ -48,9 +54,15 @@ import { WorkspacePromptPanelComponent } from '@/pattern/speech/workspace-prompt
 export class WorkspaceWipPage {
   private readonly route = inject(ActivatedRoute);
   private readonly workspaceService = inject(WorkspaceControllerService);
+  private readonly promptDraftSync = inject(PromptDraftSyncService);
 
   readonly repoId = this.route.snapshot.paramMap.get('repoId')!;
   readonly workspaceId = this.route.snapshot.paramMap.get('workspaceId')!;
+
+  constructor() {
+    // Hydrate + autosave this workspace's prompt draft, and scope the shared store to it.
+    this.promptDraftSync.connect(this.repoId, this.workspaceId);
+  }
 
   // Same key AND shape as the branch list's workspaces query, so both share one cache entry.
   readonly workspacesQuery = injectQuery(() => ({

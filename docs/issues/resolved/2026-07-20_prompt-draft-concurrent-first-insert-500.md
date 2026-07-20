@@ -1,5 +1,18 @@
 # Prompt-draft concurrent first-insert races to a 500 (and loses that autosave)
 
+> **Resolved 2026-07-20** (high-effort code review of the step-4 diff). Fixed with option 3 below —
+> a DB-native atomic upsert. `WorkspacePromptDraftRepository.upsert(...)` issues a single H2
+> `MERGE INTO … KEY (workspace_id_fk) … VALUES (…, current_timestamp)` keyed on the shared PK, and
+> `WorkspacePromptDraftService.saveDraft` calls it instead of the read-then-insert (then re-reads to
+> return the DB-assigned `updatedAt`, which a later GET returns byte-for-byte so the client's own-echo
+> dedup still holds). The MERGE serializes concurrent first-saves under the row lock — last write
+> wins, no PK violation. Regression:
+> `WorkspacePromptDraftControllerTest.concurrentFirstSavesUpsertWithoutRacingToA500` fires 8
+> simultaneous first-saves for a draftless workspace and asserts every one is a clean 200 with one
+> surviving row. The richer optimistic-concurrency escalation (option 1: base-`updatedAt` → 409) is
+> **not** built — it stays parked under the feature's *Concurrent editing* open question; this fix
+> only removes the transient 500, keeping last-write-wins.
+
 ## Introduction
 
 Surfaced by the high-effort code review of the `refresh-resilient-prompt-building` step-2 diff

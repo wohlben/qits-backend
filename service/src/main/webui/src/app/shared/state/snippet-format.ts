@@ -63,8 +63,11 @@ export function buildSerializedPrompt(
 ): string {
   // Trim here (not at the call sites) so the launch path and the draft autosave produce identical
   // markdown regardless of stray whitespace the user typed — the persisted `serializedPrompt` is
-  // exactly what an agent launch sends.
-  const parts = [promptText.trim()];
+  // exactly what an agent launch sends. Only seed the prompt text when it is non-empty: a
+  // picks-only draft must not prefix the block with blank lines (the taskPrompt MCP tool serves
+  // this verbatim as its text block, so a leading empty line is a malformed first line).
+  const trimmed = promptText.trim();
+  const parts = trimmed ? [trimmed] : [];
   if (snippets.length) {
     parts.push(formatSnippetsForPrompt(snippets));
   }
