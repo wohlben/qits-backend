@@ -112,6 +112,193 @@ describe('PromptContextStore', () => {
   });
 });
 
+describe('PromptContextStore — draft persistence surface', () => {
+  function store() {
+    return TestBed.inject(PromptContextStore);
+  }
+
+  it('scopes the bucket to the active workspace, resetting it on a switch', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.add(pick());
+    s.setPromptText('A text');
+    expect(s.snippets()).toHaveLength(1);
+
+    s.setActiveWorkspace('B');
+    // A's picks and text are invisible under B — no cross-workspace carry-over.
+    expect(s.snippets()).toEqual([]);
+    expect(s.promptText()).toBe('');
+    expect(s.dirty()).toBe(false);
+    expect(s.lastSavedUpdatedAt()).toBeNull();
+  });
+
+  it('round-trips promptText and flips dirty on setPromptText', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    expect(s.dirty()).toBe(false);
+    s.setPromptText('do the thing');
+    expect(s.promptText()).toBe('do the thing');
+    expect(s.dirty()).toBe(true);
+  });
+
+  it('serializes v:1 with the known slices and retains unknown passthrough keys', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.hydrateFromContent(
+      'A',
+      JSON.stringify({
+        v: 1,
+        promptText: 'hi',
+        snippets: [],
+        references: [],
+        sketchCanvas: 'data:image/png;base64,AAAA',
+        attachments: ['att_1'],
+      }),
+      't1',
+    );
+    const out = JSON.parse(s.serializeContent());
+    expect(out.v).toBe(1);
+    expect(out.promptText).toBe('hi');
+    // A future client's slices survive the round-trip through an older client.
+    expect(out.sketchCanvas).toBe('data:image/png;base64,AAAA');
+    expect(out.attachments).toEqual(['att_1']);
+  });
+
+  it('hydrates only for the active workspace and only when pristine', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+
+    // Wrong workspace — ignored.
+    s.hydrateFromContent('B', JSON.stringify({ promptText: 'nope' }), 't1');
+    expect(s.promptText()).toBe('');
+
+    // Local edit — the refetch must not clobber it.
+    s.setPromptText('local');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'remote' }), 't2');
+    expect(s.promptText()).toBe('local');
+  });
+
+  it('treats a parse failure as an absent composition but records the row timestamp', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.hydrateFromContent('A', 'not json', 't1');
+    expect(s.promptText()).toBe('');
+    expect(s.snippets()).toEqual([]);
+    expect(s.justRestored()).toBe(false);
+    expect(s.lastSavedUpdatedAt()).toBe('t1');
+  });
+
+  it('clears to empty on an absent (deleted-elsewhere) draft', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'x' }), 't1');
+    expect(s.promptText()).toBe('x');
+
+    s.hydrateFromContent('A', null, null);
+    expect(s.promptText()).toBe('');
+    expect(s.lastSavedUpdatedAt()).toBeNull();
+  });
+
+  it('ignores the echo of its own save (same updatedAt) so the restore hint never re-raises', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('x');
+    s.markSaved('t1'); // as after a successful PUT: pristine, hint down
+    expect(s.justRestored()).toBe(false);
+
+    // The save echoes back over SSE with the timestamp we already hold — a no-op.
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'x' }), 't1');
+    expect(s.justRestored()).toBe(false);
+  });
+
+  it('raises justRestored for a non-empty restore and clears it on the first edit', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'earlier idea' }), 't1');
+    expect(s.justRestored()).toBe(true);
+
+    s.setPromptText('earlier idea, edited');
+    expect(s.justRestored()).toBe(false);
+  });
+
+  it('does not raise justRestored for an empty restored draft', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: '', snippets: [], references: [] }), 't1');
+    expect(s.justRestored()).toBe(false);
+  });
+
+  it('markSaved clears dirty and records the timestamp without bumping the revision', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('x');
+    const rev = s.revision();
+    expect(s.dirty()).toBe(true);
+
+    s.markSaved('t9');
+    expect(s.dirty()).toBe(false);
+    expect(s.lastSavedUpdatedAt()).toBe('t9');
+    expect(s.revision()).toBe(rev); // a save is not an edit
+  });
+
+  it('bumps the revision on user mutations only, not on hydrate/markSaved/setActiveWorkspace', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    const start = s.revision();
+    s.setPromptText('x');
+    s.add(pick());
+    expect(s.revision()).toBe(start + 2);
+
+    const afterEdits = s.revision();
+    s.markSaved('t1');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'x' }), 't2');
+    s.setActiveWorkspace('A'); // same id — no-op
+    expect(s.revision()).toBe(afterEdits);
+  });
+
+  it('reports emptiness across promptText, snippets, references and passthrough', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    expect(s.isEmpty()).toBe(true);
+    s.setPromptText('   '); // whitespace only is still empty
+    expect(s.isEmpty()).toBe(true);
+    s.setPromptText('x');
+    expect(s.isEmpty()).toBe(false);
+  });
+
+  it('clearContext() drops picks + references but keeps the typed prompt text', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.setPromptText('keep me');
+    s.add(pick());
+    s.addReference({ path: 'src/App.java', startLine: 1, endLine: 2 });
+
+    s.clearContext();
+    expect(s.snippets()).toEqual([]);
+    expect(s.references()).toEqual([]);
+    expect(s.promptText()).toBe('keep me'); // the composed prompt survives the web-view "Clear"
+    expect(s.dirty()).toBe(true);
+  });
+
+  it('clear() empties every slice incl. passthrough and marks dirty', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.hydrateFromContent('A', JSON.stringify({ promptText: 'x', foo: 'bar' }), 't1');
+    expect(s.isEmpty()).toBe(false); // passthrough `foo` keeps it non-empty
+
+    s.clear();
+    expect(s.promptText()).toBe('');
+    expect(s.isEmpty()).toBe(true);
+    expect(s.dirty()).toBe(true);
+    expect(JSON.parse(s.serializeContent())).toEqual({
+      v: 1,
+      promptText: '',
+      snippets: [],
+      references: [],
+    });
+  });
+});
+
 describe('mergeReference', () => {
   const ref = (startLine: number, endLine: number, path = 'a.ts'): CodeReference => ({
     path,

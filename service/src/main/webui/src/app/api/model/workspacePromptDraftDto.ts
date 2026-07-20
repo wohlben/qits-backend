@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
-export interface Response92 { 
-    trace?: TelemetryTraceDto;
+export interface WorkspacePromptDraftDto { 
+    content?: string;
+    serializedPrompt?: string;
+    updatedAt?: string;
 }
 

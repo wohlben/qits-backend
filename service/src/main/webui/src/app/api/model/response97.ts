@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
-export interface Response92 { 
-    trace?: TelemetryTraceDto;
+export interface Response97 { 
+    variant?: string;
+    username?: string;
 }
 

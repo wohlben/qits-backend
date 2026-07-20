@@ -39,6 +39,22 @@ components:
       enum:
       - PREREQUISITE
       - QUALITY_GATE
+    AddAttachmentRequest:
+      type: object
+      required:
+      - mimeType
+      - label
+      - source
+      - dataBase64
+      properties:
+        mimeType:
+          type: string
+        label:
+          type: string
+        source:
+          type: string
+        dataBase64:
+          type: string
     AgentLaunchMode:
       type: string
       enum:
@@ -1710,8 +1726,8 @@ components:
     Response89:
       type: object
       properties:
-        text:
-          type: string
+        updatedAt:
+          $ref: "#/components/schemas/Instant"
     Response9:
       type: object
       properties:
@@ -1720,37 +1736,47 @@ components:
     Response90:
       type: object
       properties:
+        id:
+          type: string
+    Response91:
+      type: object
+      properties:
+        text:
+          type: string
+    Response92:
+      type: object
+      properties:
         trace:
           $ref: "#/components/schemas/TelemetryTraceDto"
-    Response91:
+    Response93:
       type: object
       properties:
         spans:
           type: array
           items:
             $ref: "#/components/schemas/TelemetrySpanDto"
-    Response92:
+    Response94:
       type: object
       properties:
         metrics:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryMetricDto"
-    Response93:
+    Response95:
       type: object
       properties:
         logs:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryLogDto"
-    Response94:
+    Response96:
       type: object
       properties:
         groups:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryErrorGroupDto"
-    Response95:
+    Response97:
       type: object
       properties:
         variant:
@@ -1763,6 +1789,15 @@ components:
       - NEVER
       - ON_FAILURE
       - ALWAYS
+    SaveDraftRequest:
+      type: object
+      required:
+      - content
+      properties:
+        content:
+          type: string
+        serializedPrompt:
+          type: string
     SetMainBranchRequest:
       type: object
       required:
@@ -2184,6 +2219,15 @@ components:
           $ref: "#/components/schemas/Instant"
         resolvedAt:
           $ref: "#/components/schemas/Instant"
+    WorkspacePromptDraftDto:
+      type: object
+      properties:
+        content:
+          type: string
+        serializedPrompt:
+          type: string
+        updatedAt:
+          $ref: "#/components/schemas/Instant"
     WorkspaceRuntimeStatus:
       type: string
       enum:
@@ -2297,7 +2341,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response95"
+                $ref: "#/components/schemas/Response97"
       summary: Me
       tags:
       - Auth Controller
@@ -4085,6 +4129,132 @@ paths:
       summary: Merge
       tags:
       - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft:
+    put:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveDraftRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response89"
+        "400":
+          description: Bad Request
+      summary: Put
+      tags:
+      - Workspace Prompt Draft Controller
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspacePromptDraftDto"
+      summary: Get
+      tags:
+      - Workspace Prompt Draft Controller
+    delete:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete
+      tags:
+      - Workspace Prompt Draft Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft/attachments:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAttachmentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Response90"
+        "400":
+          description: Bad Request
+      summary: Add Attachment
+      tags:
+      - Workspace Prompt Draft Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft/attachments/{attachmentId}:
+    delete:
+      parameters:
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete Attachment
+      tags:
+      - Workspace Prompt Draft Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-refinements:
     post:
       parameters:
@@ -4186,7 +4356,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response94"
+                $ref: "#/components/schemas/Response96"
       summary: Errors
       tags:
       - Workspace Telemetry Controller
@@ -4222,7 +4392,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response93"
+                $ref: "#/components/schemas/Response95"
       summary: Logs
       tags:
       - Workspace Telemetry Controller
@@ -4249,7 +4419,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response92"
+                $ref: "#/components/schemas/Response94"
       summary: Metrics
       tags:
       - Workspace Telemetry Controller
@@ -4288,7 +4458,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response91"
+                $ref: "#/components/schemas/Response93"
       summary: Slow Spans
       tags:
       - Workspace Telemetry Controller
@@ -4316,7 +4486,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response90"
+                $ref: "#/components/schemas/Response92"
       summary: Trace
       tags:
       - Workspace Telemetry Controller
@@ -4673,7 +4843,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response89"
+                $ref: "#/components/schemas/Response91"
         "400":
           description: Bad Request
       summary: Transcribe

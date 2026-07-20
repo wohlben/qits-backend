@@ -49,6 +49,31 @@ export function formatSnippetsForPrompt(snippets: PickedSnippet[]): string {
     .join('\n\n');
 }
 
+/**
+ * The launch-ready prompt: the editable prompt text, then the picked-element block and the
+ * selected-code block, each appended only when non-empty, joined by blank lines. This is the single
+ * source of truth for prompt serialization — `speak-to-prompt.launch()` sends it as the agent's
+ * `initialContext`, and the draft autosave persists it as `serializedPrompt` (what the `taskPrompt`
+ * MCP tool serves), so the two are byte-identical.
+ */
+export function buildSerializedPrompt(
+  promptText: string,
+  snippets: PickedSnippet[],
+  references: CodeReference[],
+): string {
+  // Trim here (not at the call sites) so the launch path and the draft autosave produce identical
+  // markdown regardless of stray whitespace the user typed — the persisted `serializedPrompt` is
+  // exactly what an agent launch sends.
+  const parts = [promptText.trim()];
+  if (snippets.length) {
+    parts.push(formatSnippetsForPrompt(snippets));
+  }
+  if (references.length) {
+    parts.push(formatReferencesForPrompt(references));
+  }
+  return parts.join('\n\n');
+}
+
 /** `path:start` or `path:start-end` — the chip/row label and the chat dialog's insert form. */
 export function codeReferenceLabel(ref: CodeReference): string {
   return ref.startLine === ref.endLine

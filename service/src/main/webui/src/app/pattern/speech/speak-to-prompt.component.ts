@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   input,
   output,
@@ -19,11 +20,7 @@ import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
-import {
-  codeReferenceLabel,
-  formatReferencesForPrompt,
-  formatSnippetsForPrompt,
-} from '@/shared/state/snippet-format';
+import { buildSerializedPrompt, codeReferenceLabel } from '@/shared/state/snippet-format';
 import { WavRecorder } from './wav-recorder';
 
 /**
@@ -36,6 +33,25 @@ import { WavRecorder } from './wav-recorder';
   imports: [ZardButtonComponent, NgIcon, RouterLink],
   template: `
     <div class="flex flex-col gap-6">
+      <!-- A draft composed earlier (this or another device) was restored from the backend. Cheap
+           insurance against stale context silently riding into a launch; dismissed on first edit. -->
+      @if (promptContext.justRestored()) {
+        <div
+          class="flex items-center justify-between gap-3 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+        >
+          <span>Restored draft{{ restoredAgo() }}.</span>
+          <button
+            z-button
+            zType="ghost"
+            zSize="sm"
+            type="button"
+            (click)="promptContext.clear()"
+          >
+            Discard
+          </button>
+        </div>
+      }
+
       <section class="flex flex-col gap-2">
         <div class="flex items-center gap-3">
           <button
@@ -101,7 +117,7 @@ import { WavRecorder } from './wav-recorder';
             z-button
             zType="secondary"
             [zDisabled]="!transcript().trim()"
-            (click)="refinedPrompt.set(transcript())"
+            (click)="useTranscriptAsIs()"
           >
             Use transcript as-is
           </button>
@@ -217,22 +233,22 @@ import { WavRecorder } from './wav-recorder';
         </section>
       }
 
-      @if (refinedPrompt() !== null) {
+      @if (launchSectionVisible()) {
         <section class="flex flex-col gap-2">
           <label class="flex flex-col gap-1 text-sm">
             <span class="font-medium">Prompt for the agent</span>
             <textarea
               rows="10"
               class="rounded-md border bg-background p-2 text-sm"
-              [value]="refinedPrompt()"
-              (input)="refinedPrompt.set(promptArea.value)"
+              [value]="promptContext.promptText()"
+              (input)="promptContext.setPromptText(promptArea.value)"
               #promptArea
             ></textarea>
           </label>
           <div class="flex items-center gap-2">
             <button
               z-button
-              [zDisabled]="!refinedPrompt()?.trim() || launchMutation.isPending()"
+              [zDisabled]="!promptContext.promptText().trim() || launchMutation.isPending()"
               [zLoading]="launchMutation.isPending()"
               (click)="launch(AgentLaunchMode.Chat)"
             >
@@ -241,7 +257,7 @@ import { WavRecorder } from './wav-recorder';
             <button
               z-button
               zType="secondary"
-              [zDisabled]="!refinedPrompt()?.trim() || launchMutation.isPending()"
+              [zDisabled]="!promptContext.promptText().trim() || launchMutation.isPending()"
               (click)="launch(AgentLaunchMode.Interactive)"
               title="The full Claude Code TUI in a terminal instead of the chat view"
             >
@@ -275,8 +291,44 @@ export class SpeakToPromptComponent {
   protected readonly refLabel = codeReferenceLabel;
 
   readonly transcript = signal('');
-  /** Null until a refinement (or "as-is") produced something — gates the launch section. */
-  readonly refinedPrompt = signal<string | null>(null);
+  /**
+   * True once a refinement (or "Use transcript as-is") produced a prompt this session — gates the
+   * launch section together with a restored non-empty `promptText`, so the section also appears when
+   * a persisted draft is rehydrated on load (see {@link launchSectionVisible}).
+   */
+  readonly promptStarted = signal(false);
+
+  /**
+   * The editable prompt lives in the store (persisted per workspace); show the launch section once
+   * the draft has anything worth launching — a prompt produced this session (`promptStarted`), typed
+   * text, or restored/picked context (snippets/references). Gating on the whole bucket (not just
+   * `promptText`) keeps the textarea + Launch buttons reachable for a restored picks-only draft, so
+   * the user can add a prompt and act on it instead of only being able to Discard.
+   */
+  readonly launchSectionVisible = computed(
+    () => this.promptStarted() || !this.promptContext.isEmpty(),
+  );
+
+  /** A relative "· 2h ago"-style suffix for the restore hint, from the draft's last-saved timestamp. */
+  readonly restoredAgo = computed(() => {
+    const iso = this.promptContext.lastSavedUpdatedAt();
+    if (!iso) {
+      return '';
+    }
+    const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
+    if (seconds < 60) {
+      return ' from moments ago';
+    }
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      return ` from ${minutes}m ago`;
+    }
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+      return ` from ${hours}h ago`;
+    }
+    return ` from ${Math.floor(hours / 24)}d ago`;
+  });
 
   /** Utterance segments stream in while recording; uploads are serialized to keep text order. */
   readonly recorder = new WavRecorder((audioBase64) => this.enqueueSegment(audioBase64));
@@ -321,8 +373,17 @@ export class SpeakToPromptComponent {
           { transcript },
         ),
       ),
-    onSuccess: (res) => this.refinedPrompt.set(res.prompt ?? ''),
+    onSuccess: (res) => {
+      this.promptContext.setPromptText(res.prompt ?? '');
+      this.promptStarted.set(true);
+    },
   }));
+
+  /** Skip refinement: promote the raw transcript straight into the editable prompt. */
+  useTranscriptAsIs(): void {
+    this.promptContext.setPromptText(this.transcript());
+    this.promptStarted.set(true);
+  }
 
   protected readonly AgentLaunchMode = AgentLaunchMode;
 
@@ -347,17 +408,15 @@ export class SpeakToPromptComponent {
   }));
 
   launch(mode: AgentLaunchMode) {
-    const prompt = this.refinedPrompt()?.trim();
-    if (!prompt) return;
-    const snippets = this.promptContext.snippets();
-    const references = this.promptContext.references();
-    const parts = [prompt];
-    if (snippets.length) {
-      parts.push(formatSnippetsForPrompt(snippets));
-    }
-    if (references.length) {
-      parts.push(formatReferencesForPrompt(references));
-    }
-    this.launchMutation.mutate({ prompt: parts.join('\n\n'), mode });
+    if (!this.promptContext.promptText().trim()) return;
+    // Same serializer (and same untrimmed store inputs) the draft autosave uses for
+    // `serializedPrompt`, so what the agent receives here is byte-identical to what the taskPrompt
+    // MCP tool would serve. Launch does not clear the draft.
+    const prompt = buildSerializedPrompt(
+      this.promptContext.promptText(),
+      this.promptContext.snippets(),
+      this.promptContext.references(),
+    );
+    this.launchMutation.mutate({ prompt, mode });
   }
 }

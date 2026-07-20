@@ -63,12 +63,14 @@ describe('SpeakToPromptComponent', () => {
     expect(
       refinementService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptRefinementsPost,
     ).toHaveBeenCalledWith('repo-1', 'wt-1', { transcript: 'umm add a healthcheck' });
-    expect(fixture.componentInstance.refinedPrompt()).toBe('refined prompt');
+    // The refined prompt lands in the store (persisted per workspace), not component-local state.
+    expect(TestBed.inject(PromptContextStore).promptText()).toBe('refined prompt');
+    expect(fixture.componentInstance.launchSectionVisible()).toBe(true);
   });
 
   it('launches the agent with the refined prompt as initial context and opens its command', async () => {
     const fixture = createComponent();
-    fixture.componentInstance.refinedPrompt.set('do the thing');
+    TestBed.inject(PromptContextStore).setPromptText('do the thing');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -82,7 +84,7 @@ describe('SpeakToPromptComponent', () => {
 
   it('launches the interactive terminal session when asked', async () => {
     const fixture = createComponent();
-    fixture.componentInstance.refinedPrompt.set('do the thing');
+    TestBed.inject(PromptContextStore).setPromptText('do the thing');
     fixture.componentInstance.launch(AgentLaunchMode.Interactive);
     await fixture.whenStable();
 
@@ -101,7 +103,7 @@ describe('SpeakToPromptComponent', () => {
     const fixture = createComponent();
     let launchedId: string | undefined;
     fixture.componentInstance.launched.subscribe((id) => (launchedId = id));
-    fixture.componentInstance.refinedPrompt.set('do the thing');
+    TestBed.inject(PromptContextStore).setPromptText('do the thing');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -114,7 +116,7 @@ describe('SpeakToPromptComponent', () => {
     fixture.componentRef.setInput('navigateOnLaunch', false);
     let launchedId: string | undefined;
     fixture.componentInstance.launched.subscribe((id) => (launchedId = id));
-    fixture.componentInstance.refinedPrompt.set('do the thing');
+    TestBed.inject(PromptContextStore).setPromptText('do the thing');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -132,7 +134,7 @@ describe('SpeakToPromptComponent', () => {
       textPreview: 'Go',
     });
     const fixture = createComponent();
-    fixture.componentInstance.refinedPrompt.set('fix this button');
+    TestBed.inject(PromptContextStore).setPromptText('fix this button');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -272,7 +274,7 @@ describe('SpeakToPromptComponent', () => {
       excerpt: 'int secret = 42;',
     });
     const fixture = createComponent();
-    fixture.componentInstance.refinedPrompt.set('fix this');
+    TestBed.inject(PromptContextStore).setPromptText('fix this');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -310,7 +312,7 @@ describe('SpeakToPromptComponent', () => {
     });
     store.addReference({ path: 'src/App.java', startLine: 10, endLine: 12 });
     const fixture = createComponent();
-    fixture.componentInstance.refinedPrompt.set('fix this');
+    TestBed.inject(PromptContextStore).setPromptText('fix this');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -327,7 +329,7 @@ describe('SpeakToPromptComponent', () => {
     const store = TestBed.inject(PromptContextStore);
     store.addReference({ path: 'src/App.java', startLine: 7, endLine: 7 });
     const fixture = createComponent();
-    fixture.componentInstance.refinedPrompt.set('fix this');
+    TestBed.inject(PromptContextStore).setPromptText('fix this');
     fixture.componentInstance.launch(AgentLaunchMode.Chat);
     await fixture.whenStable();
 
@@ -347,5 +349,84 @@ describe('SpeakToPromptComponent', () => {
       audioBase64: 'QkFTRTY0',
     });
     expect(fixture.componentInstance.transcript()).toBe('earlier text spoken words');
+  });
+
+  /** Seed the store as if the sync service had hydrated a persisted draft for this workspace. */
+  function restoreDraft(promptText: string) {
+    const store = TestBed.inject(PromptContextStore);
+    store.setActiveWorkspace('wt-1');
+    store.hydrateFromContent(
+      'wt-1',
+      JSON.stringify({ v: 1, promptText, snippets: [], references: [] }),
+      '2020-01-01T00:00:00Z',
+    );
+    return store;
+  }
+
+  it('shows a restore hint for a restored non-empty draft, editable and discardable', () => {
+    const store = restoreDraft('earlier idea');
+    const fixture = createComponent();
+
+    const html = () => fixture.nativeElement as HTMLElement;
+    expect(html().textContent).toContain('Restored draft');
+    expect(fixture.componentInstance.launchSectionVisible()).toBe(true);
+    expect(store.promptText()).toBe('earlier idea'); // shown in the editable textarea
+
+    const discard = Array.from(html().querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.textContent?.trim() === 'Discard',
+    );
+    expect(discard).toBeDefined();
+    discard!.click();
+    fixture.detectChanges();
+
+    expect(store.justRestored()).toBe(false);
+    expect(store.promptText()).toBe('');
+    expect(html().textContent).not.toContain('Restored draft');
+    store.clear();
+  });
+
+  it('reveals the launch section for a restored picks-only draft (no typed prompt yet)', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.setActiveWorkspace('wt-1');
+    // A draft with a picked element but no prompt text — restored from the backend.
+    store.hydrateFromContent(
+      'wt-1',
+      JSON.stringify({
+        v: 1,
+        promptText: '',
+        snippets: [
+          {
+            id: 's1',
+            html: '<button>Go</button>',
+            selector: '#root > button',
+            url: 'http://localhost/daemon/wt/d/',
+            tag: 'button',
+            textPreview: 'Go',
+            capturedAt: 0,
+          },
+        ],
+        references: [],
+      }),
+      't1',
+    );
+    const fixture = createComponent();
+
+    // The textarea + Launch buttons must be reachable so the user can add a prompt and act on it.
+    expect(fixture.componentInstance.launchSectionVisible()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('textarea[rows="10"]')).not.toBeNull();
+    store.clear();
+  });
+
+  it('dismisses the restore hint on the first edit', () => {
+    const store = restoreDraft('earlier idea');
+    const fixture = createComponent();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Restored draft');
+
+    store.setPromptText('earlier idea, edited');
+    fixture.detectChanges();
+
+    expect(store.justRestored()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Restored draft');
+    store.clear();
   });
 });

@@ -41,6 +41,7 @@ import { WorkspaceAgentSessionComponent } from '@/pattern/workspace/workspace-ag
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { WorkspaceLiveService } from '@/pattern/workspace/workspace-live.service';
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { WorkspacePluginsComponent } from '@/pattern/workspace/workspace-plugins.component';
 import { TechnicalProcessViewComponent } from '@/pattern/workspace/technical-process-view.component';
 import { WorkspaceSessionTreeComponent } from '@/pattern/workspace/workspace-session-tree.component';
@@ -109,7 +110,7 @@ const PROCESS_TAB_LABEL = 'Starting';
     ZardTabComponent,
     ZardTabGroupComponent,
   ],
-  providers: [WorkspaceLiveService],
+  providers: [WorkspaceLiveService, PromptDraftSyncService],
   template: `
     <app-page-layout
       [request]="workspacesQuery"
@@ -229,6 +230,7 @@ export class WorkspaceDetailPage {
   private readonly bootstrapService = inject(WorkspaceBootstrapControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly live = inject(WorkspaceLiveService);
+  private readonly promptDraftSync = inject(PromptDraftSyncService);
 
   protected readonly processTabLabel = PROCESS_TAB_LABEL;
 
@@ -267,6 +269,9 @@ export class WorkspaceDetailPage {
   constructor() {
     // Push freshness over one SSE channel; the child queries no longer poll (see WorkspaceLiveService).
     this.live.connect(this.repoId, this.workspaceId);
+
+    // Hydrate + autosave this workspace's prompt draft (refresh- and device-resilient composition).
+    this.promptDraftSync.connect(this.repoId, this.workspaceId);
 
     // Discovery → displayed process id, with the unmount linger described on activeProcessId.
     effect(() => {

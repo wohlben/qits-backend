@@ -28,6 +28,7 @@ api/workspaceBootstrapController.service.ts
 api/workspaceController.service.ts
 api/workspaceDaemonController.service.ts
 api/workspaceHistoryController.service.ts
+api/workspacePromptDraftController.service.ts
 api/workspaceTelemetryController.service.ts
 configuration.ts
 encoder.ts
@@ -36,6 +37,7 @@ index.ts
 model/actionConfigurationDto.ts
 model/actionScope.ts
 model/actionType.ts
+model/addAttachmentRequest.ts
 model/agentLaunchMode.ts
 model/agentMcpScope.ts
 model/agentSessionNodeDto.ts
@@ -229,7 +231,10 @@ model/response92.ts
 model/response93.ts
 model/response94.ts
 model/response95.ts
+model/response96.ts
+model/response97.ts
 model/restartPolicy.ts
+model/saveDraftRequest.ts
 model/setMainBranchRequest.ts
 model/spanEvent.ts
 model/syncStatusDto.ts
@@ -258,6 +263,7 @@ model/workspaceEventType.ts
 model/workspaceFileContentDto.ts
 model/workspaceHistoryDetailDto.ts
 model/workspaceHistoryDto.ts
+model/workspacePromptDraftDto.ts
 model/workspaceRuntimeStatus.ts
 model/workspaceStatus.ts
 param.ts

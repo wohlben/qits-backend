@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { TelemetryLogDto } from './telemetryLogDto';
 
 
 export interface Response95 { 
-    variant?: string;
-    username?: string;
+    logs?: Array<TelemetryLogDto>;
 }
 

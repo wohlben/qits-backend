@@ -146,7 +146,7 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
                 zType="ghost"
                 zSize="sm"
                 type="button"
-                (click)="promptContext.clear()"
+                (click)="promptContext.clearContext()"
               >
                 Clear
               </button>

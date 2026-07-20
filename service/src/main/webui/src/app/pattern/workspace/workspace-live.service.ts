@@ -102,6 +102,10 @@ export class WorkspaceLiveService {
       // A technical process (e.g. a container start) began or completed: re-fetch the discovery
       // endpoint; the log payload itself rides the process's own SSE stream, never this channel.
       process: [['workspace-active-process', repoId, workspaceId]],
+      // The workspace's prompt draft changed (autosave PUT or Discard/Clear DELETE) — typically from
+      // another device/browser. Invalidate the draft query; PromptDraftSyncService re-applies it only
+      // when the local draft is pristine, so a mid-typing device is never clobbered.
+      'prompt-draft': [['workspace-prompt-draft', repoId, workspaceId]],
     };
   }
 }

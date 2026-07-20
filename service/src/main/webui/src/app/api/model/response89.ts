@@ -10,6 +10,6 @@
 
 
 export interface Response89 { 
-    text?: string;
+    updatedAt?: string;
 }
 

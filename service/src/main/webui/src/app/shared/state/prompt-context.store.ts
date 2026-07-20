@@ -147,18 +147,65 @@ export function mergeReference(refs: CodeReference[], ref: CodeReference): CodeR
 }
 
 /**
- * The prompt-context cache: elements picked from a daemon web view plus code references selected
- * in the Files tab, waiting to be handed to an agent. Root-scoped so both outlive their collecting
- * component and navigation — pick or select, then use them from speak-to-prompt (initialContext)
- * or a command chat (draft). The consumers render the tray; this store is only the cache.
+ * The current schema version of the opaque draft `content` blob the client owns. The server never
+ * interprets it; bump this if the slice shapes change in a way the client must migrate.
+ */
+const DRAFT_CONTENT_VERSION = 1;
+
+/**
+ * The prompt-context store: the composition state for one workspace's next agent launch — the
+ * editable prompt text, elements picked from a daemon web view, and code references selected in the
+ * Files tab. Root-scoped so it outlives its collecting components and navigation, but the state it
+ * holds is the **active** workspace's bucket: {@link setActiveWorkspace} resets it on a workspace
+ * switch, so picks staged under workspace A never leak into workspace B (the one deliberate change
+ * from the old global bag).
+ *
+ * The store is HTTP-free — it is the in-memory model that {@code PromptDraftSyncService} persists to
+ * and hydrates from the backend `prompt-draft` endpoints. Every **user** mutation flips {@link dirty}
+ * (and dismisses the restore hint) and bumps {@link revision} so the sync service's debounced
+ * autosave fires; {@link hydrateFromContent} and {@link markSaved} deliberately do neither, which is
+ * what keeps a hydrate from triggering a save (no autosave storm, no delete-on-first-load).
  */
 export const PromptContextStore = signalStore(
   { providedIn: 'root' },
-  withState({ snippets: [] as PickedSnippet[], references: [] as CodeReference[] }),
-  // A qits-in-qits capture of this UI carries the staged prompt context as app state.
+  withState({
+    snippets: [] as PickedSnippet[],
+    references: [] as CodeReference[],
+    /** The editable "Prompt for the agent" text — moved here from speak-to-prompt component state. */
+    promptText: '',
+    /**
+     * Unknown/newer `content` keys (a future client's `attachments`, `sketchCanvas`, `chatDraft`)
+     * read from the server and re-emitted verbatim on serialize, so an older client round-trips a
+     * newer draft without dropping fields.
+     */
+    passthrough: {} as Record<string, unknown>,
+    /** The workspace the bucket currently belongs to; a change resets the bucket. */
+    activeWorkspaceId: null as string | null,
+    /** Unsaved local edits exist — gates autosave and blocks a pristine-only hydrate from clobbering. */
+    dirty: false,
+    /** The server row's `updatedAt` (ISO), or null when no row exists (never saved / deleted). */
+    lastSavedUpdatedAt: null as string | null,
+    /** A non-empty draft was just restored from the backend — drives the one-line restore hint. */
+    justRestored: false,
+    /** Monotonic edit counter the sync service debounces on; bumped only by user mutations. */
+    revision: 0,
+  }),
+  // A qits-in-qits capture of this UI carries the active workspace's composition as app state.
   withQitsSnapshot('promptContext'),
   withComputed((store) => ({
     count: computed(() => store.snippets().length),
+    /**
+     * Nothing worth persisting: no prompt text, no picks, no references, and no passthrough slices.
+     * An empty bucket that already has a server row autosaves as a DELETE; one that never had a row
+     * is a no-op.
+     */
+    isEmpty: computed(
+      () =>
+        store.promptText().trim() === '' &&
+        store.snippets().length === 0 &&
+        store.references().length === 0 &&
+        Object.keys(store.passthrough()).length === 0,
+    ),
   })),
   withMethods((store) => {
     // The element's identity: its selector at its pick-time document URL.
@@ -166,12 +213,25 @@ export const PromptContextStore = signalStore(
       store.snippets().find((s) => s.selector === pick.selector && s.url === pick.url);
     const sameRef = (a: CodeReference, b: CodeReference) =>
       a.path === b.path && a.startLine === b.startLine && a.endLine === b.endLine;
+    /**
+     * Apply a user edit: patch the slice, mark the bucket dirty, dismiss the restore hint, and bump
+     * the revision so the sync service's autosave debounce fires. The single seam every user
+     * mutation goes through — so "user edit ⇒ dirty ⇒ autosave" holds by construction.
+     */
+    const commit = (updater: (state: { snippets: PickedSnippet[]; references: CodeReference[] }) => object) =>
+      patchState(store, (state) => ({
+        ...updater(state),
+        dirty: true,
+        justRestored: false,
+        revision: state.revision + 1,
+      }));
     const remove = (id: string): void => {
-      patchState(store, (state) => ({ snippets: state.snippets.filter((s) => s.id !== id) }));
+      commit((state) => ({ snippets: state.snippets.filter((s) => s.id !== id) }));
     };
     /**
      * Idempotent on the element's identity: re-adding an already picked element returns the
-     * existing snippet instead of adding a duplicate.
+     * existing snippet instead of adding a duplicate (and leaves the bucket unchanged, so a re-pick
+     * doesn't dirty the draft).
      */
     const add = (pick: NewSnippet): PickedSnippet => {
       const existing = findExisting(pick);
@@ -179,7 +239,7 @@ export const PromptContextStore = signalStore(
         return existing;
       }
       const snippet: PickedSnippet = { ...pick, id: crypto.randomUUID(), capturedAt: Date.now() };
-      patchState(store, (state) => ({ snippets: [...state.snippets, snippet] }));
+      commit((state) => ({ snippets: [...state.snippets, snippet] }));
       return snippet;
     };
     return {
@@ -199,17 +259,134 @@ export const PromptContextStore = signalStore(
       },
       /** Stages a reference, merging it into any same-path references it overlaps or touches. */
       addReference(ref: CodeReference): void {
-        patchState(store, (state) => ({ references: mergeReference(state.references, ref) }));
+        commit((state) => ({ references: mergeReference(state.references, ref) }));
       },
       /** Removes by value — a reference's identity is its `(path, startLine, endLine)` triple. */
       removeReference(ref: CodeReference): void {
-        patchState(store, (state) => ({
-          references: state.references.filter((r) => !sameRef(r, ref)),
-        }));
+        commit((state) => ({ references: state.references.filter((r) => !sameRef(r, ref)) }));
       },
-      /** Empties the whole context — snippets and references; "start a fresh prompt". */
+      /** Sets the editable prompt text (the speak-to-prompt "Prompt for the agent" textarea). */
+      setPromptText(text: string): void {
+        commit(() => ({ promptText: text }));
+      },
+      /**
+       * Empties the whole active bucket — prompt text, snippets, references, passthrough; "start a
+       * fresh prompt". Marks dirty, so if a server row exists the sync service DELETEs it. Backs the
+       * restore hint's "Discard" (throw the restored draft away entirely).
+       */
       clear(): void {
-        patchState(store, { snippets: [], references: [] });
+        commit(() => ({ snippets: [], references: [], promptText: '', passthrough: {} }));
+      },
+      /**
+       * Drops the collected context (picked elements + code references) but keeps the typed prompt
+       * text and passthrough — the web-view tray's "Clear picked" affordance, which must not destroy
+       * the composed prompt. Marks dirty so the trimmed draft autosaves (or DELETEs if now empty).
+       */
+      clearContext(): void {
+        commit(() => ({ snippets: [], references: [] }));
+      },
+      /**
+       * Point the store at a workspace, resetting the bucket to empty when it changes. Called by the
+       * sync service before hydrating; does NOT bump the revision, so switching workspaces never
+       * autosaves the fresh empty bucket.
+       */
+      setActiveWorkspace(workspaceId: string): void {
+        if (store.activeWorkspaceId() === workspaceId) {
+          return;
+        }
+        patchState(store, {
+          activeWorkspaceId: workspaceId,
+          snippets: [],
+          references: [],
+          promptText: '',
+          passthrough: {},
+          dirty: false,
+          lastSavedUpdatedAt: null,
+          justRestored: false,
+        });
+      },
+      /** The opaque `content` blob the server stores verbatim: known slices plus any passthrough. */
+      serializeContent(): string {
+        return JSON.stringify({
+          ...store.passthrough(),
+          v: DRAFT_CONTENT_VERSION,
+          promptText: store.promptText(),
+          snippets: store.snippets(),
+          references: store.references(),
+        });
+      },
+      /**
+       * Apply a draft fetched from the backend — but only when it is still for the active workspace
+       * and the local bucket is pristine (unsaved local edits always win; the device mid-typing keeps
+       * its version and re-saves on its next autosave). `content === null` means the server has no row
+       * (404 / deleted elsewhere): clear to empty. A parse failure treats the composition as absent
+       * but records the row's timestamp. Never marks dirty, so hydrating never triggers a save.
+       */
+      hydrateFromContent(
+        workspaceId: string,
+        content: string | null,
+        updatedAt: string | null,
+      ): void {
+        if (workspaceId !== store.activeWorkspaceId() || store.dirty()) {
+          return;
+        }
+        // Our own save echoes back over SSE with the timestamp we already recorded — ignore it, so
+        // an autosave never re-raises the "Restored draft" hint. A genuine remote edit carries a
+        // newer timestamp and falls through.
+        if (content !== null && updatedAt !== null && updatedAt === store.lastSavedUpdatedAt()) {
+          return;
+        }
+        if (content === null) {
+          patchState(store, {
+            snippets: [],
+            references: [],
+            promptText: '',
+            passthrough: {},
+            lastSavedUpdatedAt: null,
+            justRestored: false,
+          });
+          return;
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(content);
+        } catch {
+          patchState(store, { lastSavedUpdatedAt: updatedAt, justRestored: false });
+          return;
+        }
+        if (typeof parsed !== 'object' || parsed === null) {
+          patchState(store, { lastSavedUpdatedAt: updatedAt, justRestored: false });
+          return;
+        }
+        const passthrough: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+        const promptText = typeof passthrough['promptText'] === 'string' ? passthrough['promptText'] : '';
+        const snippets = Array.isArray(passthrough['snippets'])
+          ? (passthrough['snippets'] as PickedSnippet[])
+          : [];
+        const references = Array.isArray(passthrough['references'])
+          ? (passthrough['references'] as CodeReference[])
+          : [];
+        delete passthrough['v'];
+        delete passthrough['promptText'];
+        delete passthrough['snippets'];
+        delete passthrough['references'];
+        const empty =
+          promptText.trim() === '' &&
+          snippets.length === 0 &&
+          references.length === 0 &&
+          Object.keys(passthrough).length === 0;
+        patchState(store, {
+          promptText,
+          snippets,
+          references,
+          passthrough,
+          lastSavedUpdatedAt: updatedAt,
+          justRestored: !empty,
+        });
+      },
+      /** Record a completed save (PUT → the new `updatedAt`, DELETE → null); clears the dirty flag. */
+      markSaved(updatedAt: string | null): void {
+        patchState(store, { dirty: false, lastSavedUpdatedAt: updatedAt });
       },
     };
   }),
