@@ -143,12 +143,25 @@ relocation knob, and `mcp.json` lives directly under it — so each launch rende
 into its `LaunchSpec` script (a mktemp + symlink farm):
 
 ```sh
+# The container arrives with KIMI_CODE_HOME pointing at the shared volume home
+# (WorkspaceContainerFactory sets it to <claude-mount>/.kimi-code) — capture it BEFORE we repoint
+# KIMI_CODE_HOME at this launch's throwaway dir, or the source home is lost.
+QITS_KIMI_HOME="$KIMI_CODE_HOME"
 export KIMI_CODE_HOME="$(mktemp -d /tmp/qits-kimi-XXXXXX)"
 trap 'rm -rf "$KIMI_CODE_HOME"' EXIT
-# Symlink farm: everything except mcp.json comes from the shared volume home.
-for e in config.toml tui.toml credentials oauth device_id sessions session_index.jsonl; do
+# Symlink farm: everything except mcp.json resolves back to the shared volume home. Login-written
+# state (config, credentials, device id) is linked only if present.
+for e in config.toml tui.toml credentials oauth device_id; do
   [ -e "$QITS_KIMI_HOME/$e" ] && ln -s "$QITS_KIMI_HOME/$e" "$KIMI_CODE_HOME/$e"
 done
+# The session store is written at runtime and may not exist yet on a fresh volume, so create it on
+# the volume first and link unconditionally. An [ -e ] guard here would skip the absent dir, kimi
+# would then create a *real* sessions/ inside the throwaway home, and the EXIT trap would delete the
+# transcripts before AgentTranscriptService imports them.
+mkdir -p "$QITS_KIMI_HOME/sessions"
+ln -s "$QITS_KIMI_HOME/sessions" "$KIMI_CODE_HOME/sessions"
+[ -e "$QITS_KIMI_HOME/session_index.jsonl" ] || : > "$QITS_KIMI_HOME/session_index.jsonl"
+ln -s "$QITS_KIMI_HOME/session_index.jsonl" "$KIMI_CODE_HOME/session_index.jsonl"
 cat > "$KIMI_CODE_HOME/mcp.json" <<'EOF'
 { "mcpServers": { "repository": { "url": "…scoped…", "enabledTools": [ … ] } } }
 EOF
@@ -243,6 +256,12 @@ image — and in the devcontainer, which is `FROM qits/workspace:latest`. Remain
   and `config.toml` transparently (session subdir creation and atomic renames *inside* a symlinked
   dir land on the volume; verified with a real launch in the container). Also that nothing
   load-bearing (beyond diagnostic logs/history) is written to `KIMI_CODE_HOME` at runtime.
+- Whether kimi rewrites the top-level `session_index.jsonl` by atomic rename (write tmp + replace).
+  It is symlinked as a *file* (not a dir), so a rename-over would replace the symlink with a real
+  file in the throwaway home and lose index updates on cleanup — the same asymmetry that keeps
+  `launchLogin` on the real volume home. If so, the index must be reconstructed from `sessions/`
+  on import rather than relied on through the farm (the transcripts themselves are safe — they live
+  under the symlinked `sessions/` dir).
 
 ## Testing / verification
 

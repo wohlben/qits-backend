@@ -57,6 +57,9 @@ services:
       # Point the in-devcontainer `claude` at the shared login dir regardless of HOME — mirrors the
       # CLAUDE_CONFIG_DIR the workspace containers set (qits.workspace.claude-mount + /.claude).
       CLAUDE_CONFIG_DIR: /claude-home/.claude
+      # Same for Kimi Code (the second harness): KIMI_CODE_HOME puts its config, credentials and
+      # session store on the same shared volume — mirrors WorkspaceContainerFactory's container env.
+      KIMI_CODE_HOME: /claude-home/.kimi-code
       # Point Maven + pnpm at the shared cache volumes above — the SAME knobs qits sets on every
       # workspace container (WorkspaceContainerFactory). Without the pnpm one, pnpm's "store on the
       # project's drive" heuristic would put the store at /workspace/.pnpm-store (the bind-mounted

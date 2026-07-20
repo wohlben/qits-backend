@@ -68,7 +68,12 @@ RUN apt-get update \
         python3 \
         python3-venv \
         tmux \
+        ripgrep \
+        fd-find \
     && rm -rf /var/lib/apt/lists/*
+# `ripgrep`/`fd-find` are general CLI tools (they benefit action scripts) and are also where kimi's
+# search tools resolve `rg`/`fd` on PATH — the pinned kimi installer below ships only the `kimi`
+# binary, not the sidekicks a desktop install carries. Debian names fd `fdfind`, which kimi handles.
 
 # JDK 25 (Temurin, via the Adoptium apt repo). The projects this image builds — the Quarkus+Angular
 # fixture and qits itself — target `maven.compiler.release=25`, so JDK 17 (bookworm's default openjdk)
@@ -173,6 +178,21 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION} \
     && cp -L /root/.local/bin/claude /usr/local/bin/claude \
     && rm -rf /root/.local/bin/claude /root/.local/share/claude /root/.claude
 ENV DISABLE_AUTOUPDATER=1
+
+# Kimi Code CLI — the second coding-agent harness (docs/epics/qits-coding-agents/feature-ideas/kimi-code-harness.md).
+# Same treatment as Claude Code: pinned version (KIMI_VERSION fails the build loudly on an unknown
+# version), installed system-wide via KIMI_INSTALL_DIR=/usr/local so the arbitrary runtime uid finds
+# it on PATH — the pinned installer drops only the `kimi` binary itself into bin/ (the ~/.kimi-code/bin
+# `rg`/`fd` sidekicks a desktop install carries are absent here; they come from the base apt layer
+# above instead). No shell-rc edits (KIMI_NO_MODIFY_PATH — /usr/local/bin is already on PATH) and the
+# update preflight is disabled (immutable image — bump the ARG to upgrade). The trailing `kimi
+# --version` turns a download failure into a loud build break: `curl … | bash` without pipefail would
+# otherwise swallow a curl error (bash reads empty stdin and exits 0), shipping an image with no kimi.
+ARG KIMI_CODE_VERSION=0.28.1
+RUN curl -fsSL https://code.kimi.com/kimi-code/install.sh \
+        | KIMI_VERSION=${KIMI_CODE_VERSION} KIMI_INSTALL_DIR=/usr/local KIMI_NO_MODIFY_PATH=1 bash \
+    && kimi --version
+ENV KIMI_CODE_NO_AUTO_UPDATE=1
 
 # Language servers for the coding agent's LSP plugins (jdtls-lsp / typescript-lsp from the
 # claude-plugins-official marketplace — see docs/epics/qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md). The
