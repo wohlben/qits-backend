@@ -70,6 +70,7 @@ public class AgentLaunchService {
           "mcp__repository__listCommitChanges",
           "mcp__repository__getCommitFileDiff",
           "mcp__repository__listActions",
+          "mcp__repository__taskPrompt",
           "mcp__repository__telemetryErrors",
           "mcp__repository__telemetryTrace",
           "mcp__repository__telemetrySlowSpans",

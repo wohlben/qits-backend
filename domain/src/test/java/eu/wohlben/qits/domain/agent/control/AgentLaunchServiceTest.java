@@ -145,6 +145,7 @@ public class AgentLaunchServiceTest {
                     + "&workspaceId=work"),
         server.url());
     assertTrue(server.allowedTools().contains("mcp__repository__listBranches"));
+    assertTrue(server.allowedTools().contains("mcp__repository__taskPrompt"));
     assertFalse(server.allowedTools().contains("mcp__repository__runAction"));
   }
 

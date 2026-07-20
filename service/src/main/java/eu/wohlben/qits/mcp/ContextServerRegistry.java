@@ -59,7 +59,9 @@ public class ContextServerRegistry {
                 + " them in a workspace. Sessions additionally narrowed to a workspace (the '"
                 + WorkspaceScope.WORKSPACE_HEADER
                 + "' header or '?workspaceId=') also get the telemetry* tools: structured spans,"
-                + " logs and metrics exported by the workspace's instrumented processes.",
+                + " logs and metrics exported by the workspace's instrumented processes, and the"
+                + " taskPrompt tool, which returns the task prompt composed for that workspace (the"
+                + " refined markdown plus any attached images).",
             repositoryPath,
             repositoryPath + "/sse",
             ProjectScope.PROJECT_HEADER,
