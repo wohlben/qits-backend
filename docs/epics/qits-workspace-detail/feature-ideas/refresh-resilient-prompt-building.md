@@ -18,6 +18,16 @@ the workspace like every other workspace-scoped row, and it needs no client-side
 housekeeping. A running session's durability is server-side already; this gives the
 *pre-launch* composition the same home.
 
+> **2026-07-20 — promoted from convenience to necessity.**
+> [mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
+> makes the persisted draft **what the agent fetches**: the `taskPrompt` MCP tool serves the
+> workspace's current prompt (markdown + attached images) to the session, replacing prompt
+> *push* — the only viable image path for the interactive PTY (Agents tab). Two consequences
+> for this design: the parts the server must serve become **server-readable** (the *split* below
+> — a serialized-prompt field and structured attachment rows beside the still-opaque composition
+> blob), and this feature moves ahead of the sketch/attachment UX in implementation order
+> instead of trailing it.
+
 Related/dependent plans:
 
 - **Persists the store built up by**
@@ -25,10 +35,16 @@ Related/dependent plans:
   and [daemon-webview-picker](../features/2026-07-05_daemon-webview-picker.md) — the
   root-scoped `PromptContextStore` (snippets + references, soon images) is exactly the state
   that evaporates today.
+- **Serves the agent, not just the browser** —
+  [mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
+  reads this record: its `taskPrompt` tool returns `serializedPrompt` as the text block and the
+  attachment rows as image blocks. That dependency is what forces the server-readable split and
+  makes this idea a prerequisite rather than polish.
 - **Answers the open question of**
   [sketch-tab-and-image-prompt-attachments](sketch-tab-and-image-prompt-attachments.md)
-  ("does the sketch survive reload?") — the canvas autosave lands here, not there; the sketch
-  feature stays shippable without this one.
+  ("does the sketch survive reload?") — the canvas autosave lands here, not there. (Formerly
+  "the sketch feature stays shippable without this one" — no longer: under MCP delivery the
+  attachment rows persisted here are the delivery path itself.)
 - **Covers the draft owned by** [speak-to-prompt](../features/2026-07-02_speak-to-prompt.md)
   — the editable prompt textarea is component-local state today and becomes part of the
   persisted draft.
@@ -67,16 +83,30 @@ fourth column comes along for free.
 
 ## Design
 
-### Backend: one opaque draft document per workspace
+### Backend: a semi-opaque draft — opaque composition blob + server-readable prompt & attachments
+
+The record splits along one line: **what only the composing UI reads stays opaque; what the
+server must serve to the agent (via `taskPrompt`) is structured.**
 
 New entity `WorkspacePromptDraft` (own table, 1:1 with workspace, Flyway migration):
 
 - `workspaceId` (PK, FK → workspace, cascade-deleted with it — `WorkspaceService.doDiscard`
   deletes the row beside the other workspace teardown),
-- `content` — a `@Lob` JSON document, **opaque to the server**,
+- `content` — a `@Lob` JSON document, **opaque to the server** (composition state only),
+- `serializedPrompt` — a `@Lob` text column: the **launch-ready markdown** produced by the
+  client's existing prompt serializer, written on every autosave beside the blob. This is what
+  `taskPrompt` returns as its text block — the server never *builds* the prompt, it only
+  *serves* the client-serialized product.
 - `updatedAt`.
 
-The content is the client's serialized composition state, schema-versioned by the client:
+New sibling entity `WorkspacePromptAttachment` (own table, n:1 workspace, cascade-deleted):
+`id`, `workspaceId`, `mimeType`, `label` ("Sketch 1"), `source` (`sketch`/`paste`), `bytes`
+(`@Lob`), `createdAt`. Attached images live **here as rows, not as base64 inside the blob** —
+the server builds `taskPrompt`'s `ImageContent` blocks from them, enforces the per-image cap
+and magic-byte sniff at upload time (the guardrails the sketch idea's dispatch section
+specified), and the opaque blob stays small. The blob references attachments by id only.
+
+The opaque content is the client's serialized composition state, schema-versioned by the client:
 
 ```jsonc
 {
@@ -84,27 +114,34 @@ The content is the client's serialized composition state, schema-versioned by th
   "promptText": "…",               // the editable textarea content
   "snippets": [ … ],                // PickedSnippet[]
   "references": [ … ],              // CodeReference[]
-  "images": [ … ],                  // PromptImage[] (base64 payloads)
+  "attachments": ["att_9f3c", …],   // WorkspacePromptAttachment ids (bytes live in rows)
   "sketchCanvas": "data:image/png;…", // last canvas autosave → restored into the Sketch tab
   "chatDraft": "…"                  // unsent chat-input text
 }
 ```
 
-**Opaque on purpose**: the server never interprets picks/references/images — it validates only
-well-formed JSON and a size cap. The slice shapes are frontend-owned and still evolving (the
-sketch feature adds `images`); an opaque document means no backend DTO churn per slice, no
-OpenAPI model explosion, and an old backend happily stores a newer client's draft. The
-trade-off — the server can't render or migrate drafts — is acceptable for what is scratch
-state with one consumer (the composing UI). Guardrails: `qits.workspace.prompt-draft-max-bytes`
-(default 10 MiB — a few sketches plus pasted screenshots fit; over → 413) and JSON parse
-validation (→ 400).
+**Opaque where possible, on purpose**: the server never interprets picks/references/canvas — it
+validates only well-formed JSON and a size cap. The slice shapes are frontend-owned and still
+evolving; an opaque document means no backend DTO churn per slice, no OpenAPI model explosion,
+and an old backend happily stores a newer client's draft. The trade-off — the server can't
+render or migrate the *composition* — is acceptable because everything the server must
+understand (`serializedPrompt`, attachments) is structured beside it. Guardrails:
+`qits.workspace.prompt-draft-max-bytes` (default 2 MiB — the blob no longer carries image
+payloads; over → 413), JSON parse validation (→ 400), and per-attachment
+`qits.workspace.prompt-attachment-max-bytes` (default 2 MiB) + PNG/JPEG magic-byte sniff on
+upload.
 
 ### API (`repository` area, beside the other workspace sub-resources)
 
 - `GET  /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft` → `{content,
-  updatedAt}`, or 404 when none exists.
-- `PUT  …/prompt-draft` → idempotent upsert, returns `{updatedAt}`.
-- `DELETE …/prompt-draft` → 204; this is what `clear()` calls.
+  serializedPrompt, updatedAt}`, or 404 when none exists.
+- `PUT  …/prompt-draft` → idempotent upsert of `{content, serializedPrompt}`, returns
+  `{updatedAt}`.
+- `DELETE …/prompt-draft` → 204; this is what `clear()` calls — and it deletes the workspace's
+  attachment rows with it.
+- `POST …/prompt-draft/attachments` (`{mimeType, label, source, dataBase64}`) → `{id}`;
+  `DELETE …/prompt-draft/attachments/{id}` → 204. Plain JSON at sketch sizes, cap + sniff on
+  ingest.
 
 Same row/existence validation as the sibling workspace endpoints (repo row + active workspace
 row); no container involvement — the draft is pure host-side data, so it works on a `STOPPED`
@@ -131,9 +168,10 @@ keystrokes and pick-bursts don't hammer the endpoint. The draft prompt textarea 
 `speak-to-prompt` component state into the bucket (`promptText`); the speech transcript and
 intermediate refinement stay unpersisted — they are one-shot inputs whose *product* is the
 editable text. The Sketch tab autosaves `canvas.toDataURL()` into `sketchCanvas` on
-stroke-end and redraws it on mount — the working canvas persists separately from `images`
-(already-attached exports), so refresh restores both the attachments and the
-drawing-in-progress.
+stroke-end and redraws it on mount — the working canvas persists separately from the attachment
+rows (already-attached exports), so refresh restores both the attachments and the
+drawing-in-progress. Attaching an image `POST`s the attachment row first and only then records
+its id in the bucket, so the blob never references bytes the server doesn't hold.
 
 **Cross-device freshness — SSE, never polling.** The workspace detail page already holds one
 SSE subscription (`WorkspaceLiveService`, the freshness push that keeps child queries from
@@ -174,18 +212,22 @@ against week-old context silently riding into a launch; the hint disappears on f
 - **No client-side persistence layer** — no IndexedDB/localStorage mirror, no offline edit
   queue. A refresh needs the backend anyway (everything else on the page does); the draft
   simply rides the same availability.
-- **No server-side interpretation of the draft** — the backend stores a document; it does not
-  render drafts, dedupe picks, or validate references. Prompt serialization at launch stays
-  a frontend concern.
+- **No server-side interpretation of the *composition*** — the backend never renders picks,
+  dedupes snippets, or validates references; prompt **serialization stays a frontend concern**
+  (the server serves `serializedPrompt`, it does not build it). The structured parts
+  (`serializedPrompt`, attachment rows) are served verbatim to the agent via `taskPrompt`, not
+  interpreted.
 - **No history/versioning** — one draft per workspace, mutated in place. Not an undo system.
 - **No persistence of running-chat state** — already server-owned.
 
 ## Testing sketch
 
-- Backend: controller test — GET 404 when absent; PUT→GET roundtrips content byte-identical
-  with monotonic `updatedAt`; upsert overwrites; DELETE → 404 on next GET; oversize → 413;
-  malformed JSON → 400; unknown repo/workspace → 404; workspace discard deletes the row
-  (regression: no orphan). Migration applies on H2.
+- Backend: controller test — GET 404 when absent; PUT→GET roundtrips `content` +
+  `serializedPrompt` byte-identical with monotonic `updatedAt`; upsert overwrites; DELETE → 404
+  on next GET and empties the attachment rows; oversize → 413; malformed JSON → 400; unknown
+  repo/workspace → 404; workspace discard deletes draft + attachments (regression: no orphans).
+  Attachment ingest: cap → 413, wrong magic bytes → 400, sniffed type wins over claimed mime.
+  Migration applies on H2.
 - SSE: PUT emits `prompt-draft-changed` on the workspace events stream; DELETE too.
 - Store spec: buckets are workspace-scoped (A's picks invisible under B); hydrate patches the
   bucket and round-trips unknown fields; autosave debounces + coalesces (one in-flight save,

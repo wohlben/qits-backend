@@ -49,16 +49,135 @@ Related/dependent plans:
   "letting the coding agent actually *see* the PNG … inline into the prompt as an image
   block". This feature builds exactly that dispatch leg; once it exists, the capture
   screenshot (and the webview-picker rasterization path) can reuse it.
-- **Refresh survival is the sibling idea**
-  [refresh-resilient-prompt-building](refresh-resilient-prompt-building.md) — it persists the
-  whole prompt-composition state (draft text, picks, references, images, the sketch canvas)
-  per workspace; this feature ships without it and stays ephemeral like today's picks.
+- **Delivery is the new coding-agents idea**
+  [mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
+  *(added by the 2026-07-20 resolution below)* — the whole composed prompt, images included,
+  becomes something the agent **fetches** via a workspace-scoped `taskPrompt` MCP tool; the
+  pushed prompt shrinks to a bootstrap turn. That is the PTY-capable (indeed
+  launch-shape-universal) delivery this doc's original inline-block design could not provide.
+- **Refresh survival was the sibling idea — now a hard dependency**:
+  [refresh-resilient-prompt-building](refresh-resilient-prompt-building.md) persists the whole
+  prompt-composition state per workspace. Under the MCP delivery it is no longer optional
+  polish: the persisted draft **is what the agent fetches**, so it must land first (with the
+  server-readable split it documents: serialized prompt + structured attachment rows beside
+  the opaque composition blob).
 - **The deferred file-drop follow-up is the write sibling of**
   [container-file-access](../../qits-workspaces/features/2026-07-04_container-file-access.md), whose
   `WorkspaceFileAccess`/`ContainerRuntime` seams are deliberately read-only today (no
   `docker cp`, no stdin-to-file anywhere).
 
+## Feasibility update (2026-07-20): the inline stream-json approach cannot serve the PTY session
+
+The delivery thesis was checked against the real `qits/workspace` container — throwaway spikes
+driving the `docker` CLI directly (run 2026-07-20, documented here; no committed test kept) plus
+`claude --help`. It was validated in part and **invalidated for the surface that matters**.
+
+**What works (proven).** Both delivery mechanisms genuinely reach the model — each verified by the
+model reading back a nonce (`PLESIOSAUR-7731`) that exists only inside a fixture PNG:
+
+- Inline stream-json image block on stdin (`claude -p --input-format stream-json`).
+- File written into the container + path in the prompt, rendered by the model's Read tool — given a
+  **non-root** container (`--user`, else `--dangerously-skip-permissions` is refused) and a path
+  **outside `/workspace`** (else it dirties git).
+
+**Why it still fails for the must-have.** The workspace-detail agent surface we actually depend on is
+the **Agents tab — a live interactive PTY session** (`AgentLaunchMode.INTERACTIVE`,
+`ClaudeCodeAgent.start()` → `exec claude …`), and it can use **neither mechanism as an image**:
+
+- The inline image block requires `--input-format stream-json`, which per `claude --help` **"only
+  works with `--print`."** The interactive REPL is not `--print`; it has **no image-carrying input
+  format**. Its stdin is a keystroke stream — text only. No keystrokes become an image block.
+- Terminal image paste (the old Research-row-3 "already works, nothing to build") is a
+  *terminal-emulator* capability (the emulator saves the paste to a temp file and inserts a path —
+  the file route in disguise). The Agents tab is xterm.js forwarding raw keystrokes over a
+  websocket; nothing does that. It does **not** work here.
+
+So **it is impossible to hand an image to the PTY session as an image.** The file+path route is not a
+second way to put the image "in the prompt" — the image never touches the prompt/PTY; it is placed
+on the container filesystem out-of-band and the text only names it. And that route needs a
+`ContainerRuntime.writeFile` primitive that **does not exist today** (the deferred follow-up) — so as
+of today the feature is **not doable for the PTY session at all**.
+
+**Reprioritization (per product intent).** The **PTY/Agents session is the must-have**; the Chat-tab
+inline path is **nice-to-have**. That inverts this doc: its "Primary" mechanism (inline block) serves
+only the nice-to-have, while the must-have has no viable in-tree path yet. The inline-block design
+below (Dispatch et al.) is therefore parked as the **Chat-tab (nice-to-have) leg**; the PTY leg needs
+a fundamentally different mechanism — see the next section.
+
+## Alternatives for delivering an image to the PTY session
+
+Inline blocks are out, so the image must reach the model either as a **file the agent opens** or as a
+**tool result the agent receives**. Candidates, best first:
+
+1. **MCP tool result carrying image content (frontrunner — needs a spike).** The interactive session
+   already has qits' MCP servers attached (`repository`/`actions`). MCP tool results may contain
+   image content blocks, which Claude Code renders to the model (the mechanism screenshot/Playwright
+   MCP tools use). A new read-only tool — e.g. `mcp__repository__getPromptAttachments(workspaceId)`
+   returning the pending attachments as image blocks — would deliver the drawing **in any mode,
+   including the PTY**: no filesystem, no `writeFile`, no path policy, reusing plumbing qits already
+   ships. Flow: user attaches sketch (stored server-side, keyed by workspace) → qits injects a text
+   turn into the PTY ("the user attached a sketch; call `getPromptAttachments` to view it") via the
+   existing `CommandRegistry.input` → the agent calls the tool → the model sees the image. **Risk
+   retired — spike done (2026-07-20), both modes proven.** Against the real `qits/workspace` image
+   (Claude Code v2.1.204, the shared credential volume): a **throwaway stdio stub** MCP server
+   returning the nonce PNG as an MCP `ImageContent` block (a language-agnostic stub — *not* how qits
+   serves MCP, whose real servers are Java `quarkus-mcp-server` — deliberately not committed), driven
+   once via `claude -p --mcp-config … --allowedTools` and once as the **interactive TUI** (tmux-hosted
+   pty, prompt "the user attached a sketch; call `get_sketch` to view it"). In both, the model called
+   the tool on the first turn, described the
+   drawing's *content* accurately (the red "move Save here ↓" annotation), and read back the in-image
+   nonce — impossible unless Claude Code converts the MCP image result into a native image block.
+   (Contradicting web reports of ImageContent degrading to base64 text — not what this version does.)
+   Supporting stack facts: MCP spec `ImageContent` is a first-class tool-result content type, and
+   quarkiverse `quarkus-mcp-server` (which `RepositoryMcpTools` et al. run on) lists `ImageContent`
+   among the `Content` types a `@Tool` method returns directly. TUI caveats found by the spike: the
+   tool must be pre-allowed at launch (else a permission prompt interposes), and a fresh `HOME`
+   volume needs onboarding state (`~/.claude.json` `hasCompletedOnboarding`) before the TUI reaches
+   its prompt — `-p` needs neither.
+
+2. **`ContainerRuntime.writeFile` + path reference (proven, but new surface + caveats).** Write the
+   PNG into the container (`docker exec -i … 'cat > path'`), reference the path in the injected turn;
+   the Read tool renders it (proven, IT mechanism #2). Costs the new write primitive plus the two
+   caveats above (non-root container, `/tmp`-not-`/workspace`). The image reaches the model as a file
+   it opens, not as prompt content.
+
+3. **Route image-bearing turns through the chat transport instead of the PTY (product decision).**
+   Make the workspace-detail agent interaction use the chat (stream-json) session, where inline
+   blocks already work — abandoning the interactive TUI for that surface. Biggest change; sacrifices
+   the real-Claude-Code TUI UX the Agents tab exists to provide. Listed for completeness.
+
+4. **WebDAV filesystem mounted into the container via a docker volume plugin (rejected).** A
+   qits-served WebDAV share mounted at container create would make attachments (and any future
+   bi-directional exchange) plain files. Rejected on three counts: it is **per-host
+   infrastructure** (a volume plugin every docker host — dev, devcontainer, Dokploy prod — must
+   install and maintain, breaking "any host with the `qits/workspace` image works"); **davfs
+   semantics defeat the point** (close-to-flush write caching, stale read caches, unreliable
+   locking, and a qits restart leaves containers with hung stale mounts); and it is a **file
+   interface for structured data** — the write-back direction (e.g. a refined feature-idea into
+   the DB) would still need naming conventions, a watcher, and has no error back-channel, i.e. an
+   RPC rebuilt on a filesystem. The agent is a tool-using program; tools with schemas, validation
+   and synchronous errors (MCP) fit it strictly better.
+
+### Resolution (2026-07-20): deliver the *prompt* over MCP, not just the image
+
+Option 1 won the spike — and then widened: rather than an image-only side channel beside a pushed
+prompt, **the whole composed prompt moves to the fetch side**. The prompt (refined markdown +
+attached images) becomes DB-canonical via
+[refresh-resilient-prompt-building](refresh-resilient-prompt-building.md), and a workspace-scoped
+`taskPrompt` MCP tool returns it as one mixed content array (text block + labeled `ImageContent`
+blocks — the same text-beside-image adjacency the chat content array gives natively). What qits
+pushes at the session shrinks to a one-sentence **bootstrap turn** ("fetch the current task prompt
+with `taskPrompt` and implement it") — trivially deliverable as argv at launch and as injected
+keystrokes mid-session, in **every** launch shape (PTY, chat, autonomous). Design, scope precedent
+(`WorkspaceScope` + tool filter, mirroring the telemetry tools) and open questions live in
+[mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md);
+this doc keeps the sketch/compose UX and the attachment store slices.
+
 ## Research: getting an image to Claude Code
+
+> **Revised by the Feasibility update above.** The table stands as the raw mechanism analysis, but
+> its "Primary" verdict (inline block) applies only to the nice-to-have Chat tab, and row 3's
+> "already works … nothing to build" is **wrong** for qits' xterm.js web terminal — corrected above.
 
 Three mechanisms exist; qits' launch shapes map onto them unevenly.
 
@@ -135,6 +254,17 @@ design tools) for the cost of one event handler.
 
 ### Dispatch (backend)
 
+> **Superseded by the Resolution above** — kept as the record of the inline-block (chat-only)
+> design. Under the MCP delivery, dispatch is: images upload into the workspace's structured
+> attachment rows as part of draft autosave
+> ([refresh-resilient-prompt-building](refresh-resilient-prompt-building.md)); the agent pulls
+> them via `taskPrompt`
+> ([mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md));
+> the guardrails below (per-image cap, magic-byte sniff) move to the attachment upload; the
+> mode-degradation UX ("disable terminal launch while images attached") is **not built** — every
+> launch shape can fetch. Whether chat *additionally* keeps inline blocks is an open question in
+> the MCP idea doc.
+
 The image never becomes prompt *text* — it travels beside it and lands as a content block:
 
 - **Launch**: `LaunchAgentRequest` gains optional `attachments:
@@ -164,14 +294,25 @@ showing a wall of base64 — a small renderer tweak in the chat markdown path.
 
 ## Implementation order
 
-1. **Spike (half a day, de-risks everything)**: hand-feed a stream-json image block to
-   `claude --print --input-format stream-json` inside a real workspace container and confirm
-   the model sees the image. If the CLI envelope rejects image blocks (the one thin-docs risk),
-   pivot the dispatch leg to the file-drop mechanism and keep every UI piece unchanged.
-2. Store slice + Chat-tab rows + paste handler (pure frontend, testable without the tab).
-3. Backend dispatch: `LaunchAgentRequest.attachments`, socket envelope, `sendUser` widening,
-   caps + sniffing, bubble thumbnail rendering.
-4. The Sketch tab itself (atrament canvas + toolbar) — deliberately last; paste-attachment
+> **Rewritten by the Resolution**: the delivery steps now live in
+> [mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
+> and its dependency [refresh-resilient-prompt-building](refresh-resilient-prompt-building.md);
+> this feature contributes the compose-side UX on top of them.
+
+1. ~~Spike: hand-feed a stream-json image block to `claude --print --input-format stream-json`.~~
+   **Done (2026-07-20) — see the Feasibility update.** Outcome: the
+   inline block works, but only for `--print`/chat; the must-have PTY session cannot take it. The
+   follow-up spike — **option 1 (MCP image result) in an interactive session** — is also **done
+   (2026-07-20), positive** (see Alternatives §1): the PTY leg is gated no longer; the Resolution
+   above widened it into MCP delivery of the whole prompt.
+2. [refresh-resilient-prompt-building](refresh-resilient-prompt-building.md) with its
+   server-readable split (serialized prompt + structured attachment rows) — the store the rest
+   reads.
+3. [mcp-task-prompt-delivery](../../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md):
+   the `taskPrompt` tool + filter + allowlist + bootstrap turns.
+4. Store slice + Chat-tab rows + paste handler (frontend; attachments now upload into the draft's
+   attachment rows rather than riding the launch request).
+5. The Sketch tab itself (atrament canvas + toolbar) — deliberately last; paste-attachment
    already proves the pipeline end-to-end with any screenshot.
 
 ## Open questions
@@ -185,10 +326,10 @@ showing a wall of base64 — a small renderer tweak in the chat markdown path.
   [refresh-resilient-prompt-building](refresh-resilient-prompt-building.md), which persists
   the whole prompt-composition state (canvas autosave included) per workspace; this feature
   ships without it.
-- **Interactive/autonomous coverage**: is the file-drop follow-up (a
-  `ContainerRuntime.writeFile` + path convention + gitignore/permission policy) actually
-  needed, or is chat-only enough? Decide after usage; the degradation UX above keeps the gap
-  visible instead of surprising.
+- ~~**Interactive/autonomous coverage**~~ — resolved by the Resolution: MCP delivery covers every
+  launch shape, so neither the file-drop follow-up (`ContainerRuntime.writeFile`) nor the
+  degradation UX is needed for this feature. `writeFile` stays a possible future primitive for
+  unrelated raw-bytes pushes, nothing here depends on it.
 
 ## Non-goals
 
@@ -196,9 +337,11 @@ showing a wall of base64 — a small renderer tweak in the chat markdown path.
   whiteboard. If real diagramming demand appears, that's an excalidraw-room discussion, not an
   extension of this canvas.
 - No sketch persistence or gallery; a sketch's lifetime is the prompt it's attached to.
-- No image storage on the qits host and no serving endpoint — the bytes go browser → qits →
-  container stdin and live on only in the session transcript. (The screenshot idea's
-  `CaptureArtifactStore` remains its own concern.)
+- ~~No image storage on the qits host~~ — **reversed by the Resolution**: attached images are
+  now stored server-side as the draft's structured attachment rows (that is what `taskPrompt`
+  serves); their lifetime is the draft's, cascade-deleted with the workspace. Still no public
+  serving endpoint and no gallery. (The screenshot idea's `CaptureArtifactStore` remains its own
+  concern.)
 - No changes to the picked-element or code-reference flows beyond sharing the panel and
   `clear()`.
 

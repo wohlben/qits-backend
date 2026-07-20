@@ -57,6 +57,16 @@ Related epics / cross-cutting concerns:
   Code LSP plugins (jdtls, typescript-lsp) per workspace to sharpen the agent's code navigation
   (surfaced via the workspace-detail Plugins/Agents tab).
 
+## Parts (ideas)
+
+- **[mcp-task-prompt-delivery](feature-ideas/mcp-task-prompt-delivery.md)** — invert prompt
+  delivery: the composed prompt (text + image attachments) becomes DB-canonical and the agent
+  *fetches* it via a new workspace-scoped `taskPrompt` MCP tool on the `repository` server; the
+  pushed prompt shrinks to a one-sentence bootstrap turn. Launch-shape-universal (the only viable
+  image path for the interactive PTY — spike-proven 2026-07-20). Depends on the workspace-detail
+  [refresh-resilient-prompt-building](../qits-workspace-detail/feature-ideas/refresh-resilient-prompt-building.md)
+  persistence, which it promotes to a necessity.
+
 ## Done when
 
 Rolling: current when its `feature-ideas/` is empty and every coding-agent feature since this
@@ -73,3 +83,4 @@ epic's creation has landed here.
 | [agent-session-lineage](features/2026-07-10_agent-session-lineage.md) | implemented |
 | [chat-persistence-on-transcript](features/2026-07-10_chat-persistence-on-transcript.md) | implemented |
 | [agent-lsp-plugins](features/2026-07-07_agent-lsp-plugins.md) | implemented |
+| [mcp-task-prompt-delivery](feature-ideas/mcp-task-prompt-delivery.md) | idea |

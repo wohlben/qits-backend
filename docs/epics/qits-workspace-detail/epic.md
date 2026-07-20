@@ -112,12 +112,17 @@ Chronology within each group is the implementation order; the groups themselves 
 
 - **[refresh-resilient-prompt-building](feature-ideas/refresh-resilient-prompt-building.md)**
   — the prompt draft (text, picked elements, code references, attachments) becomes
-  backend-held workspace state, closing the route's last refresh-loss gap.
+  backend-held workspace state, closing the route's last refresh-loss gap. **Since 2026-07-20 a
+  prerequisite, not polish**: the persisted draft is what the agent fetches via the
+  coding-agents
+  [mcp-task-prompt-delivery](../qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
+  idea, which requires its server-readable split (serialized prompt + attachment rows).
 - **[sketch-tab-and-image-prompt-attachments](feature-ideas/sketch-tab-and-image-prompt-attachments.md)**
   — a Sketch tab (minimal canvas) + image attachments as a third structured prompt-context
-  kind. Builds on the prompt-context conventions (picked elements, code references) above;
-  pairs naturally with refresh-resilient drafts (an attached sketch should survive a reload
-  too).
+  kind. Builds on the prompt-context conventions (picked elements, code references) above.
+  Delivery to the agent (incl. the must-have interactive PTY session) is resolved to the MCP
+  fetch (see the doc's 2026-07-20 resolution) — this epic keeps the compose-side UX; the
+  backend legs live in the two docs above.
 
 ## Done when
 
