@@ -19,8 +19,13 @@ echo "[postCreate] ensuring fixture submodules are initialised ..."
 git submodule update --init --recursive \
   || echo "[postCreate] submodule init failed — fixture-derived tests/seeds may not build."
 
-echo "[postCreate] building (so the domain module is resolvable) ..."
-./mvnw -q install -DskipTests -Dqits.dev-guard.skip=true
+# Build only the cli dependency chain (domain + cli). This makes the `domain` module resolvable and
+# produces the cli fast-jar the seeds run below — WITHOUT packaging `service`, so no auth variant
+# flag is needed (the require-auth-variant enforcer only fires when the service app is packaged;
+# `-pl cli -am` skips service entirely). See CLAUDE.md: "-pl cli -am install … skips service and
+# needs no variant." Building service (and picking a variant) is left to the first quarkus:dev run.
+echo "[postCreate] building the cli chain (so the domain module is resolvable) ..."
+./mvnw -q -pl cli -am install -DskipTests -Dqits.dev-guard.skip=true
 
 # Both seeds, best-effort + time-boxed so nothing here can hang or fail container creation.
 # `seed` is idempotent (skip-if-exists); `seed-webapp` is idempotent by reset.
