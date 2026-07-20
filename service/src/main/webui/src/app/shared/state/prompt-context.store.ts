@@ -47,6 +47,24 @@ export interface PickedSnippet {
 
 export type NewSnippet = Omit<PickedSnippet, 'id' | 'capturedAt'>;
 
+/**
+ * An image attached to the prompt — a pasted screenshot or a sketch. Persisted server-side as a
+ * {@code prompt-draft/attachments} row (never in the opaque draft blob, which is too small for image
+ * payloads); {@link id} is that row's id. {@link dataBase64} is the bare (prefix-free) base64 the row
+ * stores and the {@code data:} thumbnail URL is built from. The agent fetches these rows via the
+ * {@code taskPrompt} MCP tool, so an attached image reaches every launch shape.
+ */
+export interface PromptImage {
+  /** The server attachment row's id (from the POST response / GET-list). */
+  id: string;
+  mimeType: 'image/png' | 'image/jpeg';
+  /** Auto-numbered display label, e.g. "Pasted image 1" / "Sketch 1". */
+  label: string;
+  source: 'sketch' | 'paste';
+  /** Bare base64 (no `data:…;base64,` prefix) of the image bytes. */
+  dataBase64: string;
+}
+
 /** A collected reference to a range of a file, staged to later become part of a Claude prompt. */
 export interface CodeReference {
   path: string;
@@ -153,22 +171,28 @@ export function mergeReference(refs: CodeReference[], ref: CodeReference): CodeR
 const DRAFT_CONTENT_VERSION = 1;
 
 /**
- * The single "nothing worth persisting" rule: no prompt text, no picks, no references, and no
- * passthrough slices. Shared by the {@code isEmpty} computed (which the sync service reads to pick
- * PUT vs DELETE vs no-op) and {@code hydrateFromContent} (which uses it to decide whether a restored
- * draft raises the "Restored draft" hint) so the two can never diverge.
+ * The single "nothing worth persisting" rule: no prompt text, no picks, no references, no
+ * passthrough slices, and no attached images. Shared by the {@code isEmpty} computed (which the sync
+ * service reads to pick PUT vs DELETE vs no-op) and {@code hydrateFromContent} (which uses it to
+ * decide whether a restored draft raises the "Restored draft" hint) so the two can never diverge.
+ *
+ * <p>Images count even though they live in their own rows (not the draft blob): if they didn't, a
+ * user clearing the prompt text with an image still attached would autosave a DELETE, and the server
+ * DELETE cascades the attachment rows away — silently destroying the picture.
  */
 export function isPromptContextEmpty(
   promptText: string,
   snippets: PickedSnippet[],
   references: CodeReference[],
   passthrough: Record<string, unknown>,
+  images: PromptImage[],
 ): boolean {
   return (
     promptText.trim() === '' &&
     snippets.length === 0 &&
     references.length === 0 &&
-    Object.keys(passthrough).length === 0
+    Object.keys(passthrough).length === 0 &&
+    images.length === 0
   );
 }
 
@@ -229,6 +253,13 @@ export const PromptContextStore = signalStore(
   withState({
     snippets: [] as PickedSnippet[],
     references: [] as CodeReference[],
+    /**
+     * Images attached to the prompt (pasted screenshots, sketches). Server-authoritative: backed by
+     * {@code prompt-draft/attachments} rows, not the opaque draft blob, so these are NOT serialized
+     * into {@code content} and do NOT go through the draft autosave — they are patched directly by
+     * {@code PromptDraftSyncService} (POST/DELETE round-trips + GET-list hydrate).
+     */
+    images: [] as PromptImage[],
     /** The editable "Prompt for the agent" text — moved here from speak-to-prompt component state. */
     promptText: '',
     /**
@@ -258,7 +289,13 @@ export const PromptContextStore = signalStore(
      * is a no-op.
      */
     isEmpty: computed(() =>
-      isPromptContextEmpty(store.promptText(), store.snippets(), store.references(), store.passthrough()),
+      isPromptContextEmpty(
+        store.promptText(),
+        store.snippets(),
+        store.references(),
+        store.passthrough(),
+        store.images(),
+      ),
     ),
   })),
   withMethods((store) => {
@@ -324,12 +361,50 @@ export const PromptContextStore = signalStore(
         commit(() => ({ promptText: text }));
       },
       /**
+       * Add an attached image to the slice. Patches directly (not via {@link commit}) because images
+       * are server-authoritative rows the sync service already persisted — they never ride the draft
+       * autosave, so they must not flip {@code dirty}/{@code revision}.
+       */
+      addImage(image: PromptImage): void {
+        patchState(store, (state) => ({ images: [...state.images, image] }));
+      },
+      /** Remove an attached image from the slice (the sync service DELETEs its row). */
+      removeImage(id: string): void {
+        patchState(store, (state) => ({ images: state.images.filter((i) => i.id !== id) }));
+      },
+      /** Replace the whole images slice — the sync service's GET-list hydrate (load + SSE refetch). */
+      setImages(images: PromptImage[]): void {
+        patchState(store, { images });
+      },
+      /**
+       * The next auto-numbered label for a source: "Sketch N" / "Pasted image N". Numbers one past
+       * the highest existing suffix for that source (not the current count), so removing an earlier
+       * image never makes a later attach collide with a still-present label.
+       */
+      nextImageLabel(source: PromptImage['source']): string {
+        const prefix = source === 'sketch' ? 'Sketch' : 'Pasted image';
+        const maxN = store
+          .images()
+          .filter((i) => i.source === source)
+          .reduce((max, i) => {
+            const match = /(\d+)$/.exec(i.label);
+            return match ? Math.max(max, Number(match[1])) : max;
+          }, 0);
+        return `${prefix} ${maxN + 1}`;
+      },
+      /**
        * Empties the whole active bucket — prompt text, snippets, references, passthrough; "start a
        * fresh prompt". Marks dirty, so if a server row exists the sync service DELETEs it. Backs the
        * restore hint's "Discard" (throw the restored draft away entirely).
        */
       clear(): void {
-        commit(() => ({ snippets: [], references: [], promptText: '', passthrough: {} }));
+        commit(() => ({
+          snippets: [],
+          references: [],
+          promptText: '',
+          passthrough: {},
+          images: [],
+        }));
       },
       /**
        * Drops the collected context (picked elements + code references) but keeps the typed prompt
@@ -352,6 +427,7 @@ export const PromptContextStore = signalStore(
           activeWorkspaceId: workspaceId,
           snippets: [],
           references: [],
+          images: [],
           promptText: '',
           passthrough: {},
           dirty: false,
@@ -453,6 +529,7 @@ export const PromptContextStore = signalStore(
           parsed.snippets,
           parsed.references,
           parsed.passthrough,
+          store.images(),
         );
         patchState(store, {
           ...parsed,

@@ -1106,6 +1106,11 @@ components:
           type: string
         description:
           type: string
+    PromptAttachmentSource:
+      type: string
+      enum:
+      - SKETCH
+      - PASTE
     RefinePromptRequest:
       type: object
       required:
@@ -2221,6 +2226,21 @@ components:
           $ref: "#/components/schemas/Instant"
         resolvedAt:
           $ref: "#/components/schemas/Instant"
+    WorkspacePromptAttachmentDataDto:
+      type: object
+      properties:
+        id:
+          type: string
+        mimeType:
+          type: string
+        label:
+          type: string
+        source:
+          $ref: "#/components/schemas/PromptAttachmentSource"
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        dataBase64:
+          type: string
     WorkspacePromptDraftDto:
       type: object
       properties:
@@ -4213,6 +4233,30 @@ paths:
       tags:
       - Workspace Prompt Draft Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft/attachments:
+    get:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspacePromptAttachmentDataDto"
+      summary: List Attachments
+      tags:
+      - Workspace Prompt Draft Controller
     post:
       parameters:
       - name: repoId

@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 /**
  * Launches a coding agent (Claude Code) into a workspace with an MCP server attached, scoped to the
@@ -41,6 +42,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  */
 @ApplicationScoped
 public class AgentLaunchService {
+
+  private static final Logger LOG = Logger.getLogger(AgentLaunchService.class);
 
   /** Repository and project ids are generated UUIDs; only hex and dashes ever appear. */
   private static final Pattern UUID_PATTERN = Pattern.compile("[0-9a-fA-F-]{36}");
@@ -399,7 +402,21 @@ public class AgentLaunchService {
    */
   private boolean shouldDeliverBootstrap(
       boolean deliverTaskPrompt, String repoId, String workspaceId) {
-    return deliverTaskPrompt && promptDraftService.hasDeliverablePrompt(repoId, workspaceId);
+    if (!deliverTaskPrompt) {
+      return false;
+    }
+    boolean deliverable = promptDraftService.hasDeliverablePrompt(repoId, workspaceId);
+    if (!deliverable) {
+      // The caller asked to hand the composed prompt over the fetch path, but nothing is there to
+      // serve (no serialized prompt, no attachments) — e.g. the draft was deleted between the
+      // pre-launch flush and here. Without a legacy initialContext the session would start with no
+      // seed at all; log it so that silent no-task launch is diagnosable instead of a mystery.
+      LOG.warnf(
+          "Task-prompt delivery requested for workspace %s but no deliverable prompt exists;"
+              + " the session starts without a seed",
+          workspaceId);
+    }
+    return deliverable;
   }
 
   /**

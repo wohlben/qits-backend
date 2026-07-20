@@ -143,9 +143,11 @@ describe('WorkspaceLiveService', () => {
     source.emitOpen();
 
     // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + bootstrap(1) + files(3)
-    // + process(1) + prompt-draft(1) = 14
-    expect(invalidate).toHaveBeenCalledTimes(14);
+    // + process(1) + prompt-draft(1) + prompt-attachments(1) = 15
+    expect(invalidate).toHaveBeenCalledTimes(15);
     const keys = invalidatedKeys();
+    expect(keys).toContain(JSON.stringify(['workspace-prompt-draft', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-prompt-attachments', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-bootstrap', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1']));

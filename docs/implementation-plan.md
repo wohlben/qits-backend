@@ -59,11 +59,53 @@ draft (migration V38) so the Agents tab picks up an un-run draft exactly once, a
 `TaskPromptDeliveryIT` against the real `taskPrompt` tool (print + tmux-PTY nonce read-back). See the
 "Implementation notes (as shipped)" in the feature doc.
 
-### 6. `sketch-tab-and-image-prompt-attachments` — store slice + paste handler
+### 6. `sketch-tab-and-image-prompt-attachments` — store slice + paste handler ✅ shipped 2026-07-20
 
 `images` slice (backed by the attachment rows from step 2), Chat-tab attachment rows, and the
 clipboard-paste handler. **Paste before the canvas** — it's the cheapest way to get a real image
 through the full pipeline and prove delivery end-to-end with any screenshot.
+
+Implementation notes (as shipped):
+
+- **New read path**: a `GET …/prompt-draft/attachments` endpoint returning each row's metadata **plus
+  `dataBase64`** (`WorkspacePromptAttachmentDataDto`; the byte-free `WorkspacePromptAttachmentDto`
+  stays the agent-facing shape). Forced by a config reality — image bytes can't live in the draft
+  blob (its 2 MiB cap < one encoded image at the 2 MiB attachment cap) — so thumbnails are restored
+  from the rows, not the blob. OpenAPI + the Angular client regenerated.
+- **`images` slice** on `PromptContextStore`, deliberately **orthogonal to the draft autosave**: not
+  serialized into `content`, not in `isEmpty`; patched directly (no `dirty`/`revision` churn). Managed
+  by `PromptDraftSyncService` via POST-on-attach / DELETE-on-remove + a `['workspace-prompt-attachments']`
+  GET-list query that hydrates on load and SSE-refetch. `clearAttachments()` (paired with `clear()`)
+  deletes the rows, covering the attachments-only case the draft-DELETE cascade would miss.
+- **Compose UX**: thumbnail Remove rows + a clipboard-`(paste)` handler (`shared/utils/image-attach.ts`
+  — downscale long-edge ≤ 1568 px, white-backfill, PNG-encode, strip prefix) on `speak-to-prompt`
+  (pre-launch) **and** `command-chat` (mid-session, gated on workspace context passed from
+  `workspace-chat`). Mid-session delivery is a **`taskPrompt` re-fetch nudge** appended to the outgoing
+  turn — no transport change, since `taskPrompt` reads the live rows (product decision: cover
+  mid-session too, not just launch).
+- **SSE**: attachment add/remove fire the existing `PROMPT_DRAFT` hint; the frontend invalidates both
+  the draft and attachments queries on that topic.
+- Tests: backend GET-list roundtrip; store slice (add/remove/setImages/label numbering/clear/switch,
+  no dirty bump); sync-service attach/hydrate/clearAttachments; `speak-to-prompt` + `command-chat` rows
+  + nudge; `image-attach` downscale math. Full suite green (backend + 506 frontend specs, lint clean).
+
+Post-review hardening (high-effort `/code-review`, all findings resolved):
+
+- **Data-loss fix**: `isPromptContextEmpty` now counts images, so clearing the prompt text with an
+  image attached PUTs (keeps the draft) instead of DELETE-cascading the attachment rows away. Same
+  fix un-hides the launch section for an images-only draft.
+- **Paste errors surfaced**: `onPaste` (both surfaces) catches a failed attach (oversize 413/encode)
+  and shows a message instead of swallowing it.
+- **Collision-free labels**: `nextImageLabel` numbers past the highest existing suffix, not the count.
+- **Attachment SSE split**: a dedicated `PROMPT_ATTACHMENTS` hint topic (not `PROMPT_DRAFT`), so a
+  prompt-text autosave no longer refetches image bytes or flickers a mid-POST thumbnail.
+- **Security**: `runAction` added to `ReadOnlyRepositoryToolFilter`'s mutating set (regression test in
+  `RepositoryMcpToolsTest`) — an unattended read-only run can no longer execute action scripts.
+- **Cleanups**: deleted the dead byte-free DTO + mapper; extracted the shared `prompt-draft` fetch
+  (`prompt-draft-query.ts`) used by the sync service and the Agents tab.
+- Two PLAUSIBLE step-5 delivery-model gaps (no-seed on undeliverable prompt; autonomous task loss on
+  unreachable MCP) got a diagnostic WARN and an issue doc
+  (`docs/issues/2026-07-20_fetch-model-prompt-delivery-robustness.md`); a full fix is deferred there.
 
 ### 7. `sketch-tab-and-image-prompt-attachments` — the Sketch tab itself
 

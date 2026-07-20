@@ -13,6 +13,15 @@ import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.se
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { SpeakToPromptComponent } from './speak-to-prompt.component';
 
+/** A paste event carrying one image item, for the real imageBlobFromClipboard to pick up. */
+function imagePasteEvent(): ClipboardEvent {
+  const file = new File(['x'], 'p.png', { type: 'image/png' });
+  return {
+    clipboardData: { items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }] },
+    preventDefault: vi.fn(),
+  } as unknown as ClipboardEvent;
+}
+
 describe('SpeakToPromptComponent', () => {
   const speechService = {
     apiSpeechTranscriptionsPost: vi.fn().mockReturnValue(of({ text: 'spoken words' })),
@@ -28,7 +37,13 @@ describe('SpeakToPromptComponent', () => {
       .mockReturnValue(of({ command: { id: 'cmd-1' } })),
   };
   // The launch flushes the draft first (the agent fetches it via taskPrompt); a mock that resolves.
-  const promptDraftSync = { flushNow: vi.fn().mockResolvedValue(undefined) };
+  // Image attach/remove and Discard's row cleanup delegate to the same service.
+  const promptDraftSync = {
+    flushNow: vi.fn().mockResolvedValue(undefined),
+    attachImage: vi.fn().mockResolvedValue(undefined),
+    removeImage: vi.fn().mockResolvedValue(undefined),
+    clearAttachments: vi.fn().mockResolvedValue(undefined),
+  };
   // The template's RouterLinks need a real router (a bare `{ navigate }` mock can't satisfy
   // them); the launch-navigation assertions spy on the real instance instead.
   let router: Router;
@@ -306,6 +321,89 @@ describe('SpeakToPromptComponent', () => {
   // The launch-context serialization (prompt text + picked-element block + selected-code block, and
   // their ordering) now lives in buildSerializedPrompt and is persisted as the draft's
   // serialized_prompt — covered by snippet-format.spec.ts, not through the launch payload here.
+
+  it('renders an attached image row with a thumbnail and removes it via the sync service', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.setActiveWorkspace('wt-1');
+    store.addImage({
+      id: 'att-1',
+      mimeType: 'image/png',
+      label: 'Pasted image 1',
+      source: 'paste',
+      dataBase64: 'AAAB',
+    });
+    const fixture = createComponent();
+
+    const html = fixture.nativeElement as HTMLElement;
+    expect(html.textContent).toContain('Images (attached to the prompt)');
+    expect(html.textContent).toContain('Pasted image 1');
+    const img = html.querySelector<HTMLImageElement>('img');
+    expect(img?.getAttribute('src')).toBe('data:image/png;base64,AAAB');
+
+    const remove = Array.from(html.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.getAttribute('aria-label') === 'Remove image Pasted image 1',
+    );
+    expect(remove).toBeDefined();
+    remove!.click();
+
+    expect(promptDraftSync.removeImage).toHaveBeenCalledWith('att-1');
+    store.clear();
+  });
+
+  it('shows the launch section for an images-only draft (no prompt text yet)', () => {
+    const store = TestBed.inject(PromptContextStore);
+    store.setActiveWorkspace('wt-1');
+    store.addImage({
+      id: 'att-1',
+      mimeType: 'image/png',
+      label: 'Pasted image 1',
+      source: 'paste',
+      dataBase64: 'AAAB',
+    });
+    const fixture = createComponent();
+
+    // isEmpty counts images, so the textarea + Launch buttons appear even without typed text.
+    expect(fixture.componentInstance.launchSectionVisible()).toBe(true);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('textarea[rows="10"]'),
+    ).not.toBeNull();
+    store.clear();
+  });
+
+  it('surfaces an error when a pasted image fails to attach (encode fails)', async () => {
+    // blobToAttachment relies on the DOM canvas (unavailable in jsdom), so it throws here — the same
+    // path an oversize 413 would take. The error must surface, not be swallowed.
+    const fixture = createComponent();
+    const event = imagePasteEvent();
+
+    await fixture.componentInstance.onPaste(event);
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(fixture.componentInstance.attachError()).toBe(true);
+    expect(promptDraftSync.attachImage).not.toHaveBeenCalled();
+  });
+
+  it('Discard deletes the attachment rows and clears the store', () => {
+    const store = restoreDraft('earlier idea');
+    store.addImage({
+      id: 'att-1',
+      mimeType: 'image/png',
+      label: 'Pasted image 1',
+      source: 'paste',
+      dataBase64: 'AAAB',
+    });
+    const fixture = createComponent();
+
+    const discard = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'),
+    ).find((b) => b.textContent?.trim() === 'Discard');
+    discard!.click();
+
+    expect(promptDraftSync.clearAttachments).toHaveBeenCalled();
+    expect(store.images()).toEqual([]);
+    expect(store.promptText()).toBe('');
+    store.clear();
+  });
 
   it('uploads the recording and appends the server transcript', async () => {
     const fixture = createComponent();

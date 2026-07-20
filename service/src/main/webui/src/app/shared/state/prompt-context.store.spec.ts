@@ -368,6 +368,89 @@ describe('PromptContextStore — draft persistence surface', () => {
       references: [],
     });
   });
+
+  const image = (overrides: Partial<Parameters<ReturnType<typeof store>['addImage']>[0]> = {}) => ({
+    id: 'att-1',
+    mimeType: 'image/png' as const,
+    label: 'Pasted image 1',
+    source: 'paste' as const,
+    dataBase64: 'AAAB',
+    ...overrides,
+  });
+
+  it('adds and removes images without touching the draft-autosave dirty/revision', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    const revisionBefore = s.revision();
+
+    s.addImage(image());
+    s.addImage(image({ id: 'att-2', label: 'Pasted image 2' }));
+    expect(s.images().map((i) => i.id)).toEqual(['att-1', 'att-2']);
+    // Images are server-authoritative rows, not part of the draft blob — they must not autosave.
+    expect(s.dirty()).toBe(false);
+    expect(s.revision()).toBe(revisionBefore);
+    // And they never leak into the serialized draft content.
+    expect(JSON.parse(s.serializeContent())).not.toHaveProperty('images');
+
+    s.removeImage('att-1');
+    expect(s.images().map((i) => i.id)).toEqual(['att-2']);
+    expect(s.dirty()).toBe(false);
+  });
+
+  it('setImages replaces the slice wholesale (the GET-list hydrate)', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.addImage(image());
+    s.setImages([image({ id: 'srv-1' }), image({ id: 'srv-2' })]);
+    expect(s.images().map((i) => i.id)).toEqual(['srv-1', 'srv-2']);
+    expect(s.dirty()).toBe(false);
+  });
+
+  it('auto-numbers labels per source', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    expect(s.nextImageLabel('paste')).toBe('Pasted image 1');
+    expect(s.nextImageLabel('sketch')).toBe('Sketch 1');
+
+    s.addImage(image({ id: 'p1', source: 'paste' }));
+    s.addImage(image({ id: 's1', source: 'sketch' }));
+    // Numbering counts only same-source images, so the two sequences advance independently.
+    expect(s.nextImageLabel('paste')).toBe('Pasted image 2');
+    expect(s.nextImageLabel('sketch')).toBe('Sketch 2');
+  });
+
+  it('empties images on clear() and on a workspace switch', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.addImage(image());
+    s.clear();
+    expect(s.images()).toEqual([]);
+
+    s.addImage(image({ id: 'att-9' }));
+    s.setActiveWorkspace('B');
+    expect(s.images()).toEqual([]);
+  });
+
+  it('counts an attached image as non-empty, so clearing the text does not DELETE the draft', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    // An image with no prompt text must NOT read as empty — otherwise the autosave would DELETE the
+    // draft row and the server cascade would wipe the attachment rows.
+    s.addImage(image());
+    expect(s.isEmpty()).toBe(false);
+    s.removeImage('att-1');
+    expect(s.isEmpty()).toBe(true);
+  });
+
+  it('numbers labels past the highest existing suffix, avoiding collisions after a removal', () => {
+    const s = store();
+    s.setActiveWorkspace('A');
+    s.addImage(image({ id: 'p1', label: s.nextImageLabel('paste') })); // Pasted image 1
+    s.addImage(image({ id: 'p2', label: s.nextImageLabel('paste') })); // Pasted image 2
+    s.removeImage('p1');
+    // Count is now 1, but the highest surviving suffix is 2 — the next must be 3, not a dup of 2.
+    expect(s.nextImageLabel('paste')).toBe('Pasted image 3');
+  });
 });
 
 describe('mergeReference', () => {

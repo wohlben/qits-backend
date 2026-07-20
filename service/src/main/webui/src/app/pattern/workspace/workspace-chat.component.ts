@@ -42,7 +42,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </div>
 
       @if (activeChatId(); as id) {
-        <app-command-chat [commandId]="id" />
+        <app-command-chat [commandId]="id" [repoId]="repoId()" [workspaceId]="workspaceId()" />
       } @else {
         <app-workspace-prompt-panel
           [repoId]="repoId()"

@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
-import { catchError, lastValueFrom, of } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
@@ -25,6 +25,7 @@ import {
   newestRunningChat,
   newestRunningInteractiveAgent,
 } from '@/pattern/command/running-chat';
+import { fetchPromptDraft, promptDraftQueryKey } from '@/pattern/workspace/prompt-draft-query';
 import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -156,20 +157,8 @@ export class WorkspaceAgentSessionComponent {
    * a fresh auto-launch delivers the composed prompt. 404 (never saved) maps to `null`.
    */
   readonly draftQuery = injectQuery(() => ({
-    queryKey: ['workspace-prompt-draft', this.repoId(), this.workspaceId()],
-    queryFn: (): Promise<WorkspacePromptDraftDto | null> =>
-      lastValueFrom(
-        this.draftService
-          .apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet(this.repoId(), this.workspaceId())
-          .pipe(
-            catchError((err: unknown) => {
-              if (err && typeof err === 'object' && (err as { status?: number }).status === 404) {
-                return of(null);
-              }
-              throw err;
-            }),
-          ),
-      ),
+    queryKey: promptDraftQueryKey(this.repoId(), this.workspaceId()),
+    queryFn: () => fetchPromptDraft(this.draftService, this.repoId(), this.workspaceId()),
   }));
 
   /**

@@ -25,6 +25,8 @@ import { Response90 } from '../model/response90';
 // @ts-ignore
 import { SaveDraftRequest } from '../model/saveDraftRequest';
 // @ts-ignore
+import { WorkspacePromptAttachmentDataDto } from '../model/workspacePromptAttachmentDataDto';
+// @ts-ignore
 import { WorkspacePromptDraftDto } from '../model/workspacePromptDraftDto';
 
 // @ts-ignore
@@ -94,6 +96,66 @@ export class WorkspacePromptDraftControllerService extends BaseService {
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/prompt-draft/attachments/${this.configuration.encodeParam({name: "attachmentId", value: attachmentId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
         return this.httpClient.request<any>('delete', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * List Attachments
+     * @endpoint get /api/repositories/{repoId}/workspaces/{workspaceId}/prompt-draft/attachments
+     * @param repoId 
+     * @param workspaceId 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet(repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<WorkspacePromptAttachmentDataDto>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet(repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<WorkspacePromptAttachmentDataDto>>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet(repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<WorkspacePromptAttachmentDataDto>>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet(repoId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (repoId === null || repoId === undefined) {
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet.');
+        }
+        if (workspaceId === null || workspaceId === undefined) {
+            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/prompt-draft/attachments`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Array<WorkspacePromptAttachmentDataDto>>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,

@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 
+import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardInputDirective } from '@/shared/components/input';
 import {
@@ -18,6 +19,7 @@ import {
 } from '@/shared/state/prompt-context.store';
 import { codeReferenceLabel, formatSnippetsForPrompt } from '@/shared/state/snippet-format';
 import { wsUrl } from '@/shared/utils/app-base';
+import { blobToAttachment, imageBlobFromClipboard } from '@/shared/utils/image-attach';
 import { ChatTranscriptComponent } from './chat-transcript.component';
 import { isTurnEnd, linesToItems } from './chat-stream';
 
@@ -71,6 +73,39 @@ type Status = 'connecting' | 'open' | 'closed';
         </div>
       }
 
+      <!-- Images attached to this workspace's draft (paste to add). On send the agent is nudged to
+           re-fetch them via taskPrompt. Only shown where the chat has workspace context (not the
+           standalone /commands view). -->
+      @if (canAttachImages() && promptContext.images().length > 0) {
+        <div class="flex flex-wrap items-center gap-2">
+          @for (img of promptContext.images(); track img.id) {
+            <div class="flex items-center gap-1 rounded-md border p-1 text-xs">
+              <img
+                [src]="'data:' + img.mimeType + ';base64,' + img.dataBase64"
+                class="size-10 rounded object-cover"
+                alt=""
+              />
+              <span class="max-w-32 truncate">{{ img.label }}</span>
+              <button
+                z-button
+                zType="ghost"
+                zSize="sm"
+                type="button"
+                (click)="removeImage(img.id)"
+                [attr.aria-label]="'Remove image ' + img.label"
+              >
+                Remove
+              </button>
+            </div>
+          }
+        </div>
+      }
+      @if (attachError()) {
+        <p class="text-xs text-destructive">
+          Couldn't attach the image — it may be larger than the size limit.
+        </p>
+      }
+
       <form class="flex items-center gap-2" (submit)="onSubmit($event)">
         <input
           z-input
@@ -79,6 +114,7 @@ type Status = 'connecting' | 'open' | 'closed';
           autocomplete="off"
           [value]="draft()"
           (input)="draft.set($any($event.target).value)"
+          (paste)="onPaste($event)"
           aria-label="Message"
         />
         <button z-button type="submit" [disabled]="!draft().trim()">Send</button>
@@ -91,8 +127,21 @@ export class CommandChatComponent implements OnInit, OnDestroy {
   readonly commandId = input.required<string>();
   /** Container height; the chat dialog overrides this to fill its full-size body. */
   readonly heightClass = input('h-[70vh]');
+  /**
+   * The workspace this chat belongs to. Present when hosted on the workspace detail route (enables
+   * image attach + the taskPrompt nudge); null on the standalone `/commands/{id}` view, where there
+   * is no draft to attach to.
+   */
+  readonly repoId = input<string | null>(null);
+  readonly workspaceId = input<string | null>(null);
 
   protected readonly promptContext = inject(PromptContextStore);
+  // Route-scoped: present under the workspace detail route, absent on the standalone command view.
+  private readonly sync = inject(PromptDraftSyncService, { optional: true });
+  /** True only where we can attach images: workspace context + the draft sync service are present. */
+  protected readonly canAttachImages = computed(
+    () => !!this.repoId() && !!this.workspaceId() && !!this.sync,
+  );
   /** Template alias: the `path:start[-end]` label a reference renders (and tracks) as. */
   protected readonly refLabel = codeReferenceLabel;
 
@@ -155,6 +204,38 @@ export class CommandChatComponent implements OnInit, OnDestroy {
     this.draft.update((draft) => (draft ? draft + '\n' : '') + codeReferenceLabel(ref));
   }
 
+  /** An image paste failed to attach (e.g. it exceeded the server's per-image size cap → 413). */
+  readonly attachError = signal(false);
+
+  /**
+   * Paste an image into the running chat: persist it as a draft attachment (so taskPrompt serves it)
+   * instead of pasting text. No-op without workspace context (the standalone command view). The
+   * outgoing turn (see {@link onSubmit}) nudges the agent to re-fetch the attachments. A failed
+   * attach (oversize/reject) is surfaced rather than swallowed.
+   */
+  async onPaste(event: ClipboardEvent): Promise<void> {
+    if (!this.canAttachImages()) {
+      return;
+    }
+    const blob = imageBlobFromClipboard(event.clipboardData);
+    if (!blob) {
+      return;
+    }
+    event.preventDefault();
+    this.attachError.set(false);
+    try {
+      const { dataBase64, mimeType } = await blobToAttachment(blob);
+      await this.sync!.attachImage(dataBase64, mimeType, 'paste');
+    } catch {
+      this.attachError.set(true);
+    }
+  }
+
+  /** Remove an attached image (deletes its server row via the sync service). */
+  removeImage(id: string): void {
+    void this.sync?.removeImage(id);
+  }
+
   onSubmit(event: Event): void {
     event.preventDefault();
     const text = this.draft().trim();
@@ -163,9 +244,15 @@ export class CommandChatComponent implements OnInit, OnDestroy {
     }
     this.draft.set('');
     this.thinking.set(true);
+    // When images are attached, append a nudge so the running agent re-fetches them via taskPrompt
+    // (the text-only chat turn can't carry an image; the attachment rows are the delivery path).
+    const outgoing =
+      this.canAttachImages() && this.promptContext.images().length > 0
+        ? text + '\n\n(I attached an image — call taskPrompt to view the current attachments.)'
+        : text;
     // Don't render the user bubble locally — the server echoes it back into the stream, keeping live
     // and replay identical.
-    const payload = JSON.stringify({ type: 'user', text });
+    const payload = JSON.stringify({ type: 'user', text: outgoing });
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(payload);
     } else {

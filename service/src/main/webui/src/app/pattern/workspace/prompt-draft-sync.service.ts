@@ -1,21 +1,14 @@
 import { DestroyRef, Injectable, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { injectQuery } from '@tanstack/angular-query-experimental';
-import {
-  EMPTY,
-  Observable,
-  catchError,
-  debounceTime,
-  lastValueFrom,
-  of,
-  switchMap,
-  tap,
-} from 'rxjs';
+import { QueryClient, injectQuery } from '@tanstack/angular-query-experimental';
+import { EMPTY, Observable, catchError, debounceTime, lastValueFrom, switchMap, tap } from 'rxjs';
 
 import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
-import { WorkspacePromptDraftDto } from '@/api/model/workspacePromptDraftDto';
-import { PromptContextStore } from '@/shared/state/prompt-context.store';
+import { PromptAttachmentSource } from '@/api/model/promptAttachmentSource';
+import { WorkspacePromptAttachmentDataDto } from '@/api/model/workspacePromptAttachmentDataDto';
+import { PromptContextStore, PromptImage } from '@/shared/state/prompt-context.store';
 import { buildSerializedPrompt } from '@/shared/state/snippet-format';
+import { fetchPromptDraft, promptDraftQueryKey } from './prompt-draft-query';
 
 /**
  * Keeps a workspace's prompt draft ({@link PromptContextStore}) in sync with the backend
@@ -45,30 +38,53 @@ export class PromptDraftSyncService {
   private readonly store = inject(PromptContextStore);
   private readonly draftService = inject(WorkspacePromptDraftControllerService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly queryClient = inject(QueryClient);
 
   private readonly repoId = signal<string | null>(null);
   private readonly workspaceId = signal<string | null>(null);
 
   /** Fetch-on-load + on-SSE-invalidation; 404 (never saved) maps to `null`. */
   private readonly draftQuery = injectQuery(() => ({
-    queryKey: ['workspace-prompt-draft', this.repoId(), this.workspaceId()],
+    queryKey: promptDraftQueryKey(this.repoId(), this.workspaceId()),
     enabled: this.repoId() !== null && this.workspaceId() !== null,
-    queryFn: (): Promise<WorkspacePromptDraftDto | null> =>
+    queryFn: () => fetchPromptDraft(this.draftService, this.repoId()!, this.workspaceId()!),
+  }));
+
+  /**
+   * The workspace's image attachments (thumbnail rows). Server-authoritative and separate from the
+   * draft blob (image bytes are too big for it) — this is the read path that restores thumbnails
+   * after a refresh. Refetched on the same SSE `prompt-draft` topic as the draft. Empty array when
+   * none (the endpoint returns `[]`, never 404).
+   */
+  private readonly attachmentsQuery = injectQuery(() => ({
+    queryKey: ['workspace-prompt-attachments', this.repoId(), this.workspaceId()],
+    enabled: this.repoId() !== null && this.workspaceId() !== null,
+    queryFn: (): Promise<WorkspacePromptAttachmentDataDto[]> =>
       lastValueFrom(
-        this.draftService
-          .apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet(this.repoId()!, this.workspaceId()!)
-          .pipe(
-            catchError((err: unknown) => {
-              if (err && typeof err === 'object' && (err as { status?: number }).status === 404) {
-                return of(null);
-              }
-              throw err;
-            }),
-          ),
+        this.draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet(
+          this.repoId()!,
+          this.workspaceId()!,
+        ),
       ),
   }));
 
   constructor() {
+    // Hydrate the images slice from the attachments query (load + SSE refetch). Unlike the draft,
+    // images are server-authoritative, so this replaces the slice wholesale rather than gating on a
+    // pristine/dirty flag; the guard only keeps a stale in-flight result from landing on the next
+    // workspace after a switch.
+    effect(() => {
+      const workspaceId = this.workspaceId();
+      if (
+        !workspaceId ||
+        workspaceId !== this.store.activeWorkspaceId() ||
+        !this.attachmentsQuery.isSuccess()
+      ) {
+        return;
+      }
+      this.store.setImages((this.attachmentsQuery.data() ?? []).map((a) => toPromptImage(a)));
+    });
+
     // Hydrate the store when the query resolves (or refetches after an SSE invalidation). The store
     // applies it only when still for the active workspace and pristine, so this can't clobber typing.
     effect(() => {
@@ -133,6 +149,90 @@ export class PromptDraftSyncService {
     this.store.setActiveWorkspace(workspaceId);
     this.repoId.set(repoId);
     this.workspaceId.set(workspaceId);
+  }
+
+  /**
+   * Persist an image (a pasted screenshot, or a sketch export) as an attachment row and add it to the
+   * images slice. The bytes live in the row, not the draft blob — the agent fetches it via {@code
+   * taskPrompt}, so it reaches every launch shape. Optimistically patches the slice, then refetches
+   * the GET-list to reconcile with the server (sniffed mime, stored id). A no-op before {@link
+   * connect}.
+   */
+  async attachImage(
+    dataBase64: string,
+    mimeType: 'image/png' | 'image/jpeg',
+    source: 'sketch' | 'paste',
+  ): Promise<void> {
+    const repoId = this.repoId();
+    const workspaceId = this.workspaceId();
+    if (!repoId || !workspaceId) {
+      return;
+    }
+    const label = this.store.nextImageLabel(source);
+    const res = await lastValueFrom(
+      this.draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(
+        repoId,
+        workspaceId,
+        { mimeType, label, source: source.toUpperCase(), dataBase64 },
+      ),
+    );
+    if (res.id) {
+      this.store.addImage({ id: res.id, mimeType, label, source, dataBase64 });
+    }
+    await this.queryClient.invalidateQueries({
+      queryKey: ['workspace-prompt-attachments', repoId, workspaceId],
+    });
+  }
+
+  /** Delete an attachment row and drop it from the slice. Optimistic; refetch reconciles on failure. */
+  async removeImage(id: string): Promise<void> {
+    const repoId = this.repoId();
+    const workspaceId = this.workspaceId();
+    if (!repoId || !workspaceId) {
+      return;
+    }
+    this.store.removeImage(id);
+    try {
+      await lastValueFrom(
+        this.draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsAttachmentIdDelete(
+          id,
+          repoId,
+          workspaceId,
+        ),
+      );
+    } finally {
+      await this.queryClient.invalidateQueries({
+        queryKey: ['workspace-prompt-attachments', repoId, workspaceId],
+      });
+    }
+  }
+
+  /**
+   * Delete every current attachment row — the row-cleanup half of "Discard"/clear. The caller pairs
+   * this with {@code store.clear()} (which empties the slice and DELETEs the draft row via autosave);
+   * deleting the rows explicitly here also covers the attachments-only case, where there is no draft
+   * row for the server-side cascade to fire on. Ids are read synchronously on entry, so it is safe to
+   * call just before {@code store.clear()} empties the slice.
+   */
+  async clearAttachments(): Promise<void> {
+    const repoId = this.repoId();
+    const workspaceId = this.workspaceId();
+    if (!repoId || !workspaceId) {
+      return;
+    }
+    const ids = this.store.images().map((image) => image.id);
+    for (const id of ids) {
+      await lastValueFrom(
+        this.draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsAttachmentIdDelete(
+          id,
+          repoId,
+          workspaceId,
+        ),
+      ).catch(() => undefined);
+    }
+    await this.queryClient.invalidateQueries({
+      queryKey: ['workspace-prompt-attachments', repoId, workspaceId],
+    });
   }
 
   /**
@@ -214,4 +314,15 @@ export class PromptDraftSyncService {
   private flush(): void {
     this.pendingRequest()?.request.subscribe({ error: () => undefined });
   }
+}
+
+/** Map a GET-list attachment DTO to the store's {@link PromptImage} (server enum → lowercase source). */
+function toPromptImage(dto: WorkspacePromptAttachmentDataDto): PromptImage {
+  return {
+    id: dto.id ?? '',
+    mimeType: dto.mimeType === 'image/jpeg' ? 'image/jpeg' : 'image/png',
+    label: dto.label ?? '',
+    source: dto.source === PromptAttachmentSource.Sketch ? 'sketch' : 'paste',
+    dataBase64: dto.dataBase64 ?? '',
+  };
 }

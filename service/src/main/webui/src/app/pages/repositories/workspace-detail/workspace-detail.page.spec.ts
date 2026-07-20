@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap, Router, type ParamMap } from '@angular/router';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
@@ -11,6 +11,7 @@ import { AgentSessionControllerService } from '@/api/api/agentSessionController.
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { RepositoryActionsControllerService } from '@/api/api/repositoryActionsController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
+import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
 import { DaemonStatus } from '@/api/model/daemonStatus';
@@ -44,6 +45,17 @@ describe('WorkspaceDetailPage', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentSessionsGet: vi
       .fn()
       .mockReturnValue(of({ sessions: [] })),
+  };
+  // No draft/attachments in these tests: GET 404 (→ null draft) and an empty attachment list, so the
+  // draft + attachments queries resolve deterministically (the Agents-tab launch refetches the draft;
+  // without a mock it would race a real HTTP call against the test's single-macrotask flush).
+  const draftService = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet: vi
+      .fn()
+      .mockReturnValue(throwError(() => ({ status: 404 }))),
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet: vi
+      .fn()
+      .mockReturnValue(of([])),
   };
   // Subject-backed so tests can deep-link (set before creating) or emit in-page URL changes.
   let paramMap$: BehaviorSubject<ParamMap>;
@@ -122,6 +134,7 @@ describe('WorkspaceDetailPage', () => {
         { provide: AgentPluginControllerService, useValue: pluginService },
         { provide: AgentControllerService, useValue: agentService },
         { provide: AgentSessionControllerService, useValue: agentSessionService },
+        { provide: WorkspacePromptDraftControllerService, useValue: draftService },
         { provide: ZardDarkMode, useValue: { themeMode: () => EDarkModes.LIGHT } },
       ],
     }).compileComponents();

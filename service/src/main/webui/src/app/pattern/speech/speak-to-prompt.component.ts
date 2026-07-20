@@ -22,6 +22,7 @@ import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.se
 import { ZardButtonComponent } from '@/shared/components/button';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { codeReferenceLabel } from '@/shared/state/snippet-format';
+import { blobToAttachment, imageBlobFromClipboard } from '@/shared/utils/image-attach';
 import { WavRecorder } from './wav-recorder';
 
 /**
@@ -46,7 +47,7 @@ import { WavRecorder } from './wav-recorder';
             zType="ghost"
             zSize="sm"
             type="button"
-            (click)="promptContext.clear()"
+            (click)="discard()"
           >
             Discard
           </button>
@@ -234,15 +235,49 @@ import { WavRecorder } from './wav-recorder';
         </section>
       }
 
+      <!-- Images attached to the prompt: pasted screenshots (and, from the Sketch tab, drawings).
+           They ride the launch via the taskPrompt MCP tool the same way picks/references do. -->
+      @if (promptContext.images().length > 0) {
+        <section class="flex flex-col gap-2">
+          <span class="text-sm font-medium">Images (attached to the prompt)</span>
+          @for (img of promptContext.images(); track img.id) {
+            <div class="flex items-center gap-2 rounded-md border p-2 text-sm">
+              <img
+                [src]="'data:' + img.mimeType + ';base64,' + img.dataBase64"
+                class="size-16 rounded object-cover"
+                alt=""
+              />
+              <span class="min-w-0 flex-1 truncate">{{ img.label }}</span>
+              <button
+                z-button
+                zType="ghost"
+                type="button"
+                (click)="removeImage(img.id)"
+                [attr.aria-label]="'Remove image ' + img.label"
+              >
+                Remove
+              </button>
+            </div>
+          }
+        </section>
+      }
+      @if (attachError()) {
+        <p class="text-sm text-destructive">
+          Couldn't attach the image — it may be larger than the size limit. Try a smaller image.
+        </p>
+      }
+
       @if (launchSectionVisible()) {
         <section class="flex flex-col gap-2">
           <label class="flex flex-col gap-1 text-sm">
             <span class="font-medium">Prompt for the agent</span>
+            <!-- Paste an image here to attach it (screenshots, design exports); text paste is normal. -->
             <textarea
               rows="10"
               class="rounded-md border bg-background p-2 text-sm"
               [value]="promptContext.promptText()"
               (input)="promptContext.setPromptText(promptArea.value)"
+              (paste)="onPaste($event)"
               #promptArea
             ></textarea>
           </label>
@@ -392,6 +427,42 @@ export class SpeakToPromptComponent {
   useTranscriptAsIs(): void {
     this.promptContext.setPromptText(this.transcript());
     this.promptStarted.set(true);
+  }
+
+  /** An image paste failed to attach (e.g. it exceeded the server's per-image size cap → 413). */
+  readonly attachError = signal(false);
+
+  /**
+   * Paste an image into the prompt as an attachment instead of text. When the clipboard carries an
+   * image, prevent the default text paste, downscale/encode it, and attach it to the draft; a paste
+   * with no image falls through to the normal textarea paste. A failed attach (oversize/reject) is
+   * surfaced rather than swallowed.
+   */
+  async onPaste(event: ClipboardEvent): Promise<void> {
+    const blob = imageBlobFromClipboard(event.clipboardData);
+    if (!blob) {
+      return;
+    }
+    event.preventDefault();
+    this.attachError.set(false);
+    try {
+      const { dataBase64, mimeType } = await blobToAttachment(blob);
+      await this.promptDraftSync.attachImage(dataBase64, mimeType, 'paste');
+    } catch {
+      this.attachError.set(true);
+    }
+  }
+
+  /** Remove an attached image (deletes its server row via the sync service). */
+  removeImage(id: string): void {
+    void this.promptDraftSync.removeImage(id);
+  }
+
+  /** Discard the whole restored draft — clears the store and deletes any attachment rows. */
+  discard(): void {
+    // clearAttachments captures the row ids synchronously before clear() empties the slice.
+    void this.promptDraftSync.clearAttachments();
+    this.promptContext.clear();
   }
 
   protected readonly AgentLaunchMode = AgentLaunchMode;

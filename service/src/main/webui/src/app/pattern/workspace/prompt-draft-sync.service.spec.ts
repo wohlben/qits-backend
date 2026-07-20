@@ -13,6 +13,11 @@ describe('PromptDraftSyncService', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftGet: ReturnType<typeof vi.fn>;
     apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut: ReturnType<typeof vi.fn>;
     apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftDelete: ReturnType<typeof vi.fn>;
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet: ReturnType<typeof vi.fn>;
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost: ReturnType<typeof vi.fn>;
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsAttachmentIdDelete: ReturnType<
+      typeof vi.fn
+    >;
   };
 
   /**
@@ -27,6 +32,16 @@ describe('PromptDraftSyncService', () => {
         .fn()
         .mockReturnValue(of({ updatedAt: 't-new' })),
       apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftDelete: vi.fn().mockReturnValue(of({})),
+      // Attachments default to an empty list (no images) unless a test overrides it.
+      apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet: vi
+        .fn()
+        .mockReturnValue(of([])),
+      apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost: vi
+        .fn()
+        .mockReturnValue(of({ id: 'att-new' })),
+      apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsAttachmentIdDelete: vi
+        .fn()
+        .mockReturnValue(of({})),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -211,6 +226,65 @@ describe('PromptDraftSyncService', () => {
       draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftDelete,
     ).not.toHaveBeenCalled();
     expect(draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut).not.toHaveBeenCalled();
+  });
+
+  it('hydrates the images slice from the attachments GET-list', async () => {
+    configure();
+    draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsGet.mockReturnValue(
+      of([
+        {
+          id: 'srv-1',
+          mimeType: 'image/png',
+          label: 'Sketch 1',
+          source: 'SKETCH',
+          createdAt: 't',
+          dataBase64: 'AAAB',
+        },
+      ]),
+    );
+    const { service, store } = makeService();
+    service.connect('repo-1', 'wt-1');
+
+    await vi.waitFor(() => {
+      TestBed.tick();
+      expect(store.images().map((i) => i.id)).toEqual(['srv-1']);
+    });
+    // The server enum (SKETCH/PASTE) maps to the store's lowercase source.
+    expect(store.images()[0].source).toBe('sketch');
+    expect(store.images()[0].dataBase64).toBe('AAAB');
+  });
+
+  it('attachImage POSTs the row (source upper-cased) and adds it to the slice', async () => {
+    configure();
+    const { service, store } = makeService();
+    service.connect('repo-1', 'wt-1');
+
+    await service.attachImage('AAAB', 'image/png', 'paste');
+
+    expect(
+      draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost,
+    ).toHaveBeenCalledWith('repo-1', 'wt-1', {
+      mimeType: 'image/png',
+      label: 'Pasted image 1',
+      source: 'PASTE',
+      dataBase64: 'AAAB',
+    });
+    expect(store.images().map((i) => i.id)).toContain('att-new');
+  });
+
+  it('clearAttachments deletes every current attachment row', async () => {
+    configure();
+    const { service, store } = makeService();
+    service.connect('repo-1', 'wt-1');
+    store.addImage({ id: 'a1', mimeType: 'image/png', label: 'x', source: 'paste', dataBase64: 'AAAB' });
+    store.addImage({ id: 'a2', mimeType: 'image/png', label: 'y', source: 'paste', dataBase64: 'AAAB' });
+
+    await service.clearAttachments();
+
+    const del =
+      draftService.apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsAttachmentIdDelete;
+    expect(del).toHaveBeenCalledWith('a1', 'repo-1', 'wt-1');
+    expect(del).toHaveBeenCalledWith('a2', 'repo-1', 'wt-1');
   });
 
   it('flushes a pending edit with a final PUT on destroy', () => {

@@ -129,6 +129,7 @@ model/models.ts
 model/orderBootstrapCommandsRequest.ts
 model/origin.ts
 model/projectDto.ts
+model/promptAttachmentSource.ts
 model/refinePromptRequest.ts
 model/reportAgentSessionRequest.ts
 model/repositoryArchetype.ts
@@ -263,6 +264,7 @@ model/workspaceEventType.ts
 model/workspaceFileContentDto.ts
 model/workspaceHistoryDetailDto.ts
 model/workspaceHistoryDto.ts
+model/workspacePromptAttachmentDataDto.ts
 model/workspacePromptDraftDto.ts
 model/workspaceRuntimeStatus.ts
 model/workspaceStatus.ts
