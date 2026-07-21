@@ -67,3 +67,28 @@ Add opt-out resource limits to `WorkspaceContainerFactory`:
 
 Blank config value disables the flag, matching the volume-mount pattern already in the
 factory. `FakeContainerRuntime`-based tests are unaffected (no real `docker run`).
+
+## Resolution (2026-07-21)
+
+Implemented exactly as suggested:
+
+- `WorkspaceContainer` gained `memory(limit)` (renders `--memory <l> --memory-swap <l>` —
+  a hard cap the container can't swap past), `pidsLimit(l)` (`--pids-limit`) and `cpus(l)`
+  (`--cpus`), all omitting the flags when blank/null, in the builder's fixed render order.
+- `WorkspaceContainerFactory` applies them from three new `Optional<String>` config
+  properties (`qits.workspace.memory-limit` / `.pids-limit` / `.cpus` — the `timezone`
+  Optional pattern, so a blank value cleanly disables a limit).
+- Shipped defaults (`service` and `cli` `application.properties`):
+  `memory-limit=4g`, `pids-limit`/`cpus` blank (off). With the cgroup cap in place each
+  JVM in the container sizes its default heap against 4g, not host RAM.
+- Regression tests: `WorkspaceContainerTest` (render order, equal `--memory-swap`,
+  blank-omits) and `WorkspaceContainerFactoryTest` (default cap present, blank disables,
+  pids/cpus flow through).
+
+Note: container flags are fixed at creation — containers that already exist keep running
+uncapped until recreated (stop the workspace / remove the container; lazy provisioning
+re-materializes it with the cap).
+
+The two secondary unbounded growths (the `CommandLogService` queue and the
+`command_log_line`/tmux-log disk retention) were **not** part of this fix — parked in
+`docs/backlog.md`.
