@@ -5,6 +5,7 @@ import {
   OnDestroy,
   effect,
   input,
+  output,
   viewChild,
 } from '@angular/core';
 import { FitAddon } from '@xterm/addon-fit';
@@ -45,6 +46,13 @@ export class WebTerminalComponent implements OnDestroy {
    * default `api/terminal/commands/<commandId>`. Used by the daemon interactive terminal.
    */
   readonly socketPath = input<string>();
+
+  /**
+   * Fires on the clean server close (1000) — the session behind the socket ended for good (the
+   * process exited, or the server detached explicitly). Hosts use it to refresh state the session
+   * may have changed (e.g. sync-status after the sign-in push).
+   */
+  readonly closed = output<void>();
 
   private readonly host = viewChild<ElementRef<HTMLDivElement>>('host');
 
@@ -169,6 +177,7 @@ export class WebTerminalComponent implements OnDestroy {
       if (event.code === 1000) {
         this.finalClose = true;
         term.write('\r\n\x1b[31m[disconnected]\x1b[0m\r\n');
+        this.closed.emit();
         return;
       }
       if (this.retries >= 5) {

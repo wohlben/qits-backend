@@ -54,7 +54,8 @@ their framing as replayable segmented processes.
   standalone Push button as the next instance (one `push:<basename>` segment), replacing the
   silently-swallowed 500; also surfaces the pull/sync/push POSTs' own in-request errors in an
   inline banner. Hosts the sign-in affordance of
-  [git-remote-https-auth](../qits-project-repositories/feature-ideas/git-remote-https-auth.md).
+  [git-remote-https-auth](../qits-project-repositories/features/2026-07-21_git-remote-https-auth.md)
+  (implemented).
 
 ## Done when
 

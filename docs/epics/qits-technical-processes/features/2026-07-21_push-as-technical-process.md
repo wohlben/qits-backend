@@ -8,8 +8,9 @@ UI shows **nothing at all**: the backend throws `InternalServerErrorException("G
 …")` → HTTP 500 with a `{message}` body, but `pushMutation`
 (`repository-sync.component.ts`) defines only `onSuccess`, the sync bar has no error slot, and
 there is no global mutation error handler — the spinner just stops. Today that is the *normal*
-outcome of clicking Push against any auth-requiring HTTPS remote (no credential handling exists;
-see [git-remote-https-auth](../../qits-project-repositories/feature-ideas/git-remote-https-auth.md)),
+outcome of clicking Push against any auth-requiring HTTPS remote (no credential handling existed
+until
+[git-remote-https-auth](../../qits-project-repositories/features/2026-07-21_git-remote-https-auth.md)),
 so the button looks dead.
 
 This feature makes Push the next process instance — a single `push:<url-basename>` segment
@@ -27,9 +28,10 @@ Related/dependent plans:
   [repository-pull-active-process-discovery](2026-07-19_repository-pull-active-process-discovery.md):
   the kind-aware single-flight and the `active-process` reattach work unchanged for a `push` kind.
 - **Hosts the sign-in affordance** of
-  [git-remote-https-auth](../../qits-project-repositories/feature-ideas/git-remote-https-auth.md)
-  — the process dialog is where an auth-classified push failure will offer the "Sign in & push"
-  terminal. That feature depends on this one.
+  [git-remote-https-auth](../../qits-project-repositories/features/2026-07-21_git-remote-https-auth.md)
+  (**implemented**) — the process dialog is where an auth-classified push failure (a
+  `segment-settled` frame carrying `hint: remote-auth`) offers the "Sign in & push" terminal. That
+  feature builds on this one.
 
 ## What exists today (the code being changed)
 

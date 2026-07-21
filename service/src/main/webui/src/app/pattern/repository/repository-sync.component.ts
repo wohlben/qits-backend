@@ -13,12 +13,16 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { lastValueFrom } from 'rxjs';
 
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
-import { TechnicalProcessViewComponent } from '@/pattern/workspace/technical-process-view.component';
+import {
+  SegmentHint,
+  TechnicalProcessViewComponent,
+} from '@/pattern/workspace/technical-process-view.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 import { RepositorySyncBarComponent } from '@/ui/components/repository/repository-sync-bar.component';
 import { invalidateRepository } from './invalidate-repository';
 import { RepositoryLiveService } from './repository-live.service';
+import { WebTerminalComponent } from './web-terminal.component';
 
 /**
  * Smart wrapper for the repository sync bar. Fetches the main branch's sync status and the
@@ -44,7 +48,12 @@ import { RepositoryLiveService } from './repository-live.service';
  */
 @Component({
   selector: 'app-repository-sync',
-  imports: [RepositorySyncBarComponent, TechnicalProcessViewComponent, ZardButtonComponent],
+  imports: [
+    RepositorySyncBarComponent,
+    TechnicalProcessViewComponent,
+    WebTerminalComponent,
+    ZardButtonComponent,
+  ],
   providers: [RepositoryLiveService],
   template: `
     <app-repository-sync-bar
@@ -74,12 +83,26 @@ import { RepositoryLiveService } from './repository-live.service';
     <!-- Pull / Sync / Push: the live, segmented log streamed from the technical process (pull: one
          segment per repo, imported submodules included; sync appends a push segment; push is that
          single segment alone). Closing the dialog does not stop the process — reopening within the
-         retention window replays and resumes. -->
+         retention window replays and resumes. A segment settled with the 'remote-auth' hint offers
+         "Sign in & push", which swaps the dialog content to the interactive sign-in terminal (a
+         host-side interactive git push whose prompt round-trip fills the credential store). -->
     <ng-template #processTpl>
-      @if (processId(); as pid) {
-        <app-technical-process-view [processId]="pid" (finished)="onProcessFinished()" />
+      @if (showTerminal()) {
+        <app-web-terminal
+          [socketPath]="'api/terminal/repositories/' + remoteAuthRepoId() + '/remote-login'"
+          (closed)="onLoginTerminalClosed()"
+        />
+      } @else if (processId(); as pid) {
+        <app-technical-process-view
+          [processId]="pid"
+          (finished)="onProcessFinished()"
+          (segmentHint)="onSegmentHint($event)"
+        />
       }
       <div class="mt-3 flex items-center gap-2">
+        @if (remoteAuthHint() && !showTerminal()) {
+          <button z-button type="button" (click)="openSignInTerminal()">Sign in &amp; push</button>
+        }
         <button z-button zType="secondary" type="button" (click)="closeDialog()">Close</button>
       </div>
     </ng-template>
@@ -105,6 +128,23 @@ export class RepositorySyncComponent {
    * process never sees. Rendered as the inline destructive banner; cleared on the next success.
    */
   readonly syncError = signal<string | null>(null);
+
+  /**
+   * A segment of the current process settled with the 'remote-auth' hint — the failure was the
+   * remote's auth wall, so the dialog offers "Sign in & push". Idempotent (a reconnect's replay
+   * re-emits the hint); reset when a new process starts or the dialog closes.
+   */
+  readonly remoteAuthHint = signal(false);
+
+  /**
+   * The repository to sign into — the hint's target, which for a submodule child that failed on its
+   * own remote is the CHILD's id, not the root's. Defaults to the root repo.
+   */
+  private readonly remoteAuthTarget = signal<string | null>(null);
+  readonly remoteAuthRepoId = computed(() => this.remoteAuthTarget() ?? this.repoId());
+
+  /** The dialog content is swapped to the sign-in terminal (the "Sign in & push" click). */
+  readonly showTerminal = signal(false);
 
   /**
    * The repository's currently-running pull/sync process, discovered on mount and kept live by the
@@ -215,6 +255,9 @@ export class RepositorySyncComponent {
    */
   private markProcessActive(processId: string) {
     this.processId.set(processId);
+    this.remoteAuthHint.set(false);
+    this.remoteAuthTarget.set(null);
+    this.showTerminal.set(false);
     const queryKey = ['repository-active-process', this.repoId()];
     // Cancel any in-flight mount fetch first: it was started when nothing was live, so its stale null
     // would otherwise resolve after this and clobber the guard back off mid-pull.
@@ -231,19 +274,66 @@ export class RepositorySyncComponent {
     invalidateRepository(this.queryClient, this.repoId());
   }
 
-  /** Open the process dialog; hides the built-in footer (the template owns its Close button). */
+  /**
+   * A settled segment carried a failure-classification hint; 'remote-auth' arms the sign-in for the
+   * hint's target repo (a submodule child's own remote, when it is the one that rejected).
+   */
+  onSegmentHint(event: SegmentHint) {
+    if (event.hint === 'remote-auth') {
+      this.remoteAuthHint.set(true);
+      this.remoteAuthTarget.set(event.target);
+    }
+  }
+
+  /** Swap the dialog content to the interactive sign-in terminal. */
+  openSignInTerminal() {
+    this.showTerminal.set(true);
+  }
+
+  /**
+   * The sign-in terminal's session ended (clean server close): the push either succeeded — the
+   * refreshed sync-status reading "Up to date with remote" is the success signal — or git printed
+   * why not. Swap back to the process view so a failed sign-in can be retried via the still-shown
+   * "Sign in & push" button (the hint stays armed); the dialog stays open for reading.
+   */
+  onLoginTerminalClosed() {
+    this.showTerminal.set(false);
+    invalidateRepository(this.queryClient, this.repoId());
+  }
+
+  /**
+   * Open the process dialog; hides the built-in footer (the template owns its Close button). Every
+   * close path — the template Close button, ESC, or a backdrop click — routes through {@link
+   * handleDialogClosed} (wrapping the ref's own `close` so a dismissal we didn't initiate still
+   * clears our state; otherwise a stale `activeDialogRef` would block the reattach effect).
+   */
   private openDialog(title: string) {
-    this.activeDialogRef = this.dialog.create({
+    const ref = this.dialog.create({
       zTitle: title,
       zContent: this.processTpl(),
       zHideFooter: true,
     });
+    this.activeDialogRef = ref;
+    const originalClose = ref.close.bind(ref);
+    ref.close = (result?: unknown) => {
+      originalClose(result);
+      this.handleDialogClosed();
+    };
   }
 
   closeDialog() {
     this.activeDialogRef?.close();
+  }
+
+  private handleDialogClosed() {
+    if (!this.activeDialogRef) {
+      return;
+    }
     this.activeDialogRef = undefined;
     this.processId.set(null);
+    this.remoteAuthHint.set(false);
+    this.remoteAuthTarget.set(null);
+    this.showTerminal.set(false);
     // Closing tears down the process view, so its (finished) invalidation may never fire. Refresh on
     // close too so the header/tree converge to the pulled state (a no-op refetch if it already did).
     // `invalidateRepository` also matches `['repository-active-process', repoId]`, so the guard

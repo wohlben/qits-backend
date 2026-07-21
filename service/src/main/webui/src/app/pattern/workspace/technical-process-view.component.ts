@@ -23,6 +23,16 @@ interface TechnicalProcessFrame {
   seq: number;
   line?: string | null;
   status?: 'ok' | 'failed' | null;
+  /** Optional failure classification on a failed `segment-settled` (e.g. 'remote-auth'). */
+  hint?: string | null;
+  /** The identifier the hint acts on (e.g. the repo id to sign into — a child, not the root). */
+  hintTarget?: string | null;
+}
+
+/** A settled segment's failure classification and the target the UI should act on. */
+export interface SegmentHint {
+  hint: string;
+  target: string | null;
 }
 
 interface SegmentView {
@@ -99,6 +109,13 @@ export class TechnicalProcessViewComponent {
 
   /** Fires once, on the terminal `done` frame, with the process's overall verdict. */
   readonly finished = output<'ok' | 'failed'>();
+
+  /**
+   * Fires for every settled segment carrying a failure-classification hint (e.g. 'remote-auth' —
+   * the host offers the sign-in terminal for `target`). A reconnect's replay re-emits; hosts treat
+   * it as an idempotent set, not a counter.
+   */
+  readonly segmentHint = output<SegmentHint>();
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly logBodies = viewChildren<ElementRef<HTMLElement>>('logBody');
@@ -187,6 +204,9 @@ export class TechnicalProcessViewComponent {
             }
             return [...list];
           });
+          if (frame.hint) {
+            this.segmentHint.emit({ hint: frame.hint, target: frame.hintTarget ?? null });
+          }
         }
         break;
       case 'done': {
