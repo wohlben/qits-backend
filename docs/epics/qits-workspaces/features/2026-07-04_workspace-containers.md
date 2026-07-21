@@ -142,8 +142,12 @@ read host secrets but can exfiltrate what it finds inside the container); the do
 ## Explicitly deferred (unchanged)
 
 File browsing into the container (Phase 2); agent sessions + credential hand-off (Phase 3);
-per-repo images / devcontainer.json; resource limits; egress allowlisting; remote execution
-nodes; idle-stop/restart policies; migration of pre-existing host workspaces (resolve or reseed).
+per-repo images / devcontainer.json; egress allowlisting; remote execution nodes;
+idle-stop/restart policies; migration of pre-existing host workspaces (resolve or reseed).
+(Resource limits landed 2026-07-21: `qits.workspace.memory-limit` — default `4g`, rendered as
+`--memory` + `--memory-swap` — plus opt-in `pids-limit`/`cpus`, all set by
+`WorkspaceContainerFactory`; see
+`docs/issues/resolved/2026-07-21_workspace-container-unbounded-memory-host-oom.md`.)
 
 ## Open questions carried forward
 

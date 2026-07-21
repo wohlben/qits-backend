@@ -7,6 +7,7 @@ import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
 import eu.wohlben.qits.domain.process.control.RepoProcessLease;
 import eu.wohlben.qits.domain.process.control.TechnicalProcess;
 import eu.wohlben.qits.domain.process.control.TechnicalProcessRegistry;
+import eu.wohlben.qits.domain.process.dto.TechnicalProcessFrame;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.dto.BranchDto;
 import eu.wohlben.qits.domain.repository.dto.SyncStatusDto;
@@ -24,6 +25,7 @@ import jakarta.transaction.Transactional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +54,10 @@ public class RepositoryService {
   @Inject ContainerRuntime containerRuntime;
 
   @Inject GitExecutor git;
+
+  @Inject GitIdentity gitIdentity;
+
+  @Inject GitRemoteAuth remoteAuth;
 
   @Inject GitSubmoduleParser submoduleParser;
 
@@ -142,7 +148,9 @@ public class RepositoryService {
     try {
       Files.createDirectories(originPath.getParent());
       git.exec(
-          null, "git", "clone", "--mirror", "--end-of-options", repo.url, originPath.toString());
+          null,
+          remoteAuth.gitWithCredentials(
+              "clone", "--mirror", "--end-of-options", repo.url, originPath.toString()));
     } catch (Exception e) {
       throw new InternalServerErrorException("Git clone failed: " + e.getMessage());
     }
@@ -272,13 +280,15 @@ public class RepositoryService {
 
   /**
    * Pulls the remote's main branch into the local mirror. Fetches the branch and fast-forwards the
-   * local ref only when the remote is strictly ahead; a no-op when already up to date or locally
-   * ahead, and an error when the histories have diverged (manual merge needed). After its own pull,
-   * recursively pulls the repository's IMPORTED submodule children (sibling repositories) — a
-   * gitlink bump arriving on the superproject's main branch must never point at a commit the child
-   * sibling's origin does not yet have, or the workspace container's {@code submodule update}
-   * (which clones from that origin via the git host) fails with "Server does not allow request for
-   * unadvertised object".
+   * local ref when the remote is strictly ahead; a no-op when already up to date or locally ahead.
+   * Diverged histories are reconciled rather than refused: a cleanly-mergeable divergence becomes a
+   * real merge commit on the branch, and a conflicting one parks the remote tip on {@code
+   * merge/<branch>-origin-<branch>} (overwriting a previous attempt) and fails with the resolution
+   * path in the message — see {@link #mergeDivergedRemote}. After its own pull, recursively pulls
+   * the repository's IMPORTED submodule children (sibling repositories) — a gitlink bump arriving
+   * on the superproject's main branch must never point at a commit the child sibling's origin does
+   * not yet have, or the workspace container's {@code submodule update} (which clones from that
+   * origin via the git host) fails with "Server does not allow request for unadvertised object".
    */
   public String pullRepository(String repoId) {
     return pullRepository(repoId, new HashSet<>(), null, null, new HashSet<>());
@@ -331,9 +341,9 @@ public class RepositoryService {
                 process.expectDaemons(List.of());
                 process.finishProvision(true);
               } catch (RuntimeException e) {
-                // Root failure (diverged branch, unreachable remote): settle the open root segment
-                // failed (appending the message) and emit `done failed`. Idempotent.
-                process.failProvision(e.getMessage());
+                // Root failure (diverged branch, unreachable remote, auth wall): settle the open
+                // root segment failed (appending the message) and emit `done failed`. Idempotent.
+                failWithAuthHint(process, e.getMessage(), repoId);
                 LOG.debugf(e, "Streamed pull failed for repository %s", repoId);
               }
             });
@@ -351,6 +361,31 @@ public class RepositoryService {
   private BadRequestException repositoryBusy(String runningKind) {
     return new BadRequestException(
         "A " + runningKind + " is already running for this repository; wait for it to finish.");
+  }
+
+  /**
+   * Settle {@code segment} failed, classifying an auth-wall failure with the {@code remote-auth}
+   * hint whose target is {@code authRepoId} — the repository whose remote to sign into. For a
+   * submodule child that is the <em>child</em>'s id, not the root's, so the sign-in terminal seeds
+   * the credentials for the host that actually rejected.
+   */
+  private void settleWithAuthHint(
+      TechnicalProcess process, String segment, String message, String authRepoId) {
+    boolean auth = GitRemoteAuth.isAuthFailure(message);
+    process.settleSegment(
+        segment,
+        false,
+        auth ? TechnicalProcessFrame.HINT_REMOTE_AUTH : null,
+        auth ? authRepoId : null);
+  }
+
+  /**
+   * {@link #settleWithAuthHint} for the whole-process failure path (settles every open segment).
+   */
+  private void failWithAuthHint(TechnicalProcess process, String message, String authRepoId) {
+    boolean auth = GitRemoteAuth.isAuthFailure(message);
+    process.failProvision(
+        message, auth ? TechnicalProcessFrame.HINT_REMOTE_AUTH : null, auth ? authRepoId : null);
   }
 
   /** The scalar snapshot a single repo's pull needs, read in one short transaction. */
@@ -414,11 +449,7 @@ public class RepositoryService {
           git.exec(
               ctx.workdir().toFile(),
               lineSink(process, segmentName),
-              "git",
-              "fetch",
-              "--end-of-options",
-              ctx.url(),
-              ctx.branch());
+              remoteAuth.gitWithCredentials("fetch", "--end-of-options", ctx.url(), ctx.branch()));
       String remoteSha = git.exec(ctx.workdir().toFile(), "git", "rev-parse", "FETCH_HEAD").trim();
       String localSha =
           git.exec(ctx.workdir().toFile(), "git", "rev-parse", "refs/heads/" + ctx.branch()).trim();
@@ -450,8 +481,17 @@ public class RepositoryService {
         settleOk(process, segmentName);
         return withImportedChildPulls(repoId, fetchOutput, visited, process, usedSegments);
       }
-      throw new BadRequestException(
-          "Branch '" + ctx.branch() + "' has diverged from the remote; manual merge required");
+      // Diverged: merge the remote in when the merge is clean; a conflict parks the remote tip on
+      // the merge/<branch>-origin-<branch> branch and throws (the message carries the resolution
+      // path).
+      String mergeVerdict =
+          mergeDivergedRemote(
+              ctx.workdir(), ctx.hasMainWorkspace(), ctx.branch(), localSha, remoteSha);
+      streamLine(process, segmentName, mergeVerdict);
+      ingestConfigQuietly(repoId);
+      streamConfigOutcome(process, segmentName, repoId);
+      settleOk(process, segmentName);
+      return withImportedChildPulls(repoId, fetchOutput, visited, process, usedSegments);
     } catch (BadRequestException e) {
       throw e;
     } catch (Exception e) {
@@ -500,7 +540,9 @@ public class RepositoryService {
             .append(e.getMessage());
         if (process != null) {
           process.appendLine(childSegment, "pull failed: " + e.getMessage());
-          process.settleSegment(childSegment, false);
+          // Target the CHILD repo: its remote (possibly a different host than the root) is the one
+          // that rejected, so the sign-in must seed the child's credentials.
+          settleWithAuthHint(process, childSegment, e.getMessage(), edge.childId());
         }
       }
     }
@@ -509,6 +551,76 @@ public class RepositoryService {
 
   private static String shortSha(String sha) {
     return sha.length() > 12 ? sha.substring(0, 12) : sha;
+  }
+
+  /** The branch a conflicting remote tip is parked on, for {@code branch}. */
+  static String mergeBranchName(String branch) {
+    return "merge/" + branch + "-origin-" + branch;
+  }
+
+  /**
+   * Reconciles a diverged {@code branch} (neither {@code localSha} nor {@code remoteSha} is an
+   * ancestor of the other) after the remote commits were fetched into {@code workdir}'s object
+   * store. A clean three-way merge (probed with {@code git merge-tree --write-tree}, no working
+   * tree needed) becomes a real merge commit — local tip as first parent, remote tip as second —
+   * and the branch ref advances to it; the returned verdict line describes it. A conflicting merge
+   * parks the remote tip on {@code merge/<branch>-origin-<branch>} (created, or overwritten from a
+   * previous attempt, so the parked tip always matches the remote's current state) and throws — the
+   * message names the conflicting files and the resolution path: merge {@code branch} into the
+   * parked branch, resolve, integrate back, then pull/sync/push again.
+   */
+  private String mergeDivergedRemote(
+      Path workdir, boolean checkedOut, String branch, String localSha, String remoteSha)
+      throws Exception {
+    GitExecutor.ExecResult probe =
+        git.execAllowNonZero(
+            workdir.toFile(),
+            "git",
+            "merge-tree",
+            "--write-tree",
+            "--name-only",
+            "--end-of-options",
+            localSha,
+            remoteSha);
+    if (probe.exitCode() == 0) {
+      String message = "Merge remote '" + branch + "' into " + branch;
+      String mergeSha;
+      if (checkedOut) {
+        // The branch is checked out here (host-workspace seam): a real `git merge` moves the ref,
+        // index and working tree together. The merge-tree probe said clean, so it won't conflict.
+        List<String> merge = new ArrayList<>(List.of("git"));
+        merge.addAll(gitIdentity.inlineArgs());
+        merge.addAll(List.of("merge", "-m", message, "--end-of-options", remoteSha));
+        git.exec(workdir.toFile(), merge.toArray(String[]::new));
+        mergeSha = git.exec(workdir.toFile(), "git", "rev-parse", "HEAD").trim();
+      } else {
+        // Bare origin: commit the merged tree directly in the object store and advance the ref.
+        String tree = probe.output().lines().findFirst().orElseThrow().trim();
+        List<String> commit = new ArrayList<>(List.of("git"));
+        commit.addAll(gitIdentity.inlineArgs());
+        commit.addAll(List.of("commit-tree", tree, "-p", localSha, "-p", remoteSha, "-m", message));
+        mergeSha = git.exec(workdir.toFile(), commit.toArray(String[]::new)).trim();
+        git.exec(workdir.toFile(), "git", "update-ref", "refs/heads/" + branch, mergeSha);
+      }
+      return "Merged remote into '" + branch + "' (merge commit " + shortSha(mergeSha) + ")";
+    }
+    if (probe.exitCode() == 1) {
+      String mergeBranch = mergeBranchName(branch);
+      git.exec(workdir.toFile(), "git", "update-ref", "refs/heads/" + mergeBranch, remoteSha);
+      throw new BadRequestException(
+          "Branch '"
+              + branch
+              + "' conflicts with the remote (conflicting files: "
+              + String.join(", ", GitExecutor.conflictedFiles(probe.output()))
+              + "); the remote tip was saved to branch '"
+              + mergeBranch
+              + "' (replacing any previous attempt) — merge '"
+              + branch
+              + "' into it, resolve the conflicts, integrate it back, then pull, sync or push"
+              + " again");
+    }
+    throw new InternalServerErrorException(
+        "Git merge-tree failed [" + probe.exitCode() + "]: " + probe.output());
   }
 
   /**
@@ -577,33 +689,116 @@ public class RepositoryService {
     }
   }
 
-  /** The scalar snapshot a push needs, read in one short transaction. */
-  private record PushContext(String url, String branch, Path originPath) {}
+  /**
+   * The scalar snapshot a push needs (url, main branch, bare-origin path), read in one short
+   * transaction — shared by {@link #pushRepository} and the remote-login sign-in terminal, whose
+   * interactive push runs exactly the same command shape in a host-side PTY.
+   */
+  public record PushSpec(String url, String branch, Path originPath) {}
+
+  /** Reads a {@link PushSpec} in its own short transaction (404 for an unknown id). */
+  public PushSpec pushSpec(String repoId) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Repository repo = get(repoId);
+              Path originPath = requireOrigin(repoId);
+              return new PushSpec(repo.url, resolveMainBranch(repo, originPath), originPath);
+            });
+  }
 
   /**
    * Pushes the local main branch to the remote. Pushes to the URL directly rather than the "origin"
    * remote, whose {@code mirror=true} config forbids the single-branch refspec.
+   *
+   * <p>A push the remote rejects as non-fast-forward (the remote gained commits we don't have)
+   * doesn't just fail anymore: the remote branch is fetched and reconciled with the same policy the
+   * pull uses — remote strictly ahead fast-forwards the mirror (nothing to push), a diverged branch
+   * that merges cleanly gets a merge commit and the push is retried once, and a conflicting
+   * divergence parks the remote tip on {@code merge/<branch>-origin-<branch>} (see {@link
+   * #mergeDivergedRemote}) and fails with the resolution path in the message.
    *
    * <p>Reads its inputs in a short transaction and runs {@code git push} outside it (the pull's
    * {@link PullContext} pattern), so it is safe on a worker thread with no request context — the
    * streamed sync ({@link #beginSyncRepository}) calls it there.
    */
   public String pushRepository(String repoId) {
-    PushContext ctx =
-        QuarkusTransaction.requiringNew()
-            .call(
-                () -> {
-                  Repository repo = get(repoId);
-                  Path originPath = requireOrigin(repoId);
-                  return new PushContext(repo.url, resolveMainBranch(repo, originPath), originPath);
-                });
+    PushSpec ctx = pushSpec(repoId);
     try {
-      return git.exec(
+      return push(ctx);
+    } catch (Exception e) {
+      if (!isNonFastForwardRejection(e.getMessage())) {
+        throw new InternalServerErrorException("Git push failed: " + e.getMessage());
+      }
+      return reconcileRejectedPush(repoId, ctx, e.getMessage());
+    }
+  }
+
+  private String push(PushSpec ctx) throws Exception {
+    return git.exec(
+        ctx.originPath().toFile(),
+        remoteAuth.gitWithCredentials(
+            "push", ctx.url(), "refs/heads/" + ctx.branch() + ":refs/heads/" + ctx.branch()));
+  }
+
+  /**
+   * The remote refused the ref update because it holds commits the mirror doesn't — git's "fetch
+   * first"/"non-fast-forward" rejection, as opposed to a hook decline ("remote rejected") or a
+   * transport/auth failure, which must surface unchanged.
+   */
+  private static boolean isNonFastForwardRejection(String message) {
+    return message != null
+        && (message.contains("non-fast-forward") || message.contains("fetch first"));
+  }
+
+  /**
+   * The push half of the divergence policy: fetch the remote branch, then fast-forward the mirror
+   * when the remote is strictly ahead (nothing local to push), merge-and-retry-once when the
+   * histories diverged but merge cleanly, and let {@link #mergeDivergedRemote}'s conflict path park
+   * the remote tip and throw otherwise. When the fetched tip turns out NOT to explain the rejection
+   * (already contained locally — e.g. a racing pull got there first), the original rejection is
+   * surfaced unchanged.
+   */
+  private String reconcileRejectedPush(String repoId, PushSpec ctx, String rejection) {
+    try {
+      git.exec(
           ctx.originPath().toFile(),
-          "git",
-          "push",
-          ctx.url(),
-          "refs/heads/" + ctx.branch() + ":refs/heads/" + ctx.branch());
+          remoteAuth.gitWithCredentials(
+              "fetch", "--end-of-options", ctx.url(), "refs/heads/" + ctx.branch()));
+      String remoteSha =
+          git.exec(ctx.originPath().toFile(), "git", "rev-parse", "FETCH_HEAD").trim();
+      String localSha =
+          git.exec(ctx.originPath().toFile(), "git", "rev-parse", "refs/heads/" + ctx.branch())
+              .trim();
+      if (remoteSha.equals(localSha) || isAncestor(ctx.originPath(), remoteSha, localSha)) {
+        throw new InternalServerErrorException("Git push failed: " + rejection);
+      }
+      if (isAncestor(ctx.originPath(), localSha, remoteSha)) {
+        // The remote simply moved ahead — catch the mirror up instead of failing.
+        git.exec(
+            ctx.originPath().toFile(),
+            "git",
+            "update-ref",
+            "refs/heads/" + ctx.branch(),
+            remoteSha);
+        ingestConfigQuietly(repoId);
+        return "Remote is ahead; fast-forwarded '"
+            + ctx.branch()
+            + "' to "
+            + shortSha(remoteSha)
+            + " — nothing to push";
+      }
+      String mergeVerdict =
+          mergeDivergedRemote(ctx.originPath(), false, ctx.branch(), localSha, remoteSha);
+      // Ingest only after the retried push actually reaches the remote — ingesting from the local
+      // merge commit first would leave the DB reflecting config from a commit that, if this retry
+      // is
+      // itself rejected (e.g. a racing third push), never made it past the mirror.
+      String pushOutput = push(ctx);
+      ingestConfigQuietly(repoId);
+      return mergeVerdict + "\n" + pushOutput;
+    } catch (BadRequestException | InternalServerErrorException e) {
+      throw e;
     } catch (Exception e) {
       throw new InternalServerErrorException("Git push failed: " + e.getMessage());
     }
@@ -671,7 +866,7 @@ public class RepositoryService {
                   // stay green and finish() computes overall `done failed` from the red push
                   // segment.
                   process.appendLine(pushSegment, "push failed: " + e.getMessage());
-                  process.settleSegment(pushSegment, false);
+                  settleWithAuthHint(process, pushSegment, e.getMessage(), repoId);
                 }
                 process.expectDaemons(List.of());
                 process.finishProvision(true);
@@ -679,8 +874,55 @@ public class RepositoryService {
                 // Root pull failure (diverged branch, unreachable remote): settle the open pull
                 // segment failed and emit `done failed` before the push segment ever opens.
                 // Idempotent.
-                process.failProvision(e.getMessage());
+                failWithAuthHint(process, e.getMessage(), repoId);
                 LOG.debugf(e, "Streamed sync failed for repository %s", repoId);
+              }
+            });
+        yield process.id();
+      }
+    };
+  }
+
+  /**
+   * The streamed push: a single {@code push:<basename>} segment wrapping {@link #pushRepository} —
+   * {@link #beginSyncRepository} minus the pull walk. Registers the {@link TechnicalProcess} before
+   * the push runs and returns its id immediately; a push failure settles the segment {@code failed}
+   * with git's message in-stream and {@code finish()} computes overall {@code done failed}. Throws
+   * 404 in-request for an unknown id.
+   *
+   * <p>Kind-aware single-flight (see {@link #beginPullRepository}): a live push is reused; a live
+   * pull/sync is a conflict (400), and vice versa — one repo process at a time.
+   */
+  public String beginPushRepository(String repoId) {
+    // Validate in-request (unknown id → plain 404, not a process) and name the sole segment by the
+    // repo's url basename, matching the sync's push segment shape.
+    String rootSegment =
+        QuarkusTransaction.requiringNew()
+            .call(() -> "push:" + Path.of(get(repoId).url).getFileName().toString());
+    return switch (processes.beginForRepository(repoId, "push")) {
+      case RepoProcessLease.Reused r -> r.processId();
+      case RepoProcessLease.Conflict c -> throw repositoryBusy(c.runningKind());
+      case RepoProcessLease.Fresh f -> {
+        TechnicalProcess process = f.process();
+        processExecutor.submit(
+            () -> {
+              try {
+                // Open before the push so "now pushing" is visible while it blocks on the network.
+                process.openSegment(rootSegment);
+                try {
+                  streamLines(process, rootSegment, pushRepository(repoId));
+                  settleOk(process, rootSegment);
+                } catch (RuntimeException e) {
+                  // Degrade the segment only (not failProvision): the red segment carries git's
+                  // full message and finish() computes overall `done failed` from it.
+                  process.appendLine(rootSegment, "push failed: " + e.getMessage());
+                  settleWithAuthHint(process, rootSegment, e.getMessage(), repoId);
+                }
+                process.expectDaemons(List.of());
+                process.finishProvision(true);
+              } catch (RuntimeException e) {
+                process.failProvision(e.getMessage());
+                LOG.debugf(e, "Streamed push failed for repository %s", repoId);
               }
             });
         yield process.id();
@@ -724,7 +966,9 @@ public class RepositoryService {
     String remoteSha;
     try {
       String out =
-          git.exec(originPath.toFile(), "git", "ls-remote", "origin", "refs/heads/" + branch)
+          git.exec(
+                  originPath.toFile(),
+                  remoteAuth.gitWithCredentials("ls-remote", "origin", "refs/heads/" + branch))
               .trim();
       remoteSha = out.isBlank() ? null : out.split("\\s+")[0];
     } catch (Exception e) {
@@ -751,11 +995,8 @@ public class RepositoryService {
       // can smuggle a git flag (e.g. `--upload-pack=<cmd>`) into the fetch.
       git.exec(
           originPath.toFile(),
-          "git",
-          "fetch",
-          "--end-of-options",
-          repo.url,
-          "refs/heads/" + branch);
+          remoteAuth.gitWithCredentials(
+              "fetch", "--end-of-options", repo.url, "refs/heads/" + branch));
       String counts =
           git.exec(
                   originPath.toFile(),

@@ -50,6 +50,12 @@ their framing as replayable segmented processes.
   — active-process discovery, reattach, and a concurrency guard for pulls.
 - **[sync-as-technical-process](features/2026-07-19_sync-as-technical-process.md)** — sync =
   the pull segments plus a final push segment.
+- **[push-as-technical-process](features/2026-07-21_push-as-technical-process.md)** — the
+  standalone Push button as the next instance (one `push:<basename>` segment), replacing the
+  silently-swallowed 500; also surfaces the pull/sync/push POSTs' own in-request errors in an
+  inline banner. Hosts the sign-in affordance of
+  [git-remote-https-auth](../qits-project-repositories/features/2026-07-21_git-remote-https-auth.md)
+  (implemented).
 
 ## Done when
 
@@ -65,3 +71,4 @@ parts.
 | [repository-pull-technical-process](features/2026-07-19_repository-pull-technical-process.md) | implemented |
 | [repository-pull-active-process-discovery](features/2026-07-19_repository-pull-active-process-discovery.md) | implemented |
 | [sync-as-technical-process](features/2026-07-19_sync-as-technical-process.md) | implemented |
+| [push-as-technical-process](features/2026-07-21_push-as-technical-process.md) | implemented |

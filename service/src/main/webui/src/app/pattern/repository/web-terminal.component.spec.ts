@@ -113,6 +113,23 @@ describe('WebTerminalComponent', () => {
     expect(FakeWebSocket.instances).toHaveLength(1);
   });
 
+  it('emits closed on the clean server close only — the host refreshes what the session changed', () => {
+    const fixture = createComponent();
+    const closes: number[] = [];
+    fixture.componentInstance.closed.subscribe(() => closes.push(1));
+
+    const first = FakeWebSocket.instances[0];
+    first.serverOpens();
+    first.serverCloses(1006); // abnormal — reconnects, no closed emission
+    expect(closes).toHaveLength(0);
+
+    vi.advanceTimersByTime(300);
+    const second = FakeWebSocket.instances[1];
+    second.serverOpens();
+    second.serverCloses(1000); // the session ended for good
+    expect(closes).toHaveLength(1);
+  });
+
   it('a successful reopen resets the retry budget', () => {
     createComponent();
     FakeWebSocket.instances[0].serverCloses(1006);

@@ -42,11 +42,13 @@ class FakeEventSource {
   template: `<app-technical-process-view
     [processId]="processId()"
     (finished)="verdicts.push($event)"
+    (segmentHint)="hints.push($event)"
   />`,
 })
 class TestProcessHost {
   readonly processId = signal('proc-1');
   readonly verdicts: Array<'ok' | 'failed'> = [];
+  readonly hints: Array<{ hint: string; target: string | null }> = [];
 }
 
 describe('TechnicalProcessViewComponent', () => {
@@ -146,6 +148,26 @@ describe('TechnicalProcessViewComponent', () => {
 
     expect(view.lost()).toBe(true);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('ended before');
+  });
+
+  it('emits segmentHint with the hint target for a settled frame carrying a hint, and not otherwise', () => {
+    const { fixture, source } = mount();
+    source.emitFrame({ segment: 'pull:child', kind: 'segment-open', seq: 0 });
+    source.emitFrame({
+      segment: 'pull:child',
+      kind: 'segment-settled',
+      seq: 1,
+      status: 'failed',
+      hint: 'remote-auth',
+      hintTarget: 'child-repo-7',
+    });
+    source.emitFrame({ segment: 'other', kind: 'segment-open', seq: 2 });
+    source.emitFrame({ segment: 'other', kind: 'segment-settled', seq: 3, status: 'failed' });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.hints).toEqual([
+      { hint: 'remote-auth', target: 'child-repo-7' },
+    ]);
   });
 
   it('ignores ping heartbeat frames', () => {
