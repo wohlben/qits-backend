@@ -51,6 +51,14 @@ their framing as replayable segmented processes.
 - **[sync-as-technical-process](features/2026-07-19_sync-as-technical-process.md)** — sync =
   the pull segments plus a final push segment.
 
+## Parts (ideas)
+
+- **[push-as-technical-process](feature-ideas/push-as-technical-process.md)** — the standalone
+  Push button becomes the next instance (one `push:<basename>` segment), replacing today's
+  silently-swallowed 500; also surfaces the pull/sync/push POSTs' own in-request errors. Hosts
+  the sign-in affordance of
+  [git-remote-https-auth](../qits-project-repositories/feature-ideas/git-remote-https-auth.md).
+
 ## Done when
 
 Rolling: current when its `feature-ideas/` is empty and every technical-process feature since
@@ -65,3 +73,4 @@ parts.
 | [repository-pull-technical-process](features/2026-07-19_repository-pull-technical-process.md) | implemented |
 | [repository-pull-active-process-discovery](features/2026-07-19_repository-pull-active-process-discovery.md) | implemented |
 | [sync-as-technical-process](features/2026-07-19_sync-as-technical-process.md) | implemented |
+| [push-as-technical-process](feature-ideas/push-as-technical-process.md) | idea |

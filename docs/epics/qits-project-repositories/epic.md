@@ -40,6 +40,14 @@ host** and the **fixture** repositories (test infrastructure), and the
 - **[qits-config-in-repo-configuration](features/2026-07-18_qits-config-in-repo-configuration.md)**
   — `.qits-config`: repository configuration committed in the repo, reconciled on clone/sync.
 
+## Parts (ideas)
+
+- **[git-remote-https-auth](feature-ideas/git-remote-https-auth.md)** — authenticate qits
+  against upstream HTTPS remotes: a persistent `credential.helper=store` file wired into every
+  remote-touching git verb, filled once via an interactive host-side sign-in terminal (the
+  Claude-login pattern applied to `git push`). Depends on
+  [push-as-technical-process](../qits-technical-processes/feature-ideas/push-as-technical-process.md).
+
 ## Done when
 
 Rolling: current when its `feature-ideas/` is empty and every repository-level feature since
@@ -52,3 +60,4 @@ this epic's creation has landed here.
 | [repository-discovery](features/2026-05-01_repository-discovery.md) | implemented |
 | [streaming-gitexecutor-exec](features/2026-07-19_streaming-gitexecutor-exec.md) | implemented |
 | [qits-config-in-repo-configuration](features/2026-07-18_qits-config-in-repo-configuration.md) | implemented |
+| [git-remote-https-auth](feature-ideas/git-remote-https-auth.md) | idea |
