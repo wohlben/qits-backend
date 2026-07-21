@@ -117,13 +117,17 @@ public class CommandLifecycleService {
       }
     } else {
       if (current == null) {
-        // Only agent launches carry the hook, and they always pin a first entry — a report on an
-        // empty list means something drifted; record it anyway so lineage follows reality.
-        LOG.warnf("Session report for command %s without a pinned session", commandId);
+        // Agent launches that cannot pin a session id (Kimi Code) start with an empty list; the
+        // first hook report establishes the session.
+        LOG.debugf("Session report for command %s without a pinned session", commandId);
       }
       command.agentSessions.add(
           new AgentSessionRef(
-              sessionId, AgentSessionSource.SWITCHED, null, transcriptPath, Instant.now()));
+              sessionId,
+              current == null ? AgentSessionSource.REPORTED : AgentSessionSource.SWITCHED,
+              null,
+              transcriptPath,
+              Instant.now()));
     }
     changePublisher.fire(
         command.workspace.repository.id,

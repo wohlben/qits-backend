@@ -108,6 +108,7 @@ components:
       - RESUMED
       - FORKED
       - SWITCHED
+      - REPORTED
     AgentSubagentDto:
       type: object
       properties:

@@ -21,6 +21,7 @@ public final class CodingAgentFactory {
   public static CodingAgent ofType(AgentType type) {
     return switch (type) {
       case CLAUDE -> new ClaudeCodeAgent();
+      case KIMI -> new KimiCodeAgent();
     };
   }
 }

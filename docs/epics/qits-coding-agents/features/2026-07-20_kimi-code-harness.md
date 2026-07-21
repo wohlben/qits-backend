@@ -16,33 +16,33 @@ one harness per qits deployment, no per-launch UI picker.
 **The native in-UI chat is deliberately out of scope here** — kimi has no stdin stream-json chat
 mode, so its chat rides its **ACP (Agent Client Protocol)** stdio interface, a large enough piece
 to own its own document. This harness feature ships without kimi chat; kimi chat launches are
-rejected until [kimi-code-acp-chat](kimi-code-acp-chat.md) lands. Interactive and autonomous runs
+rejected until [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md) lands. Interactive and autonomous runs
 are fully functional.
 
 Related / dependent plans:
 
-- Builds directly on the [coding-agent-harness](../features/2026-07-01_coding-agent-harness.md):
+- Builds directly on the [coding-agent-harness](2026-07-01_coding-agent-harness.md):
   `CodingAgent` / `CodingAgentFactory` / `AgentType` / `LaunchSpec` are the extension points this
   feature plugs into; `AgentLaunchService` owns the MCP scope→URL construction both harnesses share.
-- **Prerequisite of [kimi-code-acp-chat](kimi-code-acp-chat.md)** — the native chat over ACP builds
+- **Prerequisite of [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md)** — the native chat over ACP builds
   on the `AgentType.KIMI` harness, session-identity model, transcript import, and auth this feature
   establishes.
-- Reuses the session machinery of [agent-session-lineage](../features/2026-07-10_agent-session-lineage.md)
+- Reuses the session machinery of [agent-session-lineage](2026-07-10_agent-session-lineage.md)
   (session refs on the command row, the session-report endpoint) with a relaxed identity model —
   kimi session ids can't be pinned at launch.
-- Reuses the transcript import of [chat-persistence-on-transcript](../features/2026-07-10_chat-persistence-on-transcript.md)
+- Reuses the transcript import of [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md)
   (`AgentTranscriptService` / `AgentTranscriptTailService`) against kimi's `wire.jsonl` layout.
 - Rides the same container/credential model as
-  [container-agent-sessions](../features/2026-07-04_container-agent-sessions.md): the shared named
+  [container-agent-sessions](2026-07-04_container-agent-sessions.md): the shared named
   volume, the HOME overlay, `docker/workspace/agent-login.sh`.
-- Complements [mcp-task-prompt-delivery](mcp-task-prompt-delivery.md): the fetch-not-push prompt
+- Complements [mcp-task-prompt-delivery](../feature-ideas/mcp-task-prompt-delivery.md): the fetch-not-push prompt
   model is launch-shape-universal and applies unchanged to kimi (its `-p` and TUI modes both
   support MCP tools).
 
 ## Problem: where Claude is assumed today
 
 The harness abstraction covers **command rendering**; everything around it is Claude-shaped
-(the chat-specific assumptions are addressed in [kimi-code-acp-chat](kimi-code-acp-chat.md)):
+(the chat-specific assumptions are addressed in [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md)):
 
 - **`AgentType` / `CodingAgentFactory`** — one value, one case. (The intended extension point; no
   design flaw.)
@@ -93,11 +93,14 @@ Probed against the installed CLI and the official docs
   `auth status` subcommand; the probe is credential-file presence (or a trivial `-p` run).
 - **Sessions / transcripts**: `$KIMI_CODE_HOME/sessions/<workDirKey>/<sessionId>/agents/main/
   wire.jsonl`, with subagent sidechains as sibling `agents/<subagentId>/wire.jsonl` and `state.json`
-  metadata. Session ids are `session_<uuid>`. `wire.jsonl` has its own schema (a `metadata` line
-  with `protocol_version`, `config.update`, message events) and carries request-trace noise (tool
-  schemas, MCP listings) the import must filter.
+  metadata. Session ids are `session_<uuid>`. The `<workDirKey>` is
+  **`wd_<basename(cwd)>_<sha256(cwd)[:12]>`** (verified on CLI 0.28.1: `/workspace` →
+  `wd_workspace_c52ddf65534b`, `/tmp` → `wd_tmp_e9671acd2448`, `/tmp/probe-nest/sub` →
+  `wd_sub_7e6a66d1ac42` — NOT Claude's non-alphanumeric→`-` escaping). `wire.jsonl` has its own
+  schema (a `metadata` line with `protocol_version`, `config.update`, message events) and carries
+  request-trace noise (tool schemas, MCP listings) the import must filter.
 - **Chat (bidirectional)**: no stdin stream-json — the programmatic protocol is `kimi acp`, owned
-  by [kimi-code-acp-chat](kimi-code-acp-chat.md).
+  by [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md).
 
 ## Proposed design
 
@@ -107,25 +110,27 @@ A `KimiCodeAgent extends CodingAgent` rendering kimi command lines, added to the
 `start()` → `exec kimi` (TUI; `--yolo` when skip-permissions, `-S <id>` on resume, `-m` model);
 `run(prompt)` → `kimi -p '<prompt>' [--output-format stream-json]`. `transcriptPath`/`subagentsDir`
 map to the `sessions/<workDirKey>/<id>/agents/` layout. (`chat()` → `exec kimi acp` is added by
-[kimi-code-acp-chat](kimi-code-acp-chat.md); until then a kimi `chat()` render throws / the launch
+[kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md); until then a kimi `chat()` render throws / the launch
 is rejected — see below.)
 
 A global **`qits.agent.type=claude|kimi`** (default `claude`) is read by `AgentLaunchService` (one
 `ofType` call site per render method becomes type-driven, display names per harness),
 `PromptRefinementService`, `AgentAuthStatus`, the transcript services (per-harness config dir +
-path convention), and `AgentPluginService` (plugins stay Claude-only; the UI hides that surface for
-kimi).
+path convention), and `AgentPluginService` (plugins stay Claude-only; under kimi the endpoints
+reject with a clear 400).
 
 ### 2. Session identity without pinning
 
 Kimi can't pin a session id, so the lineage model relaxes: a fresh kimi launch starts **unpinned**
 and qits learns the id from the harness itself — the `SessionStart` hook POST (payload carries
-`session_id`, wired to the existing `/api/commands/{id}/agent-session` endpoint via a `[[hooks]]`
-entry in the volume's `config.toml`), and for `-p` runs the `session.resume_hint` meta line. The
-first `AgentSessionRef` on the command row becomes "reported at start" rather than PINNED. Resume
-maps to `-S <id>`; **fork is rejected with a clear 400 for kimi** (no CLI support — emulating it by
-copying session dirs is explicitly out). Session-id validation accepts harness-native ids
-(`session_<uuid>`) instead of canonical UUIDs only.
+`session_id`), wired to the existing `/api/commands/{id}/agent-session` endpoint. Kimi's only hook
+channel is a `[[hooks]]` entry in `config.toml` and the report URL is per-command, so the hook
+can't live on the shared volume: each launch writes a **launch-local `config.toml`** into its
+throwaway `KIMI_CODE_HOME` (a copy of the volume's config plus the appended `[[hooks]]` entry;
+see §3). The first `AgentSessionRef` on the command row becomes "reported at start" rather than
+PINNED. Resume maps to `-S <id>`; **fork is rejected with a clear 400 for kimi** (no CLI support —
+emulating it by copying session dirs is explicitly out). Session-id validation accepts
+harness-native ids (`session_<uuid>`) instead of canonical UUIDs only.
 
 ### 3. MCP delivery for interactive + autonomous: a per-launch `KIMI_CODE_HOME`
 
@@ -149,9 +154,10 @@ into its `LaunchSpec` script (a mktemp + symlink farm):
 QITS_KIMI_HOME="$KIMI_CODE_HOME"
 export KIMI_CODE_HOME="$(mktemp -d /tmp/qits-kimi-XXXXXX)"
 trap 'rm -rf "$KIMI_CODE_HOME"' EXIT
-# Symlink farm: everything except mcp.json resolves back to the shared volume home. Login-written
-# state (config, credentials, device id) is linked only if present.
-for e in config.toml tui.toml credentials oauth device_id; do
+# Symlink farm: everything except mcp.json and config.toml resolves back to the shared volume
+# home. Login-written state (credentials, device id) is linked only if present. (config.toml is
+# linked instead when session reporting is off.)
+for e in tui.toml credentials oauth device_id; do
   [ -e "$QITS_KIMI_HOME/$e" ] && ln -s "$QITS_KIMI_HOME/$e" "$KIMI_CODE_HOME/$e"
 done
 # The session store is written at runtime and may not exist yet on a fresh volume, so create it on
@@ -162,17 +168,32 @@ mkdir -p "$QITS_KIMI_HOME/sessions"
 ln -s "$QITS_KIMI_HOME/sessions" "$KIMI_CODE_HOME/sessions"
 [ -e "$QITS_KIMI_HOME/session_index.jsonl" ] || : > "$QITS_KIMI_HOME/session_index.jsonl"
 ln -s "$QITS_KIMI_HOME/session_index.jsonl" "$KIMI_CODE_HOME/session_index.jsonl"
+# Launch-local config.toml: the volume's settings plus this launch's SessionStart report hook —
+# the hook URL is per-command, so a static volume-level [[hooks]] entry can't carry it.
+{ [ ! -e "$QITS_KIMI_HOME/config.toml" ] || cat "$QITS_KIMI_HOME/config.toml"; } \
+  > "$KIMI_CODE_HOME/config.toml"
+cat >> "$KIMI_CODE_HOME/config.toml" <<'EOF'
+
+[[hooks]]
+event = "SessionStart"
+command = 'curl -fsS -m 5 -X POST -H "Content-Type: application/json" --data-binary @- <url>'
+EOF
 cat > "$KIMI_CODE_HOME/mcp.json" <<'EOF'
 { "mcpServers": { "repository": { "url": "…scoped…", "enabledTools": [ … ] } } }
 EOF
-exec kimi …
+# Both heredocs MUST precede the launch (kimi reads mcp.json and config.toml at startup), and the
+# launch is NOT exec'd: exec would replace the shell, so the farm's EXIT trap would never fire and
+# the throwaway home would leak. As the script's last command, kimi still hands its exit code on.
+kimi …
 ```
 
 Every launch gets its **own** `mcp.json` — no race, no lock, nothing written into the workspace
-clone, no `.git/info/exclude` — while credentials, hooks config, and the session store flow
-through the symlinks onto the shared volume, so login, the `SessionStart` report hook, and the
-`wire.jsonl` transcript import all keep working unchanged (kimi creates session subdirs *inside*
-the symlinked `sessions/`; the writes land on the volume). The user-level
+clone, no `.git/info/exclude` — while credentials and the session store flow through the symlinks
+onto the shared volume, so login and the `wire.jsonl` transcript import keep working unchanged
+(kimi creates session subdirs *inside* the symlinked `sessions/`; the writes land on the volume).
+The `config.toml` is the one farm exception under session reporting: the launch writes a
+launch-local copy carrying its own `SessionStart` report hook (§2), because the hook URL is
+per-command. The user-level
 `$KIMI_CODE_HOME/mcp.json` on the volume is deliberately **not** used: it is global across all
 workspaces — exactly the clobbering this section exists to avoid. Runtime-only state that lands in
 the throwaway dir instead (diagnostic logs, `user-history`, update checks) is acceptable — none of
@@ -192,7 +213,7 @@ tool naming is identical, so nothing else changes).
 
 > **Chat** (over ACP) uses a different, protocol-native channel — scoped `mcpServers` on
 > `session/new`, no file — because the ACP transport has a per-session slot the file-based modes
-> lack. See [kimi-code-acp-chat](kimi-code-acp-chat.md) §"MCP over ACP".
+> lack. See [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md) §"MCP over ACP".
 
 ### 4. Auth on the shared volume
 
@@ -209,21 +230,25 @@ subcommand exists).
 ### 5. Transcript import
 
 `AgentTranscriptService`/`AgentTranscriptTailService` resolve kimi's
-`sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl` (the workDirKey derivation is verified
-and pinned by a regression IT, exactly like the claude escaped-cwd convention) and import it with
+`sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl` (the `wd_<basename>_<sha256[:12]>`
+workDirKey rule is verified and pinned by `KimiCodeAgentTest`, exactly like the Claude escaped-cwd
+convention) and import it with
 kimi-shaped filtering: drop the request-trace noise (`config.update`, tool-schema dumps), map
 kimi's message events for the stat collector's conversation-turn counting, and import subagent
 sidechains from sibling `agents/<id>/wire.jsonl` dirs. The frontend consumes the normalized import
 unchanged.
 
 The transcript services (and the tail) currently hardcode `ofType(AgentType.CLAUDE)` and the
-`qits.agent.claude-config-dir`; both become per-harness: the config dir resolves to `.kimi-code`
-under kimi and the transcript/subagent path conventions come from `AgentType`.
+`qits.agent.claude-config-dir`; both become per-harness: the config dir property is renamed to
+`qits.agent.config-dir` (the old name stays honored as a fallback), and unset it **derives in
+code** from `qits.workspace.claude-mount` + the harness dot-dir — `.claude` or `.kimi-code`, a
+mapping property interpolation cannot express — while the transcript/subagent path conventions
+come from `AgentType`.
 
 > The re-attach **uuid-minting contract** (minting a stable uuid per normalized event so the live
 > ring and the durable transcript stitch losslessly) only matters for the live chat stream, so it
 > is specified together with the ACP normalizer in
-> [kimi-code-acp-chat](kimi-code-acp-chat.md). The autonomous/interactive transcript import here is
+> [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md). The autonomous/interactive transcript import here is
 > post-exit / tail-only and needs no live-ring stitching.
 
 ### 6. Image and login script
@@ -232,13 +257,19 @@ under kimi and the transcript/subagent path conventions come from `AgentType`.
 `docker/qits/Dockerfile` at a pinned version (`KIMI_CODE_VERSION` ARG, mirroring
 `CLAUDE_CODE_VERSION`, installed system-wide via `KIMI_INSTALL_DIR=/usr/local`, update preflight
 disabled with `KIMI_CODE_NO_AUTO_UPDATE=1`), so both harnesses ship in the one `qits/workspace`
-image — and in the devcontainer, which is `FROM qits/workspace:latest`. Remaining here:
-`agent-login.sh` gains a kimi path (`kimi login` in the throwaway container against the volume).
+image — and in the devcontainer, which is `FROM qits/workspace:latest`. `agent-login.sh` already supports `kimi login` against the real volume home.
+
+**Implemented (this change):** `AgentType.KIMI`, `KimiCodeAgent`, the per-launch `KIMI_CODE_HOME`
+symlink farm with scoped `mcp.json` and the launch-local `config.toml` `SessionStart` report hook,
+harness-aware `AgentLaunchService` / `AgentAuthStatus` /
+`AgentTranscriptService` / `AgentTranscriptTailService` / `PromptRefinementService` /
+`AgentPluginService`, the `qits.agent.type` global property, and the `session_<uuid>` identity model
+with a new `AgentSessionSource.REPORTED` entry. Kimi chat remains rejected until ACP chat lands.
 
 ## Not built (candidate follow-ups)
 
 - **Kimi native chat** — over ACP; its own document,
-  [kimi-code-acp-chat](kimi-code-acp-chat.md). Kimi chat launches are rejected until it lands.
+  [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md). Kimi chat launches are rejected until it lands.
 - **Fork for kimi** — no CLI support; would require copying session dirs (fragile, unversioned
   layout).
 - **Kimi plugins** — a different mechanism than the Claude marketplace; `AgentPluginService` stays
@@ -248,10 +279,14 @@ image — and in the devcontainer, which is `FROM qits/workspace:latest`. Remain
 
 ## Open verifications (spikes before/during implementation)
 
-- The `<workDirKey>` derivation rule in `sessions/<workDirKey>/…`, and `wire.jsonl` schema
-  stability across CLI versions (the `protocol_version` metadata line is the pin point).
-- Does the `SessionStart` hook fire for `-p` launches, not only the TUI? (Determines whether `-p`
-  runs can rely on the hook for identity or must parse `session.resume_hint`.)
+- **Verified (2026-07-21, CLI 0.28.1):** the `<workDirKey>` rule is
+  `wd_<basename(cwd)>_<sha256(cwd)[:12]>`, and the `SessionStart` hook **does fire for `-p`
+  launches** (payload `{"hook_event_name":"SessionStart","session_id":"session_…","cwd":…,
+  "source":"startup"}` — no `transcript_path`, so the import relies on the path convention). The
+  stream-json output also carries the documented meta line
+  `{"role":"meta","type":"session.resume_hint","session_id":"session_…",…}`; with the hook firing
+  for `-p`, no resume_hint parsing fallback is needed. Still open: `wire.jsonl` schema stability
+  across CLI versions (the `protocol_version` metadata line is the pin point).
 - The mktemp symlink farm's core assumption: kimi follows symlinked `sessions/`, `credentials`,
   and `config.toml` transparently (session subdir creation and atomic renames *inside* a symlinked
   dir land on the volume; verified with a real launch in the container). Also that nothing
@@ -269,7 +304,7 @@ image — and in the devcontainer, which is `FROM qits/workspace:latest`. Remain
   renders the mktemp home, the symlink farm, and the scoped `mcp.json` heredoc (prefix-stripped
   `enabledTools`); `launchLogin` provably uses the real volume home; POSIX shell-quoting.
 - `AgentLaunchServiceTest`: `qits.agent.type` selects the harness, names/probes follow; kimi fork
-  rejected with 400; kimi chat launch rejected until [kimi-code-acp-chat](kimi-code-acp-chat.md).
+  rejected with 400; kimi chat launch rejected until [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md).
 - Transcript-import tests on recorded `wire.jsonl` fixtures (main + sidechain + trace noise).
 - `AgentAuthStatus` probe parse tests (credential-file presence).
 - Extended (real-docker) IT: kimi autonomous run in a workspace container, session id reported,

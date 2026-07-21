@@ -29,11 +29,12 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 /**
- * Launches a coding agent (Claude Code) into a workspace with an MCP server attached, scoped to the
- * repository or project it runs in. This is the separate "agent code path" that replaced the old
- * {@code CLAUDE_*} action variants: it renders the launch with {@link CodingAgentFactory}, writes
- * any seed prompt into the workspace, and spawns it as a registry {@link CommandDto} — so an agent
- * session still shows up in the Commands list and is attachable/terminable like any other command.
+ * Launches a coding agent (Claude Code or Kimi Code) into a workspace with an MCP server attached,
+ * scoped to the repository or project it runs in. This is the separate "agent code path" that
+ * replaced the old {@code CLAUDE_*} action variants: it renders the launch with {@link
+ * CodingAgentFactory}, writes any seed prompt into the workspace, and spawns it as a registry
+ * {@link CommandDto} — so an agent session still shows up in the Commands list and is
+ * attachable/terminable like any other command.
  *
  * <p>Owns the MCP scope→URL construction (the read-only allowlists and the {@code ?repositoryId=} /
  * {@code ?projectId=} query params) that used to live in {@code ActionResolutionService}. Scope ids
@@ -145,13 +146,18 @@ public class AgentLaunchService {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
+  /** Which coding-agent harness this qits deployment launches (one harness per deployment). */
+  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
+  AgentType agentType;
+
   /**
-   * Launches Claude Code as a stream-json <strong>chat</strong> command in {@code workspaceId} of
-   * {@code repoId}, with the MCP server(s) for {@code scope} attached. The session is rendered as a
-   * conversation and tracked in the command registry (re-attachable, logged). Tools run
-   * auto-approved ({@code --dangerously-skip-permissions}): the CLI does not expose the stream-json
-   * permission-prompt protocol, so in-UI approval isn't currently possible; a networked deployment
-   * would want that. Returns the spawned command.
+   * Launches the active coding agent as a stream-json <strong>chat</strong> command in {@code
+   * workspaceId} of {@code repoId}, with the MCP server(s) for {@code scope} attached. The session
+   * is rendered as a conversation and tracked in the command registry (re-attachable, logged).
+   * Tools run auto-approved. Returns the spawned command.
+   *
+   * <p>Kimi Code does not support native chat yet; launching chat under {@code
+   * qits.agent.type=kimi} throws {@link BadRequestException}.
    */
   public CommandDto launchChat(
       String repoId, String workspaceId, AgentMcpScope scope, String initialContext) {
@@ -177,6 +183,10 @@ public class AgentLaunchService {
       String resumeSessionId,
       boolean fork,
       boolean deliverTaskPrompt) {
+    if (agentType == AgentType.KIMI) {
+      throw new BadRequestException(
+          "Kimi Code chat is not implemented yet; use interactive or autonomous launches");
+    }
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -193,8 +203,7 @@ public class AgentLaunchService {
     workspaceService.ensureContainer(repoId, workspaceId);
 
     // The agent can't authenticate until an operator has signed in on the shared credential volume.
-    // When it hasn't, launch an interactive `claude` REPL terminal instead — the caller redirects
-    // to
+    // When it hasn't, launch an interactive agent REPL terminal instead — the caller redirects to
     // its command page (a real PTY), the operator finishes OAuth through the REPL onboarding there,
     // and the next chat launch (this workspace or any other, same volume) sees the login and
     // proceeds.
@@ -263,11 +272,12 @@ public class AgentLaunchService {
   }
 
   /**
-   * Launches the full interactive Claude Code TUI (the plain {@code claude} REPL in xterm.js, kind
-   * {@code TERMINAL}) as a first-class agent session: same MCP scope servers, credential overlay
-   * and skip-permissions as chat, plus a pinned session id and the session-report hook — so the run
-   * is resumable, forkable, and its transcript is imported on exit like any chat. The PTY byte
-   * stream stays terminal-only; the structured conversation comes from the transcript.
+   * Launches the full interactive agent TUI (the plain {@code claude} or {@code kimi} REPL in
+   * xterm.js, kind {@code TERMINAL}) as a first-class agent session: same MCP scope servers,
+   * credential overlay and skip-permissions as chat, plus a session id and the session-report hook
+   * — so the run is resumable, forkable (Claude only), and its transcript is imported on exit like
+   * any chat. The PTY byte stream stays terminal-only; the structured conversation comes from the
+   * transcript.
    */
   public CommandDto launchInteractive(
       String repoId,
@@ -277,6 +287,9 @@ public class AgentLaunchService {
       String resumeSessionId,
       boolean fork,
       boolean deliverTaskPrompt) {
+    if (agentType == AgentType.KIMI && fork) {
+      throw new BadRequestException("fork is not supported by Kimi Code");
+    }
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -314,33 +327,47 @@ public class AgentLaunchService {
   }
 
   /**
-   * Launches an interactive {@code claude} REPL terminal (a normal PTY command, kind {@code
-   * TERMINAL}) in the workspace's container so an operator can complete the one-time OAuth through
-   * its onboarding paste flow. Writes to the shared credential volume (HOME overlay), so it signs
-   * in every workspace at once. Returned by {@link #launchChat} when the agent isn't signed in yet;
-   * the caller redirects to its terminal.
+   * Launches an interactive agent login terminal (a normal PTY command, kind {@code TERMINAL}) in
+   * the workspace's container so an operator can complete the one-time sign-in (Claude: OAuth
+   * through the REPL onboarding; Kimi: the device-code flow). Writes to the shared credential
+   * volume, so it signs in every workspace at once. Returned by {@link #launchChat} when the agent
+   * isn't signed in yet; the caller redirects to its terminal.
    */
   public CommandDto launchLogin(String repoId, String workspaceId) {
     LaunchSpec spec = renderLogin();
+    String name =
+        switch (agentType) {
+          case CLAUDE -> "Claude sign-in";
+          case KIMI -> "Kimi sign-in";
+        };
     return commandService.launchAgent(
-        repoId, workspaceId, "Claude sign-in", spec.script(), true, spec.environment());
+        repoId, workspaceId, name, spec.script(), true, spec.environment());
   }
 
-  /** Renders the interactive login command with the shared-volume {@code HOME} overlay. */
+  /** Renders the interactive login command with the shared-volume credential overlay. */
   LaunchSpec renderLogin() {
     Map<String, String> env = new HashMap<>();
     if (claudeMount != null && !claudeMount.isBlank()) {
-      env.put("HOME", claudeMount);
+      switch (agentType) {
+        case CLAUDE -> env.put("HOME", claudeMount);
+        // Kimi uses KIMI_CODE_HOME, set at the container level; login must run against the real
+        // volume home (no per-launch mktemp farm) so credential writes survive.
+        case KIMI -> env.put("KIMI_CODE_HOME", claudeMount + "/.kimi-code");
+      }
     }
-    // Run the `claude` REPL, NOT the `claude auth login` subcommand. The REPL's first-run
-    // onboarding
-    // (theme -> login method -> OAuth) renders a paste-the-code prompt over the PTY and reads it
-    // from
-    // stdin, so an operator can complete sign-in in the terminal. The `auth login` subcommand does
-    // not: in Claude Code v2.1.89 it prints the authorize URL and then blocks on a loopback HTTP
-    // callback the host browser can never reach — no paste prompt, no stdin read — so its terminal
-    // looks dead. See docs/issues/resolved/2026-07-05_claude-auth-login-terminal-no-input.md.
-    return new LaunchSpec("exec claude", true, env);
+    return switch (agentType) {
+      case CLAUDE ->
+          // Run the `claude` REPL, NOT the `claude auth login` subcommand. The REPL's first-run
+          // onboarding renders a paste-the-code prompt over the PTY and reads it from stdin, so an
+          // operator can complete sign-in in the terminal. The `auth login` subcommand blocks on a
+          // loopback HTTP callback the host browser can never reach. See the resolved issue doc.
+          new LaunchSpec("exec claude", true, env);
+      case KIMI ->
+          // Kimi login is a device-code flow that prints the verification URL + user code and
+          // polls,
+          // so it works plainly over a TTY.
+          new LaunchSpec("exec kimi login", true, env);
+    };
   }
 
   /**
@@ -350,11 +377,13 @@ public class AgentLaunchService {
   record PinnedSession(String commandId, AgentSessionRef ref) {}
 
   /**
-   * Pins the launch's session identity. Fresh launches pin a brand-new UUID ({@code PINNED});
-   * resume reuses {@code resumeSessionId} in place ({@code RESUMED}); fork branches it into a fresh
-   * pin ({@code FORKED}, with the origin recorded). Resume/fork require the session to belong to
-   * this workspace — iteration one keeps lineage where the transcript's file references and git
-   * state live. A retried launch pins fresh ids (pinned ids are create-only).
+   * Pins the launch's session identity. Fresh launches pin a brand-new UUID ({@code PINNED}); Kimi
+   * Code cannot pin a fresh session id, so its fresh launches return a {@code null} ref and qits
+   * learns the id from the harness's SessionStart hook. Resume reuses {@code resumeSessionId} in
+   * place ({@code RESUMED}); fork branches it into a fresh pin ({@code FORKED}, with the origin
+   * recorded). Resume/fork require the session to belong to this workspace — iteration one keeps
+   * lineage where the transcript's file references and git state live. A retried launch pins fresh
+   * ids (pinned ids are create-only).
    */
   PinnedSession pinSession(
       String repoId, String workspaceId, String resumeSessionId, boolean fork) {
@@ -363,12 +392,16 @@ public class AgentLaunchService {
       if (fork) {
         throw new BadRequestException("fork requires resumeSessionId");
       }
+      if (agentType == AgentType.KIMI) {
+        // Kimi cannot pin a new session id; the SessionStart hook will report it later.
+        return new PinnedSession(commandId, null);
+      }
       return new PinnedSession(
           commandId,
           new AgentSessionRef(
               UUID.randomUUID().toString(), AgentSessionSource.PINNED, null, null, Instant.now()));
     }
-    requireUuid(resumeSessionId, "session id");
+    requireSessionId(resumeSessionId, "session id");
     boolean owned =
         QuarkusTransaction.requiringNew()
             .call(
@@ -380,6 +413,9 @@ public class AgentLaunchService {
           "Session " + resumeSessionId + " does not belong to workspace " + workspaceId);
     }
     if (fork) {
+      if (agentType == AgentType.KIMI) {
+        throw new BadRequestException("fork is not supported by Kimi Code");
+      }
       return new PinnedSession(
           commandId,
           new AgentSessionRef(
@@ -393,6 +429,18 @@ public class AgentLaunchService {
         commandId,
         new AgentSessionRef(
             resumeSessionId, AgentSessionSource.RESUMED, null, null, Instant.now()));
+  }
+
+  private void requireSessionId(String value, String label) {
+    if (agentType == AgentType.KIMI) {
+      if (value == null
+          || !value.matches(
+              "session_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
+        throw new BadRequestException("Invalid " + label + ": " + value);
+      }
+      return;
+    }
+    requireUuid(value, label);
   }
 
   /**
@@ -434,12 +482,15 @@ public class AgentLaunchService {
   /** Configures the agent's session flags + report hook from the pinned identity. */
   private CodingAgent withSession(CodingAgent agent, PinnedSession pinned) {
     AgentSessionRef ref = pinned.ref();
-    switch (ref.source) {
-      case PINNED -> agent.sessionId(ref.sessionId);
-      case RESUMED -> agent.resume(ref.sessionId);
-      case FORKED -> agent.resume(ref.forkedFromSessionId).fork(ref.sessionId);
-      case SWITCHED ->
-          throw new IllegalStateException("SWITCHED is hook-reported, never a launch source");
+    if (ref != null) {
+      switch (ref.source) {
+        case PINNED -> agent.sessionId(ref.sessionId);
+        case RESUMED -> agent.resume(ref.sessionId);
+        case FORKED -> agent.resume(ref.forkedFromSessionId).fork(ref.sessionId);
+        case SWITCHED, REPORTED ->
+            throw new IllegalStateException(
+                "SWITCHED/REPORTED are hook-reported, never a launch source");
+      }
     }
     return agent.sessionReporting(sessionReportUrl(pinned.commandId()));
   }
@@ -484,7 +535,7 @@ public class AgentLaunchService {
    */
   LaunchSpec renderChat(
       String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
-    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
@@ -498,13 +549,12 @@ public class AgentLaunchService {
    */
   LaunchSpec renderAutonomous(
       String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
-    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       // Unattended run under skip-permissions: mark the server read-only so
       // ReadOnlyRepositoryToolFilter (service module) hides the mutating repository tools
       // (createWorkspace/integrateBranch/…). The run still gets taskPrompt + the read-only tools;
-      // its
-      // own git work happens inside its container, not via host-side MCP mutations.
+      // its own git work happens inside its container, not via host-side MCP mutations.
       agent.mcpServer(server.key(), McpServers.httpMcp(readOnlyMarked(server.url())));
     }
     return withSession(withAgentHome(agent), pinned).skipPermissions().run(TASK_PROMPT_BOOTSTRAP);
@@ -530,7 +580,7 @@ public class AgentLaunchService {
       AgentMcpScope scope,
       String initialContext,
       PinnedSession pinned) {
-    CodingAgent agent = CodingAgentFactory.ofType(AgentType.CLAUDE);
+    CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
@@ -543,10 +593,12 @@ public class AgentLaunchService {
   /**
    * Points the agent's {@code HOME} at the shared credential volume so the in-container {@code
    * claude} reads the operator's one-time OAuth login. CWD stays {@code /workspace}, so project
-   * detection (the repo's own {@code .claude/}, {@code CLAUDE.md}) is unaffected.
+   * detection (the repo's own {@code .claude/}, {@code CLAUDE.md}) is unaffected. Kimi Code uses
+   * the container-level {@code KIMI_CODE_HOME} and its own per-launch symlink farm, so no {@code
+   * HOME} overlay is needed.
    */
   private CodingAgent withAgentHome(CodingAgent agent) {
-    if (claudeMount != null && !claudeMount.isBlank()) {
+    if (agentType == AgentType.CLAUDE && claudeMount != null && !claudeMount.isBlank()) {
       agent.environment("HOME", claudeMount);
     }
     return agent;
@@ -620,18 +672,28 @@ public class AgentLaunchService {
   }
 
   private String nameFor(AgentMcpScope scope) {
-    return switch (scope) {
-      case ACTIONS -> "Claude Code (actions + repository MCP)";
-      case REPOSITORY -> "Claude Code (repository MCP)";
-      case PROJECT -> "Claude Code (project MCP)";
-    };
+    return harnessName(
+        scope,
+        switch (agentType) {
+          case CLAUDE -> "Claude Code";
+          case KIMI -> "Kimi Code";
+        });
   }
 
   private String interactiveNameFor(AgentMcpScope scope) {
+    return harnessName(
+        scope,
+        switch (agentType) {
+          case CLAUDE -> "Claude Code terminal";
+          case KIMI -> "Kimi Code terminal";
+        });
+  }
+
+  private static String harnessName(AgentMcpScope scope, String harnessLabel) {
     return switch (scope) {
-      case ACTIONS -> "Claude Code terminal (actions + repository MCP)";
-      case REPOSITORY -> "Claude Code terminal (repository MCP)";
-      case PROJECT -> "Claude Code terminal (project MCP)";
+      case ACTIONS -> harnessLabel + " (actions + repository MCP)";
+      case REPOSITORY -> harnessLabel + " (repository MCP)";
+      case PROJECT -> harnessLabel + " (project MCP)";
     };
   }
 

@@ -24,6 +24,7 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,14 @@ public class AgentSessionReportTest {
   /** Seeds a command with one PINNED session entry, bypassing the process registry. */
   @Transactional
   String seedAgentCommand(String sessionId, CommandStatus status) {
+    return seedCommand(
+        status,
+        new AgentSessionRef(sessionId, AgentSessionSource.PINNED, null, null, Instant.now()));
+  }
+
+  /** Seeds a command with the given session entries (none = an unpinned fresh Kimi launch). */
+  @Transactional
+  String seedCommand(CommandStatus status, AgentSessionRef... refs) {
     Project project = new Project();
     project.id = UUID.randomUUID().toString();
     project.name = "Report project";
@@ -76,8 +85,7 @@ public class AgentSessionReportTest {
             .kind(CommandKind.CHAT)
             .status(status)
             .build();
-    command.agentSessions.add(
-        new AgentSessionRef(sessionId, AgentSessionSource.PINNED, null, null, Instant.now()));
+    command.agentSessions.addAll(List.of(refs));
     commandRepository.persist(command);
     return command.id;
   }
@@ -181,5 +189,50 @@ public class AgentSessionReportTest {
         .post("/api/commands/" + commandId + "/agent-session")
         .then()
         .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
+  }
+
+  @Test
+  public void aKimiSessionIdIsAccepted() {
+    String kimiSession = "session_" + UUID.randomUUID();
+    String commandId = seedAgentCommand(UUID.randomUUID().toString(), CommandStatus.RUNNING);
+    String path =
+        "/claude-home/.kimi-code/sessions/wd_workspace_c52ddf65534b/"
+            + kimiSession
+            + "/agents/main/wire.jsonl";
+
+    given()
+        .contentType(ContentType.JSON)
+        .body(report(kimiSession, path))
+        .when()
+        .post("/api/commands/" + commandId + "/agent-session")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("command.agentSessions", hasSize(2))
+        .body("command.agentSessions[1].sessionId", equalTo(kimiSession))
+        .body("command.agentSessions[1].source", equalTo("SWITCHED"));
+  }
+
+  @Test
+  public void aFirstReportOnAnUnpinnedCommandEstablishesAReportedSession() {
+    // A fresh Kimi launch cannot pin a session id, so the command starts with an empty session
+    // list and the first hook report establishes the session as REPORTED.
+    String kimiSession = "session_" + UUID.randomUUID();
+    String commandId = seedCommand(CommandStatus.RUNNING);
+    String path =
+        "/claude-home/.kimi-code/sessions/wd_workspace_c52ddf65534b/"
+            + kimiSession
+            + "/agents/main/wire.jsonl";
+
+    given()
+        .contentType(ContentType.JSON)
+        .body(report(kimiSession, path))
+        .when()
+        .post("/api/commands/" + commandId + "/agent-session")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("command.agentSessions", hasSize(1))
+        .body("command.agentSessions[0].sessionId", equalTo(kimiSession))
+        .body("command.agentSessions[0].source", equalTo("REPORTED"))
+        .body("command.agentSessions[0].transcriptPath", equalTo(path));
   }
 }

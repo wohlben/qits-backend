@@ -15,8 +15,8 @@ import java.time.Instant;
 @Embeddable
 public class AgentSessionRef {
 
-  /** The agent session UUID — qits-generated and pinned at launch, or hook-reported. */
-  @Column(name = "session_id", nullable = false, length = 36)
+  /** The agent session id — qits-generated and pinned at launch, or hook-reported. */
+  @Column(name = "session_id", nullable = false, length = 64)
   public String sessionId;
 
   @Enumerated(EnumType.STRING)
@@ -24,7 +24,7 @@ public class AgentSessionRef {
   public AgentSessionSource source;
 
   /** Set on {@link AgentSessionSource#FORKED} entries: the session this one branched from. */
-  @Column(name = "forked_from_session_id", length = 36)
+  @Column(name = "forked_from_session_id", length = 64)
   public String forkedFromSessionId;
 
   /**

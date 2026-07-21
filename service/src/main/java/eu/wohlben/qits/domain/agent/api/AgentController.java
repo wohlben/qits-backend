@@ -16,10 +16,10 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * The agent code path: launch a coding agent (Claude Code) into a workspace with an MCP server
- * attached, scoped to the repository or project. Separate from actions and the generic {@code
- * /commands} launcher — this is what the "Configure … with Claude" buttons call. Launching returns
- * the command immediately (it is registered like any other), and the terminal is watched on {@code
+ * The agent code path: launch a coding agent (Claude Code or Kimi Code, selected by {@code
+ * qits.agent.type}) into a workspace with an MCP server attached, scoped to the repository or
+ * project. Separate from actions and the generic {@code /commands} launcher. Launching returns the
+ * command immediately (it is registered like any other), and the terminal is watched on {@code
  * command.id}.
  */
 @Path("/repositories/{repoId}/workspaces/{workspaceId}/agents")

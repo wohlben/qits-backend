@@ -49,6 +49,8 @@ public class CommandService {
   private static final String UUID_PATTERN =
       "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
+  private static final String KIMI_SESSION_PATTERN = "session_" + UUID_PATTERN;
+
   /**
    * How long {@link #launchAndAwait} blocks before returning a still-running result. The process is
    * <em>not</em> killed on timeout — it keeps running in the registry and is manageable from the
@@ -604,7 +606,8 @@ public class CommandService {
    * later becomes a transcript filename) and the command must exist and be running.
    */
   public CommandDto reportAgentSession(String commandId, String sessionId, String transcriptPath) {
-    if (sessionId == null || !sessionId.matches(UUID_PATTERN)) {
+    if (sessionId == null
+        || (!sessionId.matches(UUID_PATTERN) && !sessionId.matches(KIMI_SESSION_PATTERN))) {
       throw new BadRequestException("Invalid session id: " + sessionId);
     }
     return lifecycle.recordAgentSessionReport(commandId, sessionId, transcriptPath);

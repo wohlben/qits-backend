@@ -9,5 +9,7 @@ public enum AgentSessionSource {
   /** A branch launch: a fresh pinned ID that inherited another session's history. */
   FORKED,
   /** Reported by the harness's SessionStart hook after an in-TUI session change (e.g. /resume). */
-  SWITCHED
+  SWITCHED,
+  /** Reported by the harness because the launch could not pin a session id (Kimi Code). */
+  REPORTED
 }

@@ -68,12 +68,16 @@ public class AgentPluginService {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
+  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
+  AgentType agentType;
+
   /**
    * The plugins installed on the shared volume, read from {@code enabledPlugins} in {@code
    * settings.json}. Absent-file (never installed anything) reads as an empty list, not an error.
    */
   public List<InstalledPluginDto> listInstalled(String repoId, String workspaceId) {
     validateIds(repoId, workspaceId);
+    requireClaude();
     return installedOn(ensureContainer(repoId, workspaceId));
   }
 
@@ -85,6 +89,7 @@ public class AgentPluginService {
    */
   public List<InstalledPluginDto> install(String repoId, String workspaceId, String pluginId) {
     validateIds(repoId, workspaceId);
+    requireClaude();
     if (pluginId == null || !PLUGIN_ID.matcher(pluginId).matches()) {
       throw new BadRequestException("Invalid plugin id: " + pluginId);
     }
@@ -137,6 +142,12 @@ public class AgentPluginService {
     }
     if (workspaceId == null || !WORKSPACE_ID.matcher(workspaceId).matches()) {
       throw new BadRequestException("Invalid workspace id: " + workspaceId);
+    }
+  }
+
+  private void requireClaude() {
+    if (agentType != AgentType.CLAUDE) {
+      throw new BadRequestException("LSP plugins are only supported by Claude Code");
     }
   }
 

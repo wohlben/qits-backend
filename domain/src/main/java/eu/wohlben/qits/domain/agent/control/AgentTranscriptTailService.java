@@ -50,10 +50,8 @@ public class AgentTranscriptTailService {
   @ConfigProperty(name = "qits.agent.transcript-tail-poll-ms", defaultValue = "500")
   long pollMillis;
 
-  @ConfigProperty(
-      name = "qits.agent.claude-config-dir",
-      defaultValue = "${qits.workspace.claude-mount:/claude-home}/.claude")
-  String claudeConfigDir;
+  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
+  AgentType agentType;
 
   @Inject AgentTranscriptService transcriptService;
 
@@ -81,7 +79,7 @@ public class AgentTranscriptTailService {
 
   /** Begin polling for the command's main-session transcript (idempotent per command). */
   public void startTail(String commandId) {
-    startTail(commandId, Path.of(claudeConfigDir));
+    startTail(commandId, transcriptService.configDir());
   }
 
   /** {@link #startTail(String)}; package-visible so tests can point it at a fixture config dir. */
@@ -197,7 +195,7 @@ public class AgentTranscriptTailService {
       }
       file =
           transcriptService.resolveTranscript(
-              configDir, CodingAgentFactory.ofType(AgentType.CLAUDE), session);
+              configDir, CodingAgentFactory.ofType(agentType), session);
       return file != null;
     }
 

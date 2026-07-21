@@ -4,6 +4,6 @@ package eu.wohlben.qits.domain.agent.control;
 public enum AgentLaunchMode {
   /** The stream-json conversation over pipes, rendered as a chat (the default). */
   CHAT,
-  /** The full interactive Claude Code TUI over a PTY, rendered in xterm.js. */
+  /** The full interactive agent TUI over a PTY, rendered in xterm.js. */
   INTERACTIVE
 }

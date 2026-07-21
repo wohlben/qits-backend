@@ -50,6 +50,11 @@ Related epics / cross-cutting concerns:
 - **[chat-persistence-on-transcript](features/2026-07-10_chat-persistence-on-transcript.md)**
   (07-10) — one durable record per agent session on the transcript channel (de-duplicating the
   double-persist the lineage change exposed).
+- **[kimi-code-harness](features/2026-07-20_kimi-code-harness.md)** (07-20) — a second, peer
+  coding-agent harness for the interactive TUI + autonomous `-p` shapes: `AgentType.KIMI` behind
+  the global `qits.agent.type` switch, with unpinned hook-reported session identity, per-launch
+  `mcp.json` delivery via a mktemp `KIMI_CODE_HOME` symlink farm, device-code login on the shared
+  volume, and `wire.jsonl` transcript import. Native chat excluded (depends on ACP chat below).
 
 ### Agent capability
 
@@ -66,11 +71,6 @@ Related epics / cross-cutting concerns:
   image path for the interactive PTY — spike-proven 2026-07-20). Depends on the workspace-detail
   [refresh-resilient-prompt-building](../qits-workspace-detail/feature-ideas/refresh-resilient-prompt-building.md)
   persistence, which it promotes to a necessity.
-- **[kimi-code-harness](feature-ideas/kimi-code-harness.md)** — a second, peer coding-agent
-  harness for the interactive TUI + autonomous `-p` shapes: `AgentType.KIMI` behind the global
-  `qits.agent.type` switch, with unpinned hook-reported session identity (no `--session-id`),
-  per-launch `mcp.json` delivery of the scoped MCP servers (mktemp `KIMI_CODE_HOME` symlink farm),
-  device-code login on the shared volume, and `wire.jsonl` transcript import. Excludes native chat.
 - **[kimi-code-acp-chat](feature-ideas/kimi-code-acp-chat.md)** — the native in-UI chat for kimi
   over ACP (`kimi acp`, JSON-RPC over stdio): the ACP driver normalized into the existing chat
   envelope, scoped `mcpServers` on `session/new`/`session/load`, and the shared re-attach
@@ -92,6 +92,6 @@ epic's creation has landed here.
 | [agent-session-lineage](features/2026-07-10_agent-session-lineage.md) | implemented |
 | [chat-persistence-on-transcript](features/2026-07-10_chat-persistence-on-transcript.md) | implemented |
 | [agent-lsp-plugins](features/2026-07-07_agent-lsp-plugins.md) | implemented |
+| [kimi-code-harness](features/2026-07-20_kimi-code-harness.md) | implemented |
 | [mcp-task-prompt-delivery](feature-ideas/mcp-task-prompt-delivery.md) | idea |
-| [kimi-code-harness](feature-ideas/kimi-code-harness.md) | idea |
 | [kimi-code-acp-chat](feature-ideas/kimi-code-acp-chat.md) | idea |

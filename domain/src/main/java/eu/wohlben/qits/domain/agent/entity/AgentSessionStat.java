@@ -32,7 +32,7 @@ public class AgentSessionStat extends PanacheEntityBase {
   @Column(name = "command_id", nullable = false)
   public String commandId;
 
-  @Column(name = "session_id", nullable = false, length = 36)
+  @Column(name = "session_id", nullable = false, length = 64)
   public String sessionId;
 
   /** Null for the session's own row; the sidechain's agent id for subagent rows. */

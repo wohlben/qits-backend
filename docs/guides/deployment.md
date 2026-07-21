@@ -13,7 +13,7 @@ Related/dependent plans:
   `docs/epics/qits-workspaces/features/2026-07-08_lazy-workspace-container-provisioning.md` — why qits needs the docker
   socket and the shared network.
 - `QitsHostResolver` / `qits.workspace.git-host` — how workspace containers address qits.
-- `docs/epics/qits-coding-agents/features/2026-07-04_container-agent-sessions.md` — the shared Claude Code login volume.
+- `docs/epics/qits-coding-agents/features/2026-07-04_container-agent-sessions.md` — the shared coding-agent login volume.
 - `docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md` — auth is a BUILD variant (`forwardauth` |
   `oauth`), selected at install time; the "Ingress / auth" section below is the deployment side of
   that design.
@@ -115,8 +115,9 @@ for v in qits_shared_dot_claude qits_shared_m2 qits_shared_pnpm; do
   docker volume inspect "$v" >/dev/null 2>&1 || docker volume create "$v"; done
 docker compose -f docker-compose.prod.yml up -d
 
-# 4. One-time coding-agent (Claude Code) OAuth login onto the now-created shared volume (optional —
-#    skip if you don't use the agent; it just won't be available until you do).
+# 4. One-time coding-agent login onto the now-created shared volume (optional — skip if you don't
+#    use the agent; it just won't be available until you do). Claude Code OAuth by default;
+#    `agent-login.sh kimi` for a Kimi Code deployment (qits.agent.type=kimi).
 bash docker/workspace/agent-login.sh
 ```
 

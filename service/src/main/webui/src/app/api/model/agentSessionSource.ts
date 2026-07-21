@@ -13,7 +13,8 @@ export const AgentSessionSource = {
     Pinned: 'PINNED',
     Resumed: 'RESUMED',
     Forked: 'FORKED',
-    Switched: 'SWITCHED'
+    Switched: 'SWITCHED',
+    Reported: 'REPORTED'
 } as const;
 export type AgentSessionSource = typeof AgentSessionSource[keyof typeof AgentSessionSource];
 

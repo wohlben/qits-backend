@@ -25,7 +25,7 @@ import java.util.Map;
  *
  * <p>Rendering never spawns a process — {@link #start()}/{@link #run(String)} return a {@link
  * LaunchSpec} the command registry executes. Plain framework-free Java (no CDI), so it is trivially
- * unit-testable. {@code ClaudeCodeAgent} is the only implementation today.
+ * unit-testable. Implementations: {@code ClaudeCodeAgent}, {@code KimiCodeAgent}.
  */
 public abstract class CodingAgent {
 
@@ -53,6 +53,13 @@ public abstract class CodingAgent {
    * session log matters more than the interactive UI.
    */
   protected boolean flatOutput;
+
+  /**
+   * Whether a one-off {@link #run(String)} renders plain text instead of a structured stream
+   * (default false). Set via {@link #plainTextOutput()} by callers that consume stdout verbatim
+   * (e.g. prompt refinement); a no-op for harnesses whose run is plain text already.
+   */
+  protected boolean plainTextOutput;
 
   /** The qits-chosen session UUID to pin at launch (create-only), or null. */
   protected String sessionId;
@@ -111,6 +118,16 @@ public abstract class CodingAgent {
     return this;
   }
 
+  /**
+   * Renders a one-off run as plain text on stdout (no stream-json), for callers that consume stdout
+   * verbatim. Harnesses that default to structured output (Kimi's {@code -p}) honor it; harnesses
+   * whose run is plain text already ignore it.
+   */
+  public CodingAgent plainTextOutput() {
+    this.plainTextOutput = true;
+    return this;
+  }
+
   /** Pins a fresh session under this qits-generated UUID (create-only external naming). */
   public CodingAgent sessionId(String uuid) {
     this.sessionId = uuid;
@@ -144,13 +161,13 @@ public abstract class CodingAgent {
 
   /**
    * Render-time guard for the session configuration — harness-agnostic, called by implementations
-   * before interpolating anything into an argv. Session ids must be canonical UUIDs; {@code fork}
-   * without {@code resume} has nothing to branch; pinning <em>and</em> resuming without a fork is
-   * contradictory (a pinned id is create-only).
+   * before interpolating anything into an argv. Session ids must pass {@link #isSessionIdValid};
+   * {@code fork} without {@code resume} has nothing to branch; pinning <em>and</em> resuming
+   * without a fork is contradictory (a pinned id is create-only).
    */
   protected void validateSessionConfiguration() {
-    requireUuid(sessionId, "session id");
-    requireUuid(resumeSessionId, "resume session id");
+    requireValidSessionId(sessionId, "session id");
+    requireValidSessionId(resumeSessionId, "resume session id");
     if (forkRequested && resumeSessionId == null) {
       throw new IllegalStateException("fork requires resume: no session to branch from");
     }
@@ -160,13 +177,21 @@ public abstract class CodingAgent {
     }
   }
 
+  /**
+   * Whether {@code value} is acceptable as a session id for this harness. The default accepts
+   * canonical UUIDs only; subclasses may relax this (e.g. Kimi Code uses {@code session_<uuid>}).
+   */
+  protected boolean isSessionIdValid(String value) {
+    return value == null || value.matches(UUID_PATTERN);
+  }
+
   /** Canonical UUID only — {@code UUID.fromString} is laxer (e.g. accepts {@code 1-2-3-4-5}). */
-  private static final String UUID_PATTERN =
+  protected static final String UUID_PATTERN =
       "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
-  private static void requireUuid(String value, String what) {
-    if (value != null && !value.matches(UUID_PATTERN)) {
-      throw new IllegalArgumentException("Invalid " + what + " (not a UUID): " + value);
+  private void requireValidSessionId(String value, String what) {
+    if (!isSessionIdValid(value)) {
+      throw new IllegalArgumentException("Invalid " + what + ": " + value);
     }
   }
 

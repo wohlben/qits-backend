@@ -16,15 +16,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Turns a raw speech-to-text transcript into a coherent coding-agent prompt by running a one-shot
- * Claude call on a small model. The refinement is ephemeral — it runs as a {@code <runtime> exec}
+ * agent call on a small model. The refinement is ephemeral — it runs as a {@code <runtime> exec}
  * into the workspace's container (via {@link ProcessExecutor}, so stdout/stderr stay separate and
- * it never shows up in command history), reusing the container's {@code claude} binary and the
- * shared credential volume. The container is provisioned on demand ({@link
+ * it never shows up in command history), reusing the container's agent binary and the shared
+ * credential volume. The container is provisioned on demand ({@link
  * WorkspaceService#ensureContainer}) and the workspace context the model needs (branch, goal) is
  * passed explicitly in the meta-prompt.
  */
@@ -65,11 +66,19 @@ public class PromptRefinementService {
 
   @Inject ContainerRuntime containers;
 
-  @ConfigProperty(name = "qits.refinement.model", defaultValue = "haiku")
-  String refinementModel;
+  /**
+   * The refinement model, as a harness-specific id or alias. Unset (the default) falls back per
+   * harness: Claude's cheap tier ({@code haiku}); Kimi runs its own default model (it has no
+   * Claude-style aliases).
+   */
+  @ConfigProperty(name = "qits.refinement.model")
+  Optional<String> refinementModel;
 
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
+
+  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
+  AgentType agentType;
 
   /** Refines {@code transcript} into a coding-agent prompt, contextualized by the workspace. */
   public String refine(String repoId, String workspaceId, String transcript) {
@@ -81,8 +90,8 @@ public class PromptRefinementService {
     }
 
     WorkspaceContext context = workspaceContext(repoId, workspaceId);
-    // Provision the container on demand — the refinement runs claude inside it, using the shared
-    // credential volume, so a stopped container is re-materialized rather than failing.
+    // Provision the container on demand — the refinement runs the agent inside it, using the
+    // shared credential volume, so a stopped container is re-materialized rather than failing.
     workspaceService.ensureContainer(repoId, workspaceId);
 
     String metaPrompt =
@@ -92,16 +101,29 @@ public class PromptRefinementService {
                 ? "(none)"
                 : context.preamble(),
             transcript);
-    LaunchSpec spec =
-        CodingAgentFactory.ofType(AgentType.CLAUDE).model(refinementModel).run(metaPrompt);
+    // Plain-text output: refinement consumes stdout verbatim, so Kimi's stream-json default must
+    // not apply. The model id is harness-specific; unset means Claude's haiku, Kimi's default.
+    CodingAgent refinementAgent = CodingAgentFactory.ofType(agentType).plainTextOutput();
+    String model =
+        refinementModel
+            .filter(m -> !m.isBlank())
+            .orElse(agentType == AgentType.CLAUDE ? "haiku" : null);
+    if (model != null) {
+      refinementAgent.model(model);
+    }
+    LaunchSpec spec = refinementAgent.run(metaPrompt);
 
     // Run inside the workspace container: docker exec -w /workspace -e HOME=<claude-mount> … bash
     // -lc
-    // <claude>. Driving it through ProcessExecutor (rather than ContainerRuntime.exec) keeps stdout
+    // <agent>. Driving it through ProcessExecutor (rather than ContainerRuntime.exec) keeps stdout
     // separate from stderr — the refined prompt is stdout only — and preserves timeout handling.
     Map<String, String> env = new HashMap<>(spec.environment());
     if (claudeMount != null && !claudeMount.isBlank()) {
-      env.put("HOME", claudeMount);
+      if (agentType == AgentType.CLAUDE) {
+        env.put("HOME", claudeMount);
+      }
+      // Kimi Code's data root is already set at the container level via KIMI_CODE_HOME; no overlay
+      // needed for refinement.
     }
     String container = containers.containerName(workspaceId, repoId);
     List<String> argv = new ArrayList<>(containers.execArgv(container, false, "/workspace", env));
