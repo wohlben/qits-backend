@@ -45,6 +45,11 @@ host** and the **fixture** repositories (test infrastructure), and the
   Claude-login pattern applied to `git push`); auth-classified failures hint the process dialog
   into offering "Sign in & push". Builds on
   [push-as-technical-process](../qits-technical-processes/features/2026-07-21_push-as-technical-process.md).
+- **[diverged-remote-reconciliation](features/2026-07-21_diverged-remote-reconciliation.md)** —
+  pull/sync/push no longer fail when local and remote both gained commits: fast-forward when
+  possible, else a real merge commit in the bare origin (`merge-tree` + `commit-tree`), and a
+  conflicting divergence parks the remote tip on `merge/<branch>-origin-<branch>` (overwritten on
+  every retry) with the resolution path in the process stream.
 
 ## Parts (ideas)
 
@@ -63,3 +68,4 @@ this epic's creation has landed here.
 | [streaming-gitexecutor-exec](features/2026-07-19_streaming-gitexecutor-exec.md) | implemented |
 | [qits-config-in-repo-configuration](features/2026-07-18_qits-config-in-repo-configuration.md) | implemented |
 | [git-remote-https-auth](features/2026-07-21_git-remote-https-auth.md) | implemented |
+| [diverged-remote-reconciliation](features/2026-07-21_diverged-remote-reconciliation.md) | implemented |
