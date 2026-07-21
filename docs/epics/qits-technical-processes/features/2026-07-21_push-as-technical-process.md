@@ -19,12 +19,12 @@ carrying git's full stderr instead of a swallowed 500.
 Related/dependent plans:
 
 - **Completes the set started by**
-  [repository-pull-technical-process](../features/2026-07-19_repository-pull-technical-process.md)
-  and [sync-as-technical-process](../features/2026-07-19_sync-as-technical-process.md) — sync
+  [repository-pull-technical-process](2026-07-19_repository-pull-technical-process.md)
+  and [sync-as-technical-process](2026-07-19_sync-as-technical-process.md) — sync
   already streams its push as a `push:<basename>` segment (`RepositoryService.beginSyncRepository`);
   this reuses that exact segment shape for the standalone button.
 - **Reuses the guard** from
-  [repository-pull-active-process-discovery](../features/2026-07-19_repository-pull-active-process-discovery.md):
+  [repository-pull-active-process-discovery](2026-07-19_repository-pull-active-process-discovery.md):
   the kind-aware single-flight and the `active-process` reattach work unchanged for a `push` kind.
 - **Hosts the sign-in affordance** of
   [git-remote-https-auth](../../qits-project-repositories/feature-ideas/git-remote-https-auth.md)

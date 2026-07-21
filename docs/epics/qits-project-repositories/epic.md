@@ -46,7 +46,8 @@ host** and the **fixture** repositories (test infrastructure), and the
   against upstream HTTPS remotes: a persistent `credential.helper=store` file wired into every
   remote-touching git verb, filled once via an interactive host-side sign-in terminal (the
   Claude-login pattern applied to `git push`). Depends on
-  [push-as-technical-process](../qits-technical-processes/feature-ideas/push-as-technical-process.md).
+  [push-as-technical-process](../qits-technical-processes/features/2026-07-21_push-as-technical-process.md)
+  (implemented).
 
 ## Done when
 

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RepositoryControllerService } from '@/api/api/repositoryController.service';
@@ -23,7 +23,9 @@ describe('RepositorySyncComponent', () => {
       apiRepositoriesRepoIdPullPost: vi
         .fn()
         .mockReturnValue(of({ technicalProcessId: 'proc-1' })),
-      apiRepositoriesRepoIdPushPost: vi.fn().mockReturnValue(of({})),
+      apiRepositoriesRepoIdPushPost: vi
+        .fn()
+        .mockReturnValue(of({ technicalProcessId: 'proc-1' })),
       apiRepositoriesRepoIdSyncPost: vi
         .fn()
         .mockReturnValue(of({ technicalProcessId: 'proc-1' })),
@@ -106,6 +108,56 @@ describe('RepositorySyncComponent', () => {
     // The technical-process view emits (finished) at `done`.
     component.onProcessFinished();
     expect(invalidateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the "Pushing repository" dialog on push success without invalidating yet', async () => {
+    const { component, repositoryService, dialog, invalidateSpy } = setup();
+
+    component.pushMutation.mutate();
+    await flush();
+
+    expect(repositoryService.apiRepositoriesRepoIdPushPost).toHaveBeenCalledWith('repo-1');
+    expect(component.processId()).toBe('proc-1');
+    expect(dialog.create).toHaveBeenCalledTimes(1);
+    expect(dialog.create.mock.calls[0][0]).toMatchObject({ zTitle: 'Pushing repository' });
+    // Like pull/sync, push is asynchronous: nothing ran yet, so the header must not refresh on the
+    // POST.
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('invalidates the repository only when the push process finishes', async () => {
+    const { component, invalidateSpy } = setup();
+
+    component.pushMutation.mutate();
+    await flush();
+    expect(invalidateSpy).not.toHaveBeenCalled();
+
+    // The technical-process view emits (finished) at `done`.
+    component.onProcessFinished();
+    expect(invalidateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a POST failure in the inline banner and clears it on the next success', async () => {
+    const { component, fixture, repositoryService, dialog } = setup();
+    // An in-request failure (e.g. the 400 busy-conflict) — no process, no dialog.
+    repositoryService.apiRepositoriesRepoIdPushPost.mockReturnValueOnce(
+      throwError(() => ({ error: { message: 'A pull is already running for this repository' } })),
+    );
+
+    component.pushMutation.mutate();
+    await flush();
+    fixture.detectChanges();
+
+    expect(component.syncError()).toBe('A pull is already running for this repository');
+    expect(fixture.nativeElement.textContent).toContain(
+      'A pull is already running for this repository',
+    );
+    expect(dialog.create).not.toHaveBeenCalled();
+
+    // The next successful mutation clears the banner.
+    component.pushMutation.mutate();
+    await flush();
+    expect(component.syncError()).toBeNull();
   });
 
   it('reattaches to a running process discovered on mount (reload / second tab)', async () => {

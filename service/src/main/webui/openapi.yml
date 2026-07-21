@@ -1558,7 +1558,7 @@ components:
     Response64:
       type: object
       properties:
-        output:
+        technicalProcessId:
           type: string
     Response65:
       type: object

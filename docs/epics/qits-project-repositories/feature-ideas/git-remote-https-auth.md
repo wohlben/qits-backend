@@ -26,9 +26,9 @@ so every future push/fetch/clone against that host just works. The sign-in *is* 
 Related/dependent plans:
 
 - **Depends on**
-  [push-as-technical-process](../../qits-technical-processes/feature-ideas/push-as-technical-process.md)
-  — the streamed push dialog is where an auth-classified failure offers the "Sign in & push"
-  terminal.
+  [push-as-technical-process](../../qits-technical-processes/features/2026-07-21_push-as-technical-process.md)
+  (**implemented**) — the streamed push dialog is where an auth-classified failure offers the
+  "Sign in & push" terminal.
 - **Pattern precedent** —
   [container-agent-sessions](../../qits-coding-agents/features/2026-07-04_container-agent-sessions.md)
   (the sign-in redirect + shared credential volume) and

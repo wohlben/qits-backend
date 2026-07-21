@@ -25,14 +25,18 @@ import { RepositoryLiveService } from './repository-live.service';
  * branch list, and owns the Pull / Sync / Push and main-branch mutations. Sync / Push / main-branch
  * invalidate the sync status (and branch tree) on success so the header reflects the new state.
  *
- * Pull and Sync are asynchronous: the POST registers a technical process and returns its id
- * immediately, so `onSuccess` opens a "Pulling repository" / "Syncing repository" dialog around the
- * streamed, segmented log (one segment per pulled repository, incl. imported submodules; sync
- * appends a final push segment). Invalidation fires when that process reaches `done` — not on the
- * POST, which returns before anything ran. Closing the dialog does not stop the process. Push stays
- * synchronous.
+ * Pull, Sync and Push are asynchronous: the POST registers a technical process and returns its id
+ * immediately, so `onSuccess` opens a "Pulling repository" / "Syncing repository" / "Pushing
+ * repository" dialog around the streamed, segmented log (one segment per pulled repository, incl.
+ * imported submodules; sync appends a final push segment; push is that single segment alone).
+ * Invalidation fires when that process reaches `done` — not on the POST, which returns before
+ * anything ran. Closing the dialog does not stop the process.
  *
- * A pull/sync survives navigation: the `['repository-active-process', repoId]` query rediscovers a
+ * The POSTs' own in-request failures (unknown repo 404, the 400 busy-conflict) never reach a
+ * process, so each mutation's `onError` surfaces them in an inline destructive banner below the
+ * sync bar; the next successful mutation clears it.
+ *
+ * A process survives navigation: the `['repository-active-process', repoId]` query rediscovers a
  * running process on mount (a reload / second tab reopens the dialog), and the repository `process`
  * SSE hint ({@link RepositoryLiveService}) keeps it live — so once a pull is running, Pull/Sync/Push
  * stay disabled (even after the dialog is closed) until it finishes, closing the door on a second
@@ -59,10 +63,18 @@ import { RepositoryLiveService } from './repository-live.service';
       (push)="pushMutation.mutate()"
     />
 
-    <!-- Pull / Sync: the live, segmented log of the recursive pull (one segment per repo, imported
-         submodules included; sync appends a push segment), streamed from its technical process.
-         Closing the dialog does not stop the process — reopening within the retention window replays
-         and resumes. -->
+    @if (syncError(); as error) {
+      <div
+        class="mt-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+      >
+        {{ error }}
+      </div>
+    }
+
+    <!-- Pull / Sync / Push: the live, segmented log streamed from the technical process (pull: one
+         segment per repo, imported submodules included; sync appends a push segment; push is that
+         single segment alone). Closing the dialog does not stop the process — reopening within the
+         retention window replays and resumes. -->
     <ng-template #processTpl>
       @if (processId(); as pid) {
         <app-technical-process-view [processId]="pid" (finished)="onProcessFinished()" />
@@ -87,6 +99,12 @@ export class RepositorySyncComponent {
 
   /** The id of the running pull's technical process; drives the dialog's process view. */
   readonly processId = signal<string | null>(null);
+
+  /**
+   * The last pull/sync/push POST's in-request failure (404, the 400 busy-conflict) — errors a
+   * process never sees. Rendered as the inline destructive banner; cleared on the next success.
+   */
+  readonly syncError = signal<string | null>(null);
 
   /**
    * The repository's currently-running pull/sync process, discovered on mount and kept live by the
@@ -145,17 +163,27 @@ export class RepositorySyncComponent {
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdPullPost(this.repoId())),
     onSuccess: (res) => {
       // The pull runs asynchronously — invalidation happens on the process's `done`, not here.
+      this.syncError.set(null);
       if (res.technicalProcessId) {
         this.markProcessActive(res.technicalProcessId);
         this.openDialog('Pulling repository');
       }
     },
+    onError: (error: unknown) => this.syncError.set(this.errorMessage(error)),
   }));
 
   readonly pushMutation = injectMutation(() => ({
     mutationFn: () =>
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdPushPost(this.repoId())),
-    onSuccess: () => this.onMutationSuccess(),
+    onSuccess: (res) => {
+      // Like pull, push runs asynchronously — invalidation happens on the process's `done`, not here.
+      this.syncError.set(null);
+      if (res.technicalProcessId) {
+        this.markProcessActive(res.technicalProcessId);
+        this.openDialog('Pushing repository');
+      }
+    },
+    onError: (error: unknown) => this.syncError.set(this.errorMessage(error)),
   }));
 
   readonly syncMutation = injectMutation(() => ({
@@ -163,11 +191,13 @@ export class RepositorySyncComponent {
       lastValueFrom(this.repositoryService.apiRepositoriesRepoIdSyncPost(this.repoId())),
     onSuccess: (res) => {
       // Like pull, sync runs asynchronously — invalidation happens on the process's `done`, not here.
+      this.syncError.set(null);
       if (res.technicalProcessId) {
         this.markProcessActive(res.technicalProcessId);
         this.openDialog('Syncing repository');
       }
     },
+    onError: (error: unknown) => this.syncError.set(this.errorMessage(error)),
   }));
 
   readonly setMainBranchMutation = injectMutation(() => ({
@@ -224,5 +254,17 @@ export class RepositorySyncComponent {
 
   private onMutationSuccess() {
     invalidateRepository(this.queryClient, this.repoId());
+  }
+
+  /** Extracts the backend's `{message}` body from an HttpErrorResponse-shaped error. */
+  private errorMessage(error: unknown): string {
+    const httpError = error as { error?: unknown; message?: string } | null;
+    const body = httpError?.error;
+    if (typeof body === 'string' && body.trim()) return body;
+    if (body && typeof body === 'object') {
+      const message = (body as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return httpError?.message ?? 'The request failed';
   }
 }
