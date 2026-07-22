@@ -14,6 +14,10 @@
         <!-- The metadata-rich blob store (docs/epics/qits-artifacts/): a plain library jar with
              its OWN named datasource, consumed by `service` which hosts its REST boundary. -->
         <module>artifacts</module>
+        <!-- The in-container workspace-daemon control plane (docs/epics/qits-workspace-daemon/): a tiny
+             framework-free wire-contract jar shared by `service` (the control-socket route) and
+             `workspace-daemon` (the native binary), so neither side owns the protocol. Depends on nothing. -->
+        <module>workspace-daemon-protocol</module>
         <!-- Build-variant auth (docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md): plain library
              jars; exactly one variant module is pulled into `service` by the profile the mandatory
              -Dqits.variant=oauth|forwardauth flag activates. In the reactor unconditionally so
@@ -23,6 +27,12 @@
         <module>auth/forwardauth</module>
         <module>service</module>
         <module>cli</module>
+        <!-- The in-container client daemon (docs/epics/qits-workspace-daemon/): a Quarkus
+             command-mode app compiled to a GraalVM native binary that becomes each workspace
+             container's process (PID 1's child under tini), dials home over a WebSocket, and runs
+             qits' actions in-container. Depends only on `workspace-daemon-protocol` + quarkus-arc/vertx —
+             NOT `domain` (kept lean for native). Never needs -Dqits.variant. -->
+        <module>workspace-daemon</module>
         <!-- Playwright userflows (docs/epics/qits-userflows/), split into the reusable FRAMEWORK
              (`qits-userflows`) and the STORIES that consume it (`userflows`) ahead of the framework's
              eventual extraction into a standalone repo. Both depend on none of the other modules —
@@ -81,6 +91,11 @@
             <dependency>
                 <groupId>eu.wohlben</groupId>
                 <artifactId>artifacts</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>workspace-daemon-protocol</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -1,17 +1,17 @@
-# Command execution over the `clientd` socket (replace `docker exec`)
+# Command execution over the `workspace-daemon` socket (replace `docker exec`)
 
 ## Introduction
 
-Part 2 of [qits-workspace-client](../epic.md). **Out of scope until
-[Part 1](clientd-binary-and-control-socket.md) lands.** The first — and largest — real call site
+Part 2 of [qits-workspace-daemon](../epic.md). **Out of scope until
+[Part 1](workspace-daemon-binary-and-control-socket.md) lands.** The first — and largest — real call site
 to move off `docker exec`: the command-execution substrate. Instead of qits spawning a host-side
 `docker exec -i` client per command, the [command registry](../../qits-workspace-commands/epic.md)
-sends a `RunCommand` over the control socket and `clientd` runs the process **in-container**,
+sends a `RunCommand` over the control socket and `workspace-daemon` runs the process **in-container**,
 streaming output back over the socket.
 
 Related/dependent plans:
 
-- **Hard dependency** — [Part 1](clientd-binary-and-control-socket.md) (the binary, socket, and
+- **Hard dependency** — [Part 1](workspace-daemon-binary-and-control-socket.md) (the binary, socket, and
   `RunCommand`/`CommandChunk`/`CommandExit` envelope this part consumes).
 - **Re-homes** [qits-workspace-commands](../../qits-workspace-commands/epic.md) — the re-attach
   model, the global Commands nav, and the persisted per-line interaction log are all unchanged;
@@ -29,16 +29,16 @@ Related/dependent plans:
   stream-json coding agent).
 - **Seam B — `CommandService.prepare()` (`CommandService.java:515`)** — resolves the container,
   injects otel env (`OtelEnvironment.forLaunch` `:35`), and feeds the registry. Unchanged in
-  intent; it hands `clientd` the argv+env instead of a docker-exec argv.
+  intent; it hands `workspace-daemon` the argv+env instead of a docker-exec argv.
 - **Group kill — `CommandSession.killGroup()` (`CommandSession.java:226`)** — reads the pid file
-  via `docker exec cat`, validates the pgid, and `kill -s <sig> -- -<pgid>`. Under `clientd` the
+  via `docker exec cat`, validates the pgid, and `kill -s <sig> -- -<pgid>`. Under `workspace-daemon` the
   process group is tracked **in-process by the client** (it spawned it), so kill becomes a
   `SignalCommand { correlationId, signal }` message — no pid file, no `/proc` read.
 
 ## Scope
 
-- Add `SignalCommand` to the envelope; extend `clientd` to spawn processes (pty and pipe shapes —
-  it allocates the pty in-container, so `pty4j`'s job moves into `clientd`), track their process
+- Add `SignalCommand` to the envelope; extend `workspace-daemon` to spawn processes (pty and pipe shapes —
+  it allocates the pty in-container, so `pty4j`'s job moves into `workspace-daemon`), track their process
   groups, stream stdout/stderr as `CommandChunk`, and report `CommandExit`.
 - Route `dockerExec()` through the socket when a live client is registered for the workspace;
   **fall back to `docker exec`** when the socket is absent (the Part-1 degradation contract),

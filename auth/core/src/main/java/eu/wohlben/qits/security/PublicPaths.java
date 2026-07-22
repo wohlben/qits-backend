@@ -24,6 +24,8 @@ public final class PublicPaths {
         || path.startsWith("/git/") // container clone/push against the in-process git host
         || path.equals("/mcp")
         || path.startsWith("/mcp/") // the coding agent's MCP servers, called in-container
+        || path.startsWith(
+            "/api/workspace-daemon/") // in-container workspace-daemon's dial-home control socket
         || path.startsWith("/api/otel/") // OTLP ingest from containers and fixture SPAs
         || path.equals("/api/capture") // cross-origin capture ingest (own CORS route)
         || path.startsWith(

@@ -30,11 +30,40 @@
 # the app build independent of any image store; the runtime `qits/workspace:latest` tag (workspace
 # containers are spawned from it) is produced by the --target build above.
 
+# --- stage `workspace-daemon-build`: native-compile the in-container client daemon -------------------------
+# The workspace container's process is a GraalVM-native `qits-workspace-daemon` (docs/epics/qits-workspace-daemon/),
+# compiled here (Maven output-name `qits-workspace-daemon`) and COPYied into the `workspace` stage below. It
+# depends on neither `service` nor
+# `domain` (only workspace-daemon-protocol + quarkus-arc/vertx), so `-am` stays cheap and no node/pnpm is
+# needed — the Mandrel builder's JDK suffices. The builder JDK MUST be 25: native-image cannot read
+# bytecode newer than its own JDK, and the reactor targets release 25. (If the floating `jdk-25` tag
+# is ever absent, the Oracle GraalVM image container-registry.oracle.com/graalvm/native-image:25 is
+# the fallback native-25 toolchain.) BuildKit pulls this stage into both image builds via the
+# `COPY --from` edge in `workspace`.
+FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25 AS workspace-daemon-build
+USER root
+WORKDIR /src
+# Fetch the Maven distribution first, keyed only on the wrapper files (same rationale as `build`).
+COPY mvnw .
+COPY .mvn/ .mvn/
+RUN ./mvnw --version
+COPY . .
+# -Dnative flips quarkus.native.enabled (the module carries its own `native` profile). Cap
+# native-image RAM so the build is deterministic on small machines; disable the build cache so a
+# host cache never leaks in.
+RUN ./mvnw -B -ntp -pl workspace-daemon -am package -Dnative \
+      -DskipTests -Dqits.dev-guard.skip=true -Dmaven.build.cache.enabled=false \
+      -Dquarkus.native.native-image-xmx=4g
+
 # --- stage `workspace`: the toolchain image every workspace container runs ------------------------
 # Carries the common toolchain a repository's actions/dev servers/agent need — nothing repo-specific
-# (per-repo images and devcontainer.json support are deferred). The container itself is created by
-# DockerExecutor as `… <image> sleep infinity`; commands run via `docker exec`, so this stage only
-# needs the tools on PATH, not an entrypoint.
+# (per-repo images and devcontainer.json support are deferred). The container's process is the
+# native `qits-workspace-daemon` binary COPYied in below (docs/epics/qits-workspace-daemon/): it is the
+# stage's ENTRYPOINT (replacing `sleep infinity`), so a plain `docker run <image>` boots it and
+# DockerExecutor appends no command; everyday commands still run via `docker exec`. qits-workspace-daemon is
+# tini's child (`--init` stays PID 1). The ENTRYPOINT is set after the binary is COPYied in below;
+# the `build`/final app stages that FROM this
+# one override or ignore it, so they are unaffected.
 FROM debian:bookworm-slim AS workspace
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -74,6 +103,23 @@ RUN apt-get update \
 # `ripgrep`/`fd-find` are general CLI tools (they benefit action scripts) and are also where kimi's
 # search tools resolve `rg`/`fd` on PATH — the pinned kimi installer below ships only the `kimi`
 # binary, not the sidekicks a desktop install carries. Debian names fd `fdfind`, which kimi handles.
+
+# C/C++ build toolchain + common dev headers, available by DEFAULT in every workspace container.
+# Real projects compile native code during install/build — node-gyp addons, Python C-extensions, cgo,
+# `make`-driven builds, and GraalVM-style native-image linking — all of which need a C compiler,
+# `make`, `pkg-config` and the usual `-dev` headers (zlib/openssl). The bookworm-slim base ships none
+# of these, so without this an action or dev-server that builds a native dependency fails with
+# "gcc: not found" / "zlib.h: No such file or directory". `build-essential` pulls gcc, g++, make and
+# libc6-dev (crt objects + headers). (The `workspace-daemon` binary itself is cross-built in the separate
+# `workspace-daemon-build` Mandrel stage and only COPYied in, so this layer is for the WORKSPACE's own builds,
+# not for producing workspace-daemon.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        pkg-config \
+        zlib1g-dev \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # JDK 25 (Temurin, via the Adoptium apt repo). The projects this image builds — the Quarkus+Angular
 # fixture and qits itself — target `maven.compiler.release=25`, so JDK 17 (bookworm's default openjdk)
@@ -245,6 +291,21 @@ WORKDIR /workspace
 # every container-side git verb. The whole container is a single-tenant sandbox, so mark all
 # directories safe (system-wide, at build time as root).
 RUN git config --system --add safe.directory '*'
+
+# The in-container qits-workspace-daemon control-plane binary (docs/epics/qits-workspace-daemon/). Made the
+# container's process via the stage ENTRYPOINT below (replacing `sleep infinity`); it dials the qits
+# backend over a WebSocket and, part by part, takes over what qits does via `docker exec`. In Part 1
+# it holds the socket open and is otherwise idle. glibc is backward-compatible (the ubi9 2.34 the
+# binary links against < bookworm's 2.36), so the native binary runs here unmodified. The final app
+# image inherits it too but never runs it (own ENTRYPOINT).
+COPY --from=workspace-daemon-build /src/workspace-daemon/target/qits-workspace-daemon /usr/local/bin/qits-workspace-daemon
+RUN chmod 0755 /usr/local/bin/qits-workspace-daemon
+# Boot qits-workspace-daemon by default: `docker run <workspace-image>` starts the control plane with no extra
+# args, and DockerExecutor relies on this (it appends no container command). Exec form so tini
+# (`--init`) stays PID 1 and qits-workspace-daemon is its direct child. The `build` stage inherits this but
+# never runs as a container; the final app image overrides ENTRYPOINT with `java -jar` (below), so it
+# is unaffected.
+ENTRYPOINT ["/usr/local/bin/qits-workspace-daemon"]
 
 # --- stage `build`: package the fast-jar -----------------------------------------------------------
 # The workspace toolchain stage already has everything the reactor build needs (JDK 25, the mvnw

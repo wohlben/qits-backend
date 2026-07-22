@@ -26,6 +26,13 @@
             <artifactId>artifacts</artifactId>
         </dependency>
         <dependency>
+            <!-- The workspace-daemon control-plane wire contract (docs/epics/qits-workspace-daemon/): shared
+                 with the native `workspace-daemon` binary, so the backend's control-socket route
+                 (eu.wohlben.qits.workspacedaemonhost) and the in-container client agree on one definition. -->
+            <groupId>eu.wohlben</groupId>
+            <artifactId>workspace-daemon-protocol</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
