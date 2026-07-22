@@ -179,7 +179,7 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION} \
     && rm -rf /root/.local/bin/claude /root/.local/share/claude /root/.claude
 ENV DISABLE_AUTOUPDATER=1
 
-# Kimi Code CLI — the second coding-agent harness (docs/epics/qits-coding-agents/feature-ideas/kimi-code-harness.md).
+# Kimi Code CLI — the second coding-agent harness (docs/epics/qits-coding-agents/features/2026-07-20_kimi-code-harness.md).
 # Same treatment as Claude Code: pinned version (KIMI_VERSION fails the build loudly on an unknown
 # version), installed system-wide via KIMI_INSTALL_DIR=/usr/local so the arbitrary runtime uid finds
 # it on PATH — the pinned installer drops only the `kimi` binary itself into bin/ (the ~/.kimi-code/bin
