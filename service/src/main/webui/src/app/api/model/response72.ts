@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { BranchDto } from './branchDto';
 
 
 export interface Response72 { 
-    technicalProcessId?: string;
+    branches?: Array<BranchDto>;
 }
 

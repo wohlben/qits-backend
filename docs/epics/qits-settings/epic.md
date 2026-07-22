@@ -20,7 +20,7 @@ Related epics / cross-cutting concerns:
 
 ## Parts (ideas)
 
-- **[db-backed-default-agent-and-picker](feature-ideas/db-backed-default-agent-and-picker.md)** —
+- **[db-backed-default-agent-and-picker](features/2026-07-22_db-backed-default-agent-and-picker.md)** —
   the settings key/value backbone (entity/table/service/REST + an SPA Settings route), the
   **default coding agent** as its first setting (replacing the `qits.agent.type` property),
   per-command harness recording, and the workspace Agents/Chat-tab **agent dropdown**. Resolution is
@@ -31,10 +31,11 @@ Related epics / cross-cutting concerns:
 ## Done when
 
 Rolling: current when its `feature-ideas/` is empty and every instance-settings feature has landed
-here.
+here. As of 2026-07-22 the `feature-ideas/` directory is empty and the sole part has landed — the
+epic is current until a new instance-settings idea is filed.
 
 ## Status
 
 | Part | Status |
 |---|---|
-| [db-backed-default-agent-and-picker](feature-ideas/db-backed-default-agent-and-picker.md) | idea |
+| [db-backed-default-agent-and-picker](features/2026-07-22_db-backed-default-agent-and-picker.md) | done |

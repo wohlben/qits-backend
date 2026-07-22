@@ -29,6 +29,10 @@ export const routes: Routes = [
         path: 'feature-flows',
         loadChildren: () => import('./pages/feature-flows/feature-flows.routes').then(m => m.featureFlowsRoutes),
       },
+      {
+        path: 'settings',
+        loadChildren: () => import('./pages/settings/settings.routes').then(m => m.settingsRoutes),
+      },
     ],
   },
 ];

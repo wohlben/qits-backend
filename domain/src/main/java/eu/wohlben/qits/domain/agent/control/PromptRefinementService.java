@@ -77,8 +77,7 @@ public class PromptRefinementService {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
-  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
-  AgentType agentType;
+  @Inject AgentTypeResolver agentTypeResolver;
 
   /** Refines {@code transcript} into a coding-agent prompt, contextualized by the workspace. */
   public String refine(String repoId, String workspaceId, String transcript) {
@@ -88,6 +87,10 @@ public class PromptRefinementService {
     if (!WORKSPACE_ID_PATTERN.matcher(workspaceId == null ? "" : workspaceId).matches()) {
       throw new BadRequestException("Invalid workspace id: " + workspaceId);
     }
+
+    // Prompt refinement is a default-scoped surface (no per-launch tab choice): resolve the
+    // qits-wide default harness once.
+    AgentType agentType = agentTypeResolver.resolve(null);
 
     WorkspaceContext context = workspaceContext(repoId, workspaceId);
     // Provision the container on demand — the refinement runs the agent inside it, using the

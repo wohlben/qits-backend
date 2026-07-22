@@ -7,9 +7,14 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { AgentType } from './agentType';
 
 
 export interface Response2 { 
-    prompt?: string;
+    agents?: Array<AgentType>;
+    defaultAgent?: AgentType;
 }
+export namespace Response2 {
+}
+
 

@@ -10,6 +10,6 @@
 
 
 export interface Response91 { 
-    text?: string;
+    id?: string;
 }
 

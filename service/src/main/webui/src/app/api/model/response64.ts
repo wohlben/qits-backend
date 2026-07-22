@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { RepositoryDto } from './repositoryDto';
 
 
 export interface Response64 { 
-    technicalProcessId?: string;
+    repository?: RepositoryDto;
 }
 

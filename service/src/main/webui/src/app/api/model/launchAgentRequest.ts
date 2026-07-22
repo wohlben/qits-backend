@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { AgentLaunchMode } from './agentLaunchMode';
+import { AgentType } from './agentType';
 import { AgentMcpScope } from './agentMcpScope';
 
 
@@ -18,6 +19,7 @@ export interface LaunchAgentRequest {
     resumeSessionId?: string;
     fork?: boolean;
     deliverTaskPrompt?: boolean;
+    agentType?: AgentType;
 }
 export namespace LaunchAgentRequest {
 }

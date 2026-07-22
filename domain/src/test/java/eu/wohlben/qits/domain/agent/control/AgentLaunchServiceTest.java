@@ -60,6 +60,13 @@ public class AgentLaunchServiceTest {
   /** Seeds a finished agent command in {@code workspaceId} whose session list holds one entry. */
   @Transactional
   void seedCommandWithSession(String repositoryId, String workspaceId, String sessionId) {
+    seedCommandWithSession(repositoryId, workspaceId, sessionId, null);
+  }
+
+  /** As above, recording {@code agentType} as the command's harness (the resume-harness source). */
+  @Transactional
+  void seedCommandWithSession(
+      String repositoryId, String workspaceId, String sessionId, AgentType agentType) {
     Workspace workspace = new Workspace();
     workspace.workspaceId = workspaceId;
     workspace.repository = repositoryRepository.findById(repositoryId);
@@ -76,6 +83,7 @@ public class AgentLaunchServiceTest {
             .executeScript("exec claude")
             .interactive(false)
             .kind(CommandKind.CHAT)
+            .agentType(agentType)
             .status(CommandStatus.EXITED)
             .build();
     command.agentSessions.add(
@@ -201,7 +209,8 @@ public class AgentLaunchServiceTest {
     seedRepository(projectId, repoId);
 
     LaunchSpec spec =
-        agentLaunchService.renderChat(repoId, "work", AgentMcpScope.ACTIONS, freshPin());
+        agentLaunchService.renderChat(
+            repoId, "work", AgentMcpScope.ACTIONS, freshPin(), AgentType.CLAUDE);
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
     // Still the stream-json chat, unchanged.
@@ -219,7 +228,8 @@ public class AgentLaunchServiceTest {
     seedRepository(projectId, repoId);
 
     LaunchSpec spec =
-        agentLaunchService.renderAutonomous(repoId, "work", AgentMcpScope.REPOSITORY, freshPin());
+        agentLaunchService.renderAutonomous(
+            repoId, "work", AgentMcpScope.REPOSITORY, freshPin(), AgentType.CLAUDE);
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
     assertTrue(
@@ -250,17 +260,19 @@ public class AgentLaunchServiceTest {
     // set.
     assertTrue(
         agentLaunchService
-            .renderAutonomous(repoId, "work", AgentMcpScope.REPOSITORY, freshPin())
+            .renderAutonomous(
+                repoId, "work", AgentMcpScope.REPOSITORY, freshPin(), AgentType.CLAUDE)
             .script()
             .contains("agentReadOnly=true"));
     assertFalse(
         agentLaunchService
-            .renderChat(repoId, "work", AgentMcpScope.REPOSITORY, freshPin())
+            .renderChat(repoId, "work", AgentMcpScope.REPOSITORY, freshPin(), AgentType.CLAUDE)
             .script()
             .contains("agentReadOnly"));
     assertFalse(
         agentLaunchService
-            .renderInteractive(repoId, "work", AgentMcpScope.REPOSITORY, "look", freshPin())
+            .renderInteractive(
+                repoId, "work", AgentMcpScope.REPOSITORY, "look", freshPin(), AgentType.CLAUDE)
             .script()
             .contains("agentReadOnly"));
   }
@@ -274,12 +286,14 @@ public class AgentLaunchServiceTest {
     String reportPath = "/api/commands/" + pinned.commandId() + "/agent-session";
 
     LaunchSpec chat =
-        agentLaunchService.renderChat(repoId, "work", AgentMcpScope.REPOSITORY, pinned);
+        agentLaunchService.renderChat(
+            repoId, "work", AgentMcpScope.REPOSITORY, pinned, AgentType.CLAUDE);
     assertTrue(chat.script().contains("--session-id " + pinned.ref().sessionId), chat.script());
     assertTrue(chat.script().contains(reportPath), chat.script());
 
     LaunchSpec autonomous =
-        agentLaunchService.renderAutonomous(repoId, "work", AgentMcpScope.REPOSITORY, pinned);
+        agentLaunchService.renderAutonomous(
+            repoId, "work", AgentMcpScope.REPOSITORY, pinned, AgentType.CLAUDE);
     assertTrue(
         autonomous.script().contains("--session-id " + pinned.ref().sessionId),
         autonomous.script());
@@ -287,7 +301,7 @@ public class AgentLaunchServiceTest {
 
     LaunchSpec interactive =
         agentLaunchService.renderInteractive(
-            repoId, "work", AgentMcpScope.REPOSITORY, "look around", pinned);
+            repoId, "work", AgentMcpScope.REPOSITORY, "look around", pinned, AgentType.CLAUDE);
     assertTrue(interactive.script().startsWith("exec claude 'look around'"), interactive.script());
     assertTrue(interactive.interactive());
     assertTrue(
@@ -304,9 +318,9 @@ public class AgentLaunchServiceTest {
     seedRepository(projectId, repoId);
 
     AgentLaunchService.PinnedSession first =
-        agentLaunchService.pinSession(repoId, "work", null, false);
+        agentLaunchService.pinSession(repoId, "work", null, false, AgentType.CLAUDE);
     AgentLaunchService.PinnedSession second =
-        agentLaunchService.pinSession(repoId, "work", null, false);
+        agentLaunchService.pinSession(repoId, "work", null, false, AgentType.CLAUDE);
 
     assertEquals(AgentSessionSource.PINNED, first.ref().source);
     assertEquals(null, first.ref().forkedFromSessionId);
@@ -324,7 +338,7 @@ public class AgentLaunchServiceTest {
     seedCommandWithSession(repoId, "work", sessionId);
 
     AgentLaunchService.PinnedSession pinned =
-        agentLaunchService.pinSession(repoId, "work", sessionId, false);
+        agentLaunchService.pinSession(repoId, "work", sessionId, false, AgentType.CLAUDE);
 
     assertEquals(sessionId, pinned.ref().sessionId);
     assertEquals(AgentSessionSource.RESUMED, pinned.ref().source);
@@ -339,7 +353,7 @@ public class AgentLaunchServiceTest {
     seedCommandWithSession(repoId, "work", sessionId);
 
     AgentLaunchService.PinnedSession pinned =
-        agentLaunchService.pinSession(repoId, "work", sessionId, true);
+        agentLaunchService.pinSession(repoId, "work", sessionId, true, AgentType.CLAUDE);
 
     assertEquals(AgentSessionSource.FORKED, pinned.ref().source);
     assertEquals(sessionId, pinned.ref().forkedFromSessionId);
@@ -358,14 +372,15 @@ public class AgentLaunchServiceTest {
 
     assertThrows(
         BadRequestException.class,
-        () -> agentLaunchService.pinSession(repoId, "work", sessionId, false));
+        () -> agentLaunchService.pinSession(repoId, "work", sessionId, false, AgentType.CLAUDE));
   }
 
   @Test
   public void forkWithoutResumeSessionIsRejected() {
     String repoId = "aaaaaaaa-0000-0000-0000-00000000000b";
     assertThrows(
-        BadRequestException.class, () -> agentLaunchService.pinSession(repoId, "work", null, true));
+        BadRequestException.class,
+        () -> agentLaunchService.pinSession(repoId, "work", null, true, AgentType.CLAUDE));
   }
 
   @Test
@@ -376,7 +391,7 @@ public class AgentLaunchServiceTest {
     // `claude` REPL (whose onboarding has a paste-the-code login), NOT `claude auth login` — that
     // subcommand blocks on an unreachable loopback callback and reads no stdin (see the resolved
     // issue doc 2026-07-05_claude-auth-login-terminal-no-input.md).
-    LaunchSpec spec = agentLaunchService.renderLogin();
+    LaunchSpec spec = agentLaunchService.renderLogin(AgentType.CLAUDE);
 
     assertEquals("exec claude", spec.script());
     assertTrue(spec.interactive());
@@ -384,9 +399,37 @@ public class AgentLaunchServiceTest {
   }
 
   @Test
+  public void resumingAKimiSessionKeepsTheKimiHarnessDespiteTheClaudeDefault() {
+    // Regression: a resume must keep the resumed session's recorded harness, not re-resolve the
+    // instance default. The DB default here is CLAUDE; a KIMI-recorded session resumed with fork
+    // must still hit the Kimi-specific fork guard (which fires before any container work), proving
+    // resolveHarness read KIMI off the command row rather than the CLAUDE default.
+    String projectId = "aaaaaaaa-0000-0000-0000-00000000000c";
+    String repoId = "aaaaaaaa-0000-0000-0000-00000000000d";
+    String kimiSession = "session_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    seedRepository(projectId, repoId);
+    seedCommandWithSession(repoId, "work", kimiSession, AgentType.KIMI);
+
+    BadRequestException thrown =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                agentLaunchService.launchInteractive(
+                    repoId,
+                    "work",
+                    AgentMcpScope.REPOSITORY,
+                    null,
+                    kimiSession,
+                    true,
+                    false,
+                    null));
+    assertEquals("fork is not supported by Kimi Code", thrown.getMessage());
+  }
+
+  @Test
   public void loginTerminalCarriesNoSessionIdentity() {
     // The sign-in REPL is onboarding, not a conversation: no pinned id, no report hook.
-    LaunchSpec spec = agentLaunchService.renderLogin();
+    LaunchSpec spec = agentLaunchService.renderLogin(AgentType.CLAUDE);
 
     assertFalse(spec.script().contains("--session-id"), spec.script());
     assertFalse(spec.script().contains("--settings"), spec.script());

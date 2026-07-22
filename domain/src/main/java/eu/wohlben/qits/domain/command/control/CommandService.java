@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.command.control;
 
+import eu.wohlben.qits.domain.agent.control.AgentType;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
@@ -112,7 +113,8 @@ public class CommandService {
    * {@code QITS_PUBLIC_BASE}; null for everything else. {@code commandId} is a caller-chosen id
    * (agent launches render it into the session-report hook URL before the row exists; null
    * generates one) and {@code agentSession} the first entry of an agent launch's session list —
-   * both null for everything that isn't an agent session.
+   * both null for everything that isn't an agent session. {@code agentType} is the coding-agent
+   * harness recorded on the row (null for non-agent launches ⇒ legacy CLAUDE).
    */
   private record LaunchDescriptor(
       String actionId,
@@ -124,7 +126,8 @@ public class CommandService {
       boolean otel,
       String publicBase,
       String commandId,
-      AgentSessionRef agentSession) {
+      AgentSessionRef agentSession,
+      AgentType agentType) {
 
     static LaunchDescriptor of(ResolvedAction action) {
       return new LaunchDescriptor(
@@ -135,6 +138,7 @@ public class CommandService {
           action.environment(),
           CommandKind.TERMINAL,
           false,
+          null,
           null,
           null,
           null);
@@ -162,16 +166,18 @@ public class CommandService {
       String name,
       String script,
       boolean interactive,
-      Map<String, String> environment) {
+      Map<String, String> environment,
+      AgentType agentType) {
     return launchAgent(
-        repoId, workspaceId, name, script, interactive, environment, null, null, null);
+        repoId, workspaceId, name, script, interactive, environment, null, null, null, agentType);
   }
 
   /**
    * {@link #launchAgent} with session identity: {@code commandId} pre-names the row (it is rendered
    * into the script's session-report hook URL), {@code agentSession} is persisted as the first
    * entry of the command's session list, and {@code extraExitListener} runs after the status write
-   * (the transcript sweep). All three may be null.
+   * (the transcript sweep). The first three may be null; {@code agentType} is the resolved harness
+   * recorded on the row.
    */
   public CommandDto launchAgent(
       String repoId,
@@ -182,7 +188,8 @@ public class CommandService {
       Map<String, String> environment,
       String commandId,
       AgentSessionRef agentSession,
-      CommandExitListener extraExitListener) {
+      CommandExitListener extraExitListener,
+      AgentType agentType) {
     Prepared p =
         prepare(
             repoId,
@@ -197,7 +204,8 @@ public class CommandService {
                 false,
                 null,
                 commandId,
-                agentSession));
+                agentSession,
+                agentType));
     registry.spawn(
         p.dto().id(),
         p.container(),
@@ -219,13 +227,14 @@ public class CommandService {
       String name,
       String script,
       Map<String, String> environment) {
-    return launchChat(repoId, workspaceId, name, script, environment, null, null, null, null);
+    return launchChat(repoId, workspaceId, name, script, environment, null, null, null, null, null);
   }
 
   /**
    * {@link #launchChat} with session identity and a chat transport — same extra parameters as
    * {@link #launchAgent}, plus a {@link ChatProtocolFactory} ({@code null} ⇒ the default Claude
-   * stream-json transport; Kimi passes its ACP client).
+   * stream-json transport; Kimi passes its ACP client) and the resolved {@code agentType} recorded
+   * on the row.
    */
   public CommandDto launchChat(
       String repoId,
@@ -236,7 +245,8 @@ public class CommandService {
       String commandId,
       AgentSessionRef agentSession,
       CommandExitListener extraExitListener,
-      ChatProtocolFactory protocolFactory) {
+      ChatProtocolFactory protocolFactory,
+      AgentType agentType) {
     Prepared p =
         prepare(
             repoId,
@@ -251,7 +261,8 @@ public class CommandService {
                 false,
                 null,
                 commandId,
-                agentSession));
+                agentSession,
+                agentType));
     registry.spawnChat(
         p.dto().id(),
         p.container(),
@@ -313,6 +324,7 @@ public class CommandService {
                 otel,
                 publicBase,
                 null,
+                null,
                 null));
     CommandExitListener composite =
         (commandId, exitCode, terminatedManually) -> {
@@ -367,6 +379,7 @@ public class CommandService {
                 CommandKind.DAEMON,
                 otel,
                 publicBase,
+                null,
                 null,
                 null));
     return new DaemonRun(p.dto(), p.container(), p.env());
@@ -451,7 +464,17 @@ public class CommandService {
         repoId,
         workspaceId,
         new LaunchDescriptor(
-            null, name, script, false, environment, CommandKind.TERMINAL, false, null, null, null),
+            null,
+            name,
+            script,
+            false,
+            environment,
+            CommandKind.TERMINAL,
+            false,
+            null,
+            null,
+            null,
+            null),
         timeoutMillis,
         extraSinks);
   }
@@ -536,7 +559,8 @@ public class CommandService {
             descriptor.interactive(),
             descriptor.kind(),
             descriptor.commandId(),
-            descriptor.agentSession());
+            descriptor.agentSession(),
+            descriptor.agentType());
 
     // Only the resolved overlay reaches the container (as `docker exec -e` flags) — the host
     // environment (and its credentials) is deliberately never inherited into a workspace container.

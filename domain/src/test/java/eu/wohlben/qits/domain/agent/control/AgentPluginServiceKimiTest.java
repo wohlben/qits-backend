@@ -3,26 +3,35 @@ package eu.wohlben.qits.domain.agent.control;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import eu.wohlben.qits.domain.error.BadRequestException;
+import eu.wohlben.qits.domain.setting.control.SettingsService;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
-import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Verifies the plugin surface is disabled for Kimi Code. */
+/**
+ * Verifies the plugin surface is disabled for Kimi Code. The plugin gate resolves the qits-wide DB
+ * default now, so the test sets {@code agent.default-type=kimi} instead of a config profile.
+ */
 @QuarkusTest
-@TestProfile(AgentPluginServiceKimiTest.KimiProfile.class)
 public class AgentPluginServiceKimiTest {
 
-  public static class KimiProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      return Map.of("qits.agent.type", "kimi");
-    }
+  @Inject AgentPluginService pluginService;
+
+  @Inject SettingsService settingsService;
+
+  @BeforeEach
+  void defaultToKimi() {
+    settingsService.set(SettingsService.AGENT_DEFAULT_TYPE, "kimi");
   }
 
-  @Inject AgentPluginService pluginService;
+  @AfterEach
+  void restoreDefault() {
+    // The DB is shared across no-profile @QuarkusTests in this JVM; restore the seeded default so
+    // the kimi override never leaks into other suites' resolver reads.
+    settingsService.set(SettingsService.AGENT_DEFAULT_TYPE, "claude");
+  }
 
   @Test
   public void listInstalledRejectsKimi() {

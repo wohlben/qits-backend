@@ -13,11 +13,13 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { lastValueFrom } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
+import { AgentsControllerService } from '@/api/api/agentsController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
 import { WorkspacePromptDraftDto } from '@/api/model/workspacePromptDraftDto';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
+import { AgentType } from '@/api/model/agentType';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandStatus } from '@/api/model/commandStatus';
 import {
@@ -29,6 +31,7 @@ import { fetchPromptDraft, promptDraftQueryKey } from '@/pattern/workspace/promp
 import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { WebTerminalComponent } from '@/pattern/repository/web-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
+import { AgentTypeInputComponent } from '@/ui/inputs/agents/agent-type-input.component';
 
 /**
  * The workspace's embedded agent session: the interactive Claude Code TUI living directly in the
@@ -53,7 +56,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
  */
 @Component({
   selector: 'app-workspace-agent-session',
-  imports: [RouterLink, WebTerminalComponent, ZardButtonComponent],
+  imports: [AgentTypeInputComponent, RouterLink, WebTerminalComponent, ZardButtonComponent],
   template: `
     <section class="flex flex-col gap-3" aria-label="Agent session">
       <div class="flex items-center justify-between gap-4">
@@ -98,6 +101,15 @@ import { ZardButtonComponent } from '@/shared/components/button';
       } @else if (endedCommandId(); as endedId) {
         <div class="flex flex-col items-start gap-3 rounded-md border px-4 py-6">
           <span class="text-sm text-muted-foreground">The session has ended.</span>
+          <!-- Resume keeps the original harness — a resumed session can't switch agents — so the
+               picker is disabled here; a fresh "New session" uses the instance default. -->
+          @if (availableAgents().length > 0) {
+            <app-agent-type-input
+              [agents]="availableAgents()"
+              [value]="selectedAgent()"
+              [disabled]="true"
+            />
+          }
           <div class="flex items-center gap-2">
             <button z-button zType="secondary" type="button" (click)="resume()">Resume</button>
             <button z-button zType="secondary" type="button" (click)="startNew()">
@@ -109,6 +121,13 @@ import { ZardButtonComponent } from '@/shared/components/button';
       } @else if (idle()) {
         <div class="flex flex-col items-start gap-3 rounded-md border px-4 py-6">
           <span class="text-sm text-muted-foreground">No agent session is running.</span>
+          @if (availableAgents().length > 0) {
+            <app-agent-type-input
+              [agents]="availableAgents()"
+              [value]="selectedAgent()"
+              (valueChange)="selectedAgent.set($event)"
+            />
+          }
           <button z-button zType="secondary" type="button" (click)="startNew()">
             Start new session
           </button>
@@ -136,11 +155,23 @@ export class WorkspaceAgentSessionComponent {
   readonly jumpToChat = output<void>();
 
   private readonly agentService = inject(AgentControllerService);
+  private readonly agentsService = inject(AgentsControllerService);
   private readonly commandService = inject(CommandControllerService);
   private readonly draftService = inject(WorkspacePromptDraftControllerService);
   /** Route-scoped, shared with the compose tab — flushed before a fresh launch (see {@link launch}). */
   private readonly promptDraftSync = inject(PromptDraftSyncService);
   private readonly queryClient = inject(QueryClient);
+
+  /** The coding-agent harnesses this instance can launch, plus the configured default. */
+  readonly availableAgentsQuery = injectQuery(() => ({
+    queryKey: ['agents', 'available'],
+    queryFn: () => lastValueFrom(this.agentsService.apiAgentsAvailableGet()),
+  }));
+
+  readonly availableAgents = computed(() => this.availableAgentsQuery.data()?.agents ?? []);
+
+  /** The harness a fresh launch uses; seeded from the instance default once availability loads. */
+  readonly selectedAgent = signal<AgentType | undefined>(undefined);
 
   // Same key AND shape as the page's commands query, so both share one cache entry.
   readonly commandsQuery = injectQuery(() => ({
@@ -276,6 +307,10 @@ export class WorkspaceAgentSessionComponent {
             mode: AgentLaunchMode.Interactive,
             ...(resumeSessionId ? { resumeSessionId } : {}),
             ...(deliverTaskPrompt ? { deliverTaskPrompt: true } : {}),
+            // A resume keeps the original harness; only a fresh launch may pick the agent.
+            ...(resumeSessionId === null && this.selectedAgent()
+              ? { agentType: this.selectedAgent() }
+              : {}),
           },
         ),
       ),
@@ -295,6 +330,14 @@ export class WorkspaceAgentSessionComponent {
   }));
 
   constructor() {
+    // Seed the picker from the instance default once availability loads, until the user overrides it.
+    effect(() => {
+      const fallback = this.availableAgentsQuery.data()?.defaultAgent;
+      if (fallback && this.selectedAgent() === undefined) {
+        this.selectedAgent.set(fallback);
+      }
+    });
+
     // Resolution runs once per activation, as soon as the commands registry has answered.
     effect(() => {
       if (!this.activated() || this.resolutionLatch()) {

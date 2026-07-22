@@ -118,6 +118,8 @@ public class AgentLaunchService {
 
   @Inject AgentTranscriptTailService transcriptTailService;
 
+  @Inject AgentTypeResolver agentTypeResolver;
+
   @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
   int qitsPort;
 
@@ -149,10 +151,6 @@ public class AgentLaunchService {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
-  /** Which coding-agent harness this qits deployment launches (one harness per deployment). */
-  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
-  AgentType agentType;
-
   /**
    * Launches the active coding agent as a <strong>chat</strong> command in {@code workspaceId} of
    * {@code repoId}, with the MCP server(s) for {@code scope} attached. Claude drives it over
@@ -163,7 +161,7 @@ public class AgentLaunchService {
    */
   public CommandDto launchChat(
       String repoId, String workspaceId, AgentMcpScope scope, String initialContext) {
-    return launchChat(repoId, workspaceId, scope, initialContext, null, false, false);
+    return launchChat(repoId, workspaceId, scope, initialContext, null, false, false, null);
   }
 
   /**
@@ -184,7 +182,8 @@ public class AgentLaunchService {
       String initialContext,
       String resumeSessionId,
       boolean fork,
-      boolean deliverTaskPrompt) {
+      boolean deliverTaskPrompt,
+      AgentType agentType) {
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -194,6 +193,12 @@ public class AgentLaunchService {
     // Guard the repo id (a UUID) before ensureContainer, so a bad id is a 400 here rather than a
     // 404 "workspace not found" from the lookup below.
     requireUuid(repoId, "repository id");
+
+    // Resolve the harness once and thread it through every helper, so auth, render, transport, and
+    // the recorded command row all agree. A resume keeps the resumed session's original harness
+    // (you
+    // can't resume a Claude session under Kimi); otherwise explicit tab choice → default → CLAUDE.
+    AgentType type = resolveHarness(repoId, workspaceId, resumeSessionId, agentType);
 
     // Re-provision a lost container up front so the sign-in probe below runs against a live
     // container (a stopped one would read as not-signed-in and wrongly redirect to login, even
@@ -205,17 +210,17 @@ public class AgentLaunchService {
     // its command page (a real PTY), the operator finishes OAuth through the REPL onboarding there,
     // and the next chat launch (this workspace or any other, same volume) sees the login and
     // proceeds.
-    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId)) {
-      return launchLogin(repoId, workspaceId);
+    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId, type)) {
+      return launchLogin(repoId, workspaceId, type);
     }
 
-    PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork);
-    LaunchSpec spec = renderChat(repoId, workspaceId, scope, pinned);
+    PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork, type);
+    LaunchSpec spec = renderChat(repoId, workspaceId, scope, pinned, type);
     // Claude drives chat over stream-json (null ⇒ the default transport); Kimi has no stdin chat,
     // so
     // its chat rides an in-JVM ACP client with the scoped MCP servers carried on session/new.
     ChatProtocolFactory protocolFactory =
-        agentType == AgentType.KIMI
+        type == AgentType.KIMI
             ? process ->
                 new AcpChatProtocol(
                     process, buildAcpSessionConfig(repoId, workspaceId, scope, pinned))
@@ -225,15 +230,16 @@ public class AgentLaunchService {
         commandService.launchChat(
             repoId,
             workspaceId,
-            nameFor(scope),
+            nameFor(scope, type),
             spec.script(),
             spec.environment(),
             pinned.commandId(),
             pinned.ref(),
             chatTranscriptSweep(),
-            protocolFactory);
+            protocolFactory,
+            type);
     // The live transcript import: the durable head a mid-run re-attach replays from.
-    transcriptTailService.startTail(command.id());
+    transcriptTailService.startTail(command.id(), type);
     boolean deliverBootstrap = shouldDeliverBootstrap(deliverTaskPrompt, repoId, workspaceId);
     String seed = deliverBootstrap ? TASK_PROMPT_BOOTSTRAP : initialContext;
     if (seed != null && !seed.isBlank()) {
@@ -260,8 +266,10 @@ public class AgentLaunchService {
    * command.
    */
   public CommandDto launchAutonomous(String repoId, String workspaceId, String name) {
-    PinnedSession pinned = pinSession(repoId, workspaceId, null, false);
-    LaunchSpec spec = renderAutonomous(repoId, workspaceId, AgentMcpScope.REPOSITORY, pinned);
+    // Composed flows carry no per-launch choice, so they resolve the qits-wide default.
+    AgentType type = agentTypeResolver.resolve(null);
+    PinnedSession pinned = pinSession(repoId, workspaceId, null, false, type);
+    LaunchSpec spec = renderAutonomous(repoId, workspaceId, AgentMcpScope.REPOSITORY, pinned, type);
     CommandDto command =
         commandService.launchAgent(
             repoId,
@@ -272,7 +280,8 @@ public class AgentLaunchService {
             spec.environment(),
             pinned.commandId(),
             pinned.ref(),
-            transcriptSweep());
+            transcriptSweep(),
+            type);
     // Autonomous always renders the bootstrap turn; recordRun is a no-op when the workspace has no
     // draft row, so it needs no separate deliverability probe (the resolution caller persists one).
     recordDelivery(true, repoId, workspaceId, command.id());
@@ -294,8 +303,10 @@ public class AgentLaunchService {
       String initialContext,
       String resumeSessionId,
       boolean fork,
-      boolean deliverTaskPrompt) {
-    if (agentType == AgentType.KIMI && fork) {
+      boolean deliverTaskPrompt,
+      AgentType agentType) {
+    AgentType type = resolveHarness(repoId, workspaceId, resumeSessionId, agentType);
+    if (type == AgentType.KIMI && fork) {
       throw new BadRequestException("fork is not supported by Kimi Code");
     }
     if (scope == null) {
@@ -308,8 +319,8 @@ public class AgentLaunchService {
 
     // Same auth gate as chat: without the shared-volume login, redirect to the sign-in REPL.
     workspaceService.ensureContainer(repoId, workspaceId);
-    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId)) {
-      return launchLogin(repoId, workspaceId);
+    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId, type)) {
+      return launchLogin(repoId, workspaceId, type);
     }
 
     // Decide the seed before rendering: the argv prompt is either the bootstrap turn (agent fetches
@@ -317,19 +328,20 @@ public class AgentLaunchService {
     boolean deliverBootstrap = shouldDeliverBootstrap(deliverTaskPrompt, repoId, workspaceId);
     String seed = deliverBootstrap ? TASK_PROMPT_BOOTSTRAP : initialContext;
 
-    PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork);
-    LaunchSpec spec = renderInteractive(repoId, workspaceId, scope, seed, pinned);
+    PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork, type);
+    LaunchSpec spec = renderInteractive(repoId, workspaceId, scope, seed, pinned, type);
     CommandDto command =
         commandService.launchAgent(
             repoId,
             workspaceId,
-            interactiveNameFor(scope),
+            interactiveNameFor(scope, type),
             spec.script(),
             true,
             spec.environment(),
             pinned.commandId(),
             pinned.ref(),
-            transcriptSweep());
+            transcriptSweep(),
+            type);
     recordDelivery(deliverBootstrap, repoId, workspaceId, command.id());
     return command;
   }
@@ -341,19 +353,19 @@ public class AgentLaunchService {
    * volume, so it signs in every workspace at once. Returned by {@link #launchChat} when the agent
    * isn't signed in yet; the caller redirects to its terminal.
    */
-  public CommandDto launchLogin(String repoId, String workspaceId) {
-    LaunchSpec spec = renderLogin();
+  public CommandDto launchLogin(String repoId, String workspaceId, AgentType agentType) {
+    LaunchSpec spec = renderLogin(agentType);
     String name =
         switch (agentType) {
           case CLAUDE -> "Claude sign-in";
           case KIMI -> "Kimi sign-in";
         };
     return commandService.launchAgent(
-        repoId, workspaceId, name, spec.script(), true, spec.environment());
+        repoId, workspaceId, name, spec.script(), true, spec.environment(), agentType);
   }
 
   /** Renders the interactive login command with the shared-volume credential overlay. */
-  LaunchSpec renderLogin() {
+  LaunchSpec renderLogin(AgentType agentType) {
     Map<String, String> env = new HashMap<>();
     if (claudeMount != null && !claudeMount.isBlank()) {
       switch (agentType) {
@@ -385,6 +397,28 @@ public class AgentLaunchService {
   record PinnedSession(String commandId, AgentSessionRef ref) {}
 
   /**
+   * The harness for this launch. A resume is pinned to the resumed session's recorded harness (a
+   * Claude session can't be resumed under Kimi, and its transcript layout / auth probe are
+   * harness-specific), overriding any explicit choice or default. A fresh launch resolves normally:
+   * explicit tab choice → the {@code agent.default-type} setting → CLAUDE.
+   */
+  private AgentType resolveHarness(
+      String repoId, String workspaceId, String resumeSessionId, AgentType explicit) {
+    if (resumeSessionId != null) {
+      Optional<AgentType> resumed =
+          QuarkusTransaction.requiringNew()
+              .call(
+                  () ->
+                      commandRepository.findAgentTypeByWorkspaceAndSessionId(
+                          repoId, workspaceId, resumeSessionId));
+      if (resumed.isPresent()) {
+        return resumed.get();
+      }
+    }
+    return agentTypeResolver.resolve(explicit);
+  }
+
+  /**
    * Pins the launch's session identity. Fresh launches pin a brand-new UUID ({@code PINNED}); Kimi
    * Code cannot pin a fresh session id, so its fresh launches return a {@code null} ref and qits
    * learns the id from the harness's SessionStart hook. Resume reuses {@code resumeSessionId} in
@@ -394,7 +428,11 @@ public class AgentLaunchService {
    * ids (pinned ids are create-only).
    */
   PinnedSession pinSession(
-      String repoId, String workspaceId, String resumeSessionId, boolean fork) {
+      String repoId,
+      String workspaceId,
+      String resumeSessionId,
+      boolean fork,
+      AgentType agentType) {
     String commandId = UUID.randomUUID().toString();
     if (resumeSessionId == null) {
       if (fork) {
@@ -409,7 +447,7 @@ public class AgentLaunchService {
           new AgentSessionRef(
               UUID.randomUUID().toString(), AgentSessionSource.PINNED, null, null, Instant.now()));
     }
-    requireSessionId(resumeSessionId, "session id");
+    requireSessionId(resumeSessionId, "session id", agentType);
     boolean owned =
         QuarkusTransaction.requiringNew()
             .call(
@@ -445,7 +483,7 @@ public class AgentLaunchService {
    */
   private static final String KIMI_SESSION_PATTERN = "session_[A-Za-z0-9_-]{1,128}";
 
-  private void requireSessionId(String value, String label) {
+  private void requireSessionId(String value, String label, AgentType agentType) {
     if (agentType == AgentType.KIMI) {
       if (value == null || !value.matches(KIMI_SESSION_PATTERN)) {
         throw new BadRequestException("Invalid " + label + ": " + value);
@@ -546,12 +584,16 @@ public class AgentLaunchService {
    * assertable without spawning a container.
    */
   LaunchSpec renderChat(
-      String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
+      String repoId,
+      String workspaceId,
+      AgentMcpScope scope,
+      PinnedSession pinned,
+      AgentType agentType) {
     CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
-    return withSession(withAgentHome(agent), pinned).skipPermissions().chat();
+    return withSession(withAgentHome(agent, agentType), pinned).skipPermissions().chat();
   }
 
   /**
@@ -588,7 +630,11 @@ public class AgentLaunchService {
    * the {@code -p} argv. Package-visible so the MCP attachment is assertable without a container.
    */
   LaunchSpec renderAutonomous(
-      String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
+      String repoId,
+      String workspaceId,
+      AgentMcpScope scope,
+      PinnedSession pinned,
+      AgentType agentType) {
     CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       // Unattended run under skip-permissions: mark the server read-only so
@@ -597,7 +643,9 @@ public class AgentLaunchService {
       // its own git work happens inside its container, not via host-side MCP mutations.
       agent.mcpServer(server.key(), McpServers.httpMcp(readOnlyMarked(server.url())));
     }
-    return withSession(withAgentHome(agent), pinned).skipPermissions().run(TASK_PROMPT_BOOTSTRAP);
+    return withSession(withAgentHome(agent, agentType), pinned)
+        .skipPermissions()
+        .run(TASK_PROMPT_BOOTSTRAP);
   }
 
   /**
@@ -619,7 +667,8 @@ public class AgentLaunchService {
       String workspaceId,
       AgentMcpScope scope,
       String initialContext,
-      PinnedSession pinned) {
+      PinnedSession pinned,
+      AgentType agentType) {
     CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
@@ -627,7 +676,7 @@ public class AgentLaunchService {
     if (initialContext != null && !initialContext.isBlank()) {
       agent.initialContext(initialContext);
     }
-    return withSession(withAgentHome(agent), pinned).skipPermissions().start();
+    return withSession(withAgentHome(agent, agentType), pinned).skipPermissions().start();
   }
 
   /**
@@ -637,7 +686,7 @@ public class AgentLaunchService {
    * the container-level {@code KIMI_CODE_HOME} and its own per-launch symlink farm, so no {@code
    * HOME} overlay is needed.
    */
-  private CodingAgent withAgentHome(CodingAgent agent) {
+  private CodingAgent withAgentHome(CodingAgent agent, AgentType agentType) {
     if (agentType == AgentType.CLAUDE && claudeMount != null && !claudeMount.isBlank()) {
       agent.environment("HOME", claudeMount);
     }
@@ -711,7 +760,7 @@ public class AgentLaunchService {
     return "http://" + qitsHostResolver.qitsHost() + ":" + qitsPort + "/mcp/" + server;
   }
 
-  private String nameFor(AgentMcpScope scope) {
+  private String nameFor(AgentMcpScope scope, AgentType agentType) {
     return harnessName(
         scope,
         switch (agentType) {
@@ -720,7 +769,7 @@ public class AgentLaunchService {
         });
   }
 
-  private String interactiveNameFor(AgentMcpScope scope) {
+  private String interactiveNameFor(AgentMcpScope scope, AgentType agentType) {
     return harnessName(
         scope,
         switch (agentType) {

@@ -13,6 +13,12 @@ auth, and transcript import — by implementing the gaps the Claude-shaped assum
 Agent selection is a **global config property** (`qits.agent.type=claude|kimi`, default `claude`):
 one harness per qits deployment, no per-launch UI picker.
 
+> **Superseded (2026-07-22):** the `qits.agent.type` property has been removed. The default harness
+> is now the DB-backed `agent.default-type` setting, resolved per launch (explicit tab choice →
+> setting → CLAUDE) by `AgentTypeResolver`, and recorded on the command row so transcript import and
+> the auth probe resolve per-command. See
+> [qits-settings/db-backed-default-agent-and-picker](../../qits-settings/features/2026-07-22_db-backed-default-agent-and-picker.md).
+
 **The native in-UI chat is deliberately out of scope here** — kimi has no stdin stream-json chat
 mode, so its chat rides its **ACP (Agent Client Protocol)** stdio interface, a large enough piece
 to own its own document. This harness feature ships without kimi chat; kimi chat launches are

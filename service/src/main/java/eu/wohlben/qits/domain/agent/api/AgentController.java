@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.agent.api;
 import eu.wohlben.qits.domain.agent.control.AgentLaunchMode;
 import eu.wohlben.qits.domain.agent.control.AgentLaunchService;
 import eu.wohlben.qits.domain.agent.control.AgentMcpScope;
+import eu.wohlben.qits.domain.agent.control.AgentType;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import jakarta.inject.Inject;
@@ -16,11 +17,11 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * The agent code path: launch a coding agent (Claude Code or Kimi Code, selected by {@code
- * qits.agent.type}) into a workspace with an MCP server attached, scoped to the repository or
- * project. Separate from actions and the generic {@code /commands} launcher. Launching returns the
- * command immediately (it is registered like any other), and the terminal is watched on {@code
- * command.id}.
+ * The agent code path: launch a coding agent (Claude Code or Kimi Code) into a workspace with an
+ * MCP server attached, scoped to the repository or project. The harness is resolved per launch (the
+ * request's explicit {@code agentType} → the {@code agent.default-type} setting → CLAUDE). Separate
+ * from actions and the generic {@code /commands} launcher. Launching returns the command
+ * immediately (it is registered like any other), and the terminal is watched on {@code command.id}.
  */
 @Path("/repositories/{repoId}/workspaces/{workspaceId}/agents")
 @Produces(MediaType.APPLICATION_JSON)
@@ -44,7 +45,8 @@ public class AgentController {
       AgentLaunchMode mode,
       String resumeSessionId,
       Boolean fork,
-      Boolean deliverTaskPrompt) {
+      Boolean deliverTaskPrompt,
+      AgentType agentType) {
     public record Response(CommandDto command) {}
   }
 
@@ -67,7 +69,8 @@ public class AgentController {
                 request.initialContext(),
                 request.resumeSessionId(),
                 fork,
-                deliverTaskPrompt)
+                deliverTaskPrompt,
+                request.agentType())
             : agentLaunchService.launchChat(
                 repoId,
                 workspaceId,
@@ -75,7 +78,8 @@ public class AgentController {
                 request.initialContext(),
                 request.resumeSessionId(),
                 fork,
-                deliverTaskPrompt);
+                deliverTaskPrompt,
+                request.agentType());
     return new LaunchAgentRequest.Response(command);
   }
 }

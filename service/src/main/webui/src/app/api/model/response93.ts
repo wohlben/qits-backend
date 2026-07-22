@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetrySpanDto } from './telemetrySpanDto';
+import { Entry18 } from './entry18';
 
 
 export interface Response93 { 
-    spans?: Array<TelemetrySpanDto>;
+    entries?: Array<Entry18>;
 }
 

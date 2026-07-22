@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
+import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
 export interface Response96 { 
-    groups?: Array<TelemetryErrorGroupDto>;
+    trace?: TelemetryTraceDto;
 }
 

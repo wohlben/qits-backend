@@ -26,9 +26,8 @@ public class AgentAuthStatusKimiTest {
   public static class KimiProfile implements QuarkusTestProfile {
     @Override
     public Map<String, String> getConfigOverrides() {
-      return Map.of(
-          "qits.agent.type", "kimi",
-          "qits.workspace.claude-mount", "/tmp/qits-test-kimi-home");
+      // The harness is passed to isLoggedIn now; only the credential-mount override remains.
+      return Map.of("qits.workspace.claude-mount", "/tmp/qits-test-kimi-home");
     }
   }
 
@@ -46,11 +45,11 @@ public class AgentAuthStatusKimiTest {
     Path credentials = Path.of(KIMI_HOME, "credentials");
     Files.deleteIfExists(credentials);
 
-    assertFalse(agentAuthStatus.isLoggedIn(repoId, "work"), "no credentials yet");
+    assertFalse(agentAuthStatus.isLoggedIn(repoId, "work", AgentType.KIMI), "no credentials yet");
 
     Files.createDirectories(credentials.getParent());
     Files.writeString(credentials, "{}");
-    assertTrue(agentAuthStatus.isLoggedIn(repoId, "work"), "credentials present");
+    assertTrue(agentAuthStatus.isLoggedIn(repoId, "work", AgentType.KIMI), "credentials present");
 
     Files.deleteIfExists(credentials);
   }
@@ -58,6 +57,7 @@ public class AgentAuthStatusKimiTest {
   @Test
   public void aMissingContainerReadsAsNotSignedIn() {
     assertFalse(
-        agentAuthStatus.isLoggedIn("22222222-2222-2222-2222-222222222222", "never-created"));
+        agentAuthStatus.isLoggedIn(
+            "22222222-2222-2222-2222-222222222222", "never-created", AgentType.KIMI));
   }
 }

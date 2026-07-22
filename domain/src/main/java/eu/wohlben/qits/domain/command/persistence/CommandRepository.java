@@ -1,11 +1,13 @@
 package eu.wohlben.qits.domain.command.persistence;
 
+import eu.wohlben.qits.domain.agent.control.AgentType;
 import eu.wohlben.qits.domain.command.entity.Command;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
+import java.util.Optional;
 
 @ApplicationScoped
 public class CommandRepository implements PanacheRepositoryBase<Command, String> {
@@ -50,6 +52,24 @@ public class CommandRepository implements PanacheRepositoryBase<Command, String>
             workspaceId,
             sessionId)
         > 0;
+  }
+
+  /**
+   * The recorded harness of the workspace command that drove {@code sessionId}, if any — the source
+   * of truth for a resume, which must keep the original session's harness (a Claude session can't
+   * be resumed under Kimi). Empty when no command owns the session or its harness is unrecorded
+   * (legacy rows), in which case the caller falls back to normal resolution.
+   */
+  public Optional<AgentType> findAgentTypeByWorkspaceAndSessionId(
+      String repositoryId, String workspaceId, String sessionId) {
+    return find(
+            "select c from Command c join c.agentSessions s where c.workspace.repository.id = ?1"
+                + " and c.workspace.workspaceId = ?2 and s.sessionId = ?3",
+            repositoryId,
+            workspaceId,
+            sessionId)
+        .firstResultOptional()
+        .map(command -> command.agentType);
   }
 
   /**

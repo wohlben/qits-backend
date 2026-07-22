@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { Entry4 } from './entry4';
 
 
 export interface Response21 { 
-    daemon?: RepositoryDaemonDto;
+    entries?: Array<Entry4>;
 }
 

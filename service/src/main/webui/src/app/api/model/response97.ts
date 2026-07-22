@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { TelemetrySpanDto } from './telemetrySpanDto';
 
 
 export interface Response97 { 
-    variant?: string;
-    username?: string;
+    spans?: Array<TelemetrySpanDto>;
 }
 

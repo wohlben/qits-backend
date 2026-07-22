@@ -55,9 +55,6 @@ public class AgentTranscriptTailService {
   @ConfigProperty(name = "qits.agent.transcript-tail-poll-ms", defaultValue = "500")
   long pollMillis;
 
-  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
-  AgentType agentType;
-
   @Inject AgentTranscriptService transcriptService;
 
   @Inject CommandLogService commandLogService;
@@ -82,12 +79,19 @@ public class AgentTranscriptTailService {
     scheduler.shutdownNow();
   }
 
-  /** Begin polling for the command's main-session transcript (idempotent per command). */
-  public void startTail(String commandId) {
-    startTail(commandId, transcriptService.configDir());
+  /**
+   * Begin polling for the command's main-session transcript (idempotent per command). The harness
+   * is passed by the launch (already resolved) so the config dir picks the right dot-dir; the
+   * per-session harness for the layout switch comes off {@link AgentTranscriptService.SessionInfo}.
+   */
+  public void startTail(String commandId, AgentType agentType) {
+    startTail(commandId, transcriptService.configDir(agentType));
   }
 
-  /** {@link #startTail(String)}; package-visible so tests can point it at a fixture config dir. */
+  /**
+   * {@link #startTail(String, AgentType)}; package-visible so tests can point it at a fixture
+   * config dir.
+   */
   void startTail(String commandId, Path configDir) {
     tails.computeIfAbsent(
         commandId,
@@ -204,12 +208,12 @@ public class AgentTranscriptTailService {
       if (session == null) {
         return false;
       }
-      if (agentType == AgentType.KIMI && normalizer == null) {
+      if (session.agentType() == AgentType.KIMI && normalizer == null) {
         normalizer = new KimiEventNormalizer(session.sessionId());
       }
       file =
           transcriptService.resolveTranscript(
-              configDir, CodingAgentFactory.ofType(agentType), session);
+              configDir, CodingAgentFactory.ofType(session.agentType()), session);
       return file != null;
     }
 

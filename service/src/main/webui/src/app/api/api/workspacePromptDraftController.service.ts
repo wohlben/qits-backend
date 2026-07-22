@@ -19,9 +19,9 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { AddAttachmentRequest } from '../model/addAttachmentRequest';
 // @ts-ignore
-import { Response89 } from '../model/response89';
-// @ts-ignore
 import { Response90 } from '../model/response90';
+// @ts-ignore
+import { Response91 } from '../model/response91';
 // @ts-ignore
 import { SaveDraftRequest } from '../model/saveDraftRequest';
 // @ts-ignore
@@ -178,9 +178,9 @@ export class WorkspacePromptDraftControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response90>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response90>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response90>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response91>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response91>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response91>>;
     public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost(repoId: string, workspaceId: string, addAttachmentRequest: AddAttachmentRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftAttachmentsPost.');
@@ -228,7 +228,7 @@ export class WorkspacePromptDraftControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/prompt-draft/attachments`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response90>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response91>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: addAttachmentRequest,
@@ -371,9 +371,9 @@ export class WorkspacePromptDraftControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response89>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response89>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response89>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response90>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response90>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response90>>;
     public apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut(repoId: string, workspaceId: string, saveDraftRequest: SaveDraftRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdPromptDraftPut.');
@@ -421,7 +421,7 @@ export class WorkspacePromptDraftControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/prompt-draft`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response89>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response90>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: saveDraftRequest,

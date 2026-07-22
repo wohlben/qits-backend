@@ -6,6 +6,7 @@ api/actionConfigurationController.service.ts
 api/agentController.service.ts
 api/agentPluginController.service.ts
 api/agentSessionController.service.ts
+api/agentsController.service.ts
 api/api.ts
 api/authController.service.ts
 api/bootstrapCommandController.service.ts
@@ -23,6 +24,7 @@ api/repositoryActionsController.service.ts
 api/repositoryController.service.ts
 api/repositoryDaemonController.service.ts
 api/repositorySubmoduleController.service.ts
+api/settingController.service.ts
 api/speechController.service.ts
 api/workspaceBootstrapController.service.ts
 api/workspaceController.service.ts
@@ -44,6 +46,7 @@ model/agentSessionNodeDto.ts
 model/agentSessionRefDto.ts
 model/agentSessionSource.ts
 model/agentSubagentDto.ts
+model/agentType.ts
 model/available.ts
 model/bootstrapCommandDto.ts
 model/bootstrapOutcome.ts
@@ -92,6 +95,7 @@ model/entry14.ts
 model/entry15.ts
 model/entry16.ts
 model/entry17.ts
+model/entry18.ts
 model/entry2.ts
 model/entry3.ts
 model/entry4.ts
@@ -139,6 +143,8 @@ model/repositorySubmoduleDto.ts
 model/response.ts
 model/response1.ts
 model/response10.ts
+model/response100.ts
+model/response101.ts
 model/response11.ts
 model/response12.ts
 model/response13.ts
@@ -234,9 +240,12 @@ model/response94.ts
 model/response95.ts
 model/response96.ts
 model/response97.ts
+model/response98.ts
+model/response99.ts
 model/restartPolicy.ts
 model/saveDraftRequest.ts
 model/setMainBranchRequest.ts
+model/settingDto.ts
 model/spanEvent.ts
 model/syncStatusDto.ts
 model/telemetryErrorGroupDto.ts
@@ -256,6 +265,7 @@ model/updateFeatureFlowPhaseStepRequest.ts
 model/updateHistoryRequest.ts
 model/updateProjectRequest.ts
 model/updateRepositoryDaemonRequest.ts
+model/updateSettingRequest.ts
 model/webViewDto.ts
 model/webViewInput.ts
 model/workspaceDto.ts

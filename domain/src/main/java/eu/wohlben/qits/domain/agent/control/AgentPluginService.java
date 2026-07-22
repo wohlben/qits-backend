@@ -68,8 +68,7 @@ public class AgentPluginService {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
-  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
-  AgentType agentType;
+  @Inject AgentTypeResolver agentTypeResolver;
 
   /**
    * The plugins installed on the shared volume, read from {@code enabledPlugins} in {@code
@@ -146,7 +145,7 @@ public class AgentPluginService {
   }
 
   private void requireClaude() {
-    if (agentType != AgentType.CLAUDE) {
+    if (agentTypeResolver.resolve(null) != AgentType.CLAUDE) {
       throw new BadRequestException("LSP plugins are only supported by Claude Code");
     }
   }

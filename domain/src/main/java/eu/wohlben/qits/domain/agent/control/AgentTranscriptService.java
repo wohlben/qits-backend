@@ -98,10 +98,6 @@ public class AgentTranscriptService {
   @ConfigProperty(name = "qits.agent.claude-config-dir")
   Optional<String> legacyClaudeConfigDir;
 
-  /** Which harness transcripts we are importing. */
-  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
-  AgentType agentType;
-
   /**
    * Where the credential volume mounts in the <em>containers</em> (hook-reported transcript paths
    * are container-side); used to remap them onto {@link #configDir()}.
@@ -111,21 +107,37 @@ public class AgentTranscriptService {
 
   /**
    * The resolved harness config dir on qits' own filesystem: the explicit override (or its legacy
-   * name) when set, else {@code <claude-mount>/<harness dot-dir>}. Package-visible: the live tail
-   * resolves the same dir.
+   * name) when set, else {@code <claude-mount>/<harness dot-dir>}. Now per-command — the dot-dir
+   * differs by harness ({@code .claude} vs {@code .kimi-code}) — so callers pass the command's
+   * harness. Package-visible: the live tail resolves the same dir.
    */
-  Path configDir() {
+  Path configDir(AgentType agentType) {
     return agentConfigDirOverride
         .or(() -> legacyClaudeConfigDir)
         .map(Path::of)
-        .orElseGet(() -> Path.of(claudeMount, dotDir()));
+        .orElseGet(() -> Path.of(claudeMount, dotDir(agentType)));
   }
 
-  private String dotDir() {
+  private String dotDir(AgentType agentType) {
     return switch (agentType) {
       case CLAUDE -> ".claude";
       case KIMI -> ".kimi-code";
     };
+  }
+
+  /**
+   * The harness a command was launched with, read in its own transaction (exit listeners run on
+   * registry reader threads). A null column or a missing row ⇒ legacy {@link AgentType#CLAUDE}.
+   */
+  AgentType harnessOf(String commandId) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Command command = commandRepository.findById(commandId);
+              return command != null && command.agentType != null
+                  ? command.agentType
+                  : AgentType.CLAUDE;
+            });
   }
 
   /**
@@ -134,7 +146,7 @@ public class AgentTranscriptService {
    */
   public void onCommandExit(String commandId) {
     try {
-      sweep(commandId, configDir());
+      sweep(commandId, configDir(harnessOf(commandId)));
     } catch (RuntimeException e) {
       LOG.errorf(e, "Transcript sweep failed for command %s", commandId);
     }
@@ -149,7 +161,7 @@ public class AgentTranscriptService {
    */
   public void onChatExit(String commandId, long expectedMainLines) {
     try {
-      chatSweep(commandId, expectedMainLines, configDir());
+      chatSweep(commandId, expectedMainLines, configDir(harnessOf(commandId)));
     } catch (RuntimeException e) {
       LOG.errorf(e, "Transcript sweep failed for command %s", commandId);
     }
@@ -169,7 +181,7 @@ public class AgentTranscriptService {
     if (main == null) {
       return;
     }
-    CodingAgent agent = CodingAgentFactory.ofType(agentType);
+    CodingAgent agent = CodingAgentFactory.ofType(main.agentType());
     for (int attempt = 0; ; attempt++) {
       Path transcript = resolveTranscript(configDir, agent, main);
       if (transcript != null && countNonBlankLines(transcript) >= expectedMainLines) {
@@ -208,8 +220,9 @@ public class AgentTranscriptService {
               if (command == null || command.agentSessions.isEmpty()) {
                 return null;
               }
+              AgentType harness = command.agentType != null ? command.agentType : AgentType.CLAUDE;
               var ref = command.agentSessions.get(0);
-              return new SessionInfo(ref.sessionId, ref.transcriptPath);
+              return new SessionInfo(ref.sessionId, ref.transcriptPath, harness);
             });
   }
 
@@ -238,20 +251,22 @@ public class AgentTranscriptService {
     // Delete-and-reimport: a crashed prior sweep or a manual re-trigger converges to one copy.
     commandLogService.deleteChannel(commandId, LogChannel.TRANSCRIPT);
 
+    AgentType harness = info.agentType();
     ImportBuffer buffer = new ImportBuffer(commandId);
-    CodingAgent agent = CodingAgentFactory.ofType(agentType);
+    CodingAgent agent = CodingAgentFactory.ofType(harness);
     // Stats aggregate once per session even when the list revisits one (in-TUI switch back).
     Set<String> visited = new LinkedHashSet<>();
     List<AgentSessionStat> stats = new ArrayList<>();
     for (SessionInfo session : info.sessions()) {
       boolean firstVisit = visited.add(session.sessionId());
       Path transcript = resolveTranscript(configDir, agent, session);
-      StatCollector sessionStat = new StatCollector();
+      StatCollector sessionStat = new StatCollector(harness);
       if (transcript == null) {
         LOG.warnf(
             "No transcript found for session %s of command %s", session.sessionId(), commandId);
       } else {
-        importJsonl(buffer, transcript, sessionStat, kimiNormalizer(session.sessionId(), null));
+        importJsonl(
+            buffer, transcript, sessionStat, kimiNormalizer(harness, session.sessionId(), null));
         if (firstVisit) {
           stats.add(sessionStat.toStat(commandId, session.sessionId(), null, null));
         }
@@ -261,7 +276,8 @@ public class AgentTranscriptService {
               buffer,
               configDir.resolve(agent.subagentsDir(CONTAINER_CWD, session.sessionId())),
               commandId,
-              session.sessionId());
+              session.sessionId(),
+              harness);
       if (firstVisit) {
         stats.addAll(sidechainStats);
       }
@@ -275,10 +291,15 @@ public class AgentTranscriptService {
   }
 
   /** What the sweep needs from the row, copied out of the transaction. */
-  private record CommandInfo(String repoId, String workspaceId, List<SessionInfo> sessions) {}
+  private record CommandInfo(
+      String repoId, String workspaceId, AgentType agentType, List<SessionInfo> sessions) {}
 
-  /** One session's identity + hook-reported path; shared with the live tail. */
-  record SessionInfo(String sessionId, String reportedTranscriptPath) {}
+  /**
+   * One session's identity + hook-reported path + the command's harness (denormalized per session
+   * so {@code resolveTranscript} and the live tail read it straight off the session); shared with
+   * the live tail.
+   */
+  record SessionInfo(String sessionId, String reportedTranscriptPath, AgentType agentType) {}
 
   /** Read in its own transaction — exit listeners run on registry reader threads. */
   private CommandInfo loadInfo(String commandId) {
@@ -289,12 +310,16 @@ public class AgentTranscriptService {
               if (command == null) {
                 return null;
               }
+              AgentType harness = command.agentType != null ? command.agentType : AgentType.CLAUDE;
               List<SessionInfo> sessions =
                   command.agentSessions.stream()
-                      .map(ref -> new SessionInfo(ref.sessionId, ref.transcriptPath))
+                      .map(ref -> new SessionInfo(ref.sessionId, ref.transcriptPath, harness))
                       .toList();
               return new CommandInfo(
-                  command.workspace.repository.id, command.workspace.workspaceId, sessions);
+                  command.workspace.repository.id,
+                  command.workspace.workspaceId,
+                  harness,
+                  sessions);
             });
   }
 
@@ -307,7 +332,8 @@ public class AgentTranscriptService {
    * same way.
    */
   Path resolveTranscript(Path configDir, CodingAgent agent, SessionInfo session) {
-    Path reported = remapReportedPath(configDir, session.reportedTranscriptPath());
+    Path reported =
+        remapReportedPath(configDir, session.reportedTranscriptPath(), session.agentType());
     if (reported != null && Files.isRegularFile(reported)) {
       return reported;
     }
@@ -315,7 +341,7 @@ public class AgentTranscriptService {
     if (Files.isRegularFile(conventional)) {
       return conventional;
     }
-    return switch (agentType) {
+    return switch (session.agentType()) {
       case CLAUDE -> findByFilename(configDir.resolve("projects"), session.sessionId() + ".jsonl");
       case KIMI -> findKimiTranscript(configDir.resolve("sessions"), session.sessionId());
     };
@@ -326,19 +352,19 @@ public class AgentTranscriptService {
    * and resolve the remainder against qits' own config dir. In the devcontainer both are the same
    * path, so this is a no-op there.
    */
-  private Path remapReportedPath(Path configDir, String reportedPath) {
+  private Path remapReportedPath(Path configDir, String reportedPath, AgentType agentType) {
     if (reportedPath == null || reportedPath.isBlank()) {
       return null;
     }
-    String containerConfigDir = configDirPrefix();
+    String containerConfigDir = configDirPrefix(agentType);
     if (reportedPath.startsWith(containerConfigDir)) {
       return configDir.resolve(reportedPath.substring(containerConfigDir.length()));
     }
     return null; // an unexpected location — fall back to the convention.
   }
 
-  private String configDirPrefix() {
-    return claudeMount + "/" + dotDir() + "/";
+  private String configDirPrefix(AgentType agentType) {
+    return claudeMount + "/" + dotDir(agentType) + "/";
   }
 
   private Path findByFilename(Path projectsDir, String filename) {
@@ -413,7 +439,8 @@ public class AgentTranscriptService {
   }
 
   /** A Kimi wire→envelope normalizer for a session (or a sidechain of it), or null under Claude. */
-  private KimiEventNormalizer kimiNormalizer(String sessionId, String sidechainAgentId) {
+  private KimiEventNormalizer kimiNormalizer(
+      AgentType agentType, String sessionId, String sidechainAgentId) {
     if (agentType != AgentType.KIMI) {
       return null;
     }
@@ -431,18 +458,26 @@ public class AgentTranscriptService {
    * subdirectories. Returns one stat row per sidechain.
    */
   private List<AgentSessionStat> importSidechains(
-      ImportBuffer buffer, Path subagentsDir, String commandId, String sessionId) {
+      ImportBuffer buffer,
+      Path subagentsDir,
+      String commandId,
+      String sessionId,
+      AgentType agentType) {
     if (!Files.isDirectory(subagentsDir)) {
       return List.of();
     }
     return switch (agentType) {
-      case CLAUDE -> importClaudeSidechains(buffer, subagentsDir, commandId, sessionId);
-      case KIMI -> importKimiSidechains(buffer, subagentsDir, commandId, sessionId);
+      case CLAUDE -> importClaudeSidechains(buffer, subagentsDir, commandId, sessionId, agentType);
+      case KIMI -> importKimiSidechains(buffer, subagentsDir, commandId, sessionId, agentType);
     };
   }
 
   private List<AgentSessionStat> importClaudeSidechains(
-      ImportBuffer buffer, Path subagentsDir, String commandId, String sessionId) {
+      ImportBuffer buffer,
+      Path subagentsDir,
+      String commandId,
+      String sessionId,
+      AgentType agentType) {
     List<Path> sidechains;
     try (Stream<Path> list = Files.list(subagentsDir)) {
       sidechains =
@@ -458,7 +493,7 @@ public class AgentTranscriptService {
       String agentId = filename.substring("agent-".length(), filename.length() - ".jsonl".length());
       SidechainMeta meta = readSidechainMeta(sidechain, agentId);
       buffer.add(agentMetaLine(agentId, meta), Instant.now());
-      StatCollector collector = new StatCollector();
+      StatCollector collector = new StatCollector(agentType);
       importJsonl(buffer, sidechain, collector, null);
       stats.add(collector.toStat(commandId, sessionId, agentId, meta));
     }
@@ -466,7 +501,11 @@ public class AgentTranscriptService {
   }
 
   private List<AgentSessionStat> importKimiSidechains(
-      ImportBuffer buffer, Path subagentsDir, String commandId, String sessionId) {
+      ImportBuffer buffer,
+      Path subagentsDir,
+      String commandId,
+      String sessionId,
+      AgentType agentType) {
     List<Path> sidechains;
     try (Stream<Path> list = Files.list(subagentsDir)) {
       sidechains =
@@ -486,8 +525,8 @@ public class AgentTranscriptService {
       // Kimi has no separate meta file for sidechains.
       SidechainMeta meta = new SidechainMeta(null, null, null);
       buffer.add(agentMetaLine(agentId, meta), Instant.now());
-      StatCollector collector = new StatCollector();
-      importJsonl(buffer, wire, collector, kimiNormalizer(sessionId, agentId));
+      StatCollector collector = new StatCollector(agentType);
+      importJsonl(buffer, wire, collector, kimiNormalizer(agentType, sessionId, agentId));
       stats.add(collector.toStat(commandId, sessionId, agentId, meta));
     }
     return stats;
@@ -560,7 +599,7 @@ public class AgentTranscriptService {
    * carrier, a thinking-only line, or a meta line. Counted on the source shape (once per message):
    * Claude's envelope line or Kimi's raw {@code wire.jsonl} message.
    */
-  private boolean isConversationTurn(JsonNode node) {
+  private boolean isConversationTurn(JsonNode node, AgentType agentType) {
     if (node == null) {
       return false;
     }
@@ -641,14 +680,19 @@ public class AgentTranscriptService {
 
   /** Aggregates one transcript's stat row while its lines stream through the import. */
   private class StatCollector {
+    private final AgentType agentType;
     private int messageCount;
     private Instant firstTimestamp;
+
+    private StatCollector(AgentType agentType) {
+      this.agentType = agentType;
+    }
 
     private void observe(JsonNode node, Instant timestamp) {
       if (firstTimestamp == null && timestamp != null) {
         firstTimestamp = timestamp;
       }
-      if (isConversationTurn(node)) {
+      if (isConversationTurn(node, agentType)) {
         messageCount++;
       }
     }

@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.command.entity;
 
+import eu.wohlben.qits.domain.agent.control.AgentType;
 import eu.wohlben.qits.domain.repository.entity.Workspace;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.CollectionTable;
@@ -92,6 +93,15 @@ public class Command extends PanacheEntityBase {
   /** Whether the action was interactive (a human attaches a terminal) — snapshot of the action. */
   @Column(nullable = false)
   public boolean interactive;
+
+  /**
+   * The coding-agent harness this command was launched with, recorded so post-hoc services
+   * (transcript import, the auth probe) resolve per-command rather than from a global. Null for
+   * non-agent launches and legacy rows ({@code null} ⇒ treated as {@link AgentType#CLAUDE}).
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "agent_type")
+  public AgentType agentType;
 
   @CreationTimestamp
   @Column(name = "launched_at", nullable = false, updatable = false)

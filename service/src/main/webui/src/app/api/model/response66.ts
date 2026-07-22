@@ -10,9 +10,6 @@
 
 
 export interface Response66 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
-    cleanedUp?: boolean;
+    technicalProcessId?: string;
 }
 

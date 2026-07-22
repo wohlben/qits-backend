@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.command.control;
 
+import eu.wohlben.qits.domain.agent.control.AgentType;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
 import eu.wohlben.qits.domain.command.entity.AgentSessionSource;
@@ -50,7 +51,8 @@ public class CommandLifecycleService {
    * launches render it into the session-report hook URL — and pass it as {@code commandId}; null
    * generates a fresh one. {@code initialAgentSession} is the first entry of an agent launch's
    * session list, persisted in the same transaction as the row so the hook can never race it; null
-   * for everything that isn't an agent session (actions, daemons, the login REPL).
+   * for everything that isn't an agent session (actions, daemons, the login REPL). {@code
+   * agentType} is the resolved coding-agent harness (null for non-agent launches ⇒ legacy CLAUDE).
    */
   @Transactional
   public CommandDto createRunning(
@@ -64,7 +66,8 @@ public class CommandLifecycleService {
       boolean interactive,
       CommandKind kind,
       String commandId,
-      AgentSessionRef initialAgentSession) {
+      AgentSessionRef initialAgentSession,
+      AgentType agentType) {
     Workspace workspace =
         workspaceRepository
             .findActiveByRepositoryAndWorkspaceId(repoId, workspaceId)
@@ -80,6 +83,7 @@ public class CommandLifecycleService {
             .executeScript(executeScript)
             .interactive(interactive)
             .kind(kind)
+            .agentType(agentType)
             .status(CommandStatus.RUNNING)
             .build();
     if (initialAgentSession != null) {

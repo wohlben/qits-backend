@@ -19,8 +19,6 @@ import eu.wohlben.qits.domain.repository.entity.Workspace;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
@@ -29,7 +27,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,18 +34,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The live tail must normalize Kimi {@code wire.jsonl} into the shared event envelope exactly as
  * the exit sweep does — otherwise a re-attach to a <em>running</em> Kimi chat serves raw wire lines
- * the frontend can't render and which never stitch to the live ring.
+ * the frontend can't render and which never stitch to the live ring. The harness comes from the
+ * seeded command row ({@code agentType = KIMI}), which {@code locate()} reads via the main session.
  */
 @QuarkusTest
-@TestProfile(AgentTranscriptTailServiceKimiTest.KimiProfile.class)
 public class AgentTranscriptTailServiceKimiTest {
-
-  public static class KimiProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      return Map.of("qits.agent.type", "kimi");
-    }
-  }
 
   private static final String KIMI_SESSION = "session_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 
@@ -90,6 +80,7 @@ public class AgentTranscriptTailServiceKimiTest {
             .executeScript("exec kimi acp")
             .interactive(false)
             .kind(CommandKind.CHAT)
+            .agentType(AgentType.KIMI)
             .status(CommandStatus.RUNNING)
             .build();
     command.agentSessions.add(

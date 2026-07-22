@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -10,16 +11,19 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideMic, lucideSparkles, lucideSquare } from '@ng-icons/lucide';
-import { injectMutation } from '@tanstack/angular-query-experimental';
+import { injectMutation, injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
+import { AgentsControllerService } from '@/api/api/agentsController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
 import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
+import { AgentType } from '@/api/model/agentType';
 import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
 import { ZardButtonComponent } from '@/shared/components/button';
+import { AgentTypeInputComponent } from '@/ui/inputs/agents/agent-type-input.component';
 import { PromptContextStore } from '@/shared/state/prompt-context.store';
 import { codeReferenceLabel } from '@/shared/state/snippet-format';
 import { blobToAttachment, imageBlobFromClipboard } from '@/shared/utils/image-attach';
@@ -32,7 +36,7 @@ import { WavRecorder } from './wav-recorder';
  */
 @Component({
   selector: 'app-speak-to-prompt',
-  imports: [ZardButtonComponent, NgIcon, RouterLink],
+  imports: [AgentTypeInputComponent, ZardButtonComponent, NgIcon, RouterLink],
   template: `
     <div class="flex flex-col gap-6">
       <!-- A draft composed earlier (this or another device) was restored from the backend. Cheap
@@ -281,6 +285,13 @@ import { WavRecorder } from './wav-recorder';
               #promptArea
             ></textarea>
           </label>
+          @if (availableAgents().length > 0) {
+            <app-agent-type-input
+              [agents]="availableAgents()"
+              [value]="selectedAgent()"
+              (valueChange)="selectedAgent.set($event)"
+            />
+          }
           <div class="flex items-center gap-2">
             <button
               z-button
@@ -327,12 +338,33 @@ export class SpeakToPromptComponent {
   private readonly speechService = inject(SpeechControllerService);
   private readonly refinementService = inject(PromptRefinementControllerService);
   private readonly agentService = inject(AgentControllerService);
+  private readonly agentsService = inject(AgentsControllerService);
   private readonly router = inject(Router);
   protected readonly promptContext = inject(PromptContextStore);
   /** Route-scoped draft sync (provided by the host page) — flushed before a fetch-model launch. */
   private readonly promptDraftSync = inject(PromptDraftSyncService);
   /** Template alias: the `path:start[-end]` label a reference renders (and tracks) as. */
   protected readonly refLabel = codeReferenceLabel;
+
+  /** The coding-agent harnesses this instance can launch, plus the configured default. */
+  readonly availableAgentsQuery = injectQuery(() => ({
+    queryKey: ['agents', 'available'],
+    queryFn: () => lastValueFrom(this.agentsService.apiAgentsAvailableGet()),
+  }));
+
+  readonly availableAgents = computed(() => this.availableAgentsQuery.data()?.agents ?? []);
+
+  /** The harness the launch uses; seeded from the instance default until the user overrides it. */
+  readonly selectedAgent = signal<AgentType | undefined>(undefined);
+
+  constructor() {
+    effect(() => {
+      const fallback = this.availableAgentsQuery.data()?.defaultAgent;
+      if (fallback && this.selectedAgent() === undefined) {
+        this.selectedAgent.set(fallback);
+      }
+    });
+  }
 
   readonly transcript = signal('');
   /**
@@ -476,7 +508,12 @@ export class SpeakToPromptComponent {
           // Fetch model: the agent pulls the composed prompt (text + any images) from the persisted
           // draft via the taskPrompt MCP tool, so no initialContext rides the launch. The bootstrap
           // turn is synthesized server-side.
-          { scope: AgentMcpScope.Repository, mode, deliverTaskPrompt: true },
+          {
+            scope: AgentMcpScope.Repository,
+            mode,
+            deliverTaskPrompt: true,
+            ...(this.selectedAgent() ? { agentType: this.selectedAgent() } : {}),
+          },
         ),
       ),
     onSuccess: (res) => {

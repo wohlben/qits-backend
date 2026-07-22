@@ -20,14 +20,13 @@ public class AgentAuthStatus {
   @ConfigProperty(name = "qits.workspace.claude-mount", defaultValue = "/claude-home")
   String claudeMount;
 
-  @ConfigProperty(name = "qits.agent.type", defaultValue = "claude")
-  AgentType agentType;
-
   /**
-   * Whether the agent is signed in for {@code workspaceId}'s container. A missing container counts
-   * as not-signed-in (the caller surfaces the container-missing error on the actual launch).
+   * Whether {@code agentType} is signed in for {@code workspaceId}'s container. A missing container
+   * counts as not-signed-in (the caller surfaces the container-missing error on the actual launch).
+   * The harness is passed in (the launch has already resolved it) so the auth gate matches exactly
+   * the harness about to launch.
    */
-  public boolean isLoggedIn(String repoId, String workspaceId) {
+  public boolean isLoggedIn(String repoId, String workspaceId, AgentType agentType) {
     String container = containers.containerName(workspaceId, repoId);
     if (!containers.exists(container)) {
       return false;

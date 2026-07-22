@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
+import { AgentsControllerService } from '@/api/api/agentsController.service';
 import { PromptRefinementControllerService } from '@/api/api/promptRefinementController.service';
 import { SpeechControllerService } from '@/api/api/speechController.service';
 import { AgentLaunchMode } from '@/api/model/agentLaunchMode';
@@ -36,6 +37,11 @@ describe('SpeakToPromptComponent', () => {
       .fn()
       .mockReturnValue(of({ command: { id: 'cmd-1' } })),
   };
+  // Empty availability: no default agent → the launch omits agentType, so the body assertions here
+  // stay exact. (Production seeds the picker from a real defaultAgent.)
+  const agentsService = {
+    apiAgentsAvailableGet: vi.fn().mockReturnValue(of({})),
+  };
   // The launch flushes the draft first (the agent fetches it via taskPrompt); a mock that resolves.
   // Image attach/remove and Discard's row cleanup delegate to the same service.
   const promptDraftSync = {
@@ -58,6 +64,7 @@ describe('SpeakToPromptComponent', () => {
         { provide: SpeechControllerService, useValue: speechService },
         { provide: PromptRefinementControllerService, useValue: refinementService },
         { provide: AgentControllerService, useValue: agentService },
+        { provide: AgentsControllerService, useValue: agentsService },
         { provide: PromptDraftSyncService, useValue: promptDraftSync },
       ],
     }).compileComponents();

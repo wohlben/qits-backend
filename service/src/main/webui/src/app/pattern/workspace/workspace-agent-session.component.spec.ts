@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { AgentControllerService } from '@/api/api/agentController.service';
+import { AgentsControllerService } from '@/api/api/agentsController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
 import { PromptDraftSyncService } from '@/pattern/workspace/prompt-draft-sync.service';
@@ -68,6 +69,11 @@ describe('WorkspaceAgentSessionComponent', () => {
       .fn()
       .mockImplementation(() => of({ command: agentRun({ id: 'launched-1' }) })),
   };
+  // Empty availability: no default agent → fresh launches omit agentType, keeping the body
+  // assertions here exact. (Production seeds the picker from a real defaultAgent.)
+  const agentsService = {
+    apiAgentsAvailableGet: vi.fn().mockReturnValue(of({})),
+  };
   // No draft by default; individual tests override the GET to exercise auto-pickup. A fresh launch
   // flushes then refetches the draft before deciding delivery, so the GET (not just seeded cache) is
   // the source of truth.
@@ -103,6 +109,7 @@ describe('WorkspaceAgentSessionComponent', () => {
         provideTanStackQuery(queryClient),
         { provide: CommandControllerService, useValue: commandService },
         { provide: AgentControllerService, useValue: agentService },
+        { provide: AgentsControllerService, useValue: agentsService },
         { provide: WorkspacePromptDraftControllerService, useValue: draftService },
         { provide: PromptDraftSyncService, useValue: promptDraftSync },
       ],

@@ -21,8 +21,6 @@ import eu.wohlben.qits.domain.repository.entity.Workspace;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
@@ -30,22 +28,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Exercises Kimi {@code wire.jsonl} transcript import. */
+/**
+ * Exercises Kimi {@code wire.jsonl} transcript import. The harness now comes from the seeded
+ * command row ({@code agentType = KIMI}), not a config profile.
+ */
 @QuarkusTest
-@TestProfile(AgentTranscriptServiceKimiTest.KimiProfile.class)
 public class AgentTranscriptServiceKimiTest {
-
-  public static class KimiProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      return Map.of("qits.agent.type", "kimi");
-    }
-  }
 
   @Inject AgentTranscriptService agentTranscriptService;
 
@@ -94,6 +86,7 @@ public class AgentTranscriptServiceKimiTest {
             .executeScript("exec kimi")
             .interactive(false)
             .kind(CommandKind.TERMINAL)
+            .agentType(AgentType.KIMI)
             .status(CommandStatus.EXITED)
             .build();
     command.agentSessions.addAll(refs);
@@ -250,7 +243,8 @@ public class AgentTranscriptServiceKimiTest {
   public void configDirDerivesTheKimiCodeDotDir() {
     // The kimi home is .kimi-code, not .kimi — property interpolation can't express that mapping,
     // so the default is derived in code.
-    assertEquals(Path.of("/claude-home/.kimi-code"), agentTranscriptService.configDir());
+    assertEquals(
+        Path.of("/claude-home/.kimi-code"), agentTranscriptService.configDir(AgentType.KIMI));
   }
 
   @Test
