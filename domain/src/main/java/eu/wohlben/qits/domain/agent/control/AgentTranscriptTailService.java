@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.agent.control;
 
+import eu.wohlben.qits.domain.agent.acp.KimiEventNormalizer;
 import eu.wohlben.qits.domain.command.control.CommandLogService;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
 import jakarta.annotation.PostConstruct;
@@ -36,9 +37,13 @@ import org.jboss.logging.Logger;
  * durable head of the conversation. Main session only; sidechains and stats stay exit-sweep
  * territory, and the exit sweep's delete-and-reimport reconciles whatever the tail did.
  *
- * <p>Poll-based like the daemon file tails (no {@code WatchService}); lines are imported raw — no
- * ANSI stripping, no length cap (one line is one JSON event, the column is a CLOB) — with a partial
- * line buffered across polls until its newline arrives.
+ * <p>Poll-based like the daemon file tails (no {@code WatchService}), with a partial line buffered
+ * across polls until its newline arrives. Claude lines are imported raw (already the event
+ * envelope); Kimi {@code wire.jsonl} lines are run through a per-session {@link
+ * KimiEventNormalizer} — the same normalizer + minted uuids the exit sweep uses — so a mid-run
+ * re-attach stitches and renders identically to the post-exit reconciliation. The {@code
+ * importedLines} high-water counts raw wire lines consumed (what the exit sweep's settle compares
+ * against), not emitted envelopes.
  */
 @ApplicationScoped
 public class AgentTranscriptTailService {
@@ -134,6 +139,9 @@ public class AgentTranscriptTailService {
     private long nextSeq = AgentTranscriptService.TRANSCRIPT_SEQ_BASE;
     private volatile long importedLines;
 
+    /** Non-null under Kimi: normalizes each wire.jsonl line into the shared event envelope. */
+    private KimiEventNormalizer normalizer;
+
     private Tail(String commandId, Path configDir) {
       this.commandId = commandId;
       this.configDir = configDir;
@@ -169,6 +177,9 @@ public class AgentTranscriptTailService {
         nextSeq = AgentTranscriptService.TRANSCRIPT_SEQ_BASE;
         importedLines = 0;
         partialLine.reset();
+        if (normalizer != null) {
+          normalizer.reset(); // re-import from the top must restart the minted indices too.
+        }
         fileKey = attributes.fileKey();
       }
       readNewBytes();
@@ -192,6 +203,9 @@ public class AgentTranscriptTailService {
       AgentTranscriptService.SessionInfo session = transcriptService.mainSession(commandId);
       if (session == null) {
         return false;
+      }
+      if (agentType == AgentType.KIMI && normalizer == null) {
+        normalizer = new KimiEventNormalizer(session.sessionId());
       }
       file =
           transcriptService.resolveTranscript(
@@ -223,7 +237,6 @@ public class AgentTranscriptTailService {
       if (!batch.isEmpty()) {
         // A failed import skips these lines until the exit sweep reconciles — best-effort live.
         commandLogService.importLines(List.copyOf(batch));
-        importedLines += batch.size();
       }
     }
 
@@ -236,14 +249,25 @@ public class AgentTranscriptTailService {
       if (line.isBlank()) {
         return; // position already consumed; blank lines carry nothing.
       }
-      Instant timestamp = transcriptService.lineTimestamp(line);
-      batch.add(
-          new CommandLogService.PendingLine(
-              commandId,
-              nextSeq++,
-              LogChannel.TRANSCRIPT,
-              line,
-              timestamp != null ? timestamp : Instant.now()));
+      // High-water counts raw wire lines consumed (incl. Kimi noise the normalizer drops), because
+      // that is what the exit sweep's settle compares against the raw file — over-counting on a
+      // failed import only makes the sweep wait a little longer, never reimport short.
+      importedLines++;
+      Instant when =
+          transcriptService.lineTimestamp(line) != null
+              ? transcriptService.lineTimestamp(line)
+              : Instant.now();
+      if (normalizer == null) {
+        batch.add(
+            new CommandLogService.PendingLine(
+                commandId, nextSeq++, LogChannel.TRANSCRIPT, line, when));
+        return;
+      }
+      for (String envelope : normalizer.onWireLine(line)) {
+        batch.add(
+            new CommandLogService.PendingLine(
+                commandId, nextSeq++, LogChannel.TRANSCRIPT, envelope, when));
+      }
     }
   }
 }

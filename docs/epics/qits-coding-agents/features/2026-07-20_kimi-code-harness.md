@@ -16,7 +16,7 @@ one harness per qits deployment, no per-launch UI picker.
 **The native in-UI chat is deliberately out of scope here** — kimi has no stdin stream-json chat
 mode, so its chat rides its **ACP (Agent Client Protocol)** stdio interface, a large enough piece
 to own its own document. This harness feature ships without kimi chat; kimi chat launches are
-rejected until [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md) lands. Interactive and autonomous runs
+rejected until [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md) lands. Interactive and autonomous runs
 are fully functional.
 
 Related / dependent plans:
@@ -24,7 +24,7 @@ Related / dependent plans:
 - Builds directly on the [coding-agent-harness](2026-07-01_coding-agent-harness.md):
   `CodingAgent` / `CodingAgentFactory` / `AgentType` / `LaunchSpec` are the extension points this
   feature plugs into; `AgentLaunchService` owns the MCP scope→URL construction both harnesses share.
-- **Prerequisite of [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md)** — the native chat over ACP builds
+- **Prerequisite of [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md)** — the native chat over ACP builds
   on the `AgentType.KIMI` harness, session-identity model, transcript import, and auth this feature
   establishes.
 - Reuses the session machinery of [agent-session-lineage](2026-07-10_agent-session-lineage.md)
@@ -42,7 +42,7 @@ Related / dependent plans:
 ## Problem: where Claude is assumed today
 
 The harness abstraction covers **command rendering**; everything around it is Claude-shaped
-(the chat-specific assumptions are addressed in [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md)):
+(the chat-specific assumptions are addressed in [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md)):
 
 - **`AgentType` / `CodingAgentFactory`** — one value, one case. (The intended extension point; no
   design flaw.)
@@ -100,7 +100,7 @@ Probed against the installed CLI and the official docs
   schema (a `metadata` line with `protocol_version`, `config.update`, message events) and carries
   request-trace noise (tool schemas, MCP listings) the import must filter.
 - **Chat (bidirectional)**: no stdin stream-json — the programmatic protocol is `kimi acp`, owned
-  by [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md).
+  by [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md).
 
 ## Proposed design
 
@@ -110,7 +110,7 @@ A `KimiCodeAgent extends CodingAgent` rendering kimi command lines, added to the
 `start()` → `exec kimi` (TUI; `--yolo` when skip-permissions, `-S <id>` on resume, `-m` model);
 `run(prompt)` → `kimi -p '<prompt>' [--output-format stream-json]`. `transcriptPath`/`subagentsDir`
 map to the `sessions/<workDirKey>/<id>/agents/` layout. (`chat()` → `exec kimi acp` is added by
-[kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md); until then a kimi `chat()` render throws / the launch
+[kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md); until then a kimi `chat()` render throws / the launch
 is rejected — see below.)
 
 A global **`qits.agent.type=claude|kimi`** (default `claude`) is read by `AgentLaunchService` (one
@@ -213,7 +213,7 @@ tool naming is identical, so nothing else changes).
 
 > **Chat** (over ACP) uses a different, protocol-native channel — scoped `mcpServers` on
 > `session/new`, no file — because the ACP transport has a per-session slot the file-based modes
-> lack. See [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md) §"MCP over ACP".
+> lack. See [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md) §"MCP over ACP".
 
 ### 4. Auth on the shared volume
 
@@ -248,7 +248,7 @@ come from `AgentType`.
 > The re-attach **uuid-minting contract** (minting a stable uuid per normalized event so the live
 > ring and the durable transcript stitch losslessly) only matters for the live chat stream, so it
 > is specified together with the ACP normalizer in
-> [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md). The autonomous/interactive transcript import here is
+> [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md). The autonomous/interactive transcript import here is
 > post-exit / tail-only and needs no live-ring stitching.
 
 ### 6. Image and login script
@@ -269,7 +269,7 @@ with a new `AgentSessionSource.REPORTED` entry. Kimi chat remains rejected until
 ## Not built (candidate follow-ups)
 
 - **Kimi native chat** — over ACP; its own document,
-  [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md). Kimi chat launches are rejected until it lands.
+  [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md). Kimi chat launches are rejected until it lands.
 - **Fork for kimi** — no CLI support; would require copying session dirs (fragile, unversioned
   layout).
 - **Kimi plugins** — a different mechanism than the Claude marketplace; `AgentPluginService` stays
@@ -304,7 +304,7 @@ with a new `AgentSessionSource.REPORTED` entry. Kimi chat remains rejected until
   renders the mktemp home, the symlink farm, and the scoped `mcp.json` heredoc (prefix-stripped
   `enabledTools`); `launchLogin` provably uses the real volume home; POSIX shell-quoting.
 - `AgentLaunchServiceTest`: `qits.agent.type` selects the harness, names/probes follow; kimi fork
-  rejected with 400; kimi chat launch rejected until [kimi-code-acp-chat](../feature-ideas/kimi-code-acp-chat.md).
+  rejected with 400; kimi chat launch rejected until [kimi-code-acp-chat](2026-07-22_kimi-code-acp-chat.md).
 - Transcript-import tests on recorded `wire.jsonl` fixtures (main + sidechain + trace noise).
 - `AgentAuthStatus` probe parse tests (credential-file presence).
 - Extended (real-docker) IT: kimi autonomous run in a workspace container, session id reported,

@@ -83,6 +83,23 @@ public class KimiCodeAgentTest {
   }
 
   @Test
+  public void anOpaqueKimiSessionIdIsAcceptedForResume() {
+    // Kimi's ACP session id is opaque; a session_-prefixed path-safe slug (not a canonical uuid)
+    // resumes fine — the transcript path stays safe and no session is dropped for a non-uuid shape.
+    LaunchSpec spec = CodingAgentFactory.ofType(AgentType.KIMI).resume("session_abc123DEF").start();
+
+    assertTrue(spec.script().contains("\nkimi -S session_abc123DEF"), spec.script());
+  }
+
+  @Test
+  public void aPathUnsafeKimiSessionIdIsRejected() {
+    // A '/' or '.' in the id would escape the transcript directory, so it must not validate.
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CodingAgentFactory.ofType(AgentType.KIMI).resume("session_../evil").start());
+  }
+
+  @Test
   public void kimiSessionIdIsAccepted() {
     // A kimi-shaped id is valid; for a fresh run it is silently dropped (kimi cannot pin).
     LaunchSpec spec = CodingAgentFactory.ofType(AgentType.KIMI).sessionId(KIMI_SESSION).run("hi");
@@ -128,10 +145,29 @@ public class KimiCodeAgentTest {
   }
 
   @Test
-  public void chatIsRejected() {
-    CodingAgent agent = CodingAgentFactory.ofType(AgentType.KIMI);
+  public void chatRendersKimiAcpWithoutFarmOrMcpJson() {
+    // Chat rides the ACP transport: a plain `exec kimi acp`, no per-launch KIMI_CODE_HOME farm and
+    // no mcp.json (the MCP scope rides the ACP session/new, not a file). Even with servers attached
+    // — the renderer ignores them for chat — none leak into the script.
+    LaunchSpec spec =
+        CodingAgentFactory.ofType(AgentType.KIMI)
+            .mcpServer("actions", httpMcp(ACTIONS_URL))
+            .allowedTools(List.of("mcp__actions__listGlobalActions"))
+            .skipPermissions()
+            .chat();
 
-    assertThrows(UnsupportedOperationException.class, agent::chat);
+    assertEquals("exec kimi acp", spec.script());
+    assertFalse(spec.interactive(), "chat is driven over pipes, not a PTY");
+  }
+
+  @Test
+  public void stripServerPrefixYieldsBareToolNamesForTheMatchingServer() {
+    List<String> stripped =
+        KimiCodeAgent.stripServerPrefix(
+            "repository",
+            List.of("mcp__repository__listBranches", "mcp__actions__listGlobalActions"));
+
+    assertEquals(List.of("listBranches"), stripped);
   }
 
   @Test

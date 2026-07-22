@@ -98,6 +98,7 @@ public class CommandLifecycleService {
    * appended, duplicates included, so the list stays the faithful order of sessions driven.
    */
   @Transactional
+  @ActivateRequestContext
   public CommandDto recordAgentSessionReport(
       String commandId, String sessionId, String transcriptPath) {
     Command command = commandRepository.findById(commandId);

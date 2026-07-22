@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.domain.agent.acp.AcpSessionConfig;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
 import eu.wohlben.qits.domain.command.entity.AgentSessionSource;
 import eu.wohlben.qits.domain.command.entity.Command;
@@ -216,13 +217,58 @@ public class AgentLaunchServiceKimiTest {
   }
 
   @Test
-  public void chatLaunchIsRejectedForKimi() {
-    String projectId = "88888888-8888-8888-8888-888888888888";
-    String repoId = "99999999-9999-9999-9999-999999999999";
+  public void renderChatUsesKimiAcp() {
+    String projectId = "aaaaaaaa-0000-0000-0000-000000000001";
+    String repoId = "bbbbbbbb-1111-1111-1111-111111111111";
     seedRepository(projectId, repoId);
 
-    assertThrows(
-        BadRequestException.class,
-        () -> agentLaunchService.launchChat(repoId, "work", AgentMcpScope.REPOSITORY, "hi"));
+    LaunchSpec spec =
+        agentLaunchService.renderChat(repoId, "work", AgentMcpScope.REPOSITORY, unpinned());
+
+    // Kimi chat is the ACP transport — a plain `exec kimi acp`, no per-launch farm and no mcp.json
+    // (the MCP scope rides the ACP session/new instead).
+    assertEquals("exec kimi acp", spec.script());
+    assertFalse(spec.script().contains("mcp.json"), spec.script());
+    assertFalse(spec.environment().containsKey("HOME"), spec.environment().toString());
+  }
+
+  @Test
+  public void acpSessionConfigCarriesScopedServersWithBareEnabledTools() {
+    String projectId = "cccccccc-2222-2222-2222-222222222222";
+    String repoId = "dddddddd-3333-3333-3333-333333333333";
+    seedRepository(projectId, repoId);
+
+    AcpSessionConfig config =
+        agentLaunchService.buildAcpSessionConfig(
+            repoId, "work", AgentMcpScope.REPOSITORY, unpinned());
+
+    assertEquals("/workspace", config.cwd());
+    assertNull(config.resumeSessionId(), "a fresh chat resumes nothing");
+    assertEquals(1, config.mcpServers().size());
+    AcpSessionConfig.AcpMcpServer repository = config.mcpServers().get(0);
+    assertEquals("repository", repository.name());
+    // The scoped URL is the same one serversFor builds (narrowed to this repository + workspace).
+    assertTrue(repository.url().contains("repositoryId=" + repoId), repository.url());
+    assertTrue(repository.url().contains("workspaceId=work"), repository.url());
+    // enabledTools are bare (the mcp__repository__ prefix stripped for the ACP channel).
+    assertTrue(
+        repository.enabledTools().contains("taskPrompt"), repository.enabledTools().toString());
+    assertTrue(
+        repository.enabledTools().stream().noneMatch(t -> t.startsWith("mcp__")),
+        repository.enabledTools().toString());
+  }
+
+  @Test
+  public void acpSessionConfigCarriesTheResumedSessionId() {
+    String projectId = "eeeeeeee-4444-4444-4444-444444444444";
+    String repoId = "ffffffff-5555-5555-5555-555555555555";
+    seedCommandWithSession(projectId, repoId, KIMI_SESSION);
+
+    AgentLaunchService.PinnedSession resumed =
+        agentLaunchService.pinSession(repoId, "work", KIMI_SESSION, false);
+    AcpSessionConfig config =
+        agentLaunchService.buildAcpSessionConfig(repoId, "work", AgentMcpScope.REPOSITORY, resumed);
+
+    assertEquals(KIMI_SESSION, config.resumeSessionId());
   }
 }

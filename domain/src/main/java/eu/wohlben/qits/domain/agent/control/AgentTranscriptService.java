@@ -3,6 +3,7 @@ package eu.wohlben.qits.domain.agent.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import eu.wohlben.qits.domain.agent.acp.KimiEventNormalizer;
 import eu.wohlben.qits.domain.agent.entity.AgentSessionStat;
 import eu.wohlben.qits.domain.agent.persistence.AgentSessionStatRepository;
 import eu.wohlben.qits.domain.command.control.CommandLogService;
@@ -250,7 +251,7 @@ public class AgentTranscriptService {
         LOG.warnf(
             "No transcript found for session %s of command %s", session.sessionId(), commandId);
       } else {
-        importJsonl(buffer, transcript, sessionStat);
+        importJsonl(buffer, transcript, sessionStat, kimiNormalizer(session.sessionId(), null));
         if (firstVisit) {
           stats.add(sessionStat.toStat(commandId, session.sessionId(), null, null));
         }
@@ -376,21 +377,51 @@ public class AgentTranscriptService {
     }
   }
 
-  /** Streams one JSONL file into the buffer (no slurp — transcripts can be large). */
-  private void importJsonl(ImportBuffer buffer, Path file, StatCollector stats) {
+  /**
+   * Streams one JSONL file into the buffer (no slurp — transcripts can be large). Claude lines are
+   * already in the event envelope the frontend renders and are buffered verbatim; Kimi {@code
+   * wire.jsonl} lines are run through {@code normalizer} (non-null only for Kimi) into that same
+   * envelope with the shared minted uuids, so kimi transcripts render and a chat re-attach stitches
+   * losslessly. Stats are always collected on the <em>source</em> line — one observation per raw
+   * message — so a message that normalizes into several envelopes still counts as one turn
+   * (matching Claude's per-line counting) and the earliest raw line (incl. a timestamped metadata
+   * header) still seeds the session's first-timestamp.
+   */
+  private void importJsonl(
+      ImportBuffer buffer, Path file, StatCollector stats, KimiEventNormalizer normalizer) {
     try (BufferedReader reader = Files.newBufferedReader(file)) {
       String line;
       while ((line = reader.readLine()) != null) {
-        if (!line.isBlank()) {
-          JsonNode node = parseLine(line);
-          Instant timestamp = ownTimestamp(node);
-          buffer.add(line, timestamp != null ? timestamp : Instant.now());
-          stats.observe(node, timestamp);
+        if (line.isBlank()) {
+          continue;
         }
+        JsonNode node = parseLine(line);
+        Instant timestamp = ownTimestamp(node);
+        Instant when = timestamp != null ? timestamp : Instant.now();
+        if (normalizer == null) {
+          buffer.add(line, when);
+        } else {
+          for (String envelope : normalizer.onWireLine(node)) {
+            buffer.add(envelope, when);
+          }
+        }
+        stats.observe(node, timestamp);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /** A Kimi wire→envelope normalizer for a session (or a sidechain of it), or null under Claude. */
+  private KimiEventNormalizer kimiNormalizer(String sessionId, String sidechainAgentId) {
+    if (agentType != AgentType.KIMI) {
+      return null;
+    }
+    KimiEventNormalizer normalizer = new KimiEventNormalizer(sessionId);
+    if (sidechainAgentId != null) {
+      normalizer.asSidechain(sidechainAgentId);
+    }
+    return normalizer;
   }
 
   /**
@@ -428,7 +459,7 @@ public class AgentTranscriptService {
       SidechainMeta meta = readSidechainMeta(sidechain, agentId);
       buffer.add(agentMetaLine(agentId, meta), Instant.now());
       StatCollector collector = new StatCollector();
-      importJsonl(buffer, sidechain, collector);
+      importJsonl(buffer, sidechain, collector, null);
       stats.add(collector.toStat(commandId, sessionId, agentId, meta));
     }
     return stats;
@@ -456,7 +487,7 @@ public class AgentTranscriptService {
       SidechainMeta meta = new SidechainMeta(null, null, null);
       buffer.add(agentMetaLine(agentId, meta), Instant.now());
       StatCollector collector = new StatCollector();
-      importJsonl(buffer, wire, collector);
+      importJsonl(buffer, wire, collector, kimiNormalizer(sessionId, agentId));
       stats.add(collector.toStat(commandId, sessionId, agentId, meta));
     }
     return stats;
@@ -524,21 +555,22 @@ public class AgentTranscriptService {
   }
 
   /**
-   * Whether a transcript line is a conversation turn the operator would count — a {@code user} or
-   * {@code assistant} message actually carrying text, not a tool-result/tool-call carrier, a
-   * thinking-only line, or a meta line.
+   * Whether a <em>source</em> transcript line is a conversation turn the operator would count — a
+   * {@code user} or {@code assistant} message actually carrying text, not a tool-result/tool-call
+   * carrier, a thinking-only line, or a meta line. Counted on the source shape (once per message):
+   * Claude's envelope line or Kimi's raw {@code wire.jsonl} message.
    */
   private boolean isConversationTurn(JsonNode node) {
     if (node == null) {
       return false;
     }
     return switch (agentType) {
-      case CLAUDE -> isClaudeConversationTurn(node);
-      case KIMI -> isKimiConversationTurn(node);
+      case CLAUDE -> isEnvelopeConversationTurn(node);
+      case KIMI -> isKimiRawConversationTurn(node);
     };
   }
 
-  private static boolean isClaudeConversationTurn(JsonNode node) {
+  private static boolean isEnvelopeConversationTurn(JsonNode node) {
     String type = node.path("type").asText("");
     if (!"user".equals(type) && !"assistant".equals(type)) {
       return false;
@@ -559,11 +591,10 @@ public class AgentTranscriptService {
   }
 
   /**
-   * Kimi's {@code wire.jsonl} carries a {@code metadata} line, {@code config.update} noise, tool
-   * schemas, and message events. A conversation turn is a {@code user} or {@code assistant} message
-   * carrying text content.
+   * Kimi's raw {@code wire.jsonl} message: {@code metadata}/{@code config}/{@code session} noise is
+   * not a turn; a {@code user}/{@code assistant} message carrying text is.
    */
-  private static boolean isKimiConversationTurn(JsonNode node) {
+  private static boolean isKimiRawConversationTurn(JsonNode node) {
     if (node.has("metadata") || node.has("config") || node.has("session")) {
       return false;
     }

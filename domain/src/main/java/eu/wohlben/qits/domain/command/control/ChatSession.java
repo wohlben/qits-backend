@@ -5,12 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.domain.command.entity.LogChannel;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -26,16 +20,18 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.jboss.logging.Logger;
 
 /**
- * One live Claude Code <strong>chat</strong> process driven over the stream-json protocol on plain
- * pipes (not a PTY, which would corrupt line-delimited JSON). The registry counterpart of {@link
- * CommandSession}: same decoupled-from-any-connection model (a scrollback ring for re-attach, a
- * {@link CommandOutputSink} fan-out, {@link CommandLogWriter} persistence, an exit latch), but the
- * unit of streaming is a <em>JSON line</em>, not raw bytes.
+ * One live coding-agent <strong>chat</strong> process on plain pipes (not a PTY, which would
+ * corrupt line-delimited JSON), driven through a pluggable {@link ChatProtocol} — Claude's
+ * stream-json pass-through ({@link StreamJsonChatProtocol}) or Kimi's ACP JSON-RPC client, both
+ * normalizing to the same envelope. The registry counterpart of {@link CommandSession}: same
+ * decoupled-from-any-connection model (a scrollback ring for re-attach, a {@link CommandOutputSink}
+ * fan-out, {@link CommandLogWriter} persistence, an exit latch), but the unit of streaming is a
+ * <em>JSON line</em>, not raw bytes.
  *
- * <p>Everything the client renders flows through one unified line stream: each event Claude emits
- * on stdout, plus a synthetic {@code {"type":"user","text":…}} echo for every message the user
- * sends. That single stream is ringed (for re-attach) and broadcast (live) — stdout interception is
- * the <em>live transport</em>. The durable record is the imported agent transcript on {@link
+ * <p>Everything the client renders flows through one unified line stream: each event the protocol
+ * emits, plus a synthetic {@code {"type":"user","text":…}} echo for every message the user sends.
+ * That single stream is ringed (for re-attach) and broadcast (live) — stream interception is the
+ * <em>live transport</em>. The durable record is the imported agent transcript on {@link
  * LogChannel#TRANSCRIPT} (live tail during the run, reconciling sweep on exit); the only stdout
  * lines still persisted are failure {@code result} events, which the harness never writes to its
  * transcript, kept as {@link LogChannel#OUTPUT} rows so error bubbles survive replay. Re-attach
@@ -62,7 +58,7 @@ final class ChatSession {
   private final String container;
   private final ContainerRuntime containers;
   private final long graceMillis;
-  private final BufferedWriter stdin;
+  private final ChatProtocol protocol;
   private final CommandExitListener exitListener;
   private final Runnable onComplete;
   private final CommandLogWriter logWriter;
@@ -72,7 +68,6 @@ final class ChatSession {
   private final Deque<RingLine> ring = new ArrayDeque<>();
   private int ringBytes;
   private final Deque<CommandOutputSink> sinks = new ArrayDeque<>();
-  private final Object stdinLock = new Object();
 
   private volatile boolean terminatedManually;
   private final CountDownLatch finished = new CountDownLatch(1);
@@ -84,6 +79,7 @@ final class ChatSession {
       String container,
       ContainerRuntime containers,
       long graceMillis,
+      ChatProtocol protocol,
       CommandExitListener exitListener,
       Runnable onComplete,
       CommandLogWriter logWriter,
@@ -93,72 +89,28 @@ final class ChatSession {
     this.container = container;
     this.containers = containers;
     this.graceMillis = graceMillis;
+    this.protocol = protocol;
     this.exitListener = exitListener;
     this.onComplete = onComplete;
     this.logWriter = logWriter;
     this.logReader = logReader;
-    this.stdin =
-        new BufferedWriter(
-            new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
   }
 
   synchronized void addInitialSink(CommandOutputSink sink) {
     sinks.add(sink);
   }
 
-  void startReader() {
-    Thread t = new Thread(this::readLoop, "chat-" + commandId);
-    t.setDaemon(true);
-    t.start();
-  }
-
-  private void readLoop() {
-    try (BufferedReader out =
-        new BufferedReader(
-            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-      String line;
-      while ((line = out.readLine()) != null) {
-        if (!line.isEmpty()) {
-          emitLine(line);
-        }
-      }
-    } catch (IOException e) {
-      LOG.debugf(e, "Chat output pump ended for command %s", commandId);
-    } finally {
-      finish();
-    }
-  }
-
   /**
-   * Sends a user turn: writes the stream-json user message to Claude, and echoes it into the
-   * stream.
+   * Starts the transport: the protocol pumps the process output through {@link #emitLine} and
+   * latches the exit via {@link #finish} when the stream closes.
    */
+  void startReader() {
+    protocol.start(this::emitLine, this::finish);
+  }
+
+  /** Sends a user turn through the transport (which also echoes it into the stream). */
   void sendUser(String text) {
-    synchronized (stdinLock) {
-      try {
-        stdin.write(
-            mapper.writeValueAsString(
-                Map.of(
-                    "type",
-                    "user",
-                    "message",
-                    Map.of(
-                        "role",
-                        "user",
-                        "content",
-                        List.of(Map.of("type", "text", "text", text))))));
-        stdin.write("\n");
-        stdin.flush();
-      } catch (IOException e) {
-        LOG.debugf(e, "Chat stdin write failed for command %s", commandId);
-        return;
-      }
-    }
-    try {
-      emitLine(mapper.writeValueAsString(Map.of("type", "user", "text", text)));
-    } catch (IOException e) {
-      LOG.debugf(e, "Chat user echo failed for command %s", commandId);
-    }
+    protocol.sendUser(text);
   }
 
   /**
@@ -372,12 +324,10 @@ final class ChatSession {
 
   void terminate() {
     terminatedManually = true;
-    try {
-      stdin.close();
-    } catch (IOException ignored) {
-      // best effort
-    }
-    // Killing the host-side `docker exec` client alone would orphan the claude process inside the
+    // Close the transport first (stdin/EOF, plus any protocol-level cancel), so the agent sees the
+    // session end cleanly before we escalate to signals.
+    protocol.close();
+    // Killing the host-side `docker exec` client alone would orphan the agent process inside the
     // container, so signal its process group (recorded under setsid to a pid file), escalating to
     // SIGKILL after the grace period.
     killGroup("TERM");

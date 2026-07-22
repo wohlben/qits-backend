@@ -19,13 +19,17 @@ import java.util.Map;
  * UUIDs, and fresh sessions cannot be pinned at launch — qits learns the id from the SessionStart
  * hook.
  *
- * <p>Native chat over ACP is deliberately out of scope here; {@link #chat()} throws.
+ * <p>Native chat rides the ACP JSON-RPC stdio protocol: {@link #chat()} renders {@code exec kimi
+ * acp}, driven by an in-JVM ACP client ({@code eu.wohlben.qits.domain.agent.acp}).
  */
 public class KimiCodeAgent extends CodingAgent {
 
-  /** Kimi session ids are {@code session_<uuid>}. */
-  private static final String KIMI_SESSION_PATTERN =
-      "session_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+  /**
+   * Kimi session ids are {@code session_<uuid>} today, but opaque on the ACP transport — accept any
+   * {@code session_}-prefixed path-safe slug (a strict superset), matching {@code
+   * CommandService.KIMI_SESSION_PATTERN} so an id that was reported can also be resumed.
+   */
+  private static final String KIMI_SESSION_PATTERN = "session_[A-Za-z0-9_-]{1,128}";
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -87,10 +91,20 @@ public class KimiCodeAgent extends CodingAgent {
     return new LaunchSpec(script.toString(), false, environment);
   }
 
+  /**
+   * Kimi chat rides the ACP JSON-RPC stdio protocol: an in-JVM ACP client (see {@code
+   * eu.wohlben.qits.domain.agent.acp}) drives these pipes, normalizing {@code session/update}
+   * notifications into the shared event envelope. Unlike the interactive/autonomous shapes there is
+   * <strong>no</strong> per-launch {@code KIMI_CODE_HOME} symlink farm and <strong>no</strong>
+   * {@code mcp.json} — the scoped MCP servers ride the ACP {@code session/new}, and
+   * credentials/sessions already live on the real volume home the container's {@code
+   * KIMI_CODE_HOME} points at. A plain {@code exec} (no trap to fire) is right here; the process is
+   * long-lived and managed exactly like Claude's stream-json chat.
+   */
   @Override
   public LaunchSpec chat() {
-    throw new UnsupportedOperationException(
-        "Kimi Code chat is not implemented yet; it requires the ACP transport");
+    validateSessionConfiguration();
+    return new LaunchSpec("exec kimi acp", false, environment);
   }
 
   /**
@@ -188,9 +202,19 @@ public class KimiCodeAgent extends CodingAgent {
    * for the server we are configuring.
    */
   private List<String> enabledToolsFor(String serverKey) {
+    return stripServerPrefix(serverKey, allowedTools);
+  }
+
+  /**
+   * Strips the Claude-prefixed {@code mcp__<server>__} from the tools that belong to {@code
+   * serverKey}, yielding the bare per-server names kimi's {@code enabledTools} takes (both the
+   * file-based {@code mcp.json} and the ACP {@code session/new} channel use this form). Shared with
+   * the ACP chat launch, which builds its allowlist from the same {@code READ_ONLY_*} lists.
+   */
+  public static List<String> stripServerPrefix(String serverKey, List<String> tools) {
     String prefix = "mcp__" + serverKey + "__";
     List<String> result = new ArrayList<>();
-    for (String tool : allowedTools) {
+    for (String tool : tools) {
       if (tool.startsWith(prefix)) {
         result.add(tool.substring(prefix.length()));
       }

@@ -122,9 +122,19 @@ public class ChatSessionTest {
 
   private ChatSession newSession(FakeLog log, FakeProcess process) {
     // container/runtime/grace are unused here — these tests drive lines synchronously and never
-    // terminate, so no container signalling occurs.
+    // terminate, so no container signalling occurs. The transport is Claude's stream-json
+    // pass-through, which is what the preloaded stdout + sendUser echoes exercise.
     return new ChatSession(
-        "cmd-1", process, null, null, 0L, (commandId, exitCode, manual) -> {}, () -> {}, log, log);
+        "cmd-1",
+        process,
+        null,
+        null,
+        0L,
+        new StreamJsonChatProtocol(process, "cmd-1"),
+        (commandId, exitCode, manual) -> {},
+        () -> {},
+        log,
+        log);
   }
 
   /** Feeds the preloaded stdout through the reader thread and waits for it to drain. */
@@ -200,6 +210,9 @@ public class ChatSessionTest {
   public void attachWithEmptyTranscriptReplaysRingOnlyAndThenStreamsLive() {
     FakeLog log = new FakeLog();
     ChatSession session = newSession(log);
+    // The transport binds its wire on start (as spawnChat does before any turn); an empty fake
+    // stdout drains immediately, leaving the ring/echo path to drive the rest synchronously.
+    session.startReader();
 
     session.sendUser("hello");
     session.sendUser("world");
@@ -297,6 +310,7 @@ public class ChatSessionTest {
   public void attachWithoutSharedUuidSkipsEchoesTheTranscriptAlreadyCovers() {
     FakeLog log = new FakeLog();
     ChatSession session = newSession(log);
+    session.startReader();
 
     session.sendUser("hello");
     session.sendUser("queued mid-turn");

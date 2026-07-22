@@ -139,16 +139,50 @@ public class AgentTranscriptServiceKimiTest {
 
     agentTranscriptService.sweep(commandId, configDir);
 
-    // All non-blank wire.jsonl lines are imported raw; the stat row counts conversation turns.
+    // wire.jsonl is normalized into the Claude event envelope the frontend renders: metadata /
+    // config.update / resume-hint noise is dropped, and each message becomes one envelope line with
+    // a minted uuid + the session id (the re-attach seam).
     List<CommandLogLineDto> lines = transcriptLines(commandId);
-    assertEquals(7, lines.size(), "all wire.jsonl lines are imported");
-    assertTrue(lines.get(2).content().contains("hello"));
-    assertTrue(lines.get(3).content().contains("hi there"));
-    assertTrue(lines.get(4).content().contains("done"));
+    assertEquals(4, lines.size(), "noise dropped, messages normalized: " + lines);
+    assertTrue(lines.get(0).content().contains("\"type\":\"user\""), lines.get(0).content());
+    assertTrue(lines.get(0).content().contains("hello"), lines.get(0).content());
+    assertTrue(lines.get(0).content().contains("\"uuid\""), lines.get(0).content());
+    assertTrue(lines.get(0).content().contains(KIMI_SESSION), lines.get(0).content());
+    assertTrue(lines.get(1).content().contains("\"type\":\"assistant\""), lines.get(1).content());
+    assertTrue(lines.get(1).content().contains("hi there"), lines.get(1).content());
+    assertTrue(lines.get(2).content().contains("done"), lines.get(2).content());
+    assertTrue(lines.get(3).content().contains("tool_result"), lines.get(3).content());
 
+    // The stat row still counts conversation turns (user + assistant text; the tool_result is not).
     List<AgentSessionStat> stats = statRepository.findBySessionIds(List.of(KIMI_SESSION));
     assertEquals(1, stats.size());
     assertEquals(3, stats.get(0).messageCount);
+  }
+
+  @Test
+  public void aMultiTextMessageCountsOnceAndFirstTimestampComesFromTheMetadataHeader()
+      throws IOException {
+    String commandId = seedCommand(List.of(pinned(KIMI_SESSION)));
+    Files.write(
+        conventionalTranscript(KIMI_SESSION),
+        List.of(
+            "{\"metadata\":{\"protocol_version\":\"1.0\"},\"timestamp\":\"2026-07-10T08:00:00Z\"}",
+            "{\"role\":\"user\",\"content\":\"hello\",\"timestamp\":\"2026-07-10T08:00:05Z\"}",
+            "{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"a\"},"
+                + "{\"type\":\"text\",\"text\":\"b\"}],\"timestamp\":\"2026-07-10T08:00:06Z\"}"));
+
+    agentTranscriptService.sweep(commandId, configDir);
+
+    // Metadata dropped; the two consecutive assistant text blocks coalesce into one envelope.
+    List<CommandLogLineDto> lines = transcriptLines(commandId);
+    assertEquals(2, lines.size(), lines.toString());
+    assertTrue(lines.get(1).content().contains("ab"), lines.get(1).content());
+
+    AgentSessionStat stat = statRepository.findBySessionIds(List.of(KIMI_SESSION)).get(0);
+    // Counted per source message (user + one assistant message), not per emitted envelope.
+    assertEquals(2, stat.messageCount);
+    // The timestamped metadata header seeds the session's first-timestamp.
+    assertEquals(Instant.parse("2026-07-10T08:00:00Z"), stat.firstTimestamp);
   }
 
   @Test
@@ -175,6 +209,9 @@ public class AgentTranscriptServiceKimiTest {
     assertTrue(lines.get(1).content().contains(AgentTranscriptService.AGENT_META_TYPE));
     assertTrue(lines.get(1).content().contains("\"agentId\":\"sub-1\""));
     assertTrue(lines.get(2).content().contains("sidechain-work"));
+    // The normalized sidechain line is stamped so the frontend groups it under its Task call.
+    assertTrue(lines.get(2).content().contains("\"isSidechain\":true"), lines.get(2).content());
+    assertTrue(lines.get(2).content().contains("\"agentId\":\"sub-1\""), lines.get(2).content());
   }
 
   @Test

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The [kimi-code-harness](kimi-code-harness.md) feature adds Kimi Code as a second coding-agent
+The [kimi-code-harness](2026-07-20_kimi-code-harness.md) feature adds Kimi Code as a second coding-agent
 harness for its interactive TUI and autonomous `-p` launch shapes, but deliberately leaves out the
 **native in-UI chat**: unlike Claude Code, the kimi CLI has **no stdin stream-json chat mode**. Its
 bidirectional programmatic protocol is **ACP (Agent Client Protocol)** — JSON-RPC over stdio,
@@ -16,16 +16,16 @@ driver behind it.
 
 Related / dependent plans:
 
-- **Depends on [kimi-code-harness](kimi-code-harness.md)** (hard prerequisite): the `AgentType.KIMI`
+- **Depends on [kimi-code-harness](2026-07-20_kimi-code-harness.md)** (hard prerequisite): the `AgentType.KIMI`
   harness, the `CodingAgentFactory` switch arm, the unpinned session-identity model, the
   `wire.jsonl` transcript import, and the shared-volume auth all come from there. This feature adds
   only the chat leg.
-- Extends [stream-json-chat](../features/2026-07-01_stream-json-chat.md) with a second chat
+- Extends [stream-json-chat](2026-07-01_stream-json-chat.md) with a second chat
   transport: kimi's bidirectional protocol is ACP, not stream-json.
-- Reuses the transcript import of [chat-persistence-on-transcript](../features/2026-07-10_chat-persistence-on-transcript.md)
+- Reuses the transcript import of [chat-persistence-on-transcript](2026-07-10_chat-persistence-on-transcript.md)
   (`AgentTranscriptService` / `AgentTranscriptTailService`) against kimi's `wire.jsonl` layout — the
   re-attach uuid-minting contract below is the seam that ties the ACP live stream to that import.
-- Builds on [persistent-chat-sessions](../features/2026-07-04_persistent-chat-sessions.md): the
+- Builds on [persistent-chat-sessions](2026-07-04_persistent-chat-sessions.md): the
   `ChatSession` registry/ring/re-attach model is preserved; only the transport and envelope source
   change.
 
@@ -43,6 +43,33 @@ Kimi's ACP adapter is unusually complete (verified against the
   doesn't exist on this transport.
 - MCP over the protocol: `mcpCapabilities.http`/`.sse = true` — the adapter forwards
   client-supplied `mcpServers` on `session/new` **and** `session/load`.
+
+## Implemented (2026-07-22)
+
+Shipped as designed below, with these concrete decisions:
+
+- **Transport seam.** `ChatSession` (command domain) was made transport-pluggable behind a
+  `ChatProtocol` / `ChatWire` / `ChatProtocolFactory` seam; Claude's behavior moved verbatim into
+  `StreamJsonChatProtocol` (null factory ⇒ default, every existing caller unchanged). Kimi's
+  `AcpChatProtocol` (new framework-free `domain/agent/acp` package) is the JSON-RPC engine:
+  `initialize` → `session/new` (or `session/resume` on resume — **no** replay, since qits replays the
+  transcript head itself), `session/prompt` per turn, `session/cancel` on teardown,
+  auto-approved `session/request_permission`, with a reader thread owning all inbound
+  normalization+emission and a sender thread serializing the outbound request sequence.
+- **Shared normalizer + uuid minting.** `KimiEventNormalizer` normalizes *both* the live ACP
+  `session/update` stream and the persisted `wire.jsonl` line into the one Claude envelope; `KimiChatUuids`
+  is the single minting rule both use. The `wire.jsonl` transcript importer now runs through it too,
+  so kimi transcripts render at all (they were imported raw before) **and** a chat re-attach stitches.
+- **UUID contract: pragmatic + fallback** (not full determinism). Tool calls key on ACP `toolCallId`
+  (identical on both sides — the reliable seam anchor); messages key on `sessionId:kind:index` and
+  otherwise degrade to `ChatSession.attach`'s existing no-shared-uuid path. Real recorded traces can
+  tighten this later.
+- **Session identity.** The unpinnable kimi id is learned from the `session/new` result and recorded
+  via `commandService.reportAgentSession` (an in-JVM callback), so chat does **not** depend on whether
+  the `SessionStart` hook fires for ACP — resolving that open verification by not needing it.
+- **ACP wire shapes** are grounded in the ACP standard; with no live `kimi` CLI to record real frames
+  here, `AcpChatProtocolTest` drives a fake ACP peer over piped streams, and the real shapes are to be
+  re-verified in the extended real-docker IT.
 
 ## Proposed design
 
@@ -78,7 +105,7 @@ for the same events — otherwise every kimi re-attach degrades to the lossy no-
 (best-effort de-dup, possible double-render).
 
 > The transcript importer whose minted uuids must match lives in
-> [kimi-code-harness](kimi-code-harness.md) §"Transcript import" (the `wire.jsonl` reader). This
+> [kimi-code-harness](2026-07-20_kimi-code-harness.md) §"Transcript import" (the `wire.jsonl` reader). This
 > feature owns the *other half* of that contract — the live ACP normalizer — and the two must mint
 > identical uuids for the same events. Ship the shared minting rule as one utility consumed by both.
 

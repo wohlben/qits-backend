@@ -75,15 +75,18 @@ public class CommandRegistry {
   }
 
   /**
-   * Spawn a Claude stream-json chat process (kind {@code CHAT}) on plain pipes — not a PTY, which
-   * would echo input and corrupt the line-delimited JSON. Registry-tracked and re-attachable
-   * exactly like {@link #spawn}.
+   * Spawn a coding-agent chat process (kind {@code CHAT}) on plain pipes — not a PTY, which would
+   * echo input and corrupt the line-delimited JSON. The {@code protocolFactory} chooses the
+   * transport (null ⇒ Claude stream-json pass-through; Kimi supplies its ACP client), which
+   * normalizes to the one envelope the session rings and broadcasts. Registry-tracked and
+   * re-attachable exactly like {@link #spawn}.
    */
   public void spawnChat(
       String commandId,
       String container,
       String script,
       Map<String, String> environment,
+      ChatProtocolFactory protocolFactory,
       CommandExitListener exitListener,
       CommandLogWriter logWriter,
       CommandLogReader logReader,
@@ -102,6 +105,11 @@ public class CommandRegistry {
     } catch (IOException e) {
       throw new InternalServerErrorException("Failed to start chat: " + e.getMessage());
     }
+    // A null factory is the default Claude stream-json pass-through; Kimi supplies its ACP client.
+    ChatProtocol protocol =
+        protocolFactory != null
+            ? protocolFactory.create(process)
+            : new StreamJsonChatProtocol(process, commandId);
     ChatSession session =
         new ChatSession(
             commandId,
@@ -109,6 +117,7 @@ public class CommandRegistry {
             container,
             containers,
             graceMillis,
+            protocol,
             exitListener,
             () -> chats.remove(commandId),
             logWriter,

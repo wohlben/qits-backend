@@ -49,7 +49,13 @@ public class CommandService {
   private static final String UUID_PATTERN =
       "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 
-  private static final String KIMI_SESSION_PATTERN = "session_" + UUID_PATTERN;
+  /**
+   * Kimi session ids are {@code session_<uuid>} today, but the id is opaque on the ACP transport,
+   * so accept any {@code session_}-prefixed path-safe slug (a strict superset). This keeps the id
+   * safe to interpolate into the transcript path — no {@code /}, {@code ..} or dots — while a
+   * non-UUID-shaped id no longer costs the entire transcript.
+   */
+  private static final String KIMI_SESSION_PATTERN = "session_[A-Za-z0-9_-]{1,128}";
 
   /**
    * How long {@link #launchAndAwait} blocks before returning a still-running result. The process is
@@ -213,10 +219,14 @@ public class CommandService {
       String name,
       String script,
       Map<String, String> environment) {
-    return launchChat(repoId, workspaceId, name, script, environment, null, null, null);
+    return launchChat(repoId, workspaceId, name, script, environment, null, null, null, null);
   }
 
-  /** {@link #launchChat} with session identity — same extra parameters as {@link #launchAgent}. */
+  /**
+   * {@link #launchChat} with session identity and a chat transport — same extra parameters as
+   * {@link #launchAgent}, plus a {@link ChatProtocolFactory} ({@code null} ⇒ the default Claude
+   * stream-json transport; Kimi passes its ACP client).
+   */
   public CommandDto launchChat(
       String repoId,
       String workspaceId,
@@ -225,7 +235,8 @@ public class CommandService {
       Map<String, String> environment,
       String commandId,
       AgentSessionRef agentSession,
-      CommandExitListener extraExitListener) {
+      CommandExitListener extraExitListener,
+      ChatProtocolFactory protocolFactory) {
     Prepared p =
         prepare(
             repoId,
@@ -246,6 +257,7 @@ public class CommandService {
         p.container(),
         p.script(),
         p.env(),
+        protocolFactory,
         compose(extraExitListener),
         commandLogService,
         commandLogService);

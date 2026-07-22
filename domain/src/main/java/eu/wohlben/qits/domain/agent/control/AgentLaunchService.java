@@ -1,5 +1,8 @@
 package eu.wohlben.qits.domain.agent.control;
 
+import eu.wohlben.qits.domain.agent.acp.AcpChatProtocol;
+import eu.wohlben.qits.domain.agent.acp.AcpSessionConfig;
+import eu.wohlben.qits.domain.command.control.ChatProtocolFactory;
 import eu.wohlben.qits.domain.command.control.CommandExitListener;
 import eu.wohlben.qits.domain.command.control.CommandRegistry;
 import eu.wohlben.qits.domain.command.control.CommandService;
@@ -151,13 +154,12 @@ public class AgentLaunchService {
   AgentType agentType;
 
   /**
-   * Launches the active coding agent as a stream-json <strong>chat</strong> command in {@code
-   * workspaceId} of {@code repoId}, with the MCP server(s) for {@code scope} attached. The session
-   * is rendered as a conversation and tracked in the command registry (re-attachable, logged).
-   * Tools run auto-approved. Returns the spawned command.
-   *
-   * <p>Kimi Code does not support native chat yet; launching chat under {@code
-   * qits.agent.type=kimi} throws {@link BadRequestException}.
+   * Launches the active coding agent as a <strong>chat</strong> command in {@code workspaceId} of
+   * {@code repoId}, with the MCP server(s) for {@code scope} attached. Claude drives it over
+   * stream-json; Kimi has no stdin chat mode, so its chat rides an in-JVM ACP client with the
+   * scoped servers carried on {@code session/new}. Either way the session is rendered as one
+   * conversation and tracked in the command registry (re-attachable, logged). Tools run
+   * auto-approved. Returns the spawned command.
    */
   public CommandDto launchChat(
       String repoId, String workspaceId, AgentMcpScope scope, String initialContext) {
@@ -183,10 +185,6 @@ public class AgentLaunchService {
       String resumeSessionId,
       boolean fork,
       boolean deliverTaskPrompt) {
-    if (agentType == AgentType.KIMI) {
-      throw new BadRequestException(
-          "Kimi Code chat is not implemented yet; use interactive or autonomous launches");
-    }
     if (scope == null) {
       throw new BadRequestException("scope is required");
     }
@@ -213,6 +211,15 @@ public class AgentLaunchService {
 
     PinnedSession pinned = pinSession(repoId, workspaceId, resumeSessionId, fork);
     LaunchSpec spec = renderChat(repoId, workspaceId, scope, pinned);
+    // Claude drives chat over stream-json (null ⇒ the default transport); Kimi has no stdin chat,
+    // so
+    // its chat rides an in-JVM ACP client with the scoped MCP servers carried on session/new.
+    ChatProtocolFactory protocolFactory =
+        agentType == AgentType.KIMI
+            ? process ->
+                new AcpChatProtocol(
+                    process, buildAcpSessionConfig(repoId, workspaceId, scope, pinned))
+            : null;
 
     CommandDto command =
         commandService.launchChat(
@@ -223,7 +230,8 @@ public class AgentLaunchService {
             spec.environment(),
             pinned.commandId(),
             pinned.ref(),
-            chatTranscriptSweep());
+            chatTranscriptSweep(),
+            protocolFactory);
     // The live transcript import: the durable head a mid-run re-attach replays from.
     transcriptTailService.startTail(command.id());
     boolean deliverBootstrap = shouldDeliverBootstrap(deliverTaskPrompt, repoId, workspaceId);
@@ -431,11 +439,15 @@ public class AgentLaunchService {
             resumeSessionId, AgentSessionSource.RESUMED, null, null, Instant.now()));
   }
 
+  /**
+   * Kimi session ids are opaque {@code session_}-prefixed path-safe slugs (see {@code
+   * CommandService}).
+   */
+  private static final String KIMI_SESSION_PATTERN = "session_[A-Za-z0-9_-]{1,128}";
+
   private void requireSessionId(String value, String label) {
     if (agentType == AgentType.KIMI) {
-      if (value == null
-          || !value.matches(
-              "session_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
+      if (value == null || !value.matches(KIMI_SESSION_PATTERN)) {
         throw new BadRequestException("Invalid " + label + ": " + value);
       }
       return;
@@ -540,6 +552,34 @@ public class AgentLaunchService {
       agent.mcpServer(server.key(), McpServers.httpMcp(server.url()));
     }
     return withSession(withAgentHome(agent), pinned).skipPermissions().chat();
+  }
+
+  /**
+   * Builds the ACP session inputs for a Kimi chat: the same scoped MCP servers {@link #serversFor}
+   * produces (carried protocol-native on {@code session/new}, no {@code mcp.json}), with per-server
+   * bare {@code enabledTools} (the shared prefix-strip); the resumed session id when this launch
+   * resumes; and the session-id sink that records the id kimi returns from {@code session/new} on
+   * the command row (kimi can't pin a fresh id, so the id is learned, not pinned).
+   */
+  AcpSessionConfig buildAcpSessionConfig(
+      String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
+    List<AcpSessionConfig.AcpMcpServer> servers = new java.util.ArrayList<>();
+    for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
+      servers.add(
+          new AcpSessionConfig.AcpMcpServer(
+              server.key(),
+              server.url(),
+              KimiCodeAgent.stripServerPrefix(server.key(), server.allowedTools())));
+    }
+    AgentSessionRef ref = pinned.ref();
+    String resumeSessionId =
+        ref != null && ref.source == AgentSessionSource.RESUMED ? ref.sessionId : null;
+    String commandId = pinned.commandId();
+    return new AcpSessionConfig(
+        AgentTranscriptService.CONTAINER_CWD,
+        servers,
+        resumeSessionId,
+        id -> commandService.reportAgentSession(commandId, id, null));
   }
 
   /**
