@@ -242,13 +242,28 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>${antrun-plugin.version}</version>
-                <configuration>
-                    <skip>${qits.dev-guard.skip}</skip>
-                    <target>
-                        <condition property="qits.dev-guard.running">
-                            <socket server="127.0.0.1" port="${qits.dev-guard.port}"/>
-                        </condition>
-                        <fail if="qits.dev-guard.running">
+                <executions>
+                    <!-- Skip AND target live on the GUARD's executions only — nothing plugin-level.
+                         Plugin-level configuration merges into every maven-antrun execution in the
+                         reactor (derive-fixture-bares in domain/service/cli included): a plugin-level
+                         skip made -Dqits.dev-guard.skip=true silently skip fixture derivation, and a
+                         plugin-level target merges the guard's socket-check+fail INTO the derive
+                         step (docs/issues/resolved/2026-07-21_dev-guard-skip-disables-all-antrun-executions.md).
+                         The two executions carry identical configs by necessity (Maven has no
+                         execution-config templating) — keep both copies in sync. -->
+                    <execution>
+                        <id>guard-dev-mode-preclean</id>
+                        <phase>pre-clean</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${qits.dev-guard.skip}</skip>
+                            <target>
+                                <condition property="qits.dev-guard.running">
+                                    <socket server="127.0.0.1" port="${qits.dev-guard.port}"/>
+                                </condition>
+                                <fail if="qits.dev-guard.running">
 qits build guard: something is listening on 127.0.0.1:${qits.dev-guard.port} — a `quarkus:dev` is
 likely running. Rebuilding the reactor now can wedge it with mass "Unsatisfied dependency for domain
 beans" (dev's watcher races Maven recompiling the shared target/classes; see
@@ -259,16 +274,9 @@ docs/issues/resolved/2026-07-05_mapstruct-unsatisfied-after-incremental-compile.
   Then re-run your build.
 
 Bypass (CI, or :${qits.dev-guard.port} is not a qits dev server):  -Dqits.dev-guard.skip=true
-                        </fail>
-                    </target>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>guard-dev-mode-preclean</id>
-                        <phase>pre-clean</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
+                                </fail>
+                            </target>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>guard-dev-mode-validate</id>
@@ -276,6 +284,26 @@ Bypass (CI, or :${qits.dev-guard.port} is not a qits dev server):  -Dqits.dev-gu
                         <goals>
                             <goal>run</goal>
                         </goals>
+                        <configuration>
+                            <skip>${qits.dev-guard.skip}</skip>
+                            <target>
+                                <condition property="qits.dev-guard.running">
+                                    <socket server="127.0.0.1" port="${qits.dev-guard.port}"/>
+                                </condition>
+                                <fail if="qits.dev-guard.running">
+qits build guard: something is listening on 127.0.0.1:${qits.dev-guard.port} — a `quarkus:dev` is
+likely running. Rebuilding the reactor now can wedge it with mass "Unsatisfied dependency for domain
+beans" (dev's watcher races Maven recompiling the shared target/classes; see
+docs/issues/resolved/2026-07-05_mapstruct-unsatisfied-after-incremental-compile.md).
+
+  Stop dev first:   pkill -f quarkus:dev; pkill -f 'target/.*-dev.jar'
+  (the second kills the forked dev JVM, which is orphaned if the launcher was -9'd)
+  Then re-run your build.
+
+Bypass (CI, or :${qits.dev-guard.port} is not a qits dev server):  -Dqits.dev-guard.skip=true
+                                </fail>
+                            </target>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
