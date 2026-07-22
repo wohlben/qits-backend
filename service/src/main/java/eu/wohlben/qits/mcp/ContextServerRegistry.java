@@ -54,9 +54,8 @@ public class ContextServerRegistry {
             "repository",
             "Branches, commits and diffs of a project's repositories, plus the actions on them:"
                 + " branch off a workspace, clean up a branch, integrate a branch, and merge a"
-                + " parent (e.g. master) into a workspace. Also owns the repositories' daemons —"
-                + " long-running processes such as a dev server: define/edit them and start/stop"
-                + " them in a workspace. Sessions additionally narrowed to a workspace (the '"
+                + " parent (e.g. master) into a workspace. Sessions additionally narrowed to a"
+                + " workspace (the '"
                 + WorkspaceScope.WORKSPACE_HEADER
                 + "' header or '?workspaceId=') also get the telemetry* tools: structured spans,"
                 + " logs and metrics exported by the workspace's instrumented processes, and the"

@@ -9,8 +9,7 @@ package eu.wohlben.qits.domain.agent.control;
  * <ul>
  *   <li>{@link #ACTIONS} — the "configure this repository" pairing: the "actions" server scoped to
  *       the repository the session runs in (for managing that repository's actions), plus the
- *       "repository" server narrowed to it — repository-owned configuration such as daemons lives
- *       there.
+ *       "repository" server narrowed to it (its branches, workspaces and commits).
  *   <li>{@link #REPOSITORY} — the "repository" server, scoped to the session's project and narrowed
  *       to that one repository (for driving a single repository from within a subtree).
  *   <li>{@link #PROJECT} — the "repository" server scoped to the whole project, with no repository

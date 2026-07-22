@@ -38,3 +38,9 @@ substring matching over the serialized DTO instead of asserting the structured f
 Assert the structure, not the text — e.g. parse the tool response's daemon JSON and assert
 `webView == null` (the REST follow-up assertion four lines below already does exactly that), or
 narrow the substring check to `"port":4200`.
+
+## Resolution
+
+Resolved by removal: the admin-shaped `DaemonMcpTools` (and with them `DaemonMcpToolsTest`) were
+deleted on 2026-07-21 — the daemon MCP surface moves to workspace-scoped tools, see
+[Daemon kinds & workspace-scoped MCP](../epics/qits-workspace-daemons/feature-ideas/daemon-kinds-and-workspace-mcp.md).

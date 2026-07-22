@@ -633,8 +633,8 @@ public class AgentLaunchService {
     return switch (scope) {
       case ACTIONS ->
           // The "configure this repository" session: the actions server for the action library,
-          // plus the (narrowed) repository server — repository-owned configuration such as daemons
-          // is managed there, and the session needs both to configure the repository fully.
+          // plus the (narrowed) repository server for the repository reads (branches, workspaces,
+          // commits) — the session needs both to configure the repository fully.
           List.of(
               new ScopedMcp(
                   "actions", actionsMcpUrl() + "?repositoryId=" + repo, READ_ONLY_ACTION_TOOLS),

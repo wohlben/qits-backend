@@ -276,8 +276,8 @@ Semantics to rely on (and not fight):
   couldn't run — e.g. a missing tool).
 - The dots update over the workspace's existing SSE feed (on state flips), and the hover tooltip
   carries latency + the failing evidence (`exit 7: curl: (7) Failed to connect…`, `HTTP 503
-  (expected 2xx,3xx)`). Agents get the same data from the `listWorkspaceDaemons` MCP tool's
-  `health` field.
+  (expected 2xx,3xx)`). Agents read the same data from the workspace-daemons REST endpoint (`GET
+  /api/repositories/{repoId}/workspaces/{workspaceId}/daemons`, per-entry `instance.health`).
 
 **Verify:** start the daemon → both dots green within one interval of READY (Angular red first
 if you catch the compile window). Then kill the frontend inside the container:
