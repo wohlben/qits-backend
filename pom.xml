@@ -72,6 +72,15 @@
              (e.g. CI, or when :8080 is a non-dev process). -->
         <qits.dev-guard.port>8080</qits.dev-guard.port>
         <qits.dev-guard.skip>false</qits.dev-guard.skip>
+        <!-- Skip the derive-fixture-bares antrun step (domain/service/cli, see those poms). Fixture
+             bares are a TEST resource; a tests-skipped build that has no git submodules checked out
+             (the Docker image builds — .dockerignore strips .git, so the submodule working trees'
+             .git pointer files dangle) must not try to derive them. Its OWN property, deliberately
+             NOT reusing qits.dev-guard.skip: those were once coupled at the antrun plugin level and
+             decoupling them (docs/issues/resolved/2026-07-21_dev-guard-skip-disables-all-antrun-executions.md)
+             is what made the image build start running fixture derivation and fail on the dangling
+             .git (docs/issues/resolved/2026-07-22_dev-guard-skip-no-longer-skips-fixture-derivation.md). -->
+        <qits.fixture-derivation.skip>false</qits.fixture-derivation.skip>
     </properties>
 
     <dependencyManagement>

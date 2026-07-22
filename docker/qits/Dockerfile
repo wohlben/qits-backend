@@ -52,7 +52,8 @@ COPY . .
 # native-image RAM so the build is deterministic on small machines; disable the build cache so a
 # host cache never leaks in.
 RUN ./mvnw -B -ntp -pl workspace-daemon -am package -Dnative \
-      -DskipTests -Dqits.dev-guard.skip=true -Dmaven.build.cache.enabled=false \
+      -DskipTests -Dqits.dev-guard.skip=true -Dqits.fixture-derivation.skip=true \
+      -Dmaven.build.cache.enabled=false \
       -Dquarkus.native.native-image-xmx=4g
 
 # --- stage `workspace`: the toolchain image every workspace container runs ------------------------
@@ -327,15 +328,21 @@ RUN ./mvnw --version
 # stays lean). Then package just the `service` app + its `domain`/`auth` deps, no tests.
 COPY . .
 
-# -DskipTests: prod jar, no test run. -Dqits.dev-guard.skip=true ALSO skips the derive-fixture-bares
-#   antrun (it inherits the root pom's plugin-level `skip`), so the build needs NO git submodules —
-#   a plain shallow clone is enough. -Dmaven.build.cache.enabled=false: the cache is empty in a fresh
-#   container and its restore machinery only adds overhead here. QUARKUS_ANALYTICS_DISABLED is
-#   inherited from the workspace stage. -Dqits.variant: an empty/missing build arg fails the
-#   maven-enforcer check with the message listing the valid variants — there is no default.
+# -DskipTests: prod jar, no test run. -Dqits.fixture-derivation.skip=true skips the
+#   derive-fixture-bares antrun (a TEST-only step), so the build needs NO git submodules — a plain
+#   shallow clone is enough (.dockerignore drops .git, leaving the fixture submodules' .git pointer
+#   files dangling, which the derivation would trip over). This used to piggyback on
+#   -Dqits.dev-guard.skip=true, but the two were correctly decoupled in the root pom
+#   (docs/issues/resolved/2026-07-22_dev-guard-skip-no-longer-skips-fixture-derivation.md), so the
+#   fixture skip must now be passed explicitly. -Dqits.dev-guard.skip=true still silences the dev
+#   guard (irrelevant in an image build, but harmless). -Dmaven.build.cache.enabled=false: the cache
+#   is empty in a fresh container and its restore machinery only adds overhead here.
+#   QUARKUS_ANALYTICS_DISABLED is inherited from the workspace stage. -Dqits.variant: an empty/missing
+#   build arg fails the maven-enforcer check with the message listing the valid variants — no default.
 ARG QITS_VARIANT
 RUN ./mvnw -B -ntp -pl service -am package \
-      -DskipTests -Dqits.dev-guard.skip=true -Dmaven.build.cache.enabled=false \
+      -DskipTests -Dqits.dev-guard.skip=true -Dqits.fixture-derivation.skip=true \
+      -Dmaven.build.cache.enabled=false \
       -Dqits.variant=${QITS_VARIANT}
 
 # --- final stage: the runtime image ----------------------------------------------------------------

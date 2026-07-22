@@ -209,6 +209,9 @@ See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</r
                             <goal>run</goal>
                         </goals>
                         <configuration>
+                            <!-- Skipped in tests-skipped, no-submodule builds (the Docker images);
+                                 see qits.fixture-derivation.skip in the root pom. -->
+                            <skip>${qits.fixture-derivation.skip}</skip>
                             <target>
                                 <exec executable="bash" failonerror="true">
                                     <arg value="${maven.multiModuleProjectDirectory}/scripts/derive-fixture-bares.sh"/>
