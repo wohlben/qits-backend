@@ -20,6 +20,17 @@ allure-results/
 # OS
 .DS_Store
 
+# Home-relative caches/config a tool leaks into the repo root when run with the repo as its
+# cwd — their real homes are under $HOME, never here. `.m2` here is only the Maven *wrapper's*
+# distribution download (the dependency repo lives on the shared /caches/m2 volume via
+# MAVEN_OPTS); `.qits` here is stray (qits' real data dir is ~/.qits).
+.cache/
+.m2/
+.local/
+.redhat/
+.testcontainers.properties
+/.qits/
+
 # Logs
 *.log
 
