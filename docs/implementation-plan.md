@@ -37,43 +37,65 @@ feature-idea to `features/YYYY-MM-DD_*.md` and flips the epic Status.
 
 ---
 
+## Part 0 (prerequisite) — [project-scoped-name-addressed-git-serving](epics/qits-project-repository-submodules/feature-ideas/project-scoped-name-addressed-git-serving.md)
+
+**Lands first**, in the [qits-project-repository-submodules](epics/qits-project-repository-submodules/epic.md)
+epic (not this one). Serves a project's repositories as siblings under `/git/<projectId>/<name>`
+(names via a repository **link table**), so committed relative submodule urls resolve **natively** and
+provisioning becomes a plain clone + a **bounded, depth-capped walk over the imported edge closure**
+(native for relative urls, name-addressed override only for absolute urls; bounded rather than
+`--recurse-submodules` for cycle safety). It replaces the per-level id-addressed `submodule.<name>.url`
+override with native/name-addressed resolution and moves import to **full-closure recursive**.
+
+**Why it comes before Part 1:** it **shrinks** Part 1's hardest piece. Native relative resolution
+removes the id→url mapping and per-level override from the daemon's job — but the daemon still needs
+the **imported-edge closure** to scope the walk and redirect any absolute urls. So the
+`ProvisionRequest` / "submodule closure source" design question below is **reduced, not eliminated**:
+a lighter closure (imported paths + absolute-url child names) rather than a full id-map. Part 1 is:
+clone-on-boot + the name-addressed submodule walk + `Provisioned` / `ProvisionFailed`. The daemon env
+it needs (`QITS_WORKSPACE_DAEMON_PROJECT_ID` / `…_REPO_NAME`) is injected **with Part 1** (its only
+consumer). See that feature-idea for the full design.
+
+---
+
 ## Part 1 — [autonomous-self-clone-on-boot](epics/qits-workspace-daemon/feature-ideas/autonomous-self-clone-on-boot.md)
 
-The daemon clones `/workspace` + wires submodules from its env on boot; the host stops driving the
-clone and awaits `Provisioned`.
+The daemon clones `/workspace` (+ the name-addressed submodule walk — see **Part 0**) from its env on
+boot; the host stops driving the clone and awaits `Provisioned`. **Part 0 shrinks the hand-off** to a
+lighter imported-edge closure (no id→url map, no override for relative submodules).
 
 **Protocol**
 - [ ] Add `Provisioned { workspaceId, head }` and `ProvisionFailed { workspaceId, message }`
-      (daemon → qits). Optionally `ProvisionRequest { correlationId, submoduleClosure }` (qits →
-      daemon) if the submodule edge closure is handed over rather than discovered in-container.
+      (daemon → qits), plus a `ProvisionRequest`/closure hand-off carrying the **imported-edge
+      closure** (paths to scope the walk + child names for any absolute-url redirect). Lighter than
+      the pre-Part-0 id-map, but not eliminated.
 - [ ] Reuse `RunCommand`/`CommandChunk`/`CommandExit` for the in-container `git clone`, or fork `git`
       in a dedicated daemon `Provisioner` (a dedicated verb keeps clone output tagged for the `clone`
       `TechnicalProcess` segment).
 
 **Daemon binary (`workspace-daemon/`)**
 - [ ] In `ControlSocket.onConnected` (after `Hello`), off the event loop (worker pool), derive the
-      git-host URL from the dial-home URL host/port (`ws://qits:8080/…` → `http://qits:8080/git/<repoId>`)
-      and run `git clone --branch <branch> <url> /workspace`.
-- [ ] Reproduce `WorkspaceService.wireSubmodules`/`submoduleWiringCommands` semantics per level
-      (config `submodule.<name>.url` to the id-addressed child git-host URL, then non-recursive
-      path-scoped `submodule update --init`), capped at depth 10. Submodule closure source: **prefer
-      qits handing the imported-edge closure over the socket** (the daemon can't query
-      `repositorySubmoduleRepository`).
+      git-host base from the dial-home URL host/port (`ws://qits:8080/…` → `http://qits:8080/git`),
+      `git clone --branch <branch> http://qits:8080/git/<projectId>/<repoName> /workspace` (from the
+      `QITS_WORKSPACE_DAEMON_PROJECT_ID` / `…_REPO_NAME` env Part 0 injects), then reproduce Part 0's
+      **name-addressed submodule walk** (`WorkspaceService.materializeSubmodules`) driven by the
+      handed-over imported-edge closure: relative submodules resolve **natively** (no override);
+      absolute ones get a name-addressed redirect. No `repositorySubmoduleRepository` in-container —
+      the closure arrives over the socket.
 - [ ] Emit `Provisioned{head}` on success (`git rev-parse HEAD`), `ProvisionFailed{message}` on
       failure; stream clone output as `CommandChunk`/`DaemonLog`.
 
 **Backend socket (`service/.../workspacedaemonhost/`)**
 - [ ] `WorkspaceDaemonRegistry`: handle inbound `Provisioned`/`ProvisionFailed`, completing a
-      `CompletableFuture<ProvisionResult> awaitProvisioned(workspaceId, timeout)`; expose the
-      submodule closure hand-off if used.
+      `CompletableFuture<ProvisionResult> awaitProvisioned(workspaceId, timeout)`.
 
 **Host wiring (`domain`)**
 - [ ] `WorkspaceService.provisionContainer` (`WorkspaceService.java:192`): after `containers.run`,
       **if a client is/soon becomes live**, await `Provisioned` (feed the `clone` segment from socket
-      events) instead of running `containers.exec("git","clone",…)` + `wireSubmodules`. On
-      `ProvisionFailed`/timeout → `containers.rm` + `FAILED` (parity).
-- [ ] **Fallback branch**: no live client within the await ⇒ run today's host-driven clone +
-      `wireSubmodules` unchanged.
+      events) instead of running the host-driven `containers.exec("git","clone",…)` + Part-0
+      `materializeSubmodules`. On `ProvisionFailed`/timeout → `containers.rm` + `FAILED` (parity).
+- [ ] **Fallback branch**: no live client within the await ⇒ run the Part-0 host-driven clone +
+      `materializeSubmodules` unchanged.
 - [ ] `WorkspaceContainerStarted` still fires after the checkout exists (now gated on `Provisioned`,
       not the host clone returning).
 
@@ -82,7 +104,7 @@ clone and awaits `Provisioned`.
       still yields the checkout the suite expects; assert no host `docker exec git clone`.
 - [ ] Degradation: no live client ⇒ host clone fallback, byte-for-byte argv for a submodule-free repo.
 - [ ] Extended real-docker IT (`-Pextended`): a real container self-clones a depth-2 submodule closure
-      (`submodule-super.git`) with no host `docker exec git`.
+      (`submodule-super.git`) via native `--recurse-submodules` with no host `docker exec git`.
 
 **Docs move** → `features/2026-…_autonomous-self-clone-on-boot.md`; epic Status.
 

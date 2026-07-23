@@ -4,6 +4,14 @@ First real-world hit of the boundary `docs/epics/qits-project-repository-submodu
 documents as a follow-up ("only single-level submodules materialize offline"): a workspace for a
 repo whose submodule itself has submodules fails to start.
 
+> **Superseded at the root (planned 2026-07-23).** The `submodule.<name>.url` override this issue
+> resolved with is itself being **deleted** by
+> `docs/epics/qits-project-repository-submodules/feature-ideas/project-scoped-name-addressed-git-serving.md`:
+> serving a project's repos as siblings under `/git/<projectId>/<name>` makes committed relative
+> submodule urls resolve **natively**, so provisioning becomes a single `git clone --recurse-submodules`
+> and the level-by-level wiring walk goes away. This doc stays as the record of why the override
+> existed.
+
 > **Resolved 2026-07-16**, in two steps that ended in a redesign (see the updated status note in the
 > feature doc):
 >

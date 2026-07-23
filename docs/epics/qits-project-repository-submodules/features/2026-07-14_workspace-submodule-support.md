@@ -1,5 +1,12 @@
 # Workspace submodule support — import a repo's submodules as sibling repositories, materialized offline
 
+> **Superseded in part (planned 2026-07-23).** The layer-by-layer partial-import model and the
+> container-side `submodule.<name>.url` wiring described below are being replaced by
+> `feature-ideas/project-scoped-name-addressed-git-serving.md`: a project's repos are served as
+> siblings under `/git/<projectId>/<name>` (names via a repository link table) so relative submodule
+> urls resolve **natively**, import becomes **full-closure recursive** again, and provisioning is a
+> single `git clone --recurse-submodules`. The sibling-`Repository` model and dedup below stay.
+
 > **Status: implemented (2026-07-14); import model redesigned (2026-07-16).** The 2026-07-16 redesign
 > (prompted by the first prod encounter of the nested-submodule boundary — see
 > `docs/issues/resolved/2026-07-16_nested-submodule-clone-fails-workspace-container.md`) replaces the
