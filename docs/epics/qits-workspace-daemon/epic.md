@@ -52,7 +52,7 @@ of that interface's exec/daemon/file verbs, reached over the socket instead of t
   substrate's single `docker exec` seam (`CommandRegistry.dockerExec()` `:211`, fed by
   `CommandService.prepare()` `:515`) is the first real call site to route through `workspace-daemon`
   (Part 2). The re-attach model and interaction log are unchanged; only the transport moves.
-- **Re-homes [qits-workspace-daemons](../qits-workspace-daemons/epic.md)** — the tmux-backed
+- **Re-homes [qits-workspace-services](../qits-workspace-services/epic.md)** — the tmux-backed
   `DaemonSupervisor` (`launch` `:435`, log-mirror follower `:496`, `/proc` straggler reap
   `:723`, liveness poll `:591`, pid-group kill) collapses into `workspace-daemon`-owned supervision
   (Part 5). `workspace-daemon` streams daemon logs home as a thin client.
@@ -156,7 +156,7 @@ was split into six dependency-ordered feature-ideas.
      (**implemented 2026-07-23**; absorbs the clone piece of Part 4).
   2. **[in-container-config-discovery](feature-ideas/in-container-config-discovery.md)** (`.qits-config.yml`
      read from the checkout — the file-as-truth pivot).
-  3. **[daemon-run-bootstrap-chain](feature-ideas/daemon-run-bootstrap-chain.md)** (re-homes
+  3. **[daemon-run-bootstrap-chain](features/2026-07-23_daemon-run-bootstrap-chain.md)** (re-homes
      `WorkspaceBootstrapRunner`; absorbs
      [workspace-bootstrap-commands](../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)).
   4. **[daemon-supervised-dev-daemons](feature-ideas/daemon-supervised-dev-daemons.md)** (autonomous
@@ -204,4 +204,12 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
     retired the host provisioning fallback** (Workstream B, per directive): the daemon is now the
     sole provisioner — `hostDrivenClone`/host `materializeSubmodules` deleted, a `@Mock`
     `FakeWorkspaceDaemonProvisioner` stands in for tests, and a no-daemon container now `FAILED`s
-    instead of degrading. Parts 3–6 still parked.
+    instead of degrading.
+  - **Part 3 — [daemon-run-bootstrap-chain](features/2026-07-23_daemon-run-bootstrap-chain.md) —
+    implemented (2026-07-23).** The daemon runs the bootstrap chain (install/migrate/seed) itself
+    from its in-container config, between the self-clone and daemon start (new daemon `BootstrapRunner`
+    + `BootstrapStep`/`BootstrapOutcome`/`Bootstrapped`/`RunBootstrap` protocol). `WorkspaceBootstrapRunner`
+    became a thin awaiter of a new `WorkspaceBootstrapDriver` SPI (registry-backed, event-buffering) —
+    it records outcomes, settles `bootstrap:<name>` segments, and still gates daemon auto-start on the
+    result. Bootstrap steps run in-container, so they no longer leave host `Command` audit rows. Parts
+    4–6 still parked.

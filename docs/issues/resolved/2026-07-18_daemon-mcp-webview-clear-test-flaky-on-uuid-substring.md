@@ -5,7 +5,7 @@
 Found while running the full service suite for the
 [workspace bootstrap commands](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md) feature —
 unrelated to that change. Related: the daemon MCP tools
-([daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)).
+([daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md)).
 
 ## Observed
 
@@ -43,4 +43,4 @@ narrow the substring check to `"port":4200`.
 
 Resolved by removal: the admin-shaped `DaemonMcpTools` (and with them `DaemonMcpToolsTest`) were
 deleted on 2026-07-21 — the daemon MCP surface moves to workspace-scoped tools, see
-[Daemon kinds & workspace-scoped MCP](../epics/qits-workspace-daemons/feature-ideas/daemon-kinds-and-workspace-mcp.md).
+[Daemon kinds & workspace-scoped MCP](../epics/qits-workspace-services/feature-ideas/daemon-kinds-and-workspace-mcp.md).

@@ -22,10 +22,10 @@ Related/dependent plans:
   component Part A grows. The backend `WorkspaceTelemetryController` endpoints
   (`errors`, `traces/{traceId}`, `slow-spans`, `logs`, `metrics`) are unchanged except for the one
   optional sort addition noted below.
-- **Modifies [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md)** — its
+- **Modifies [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md)** — its
   `pattern/daemon/workspace-daemons.component.ts` currently hosts both the daemon controls and the
   Recent events feed; Part B splits the feed out.
-- **Complements [daemon web-view configuration](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)**
+- **Complements [daemon web-view configuration](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md)**
   — opening a daemon's web view and interacting with the app is the natural way to generate the
   traces Part A surfaces; it is how the empty-tab gap was found.
 - Follows the repo's **[everything available, hidden by rules](../../../../CLAUDE.md)** convention (show

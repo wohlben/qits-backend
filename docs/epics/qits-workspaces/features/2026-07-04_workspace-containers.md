@@ -21,7 +21,7 @@ execution through `docker exec`). Related/dependent plans:
 - **Phase 3 — [container-agent-sessions](../../qits-coding-agents/features/2026-07-04_container-agent-sessions.md)** (depends
   on this, now implemented): the coding agent works inside the container; credential hand-off via a
   shared `~/.claude` volume.
-- Moves [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md) into the container along with all other registry
+- Moves [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md) into the container along with all other registry
   execution — dissolving the port-collision limitation: every workspace's daemon binds its
   canonical port inside its own container network namespace.
 - The [daemon web-view picker](../../qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md) proxy resolves targets

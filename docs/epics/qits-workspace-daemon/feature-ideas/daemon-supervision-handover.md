@@ -15,7 +15,7 @@
 Part 5 of [qits-workspace-daemon](../epic.md). **Out of scope until
 [Part 1](../features/2026-07-22_workspace-daemon-binary-and-control-socket.md) lands** (and best after
 [Part 2](command-execution-over-socket.md), whose spawn/signal seam daemons build on). Moves the
-in-container half of [daemon](../../qits-workspace-daemons/epic.md) supervision — process launch,
+in-container half of [daemon](../../qits-workspace-services/epic.md) supervision — process launch,
 liveness, log mirroring, straggler reaping, and group-kill — from the host into `workspace-daemon`, which
 is PID 1 and can therefore supervise child processes natively. `DaemonSupervisor` stays on the
 host as a **thin coordinator** (state machine, backoff, status events, web-view config); it stops
@@ -25,9 +25,9 @@ Related/dependent plans:
 
 - **Hard dependency** — [Part 1](workspace-daemon-binary-and-control-socket.md); **soft dependency** —
   [Part 2](command-execution-over-socket.md) (daemons are spawned processes).
-- **Re-homes** [qits-workspace-daemons](../../qits-workspace-daemons/epic.md) — the definitions,
+- **Re-homes** [qits-workspace-services](../../qits-workspace-services/epic.md) — the definitions,
   the auto-start/auto-stop coupling to the workspace lifecycle
-  ([daemon auto-start](../../qits-workspace-daemons/features/2026-07-09_daemon-autostart-on-workspace-start.md)),
+  ([daemon auto-start](../../qits-workspace-services/features/2026-07-09_daemon-autostart-on-workspace-start.md)),
   and the web-view proxy are unchanged; only the runtime host moves.
 - **Feeds** [qits-observability](../../qits-observability/epic.md) — `workspace-daemon` streams daemon
   logs home over the socket as a thin client (the log-mirror follower disappears).

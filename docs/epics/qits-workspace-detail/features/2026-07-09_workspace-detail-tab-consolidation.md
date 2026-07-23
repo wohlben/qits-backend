@@ -29,13 +29,13 @@ Related/dependent plans:
   [stream-json-chat](../../qits-coding-agents/features/2026-07-01_stream-json-chat.md)) carries over **for free**,
   because `z-tab-group` keeps inactive panels mounted (`[hidden]`), not destroyed.
 - **Modifies the frame of [daemon-webview-picker](./2026-07-05_daemon-webview-picker.md)**
-  (and its [configuration follow-up](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)) —
+  (and its [configuration follow-up](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md)) —
   the proxy (`DaemonProxyRoute`), the `DomPicker`, and the `PromptContextStore` hand-off are
   unchanged; only the fullscreen-dialog + floaty-button shell is replaced by a tab.
-- **Modifies [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md)** — its workspace controls panel
+- **Modifies [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md)** — its workspace controls panel
   (`workspace-daemons.component.ts`) moves from above the tab group into a tab; the component
   itself is unchanged.
-- **Interacts with the [daemon-healthchecks](../../qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) idea** — its glanceable
+- **Interacts with the [daemon-healthchecks](../../qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) idea** — its glanceable
   health dots render inside the daemons panel, which after this change lives in a tab. The
   tab-label indicator introduced below is the mitigation for "glanceable things now sit behind a
   tab" and is exactly the slot an aggregate health dot would use.
@@ -141,7 +141,7 @@ need one. Two options:
 
 Lean: option 1 — the Chat dot is not cosmetic (it answers "is an agent running right now?" from
 anywhere on the page, which the header button answered before), and the same slot serves Daemons
-now and [daemon-healthchecks](../../qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) later.
+now and [daemon-healthchecks](../../qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) later.
 
 ## Cross-cutting details
 

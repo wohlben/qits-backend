@@ -9,7 +9,7 @@ log. This is the foundation on which every long-running process in qits runs.
 
 **Cross-cutting substrate** (like [qits-technical-processes](../qits-technical-processes/epic.md)),
 not part of the projects → repositories → workspaces aggregate chain: it is *consumed by* the
-domains that spawn processes. A [daemon](../qits-workspace-daemons/epic.md) **is** a
+domains that spawn processes. A [daemon](../qits-workspace-services/epic.md) **is** a
 `CommandSession`; a [coding-agent](../qits-coding-agents/epic.md) `CHAT` **is** a
 `CommandSession`. Commands execute via `docker exec` into the per-workspace container, so it
 runs *into* [qits-workspaces](../qits-workspaces/epic.md)'
@@ -19,7 +19,7 @@ Retroactive umbrella epic; future command-substrate work lands here.
 
 **Scope rule** — this epic owns the **registry, its re-attach model, the global Commands
 nav/list, and the persisted interaction log**. It does **not** own the specific process kinds
-built on top: daemons ([qits-workspace-daemons](../qits-workspace-daemons/epic.md)), agent chat
+built on top: daemons ([qits-workspace-services](../qits-workspace-services/epic.md)), agent chat
 ([qits-coding-agents](../qits-coding-agents/epic.md)). The workspace-detail route's own tabs
 stay in [qits-workspace-detail](../qits-workspace-detail/epic.md); the global Commands left-nav
 (Phase 2) is this epic's own surface, not a workspace-detail tab.

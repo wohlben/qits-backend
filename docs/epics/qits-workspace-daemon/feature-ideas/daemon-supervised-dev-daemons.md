@@ -31,12 +31,12 @@ the socket and issues only *subsequent* operations (manual restart/stop) — it 
   PID-1 daemon), arrived at from the *provisioning* side (autonomous tail-of-startup) rather than the
   *supervision* side (qits instructs). Part 5's `StartDaemon`/`SignalDaemon`/`DaemonEvent` message
   shapes and its `qits.daemons.*` knob preservation carry over.
-- **Hard dependency** — [daemon-run-bootstrap-chain](daemon-run-bootstrap-chain.md) (a successful
+- **Hard dependency** — [daemon-run-bootstrap-chain](../features/2026-07-23_daemon-run-bootstrap-chain.md) (a successful
   chain gates daemon start) and [in-container-config-discovery](in-container-config-discovery.md)
   (the daemon definitions are read from the checkout).
-- **Re-homes [qits-workspace-daemons](../../qits-workspace-daemons/epic.md)** — the definitions, the
+- **Re-homes [qits-workspace-services](../../qits-workspace-services/epic.md)** — the definitions, the
   auto-start/auto-stop lifecycle coupling
-  ([auto-start](../../qits-workspace-daemons/features/2026-07-09_daemon-autostart-on-workspace-start.md)),
+  ([auto-start](../../qits-workspace-services/features/2026-07-09_daemon-autostart-on-workspace-start.md)),
   and the web-view proxy origin resolution are unchanged; only the runtime host moves into the
   container's PID 1.
 - **Feeds [qits-observability](../../qits-observability/epic.md)** — the daemon streams dev-daemon

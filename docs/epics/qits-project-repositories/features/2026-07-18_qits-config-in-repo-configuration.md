@@ -21,10 +21,10 @@ like any other.
   [`../features/2026-07-09_unified-action-scope.md`](../../qits-feature-flows/features/2026-07-09_unified-action-scope.md) —
   repository-scoped `ActionConfiguration` (nullable `repository_id`) is the target for declared
   actions; global actions stay UI/DB-only.
-- [`../features/2026-07-04_daemons.md`](../../qits-workspace-daemons/features/2026-07-04_daemons.md),
-  [`../features/2026-07-06_daemon-webview-configuration.md`](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md),
-  [`../features/2026-07-04_daemon-log-observation-expansion.md`](../../qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md),
-  [`../features/2026-07-10_daemon-healthchecks.md`](../../qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) —
+- [`../features/2026-07-04_daemons.md`](../../qits-workspace-services/features/2026-07-04_daemons.md),
+  [`../features/2026-07-06_daemon-webview-configuration.md`](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md),
+  [`../features/2026-07-04_daemon-log-observation-expansion.md`](../../qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md),
+  [`../features/2026-07-10_daemon-healthchecks.md`](../../qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) —
   `RepositoryDaemon` with its embedded `WebView`, `LogObserver`/`LogSource` collections, and
   health checks is the richest declared object.
 - [`../features/2026-07-14_workspace-submodule-support.md`](../../qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md) —

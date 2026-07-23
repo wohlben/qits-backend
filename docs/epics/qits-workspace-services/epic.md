@@ -1,4 +1,4 @@
-# Epic: qits-workspace-daemons — managed long-running processes
+# Epic: qits-workspace-services — managed long-running processes
 
 ## Introduction
 
@@ -6,6 +6,12 @@ The **daemon domain**: an action runs to completion, a **daemon** is the sibling
 *supposed to keep running* (dev server, compile watcher, watch-mode test runner). Its result is
 not an exit code but a **status over time**. This epic owns daemon definitions, the supervised
 runtime, log observation, and the daemon↔workspace lifecycle coupling.
+
+> **Renamed from `qits-workspace-daemons`** to avoid collision with the singular
+> [qits-workspace-daemon](../qits-workspace-daemon/epic.md) — the in-container `workspace-daemon`
+> control-plane binary (PID 1), a different concept. Only the epic slug changed; the code domain
+> (packages `eu.wohlben.qits.domain.daemon`, `RepositoryDaemon`, `DaemonSupervisor`) keeps its
+> "daemon" naming.
 
 **Builds on [qits-workspaces](../qits-workspaces/epic.md)**:
 a daemon runs inside a workspace container, and its lifecycle is coupled to the workspace's

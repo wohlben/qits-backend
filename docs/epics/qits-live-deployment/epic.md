@@ -24,7 +24,7 @@ Related epics / cross-cutting concerns:
   ride the same network.
 - **Not daemon healthchecks** — this epic's `health-checks` are SmallRye probes for the **qits
   service itself** (`/q/health/*`); the per-dev-server probes in
-  [qits-workspace-daemons](../qits-workspace-daemons/epic.md) are a different, unrelated
+  [qits-workspace-services](../qits-workspace-services/epic.md) are a different, unrelated
   mechanism (they merely reuse a `/q/health` endpoint as a convenient target).
 
 ## Parts (implemented)

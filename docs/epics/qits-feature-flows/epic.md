@@ -24,7 +24,7 @@ Related epics / cross-cutting concerns:
 - **Agent launches left this model** — [qits-coding-agents](../qits-coding-agents/epic.md): the
   coding-agent harness lifted agent launches *out* of the generic action model (they were an
   `ActionVariant`), so agents are no longer fake "global actions".
-- **A deferred gate reads a daemon healthcheck** — [qits-workspace-daemons](../qits-workspace-daemons/epic.md):
+- **A deferred gate reads a daemon healthcheck** — [qits-workspace-services](../qits-workspace-services/epic.md):
   "gate this phase on the dev server being healthy" is the concrete predicate a healthcheck
   provides.
 - **Reconciled from `.qits-config`** — [qits-project-repositories](../qits-project-repositories/epic.md):

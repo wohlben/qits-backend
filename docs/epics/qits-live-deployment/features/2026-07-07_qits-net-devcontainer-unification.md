@@ -24,7 +24,7 @@ Related/dependent plans:
 - **Fixes** [web-view port frozen at container creation](../../../issues/resolved/2026-07-07_web-view-port-frozen-at-container-creation.md).
 - **Modifies** [workspace containers](../../qits-workspaces/features/2026-07-04_workspace-containers.md),
   [daemon web-view picker](../../qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md), and
-  [daemon web-view configuration](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) — specifically their
+  [daemon web-view configuration](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) — specifically their
   create-time port-publishing seam (`ContainerRuntime.run` publish ports → gone) and the recreate
   affordance (removed).
 - **Simplifies** [QitsHostResolver](../../qits-workspaces/features/2026-07-04_workspace-containers.md)'s container→qits addressing:

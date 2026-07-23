@@ -14,8 +14,8 @@ This is a *current-state contract* document: when a feature changes the contract
 guide in place.
 
 Related: [workspace submodule support](../epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md) ·
-[daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) ·
-[daemon healthchecks](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) ·
+[daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
+[daemon healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) ·
 [spa-feature-capture](../epics/qits-integration-angular/features/2026-07-14_spa-feature-capture.md) ·
 [workspace bootstrap commands](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md).
 

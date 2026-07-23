@@ -13,7 +13,7 @@ correlated by trace id.
 
 Related/dependent plans:
 
-- Delivery vehicle is [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md): daemon definitions have an `otel` toggle
+- Delivery vehicle is [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md): daemon definitions have an `otel` toggle
   that injects `OTEL_EXPORTER_OTLP_*` env vars at launch. Works without daemons too — anything
   run in a qits terminal can export to the endpoint (it lands in the bounded `_unscoped` bucket
   unless it carries the `qits.*` resource attributes).

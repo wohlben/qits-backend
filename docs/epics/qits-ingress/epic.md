@@ -51,7 +51,7 @@ port, no host publishing). The hub is the missing *inbound* half of a resolver p
   provisioning, the `ContainerRuntime` seam, the shared `qits-net`, and DNS-name addressing with no
   host-port publishing are what the hub routes *to*. "Workspaces need to become addressable anyway"
   (this epic's Part 2) is the direct extension of the container reachability model already in place.
-- **Generalizes [qits-workspace-daemons](../qits-workspace-daemons/epic.md) / the daemon web view** —
+- **Generalizes [qits-workspace-services](../qits-workspace-services/epic.md) / the daemon web view** —
   `DaemonProxyRoute` is the one existing container-reverse-proxy and the template for generalized
   workspace addressability. Its SSRF-safe supervisor-only origin resolution is the security model
   the hub keeps.

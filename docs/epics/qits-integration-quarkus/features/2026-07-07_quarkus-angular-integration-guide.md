@@ -38,13 +38,13 @@ Related/dependent plans:
 - **Generalizes [fully integrate the Quarkus+Angular fixture](../../qits-testing-fixtures/features/2026-07-05_quarkus-angular-fixture-full-integration.md)**
   — that feature made the *fixture* exercise every surface and its §A–§C tables are this guide's
   raw material. But it is fixture-facing (what the fixture and `SeedWebappService` had to become),
-  and it predates the [web-view configuration](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)
+  and it predates the [web-view configuration](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md)
   rework (frontend dev server on :4200 as the framed target, `entryPath`, the `index.html`
   `<base>` rebase, `proxy.conf.js`) and spa-observability. The guide is the *user-facing,
   current-state* rewrite.
-- **Documents the contracts of** [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md),
-  [daemon web-view configuration](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md),
-  [daemon log observation](../../qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md),
+- **Documents the contracts of** [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md),
+  [daemon web-view configuration](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md),
+  [daemon log observation](../../qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md),
   [observability](../../qits-observability/features/2026-07-04_observability.md),
   [spa-observability](../../qits-observability/features/2026-07-06_spa-observability.md), and the repo-shape signals of the
   [framework-aware file browser](../../qits-workspace-detail/features/2026-07-03_framework-aware-file-browser.md) — no code
@@ -95,7 +95,7 @@ agent. A stock starter already has the first two; the rest is additive.
 window). Verify: daemon reaches READY, restart survives.
 
 **Tier 2 — web view.** The base contract from the app's side, per
-[daemon web-view configuration](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md):
+[daemon web-view configuration](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md):
 `webView {port: 4200, entryPath}`, `ng serve --host 0.0.0.0 --serve-path "$QITS_PUBLIC_BASE"` in
 `package.json`, the `index.html` runtime `<base>` rebase (Angular 21's dev server has no
 `--base-href`), `proxy.conf.js` forwarding the based `api/` path to the backend, base-relative
@@ -186,7 +186,7 @@ the fixture.
   prerequisite; the automation is its own idea once the guide has been exercised manually.
 - **Machine-checking the contract** — a preflight probe ("does the daemon serve under
   `$QITS_PUBLIC_BASE`? does `/api/config.json` answer?") overlaps the
-  [daemon-healthchecks](../../qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) idea's territory; the guide documents, the probe
+  [daemon-healthchecks](../../qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) idea's territory; the guide documents, the probe
   idea verifies.
 - **A starter template repo** (pre-integrated archetype to clone instead of a guide to follow) —
   attractive, but it rots silently; the guide + fixture pairing keeps the contract reviewable.

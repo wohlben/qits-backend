@@ -23,7 +23,7 @@ Related/dependent plans:
 - **Extends the [workspace detail tab row](2026-07-09_workspace-detail-tab-regrouping.md)**:
   the Agents tab (today only the [LSP plugins list](../../qits-coding-agents/features/2026-07-07_agent-lsp-plugins.md))
   gains the session as its primary section; Plugins stays below it.
-- **Reuses the [tmux-backed](../../qits-workspace-daemons/features/2026-07-05_tmux-backed-daemons.md) terminal plumbing**:
+- **Reuses the [tmux-backed](../../qits-workspace-services/features/2026-07-05_tmux-backed-daemons.md) terminal plumbing**:
   `WebTerminalComponent` attach-by-`commandId` (re-attach replays scrollback, detach keeps the
   process running) is unchanged.
 - **Coexists with [workspace chat](2026-07-04_workspace-chat-dialog.md)**: chat keeps

@@ -1,5 +1,15 @@
 # Daemon-run bootstrap chain
 
+> **Implemented 2026-07-23.** The daemon runs the bootstrap chain (install/migrate/seed) itself,
+> from its in-container `.qits-config.yml` (Part 2), between the self-clone and daemon start — the
+> host no longer `docker exec`s each command. Each step runs its optional `check` (non-zero ⇒
+> SKIPPED) then `execute`; the chain fail-fast-aborts and ends with a terminal `Bootstrapped{ok}`
+> the host awaits. `WorkspaceBootstrapRunner` became a thin **awaiter**: it records outcomes, settles
+> the `bootstrap:<name>` process segments, and gates daemon auto-start on `ok` (still the only firer
+> of `WorkspaceReadyForDaemons`). **Bootstrap steps run in-container now, so they leave no host
+> `Command` audit rows** — their live output is the process segment. See the code map at the end and
+> `docs/implementation-plan.md` Part 3.
+
 ## Introduction
 
 Part 3 of the **provisioning-inversion** track of [qits-workspace-daemon](../epic.md) (see the
@@ -92,3 +102,37 @@ started.
   chain completes (the qits-in-qits guarantee).
 - **`seed-webapp` regression** — the fixture's declared bootstrap still runs and the Build & Verify
   flow still works end-to-end.
+
+## Code map (as shipped)
+
+- **Protocol** (`workspace-daemon-protocol/.../protocol/`): `BootstrapStep{workspaceId, name,
+  phase(CHECK|EXECUTE|SKIP)}`, `BootstrapOutcome{workspaceId, name, outcome(SKIPPED|SUCCEEDED|FAILED),
+  exitCode}`, `Bootstrapped{workspaceId, ok}` (daemon → qits), `RunBootstrap{correlationId, name}`
+  (qits → daemon, manual re-run); `DaemonProtocol` `BOOTSTRAP_STEP`/`BOOTSTRAP_OUTCOME`/
+  `BOOTSTRAPPED`/`RUN_BOOTSTRAP` types + `NAME`/`PHASE`/`OUTCOME`/`OK` fields +
+  `BOOTSTRAP_CORRELATION_PREFIX` (`bootstrap:<name>` tags a step's streamed `CommandChunk`s); all four
+  added to the sealed `DaemonMessage` + `DaemonCodec` arms. `DaemonCodecTest` round-trips.
+- **Daemon** (`workspace-daemon/`): new `BootstrapRunner` (framework-free, forks `bash -lc` per step,
+  check→skip / execute, fail-fast, per-step timeout→terminate, streams `bootstrap:<name>` chunks +
+  emits the step/outcome/terminal messages). `ConfigReader.State` now retains the parsed
+  `DaemonQitsConfig` (not just its JSON) so the chain reads from it. `ControlSocket.startProvisioning`
+  runs the chain after config-read — **fresh clone only**, gated by
+  `QITS_WORKSPACE_DAEMON_BOOTSTRAP_AUTORUN`; `onFrame` handles `RunBootstrap`. `Provisioner.provision`
+  now returns a boolean so the daemon skips bootstrap on a failed provision. `BootstrapRunnerTest`
+  (real processes) locks order/skip/fail-fast/timeout/empty/single.
+- **Backend** (`service/.../workspacedaemonhost/`): `WorkspaceDaemonRegistry` implements a new
+  `WorkspaceBootstrapDriver` SPI — `awaitBootstrap` (the autonomous boot path) + `runBootstrap`
+  (manual). A registry-keyed `PendingBootstrap` **buffers step events + retains the terminal**, since
+  the autonomous chain can finish before the host's async observer registers its await;
+  `awaitProvision` clears any stale slot per cycle. `onMessage` routes
+  `BootstrapStep`/`BootstrapOutcome`/`Bootstrapped` + `bootstrap:*` chunks. New backend socket tests.
+- **Host domain** (`domain/`): new framework-free `WorkspaceBootstrapDriver` SPI (`Result`,
+  `StepSink`). `WorkspaceBootstrapRunner` rewired from host `docker exec`/`launchScriptAndAwait` to
+  awaiting the driver — a `RecordingSink` opens/settles `bootstrap:<name>` segments, records outcomes
+  (name↔DB-row by base name; `commandId` now null), fires BOOTSTRAP hints, and still owns firing
+  `WorkspaceReadyForDaemons` (gated on `ok`). `WorkspaceContainerFactory` injects the autorun env.
+- **Tests**: `FakeWorkspaceBootstrapDriver` (`@Mock`, domain + service `src/test`) plays the daemon's
+  chain through `FakeContainerRuntime`; the host `WorkspaceBootstrapRunnerTest`/controller tests keep
+  order/skip/fail-fast/gate/manual coverage (audit-row assertions dropped). Extended real-docker
+  `DaemonBootstrapIT` (`-Pextended`) boots a real container that runs its committed `.qits-config.yml`
+  chain in-daemon (one run, one check-skip) with no host `docker exec bash -lc`.

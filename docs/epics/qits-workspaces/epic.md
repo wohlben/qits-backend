@@ -31,7 +31,7 @@ own domain that **builds on** this one and gets (or will get) its own epic:
 - **The technical-process framing** of workspace start — carved out as
   [qits-technical-processes](../qits-technical-processes/epic.md) (see the Introduction link):
   the workspace lifecycle is this epic's, its streamed segment-by-segment framing is that epic's.
-- **Daemons** — carved out as [qits-workspace-daemons](../qits-workspace-daemons/epic.md)
+- **Daemons** — carved out as [qits-workspace-services](../qits-workspace-services/epic.md)
   (managed long-running processes coupled to workspace lifecycle).
 - **The coding agent & chat** — carved out as [qits-coding-agents](../qits-coding-agents/epic.md)
   (harness, stream-json chat, sessions, lineage, LSP plugins).
@@ -47,7 +47,7 @@ own domain that **builds on** this one and gets (or will get) its own epic:
   since they are the workspace container's own read capabilities; only the file-browser *UI*
   that renders them is [qits-workspace-detail](../qits-workspace-detail/epic.md)'s.)
 - **Already carved out**: the workspace-detail frontend above,
-  [qits-workspace-daemons](../qits-workspace-daemons/epic.md),
+  [qits-workspace-services](../qits-workspace-services/epic.md),
   [qits-coding-agents](../qits-coding-agents/epic.md),
   [qits-workspace-commands](../qits-workspace-commands/epic.md),
   [qits-feature-flows](../qits-feature-flows/epic.md),

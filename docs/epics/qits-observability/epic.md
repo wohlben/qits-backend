@@ -16,7 +16,7 @@ buffers, browser→backend OTLP passthrough + identity relay, and the semantic c
 enrichment of the spans, logs and metrics themselves. It deliberately does **not** own the
 surfaces that *produce for* or *consume* the pipeline:
 
-- **Delivery** stays in the [daemon domain](../qits-workspace-daemons/features/2026-07-04_daemons.md): a daemon's
+- **Delivery** stays in the [daemon domain](../qits-workspace-services/features/2026-07-04_daemons.md): a daemon's
   `otel` toggle injects `OTEL_EXPORTER_OTLP_*` at launch. This epic defines the endpoint those
   env vars point at; the daemon feature decides who gets pointed.
 - **Agent access** stays with the [coding-agent harness](../qits-coding-agents/features/2026-07-01_coding-agent-harness.md):

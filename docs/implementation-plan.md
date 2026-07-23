@@ -167,40 +167,46 @@ schema Part 5 partly dismantles.
 
 ---
 
-## Part 3 — [daemon-run-bootstrap-chain](epics/qits-workspace-daemon/feature-ideas/daemon-run-bootstrap-chain.md)
+## Part 3 — [daemon-run-bootstrap-chain](epics/qits-workspace-daemon/features/2026-07-23_daemon-run-bootstrap-chain.md) ✅ implemented 2026-07-23
 
 The bootstrap chain runs inside the daemon's startup, from the in-container config; ordering by
 construction.
 
 **Protocol**
-- [ ] `BootstrapStep { workspaceId, name, phase }`, `BootstrapOutcome { workspaceId, name, outcome,
+- [x] `BootstrapStep { workspaceId, name, phase }`, `BootstrapOutcome { workspaceId, name, outcome,
       exitCode }`, `Bootstrapped { workspaceId, ok }` (daemon → qits); `RunBootstrap { correlationId,
-      … }` (qits → daemon, manual re-run).
+      name }` (qits → daemon, manual re-run). Step output rides `CommandChunk` tagged
+      `bootstrap:<name>`.
 
 **Daemon binary**
-- [ ] Run the chain in file/`orderIndex` order from the Part-2 config: per command, optional `check`
-      (non-zero ⇒ SKIPPED, no run), else `execute` to completion via `CommandExecutor`; abort the rest
-      on first failure; generous timeout → terminate. Emit `BootstrapStep`/`BootstrapOutcome`, then
-      `Bootstrapped{ok}`. A failed chain **stops the sequence before daemons**.
+- [x] Run the chain in file order from the Part-2 config (`ConfigReader.State` now retains the parsed
+      `DaemonQitsConfig`): per command, optional `check` (non-zero ⇒ SKIPPED, no run), else `execute`
+      to completion (new `BootstrapRunner`, `ProcessBuilder`/`bash -lc`); abort the rest on first
+      failure; generous per-step timeout → terminate. Emit `BootstrapStep`/`BootstrapOutcome`, then
+      `Bootstrapped{ok}`. **Fresh clone only**, gated by `QITS_WORKSPACE_DAEMON_BOOTSTRAP_AUTORUN`. A
+      failed chain **stops the sequence before daemons** (host withholds ready).
 
 **Host wiring (`domain`)**
-- [ ] Retire the provision-time trigger of `WorkspaceBootstrapRunner`
-      (`domain/.../bootstrap/control/WorkspaceBootstrapRunner.java` `onContainerStarted`). Keep the
-      **outcome/log surface** (`BootstrapRunService.recordOutcome`, BOOTSTRAP SSE hints, the Bootstrap
-      tab, `TechnicalProcess` segments) fed from the socket events instead of host `docker exec`.
-- [ ] Collapse the `WorkspaceContainerStarted` → `WorkspaceReadyForDaemons` hinge: the daemon's
-      `Provisioned`→`Bootstrapped` progression now carries the ordering. Keep the streamed Start
-      verdict wiring.
-- [ ] Manual re-run (`runChainAsync`/`runSingleAsync`) becomes a `RunBootstrap` socket instruction.
+- [x] Retired the host-driven chain in `WorkspaceBootstrapRunner.onContainerStarted`: it now **awaits**
+      the daemon over a new `WorkspaceBootstrapDriver` SPI (registry-backed, event-buffering) and a
+      `RecordingSink` feeds `BootstrapRunService.recordOutcome`, the `bootstrap:<name>`
+      `TechnicalProcess` segments, and BOOTSTRAP hints from the socket events — no host `docker exec`.
+      Bootstrap steps no longer create host `Command` audit rows.
+- [x] Kept the `WorkspaceContainerStarted` → `WorkspaceReadyForDaemons` hinge (Part 3 keeps daemon
+      *start* host-side; Part 4 collapses it): the runner fires ready after `Bootstrapped{ok:true}`,
+      withholds on `ok:false`.
+- [x] Manual re-run (`runChainAsync`/`runSingleAsync`) sends a `RunBootstrap` socket instruction.
 
 **Tests**
-- [ ] Fake-client: ordered run, `check` skip, fail-fast abort, timeout-terminate, "failed chain ⇒ no
-      daemons" gate.
-- [ ] Ordering: daemons never start before the chain completes (the qits-in-qits build-guard
-      requirement — bootstrap before anything listens on `:8080`).
-- [ ] `seed-webapp` regression: the fixture's bootstrap runs; Build & Verify still works.
+- [x] Daemon `BootstrapRunnerTest` (real processes): ordered run, `check` skip, fail-fast abort,
+      timeout-terminate, empty, single. Backend `DaemonControlSocketTest`: await completes/streams,
+      failed-chain gate, pre-await retain/buffer, manual re-run. Host `FakeWorkspaceBootstrapDriver`
+      (`@Mock`) keeps `WorkspaceBootstrapRunnerTest`/controller order/skip/gate/manual coverage.
+- [x] "Failed chain ⇒ no daemons" gate + restart pass-through asserted at the host level.
+- [ ] `seed-webapp` regression + qits-in-qits ordering ride the extended real-docker path
+      (`DaemonBootstrapIT`, `-Pextended`) — added, self-skips without docker (not run here).
 
-**Docs move** → `features/2026-…_daemon-run-bootstrap-chain.md`; epic Status. Also note the absorbed
+**Docs move** → `features/2026-07-23_daemon-run-bootstrap-chain.md`; epic Status. Also note the absorbed
 `../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md`.
 
 ---

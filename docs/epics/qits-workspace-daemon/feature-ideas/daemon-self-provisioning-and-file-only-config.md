@@ -46,7 +46,7 @@ plus reading the socket. Steps 2–5 all happen **in-container, driven by the da
 2. **[in-container-config-discovery](in-container-config-discovery.md)** — the daemon reads/parses
    `.qits-config.yml` from the checkout (its own branch), making config workspace/branch-scoped. The
    pivot enabling file-as-truth.
-3. **[daemon-run-bootstrap-chain](daemon-run-bootstrap-chain.md)** — the bootstrap chain runs inside
+3. **[daemon-run-bootstrap-chain](../features/2026-07-23_daemon-run-bootstrap-chain.md)** — the bootstrap chain runs inside
    the daemon's startup, from the in-container config; ordering preserved by construction. Re-homes
    `WorkspaceBootstrapRunner`; absorbs [workspace-bootstrap-commands](../../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md).
 4. **[daemon-supervised-dev-daemons](daemon-supervised-dev-daemons.md)** — dev daemons start as the

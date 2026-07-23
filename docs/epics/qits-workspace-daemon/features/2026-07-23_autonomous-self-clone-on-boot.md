@@ -174,7 +174,7 @@ fallback (above).
 
 - On-demand git verbs (fetch / merge / push / head) — stay [Part 4](in-container-git-verbs-over-socket.md).
 - Reading/parsing `.qits-config.yml` — [next part](in-container-config-discovery.md).
-- Bootstrap and daemon start — [parts 3](daemon-run-bootstrap-chain.md) /
+- Bootstrap and daemon start — [parts 3](2026-07-23_daemon-run-bootstrap-chain.md) /
   [4](daemon-supervised-dev-daemons.md).
 - Scoped clone credential — [Part 6](mcp-termination-and-token-provisioning.md).
 

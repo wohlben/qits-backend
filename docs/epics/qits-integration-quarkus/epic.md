@@ -21,7 +21,7 @@ composes live in their own domains and are only *referenced* here:
 - **The OTEL half** — [qits-observability](../qits-observability/epic.md) (SPA-observability's
   `config.json` relay + OTLP passthrough).
 - **The SPA library** — [qits-integration-angular](../qits-integration-angular/epic.md).
-- **The dev-server / web-view mechanics** — [qits-workspace-daemons](../qits-workspace-daemons/epic.md)
+- **The dev-server / web-view mechanics** — [qits-workspace-services](../qits-workspace-services/epic.md)
   (web-view configuration) and the [qits-workspace-detail](../qits-workspace-detail/epic.md)
   web-view picker.
 

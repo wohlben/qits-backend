@@ -19,9 +19,9 @@ app. Concretely, this means **dropping the merge branch tree** (`mainline`/`behi
 Related/dependent plans (each is a target this integrates with):
 [framework-aware file browser](../../qits-workspace-detail/features/2026-07-03_framework-aware-file-browser.md),
 [smart file display](../../qits-workspace-detail/features/2026-07-03_workspace-smart-file-display.md),
-[daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md),
+[daemons](../../qits-workspace-services/features/2026-07-04_daemons.md),
 [daemon web-view picker](../../qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md),
-[daemon log observation](../../qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md),
+[daemon log observation](../../qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md),
 [observability](../../qits-observability/features/2026-07-04_observability.md),
 [actions](../../qits-feature-flows/features/2026-05-01_actions.md) / [feature-flows](../../qits-feature-flows/features/2026-05-01_feature-flows.md),
 [coding-agent harness](../../qits-coding-agents/features/2026-07-01_coding-agent-harness.md) /

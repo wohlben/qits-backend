@@ -12,7 +12,7 @@ Related plans:
 
 - **[observability](../../epics/qits-observability/features/2026-07-04_observability.md)** — the feature this is a gap in; the
   workspace telemetry tab is its UI surface.
-- **[daemon web-view configuration](../../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)** — the
+- **[daemon web-view configuration](../../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md)** — the
   work that surfaced this: opening the `seed-webapp` web view and posting a greeting is the natural
   way to generate telemetry, and the empty tab is what you see afterward. This issue is **not**
   caused by that change (the greeting POST reaches the fixture's Quarkus backend and produces a span

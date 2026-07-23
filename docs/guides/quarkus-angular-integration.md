@@ -172,7 +172,7 @@ by Maven. If the IDE still shows stale red, reload the window so the language se
 ## Tier 1 — the dev-server daemon
 
 Daemons are defined **per repository** and run **per workspace** (see
-[daemons](../epics/qits-workspace-daemons/features/2026-07-04_daemons.md)). Create the dev-server daemon:
+[daemons](../epics/qits-workspace-services/features/2026-07-04_daemons.md)). Create the dev-server daemon:
 
 ```bash
 curl -s -X POST http://localhost:8080/api/repositories/<repoId>/daemons \
@@ -225,7 +225,7 @@ dev server `:4200` — one process group, one `readyPattern`). If Angular dies o
 Quarkus stays up, the daemon still reads READY and the app is half-broken with no signal.
 Healthchecks close that gap: named probes qits runs on an interval **inside the workspace
 container**, each with its own green/red/grey dot beside the status chip. See
-[daemon healthchecks](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md).
+[daemon healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md).
 
 **qits-side only — no app changes.** Extend the daemon definition (full `PUT`, as always):
 
@@ -294,7 +294,7 @@ The trap tier. The daemon web view frames your app in an iframe served through q
 frame targets the **frontend dev server (`:4200`)** for HMR; the SPA's API calls travel
 base-relative through the ng dev-server proxy to Quarkus, which serves under the same prefix
 via `quarkus.http.root-path` (already in the Tier 1 startScript). Full design:
-[daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md).
+[daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md).
 
 ### App-side changes (five pieces, all required)
 
@@ -408,7 +408,7 @@ hot-reloads the frame; the *Pick element* DOM picker highlights and records a pi
 
 Daemon output is observed line-by-line; a rolling file gets you the full backend log even when
 `-q` quiets Maven. See
-[daemon log observation](../epics/qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md).
+[daemon log observation](../epics/qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md).
 
 **App-side** — `application.properties`:
 
@@ -710,10 +710,10 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
 
 ## Related documents
 
-- Features: [daemons](../epics/qits-workspace-daemons/features/2026-07-04_daemons.md) ·
-  [daemon healthchecks](../epics/qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md) ·
-  [daemon web-view configuration](../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) ·
-  [daemon log observation](../epics/qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md) ·
+- Features: [daemons](../epics/qits-workspace-services/features/2026-07-04_daemons.md) ·
+  [daemon healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) ·
+  [daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
+  [daemon log observation](../epics/qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md) ·
   [observability](../epics/qits-observability/features/2026-07-04_observability.md) ·
   [spa-observability](../epics/qits-observability/features/2026-07-06_spa-observability.md) ·
   [spa-telemetry-meta-enrichment](../epics/qits-observability/features/2026-07-11_spa-telemetry-meta-enrichment.md) ·

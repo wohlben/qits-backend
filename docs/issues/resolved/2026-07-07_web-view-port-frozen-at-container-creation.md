@@ -10,7 +10,7 @@ Related/dependent plans:
 
 - **Resolved by** [qits-net devcontainer unification](../../epics/qits-live-deployment/features/2026-07-07_qits-net-devcontainer-unification.md)
   — the feature that replaced host-port publishing with shared-network DNS addressing.
-- **Bug in** [daemon web-view configuration](../../epics/qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) /
+- **Bug in** [daemon web-view configuration](../../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) /
   [daemon web-view picker](../../epics/qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md) — those shipped the
   create-time publishing model this issue was inherent to.
 - Same-family networking issues:

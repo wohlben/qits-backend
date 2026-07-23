@@ -24,7 +24,7 @@ Related plans it exists to demo:
 - **[Workspace containers](../../qits-workspaces/features/2026-07-04_workspace-containers.md)** /
   **[disposable workspace containers](../../qits-workspaces/features/2026-07-04_disposable-workspace-containers.md)** — a workspace
   clones a branch into a container and runs things; `hello.txt` runs nothing, this app does.
-- **[Daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md)** + the **[daemon web-view picker](../../qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md)**
+- **[Daemons](../../qits-workspace-services/features/2026-07-04_daemons.md)** + the **[daemon web-view picker](../../qits-workspace-detail/features/2026-07-05_daemon-webview-picker.md)**
   — need a long-running dev server serving a real page (`./mvnw quarkus:dev`).
 - **[Actions / feature-flows](../../qits-feature-flows/features/2026-05-01_actions.md)** — "build"/"test"/"run" steps need something
   buildable and testable.

@@ -6,7 +6,7 @@ Part 5 of the **provisioning-inversion** track of [qits-workspace-daemon](../epi
 [overview](daemon-self-provisioning-and-file-only-config.md)). This is the **host-side inversion of
 the config model**. With the daemon now reading config
 [in-container from the checkout](in-container-config-discovery.md) and self-running
-[bootstrap](daemon-run-bootstrap-chain.md) + [daemons](daemon-supervised-dev-daemons.md), the host's
+[bootstrap](../features/2026-07-23_daemon-run-bootstrap-chain.md) + [daemons](daemon-supervised-dev-daemons.md), the host's
 DB config store has no remaining reader — so it is **removed**. The committed `.qits-config.yml`
 becomes the authoritative, **workspace-scoped** configuration store; there is no UI-only config and
 no DB-persisted config that outlives the file.
@@ -27,7 +27,7 @@ repo-level DB config store, its reconciler, its MCP surface, and its feature-flo
   model in [Part 6](config-write-back-from-ui.md); its deferred "branch-divergent config" follow-up
   is resolved for free by the in-container read.
 - **Hard dependency** — [Part 2](in-container-config-discovery.md) (the in-container read must be the
-  live source before the DB store can be dropped), [Part 3](daemon-run-bootstrap-chain.md), and
+  live source before the DB store can be dropped), [Part 3](../features/2026-07-23_daemon-run-bootstrap-chain.md), and
   [Part 4](daemon-supervised-dev-daemons.md) (the runners must already read from the checkout, not
   DB rows).
 - **Touches [qits-feature-flows](../../qits-feature-flows/epic.md)** — feature-flow support is
@@ -77,7 +77,7 @@ repo-level DB config store, its reconciler, its MCP surface, and its feature-flo
   (`listByRepositoryId`/`listEffective` collapse to global-only), `RepositoryDaemon` (entire entity
   + service + controller + `DaemonLifecycleCoupler` repo-level auto-start), `BootstrapCommand`
   (entire entity + service + controller + the retired provision-time runner from
-  [Part 3](daemon-run-bootstrap-chain.md)). A **Flyway migration drops** those tables/columns.
+  [Part 3](../features/2026-07-23_daemon-run-bootstrap-chain.md)). A **Flyway migration drops** those tables/columns.
 - **MCP**: `RepositoryMcpTools.listActions/runAction`, `ActionConfigurationMcpTools` repository
   tools.
 - **Feature-flow binding to config actions**: the project-scoped guard in

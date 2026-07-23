@@ -22,7 +22,7 @@ Related/dependent plans:
   [stream-json chat](2026-07-01_stream-json-chat.md) protocol are what run inside the container; the
   registry still owns stdin/stdout, so [persistent chat sessions](2026-07-04_persistent-chat-sessions.md),
   the [workspace chat dialog](../../qits-workspace-detail/features/2026-07-04_workspace-chat-dialog.md), and transcript restore are unchanged.
-- The [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md) agent-notification sink injects events by writing to the
+- The [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md) agent-notification sink injects events by writing to the
   chat's stdin (`CommandRegistry.chatSend`) — that stdin is a `docker exec -i` pipe, unchanged by
   this phase. Daemon and agent share the same container, so "the dev server the agent just broke" is
   reachable at `localhost` from the agent's shell.

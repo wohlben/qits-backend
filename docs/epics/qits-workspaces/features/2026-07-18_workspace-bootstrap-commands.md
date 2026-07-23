@@ -3,7 +3,7 @@
 ## Introduction
 
 A freshly provisioned workspace container is a bare checkout: dependencies not installed, demo
-data not seeded, nothing built. Daemons ([auto-start](../../qits-workspace-daemons/features/2026-07-09_daemon-autostart-on-workspace-start.md))
+data not seeded, nothing built. Daemons ([auto-start](../../qits-workspace-services/features/2026-07-09_daemon-autostart-on-workspace-start.md))
 already couple *long-running processes* to the container lifecycle, but there is no counterpart
 for *one-shot bootstrap work* — the `pnpm install`, `./mvnw install`, database-migrate,
 fixture-seed steps that must complete **once, in order, before development (and the dev-server
@@ -30,7 +30,7 @@ Related/dependent plans:
   the hook point is `WorkspaceService.provisionContainer` (fresh `docker run` + clone + submodule
   wiring); like daemon auto-start, bootstrap triggers off the *container* lifecycle, so workspace
   *creation* stays rows-only.
-- **Sibling of [daemon auto-start](../../qits-workspace-daemons/features/2026-07-09_daemon-autostart-on-workspace-start.md)** —
+- **Sibling of [daemon auto-start](../../qits-workspace-services/features/2026-07-09_daemon-autostart-on-workspace-start.md)** —
   same `WorkspaceContainerStarted` event chain (`WorkspaceContainerEventPublisher` →
   `DaemonLifecycleCoupler`), but bootstrap must run **before** auto-start, so the coupling order
   is the core design point (below). The entity/UI shape also mirrors `RepositoryDaemon`'s

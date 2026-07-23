@@ -14,8 +14,8 @@ registered as a repository on a dev/prod qits deployment — framed web view, br
 telemetry flowing to the supervising qits, capture button included. The registration recipe is
 [docs/guides/qits-in-qits-registration.md](../../../guides/qits-in-qits-registration.md).
 
-Related/dependent plans: [daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md) ·
-[daemon web-view configuration](../../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md) ·
+Related/dependent plans: [daemons](../../qits-workspace-services/features/2026-07-04_daemons.md) ·
+[daemon web-view configuration](../../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
 [observability](../../qits-observability/features/2026-07-04_observability.md) (the in-process OTLP receiver this feature tees) ·
 [spa-feature-capture](../../qits-integration-angular/features/2026-07-14_spa-feature-capture.md) ·
 [capture-state-snapshot](../../qits-integration-angular/features/2026-07-14_capture-state-snapshot.md) ·

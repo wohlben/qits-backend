@@ -19,8 +19,8 @@ reads through), [backend framework detection](../qits-workspaces/features/2026-0
 the chat/agent backends ([stream-json chat](../qits-coding-agents/features/2026-07-01_stream-json-chat.md),
 [persistent sessions](../qits-coding-agents/features/2026-07-04_persistent-chat-sessions.md),
 [session lineage](../qits-coding-agents/features/2026-07-10_agent-session-lineage.md)), the
-[daemon domain](../qits-workspace-daemons/features/2026-07-04_daemons.md) (incl.
-[web-view configuration](../qits-workspace-daemons/features/2026-07-06_daemon-webview-configuration.md)), and the
+[daemon domain](../qits-workspace-services/features/2026-07-04_daemons.md) (incl.
+[web-view configuration](../qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md)), and the
 [observability pipeline](../qits-observability/features/2026-07-04_observability.md) the Telemetry tab renders.
 Likewise, **a tab that is another epic's deliverable stays in that epic**: the CI tab is
 [qits-userflows](../qits-userflows/epic.md) part 3.

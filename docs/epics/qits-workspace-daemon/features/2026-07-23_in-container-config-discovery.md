@@ -44,7 +44,7 @@ bootstrap → daemons), self-initiated after the clone completes. qits is not in
   `QitsConfig` record tree are unchanged as a *format*. What changes is *where* it is read (checkout,
   not bare origin) and that it is **no longer reconciled into DB rows** (that removal is
   [Part 5](config-as-single-source-of-truth.md)).
-- **Feeds [daemon-run-bootstrap-chain](daemon-run-bootstrap-chain.md) and
+- **Feeds [daemon-run-bootstrap-chain](2026-07-23_daemon-run-bootstrap-chain.md) and
   [daemon-supervised-dev-daemons](daemon-supervised-dev-daemons.md)** — the in-container config is
   the source those two steps run from.
 - **Enables [config-as-single-source-of-truth](config-as-single-source-of-truth.md)** — the read
@@ -72,7 +72,7 @@ bootstrap → daemons), self-initiated after the clone completes. qits is not in
 ## Non-goals
 
 - Removing the host DB config store — [Part 5](config-as-single-source-of-truth.md).
-- Running bootstrap/daemons — [parts 3](daemon-run-bootstrap-chain.md) /
+- Running bootstrap/daemons — [parts 3](2026-07-23_daemon-run-bootstrap-chain.md) /
   [4](daemon-supervised-dev-daemons.md).
 - Write-back from the UI — [Part 6](config-write-back-from-ui.md).
 - Changing the YAML schema — the format is unchanged.

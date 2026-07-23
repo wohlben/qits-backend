@@ -50,7 +50,7 @@ Angular dev proxies), built-in auto-reconnect in `EventSource`, and native Quark
 
 Related/dependent plans:
 
-- **[daemons](../../qits-workspace-daemons/features/2026-07-04_daemons.md) / [daemon-log-observation-expansion](../../qits-workspace-daemons/features/2026-07-04_daemon-log-observation-expansion.md)**
+- **[daemons](../../qits-workspace-services/features/2026-07-04_daemons.md) / [daemon-log-observation-expansion](../../qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md)**
   — the two biggest poll consumers. `DaemonSupervisor` flips in-memory instance status;
   `DaemonEventService.publish()` persists event rows ("the DB is the feed"). Both get a one-line
   hint-fire added at their existing mutation points; the DB stays the feed — hints only say
@@ -67,7 +67,7 @@ Related/dependent plans:
   streams over WebSocket; what polls is the **discovery** query (`['commands']` @5s in
   `workspace-chat.component.ts`) that finds the newest running chat session to attach to. A
   command-lifecycle hint replaces that poll.
-- **[daemon-healthchecks](../../qits-workspace-daemons/features/2026-07-10_daemon-healthchecks.md)** (idea) — plans to ride "the workspace poll
+- **[daemon-healthchecks](../../qits-workspace-services/features/2026-07-10_daemon-healthchecks.md)** (idea) — plans to ride "the workspace poll
   (3s/5s)" for its health dots. If this lands first, healthcheck state flips become another hint
   topic and the dots go live-on-change instead.
 - **[mutiny-reactive-programming](../../../technical/examples/mutiny-reactive-programming.md)** — the
