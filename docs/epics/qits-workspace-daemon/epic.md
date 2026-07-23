@@ -135,17 +135,41 @@ Ordered by dependency; each removes its slice of the docker-CLI surface.
   runs the periodic/maintenance work locally (checkpoint push, straggler reaping, cache
   hygiene, health probes) on socket instruction instead of host-scheduled `docker exec`.
 
-### Cross-cutting evolution (candidate to restructure the later parts)
+### Provisioning-inversion track (reframes Parts 4/5; chosen: autonomous / option 1)
+
+Instead of qits driving clone/bootstrap/daemon-start over the socket verb by verb (Parts 4+5), the
+daemon **self-provisions from its start-time env** (`QITS_WORKSPACE_DAEMON_*`, already shipped in
+Part 1): on boot it clones `/workspace`, reads `.qits-config.yml` **from the checkout**, runs
+bootstrap, and starts the dev daemons — **autonomously**. It also inverts the config source-of-truth
+(the committed file becomes authoritative and **workspace-scoped**; the UI writes back to it; the
+host DB config store is **removed**, not kept as a projection). This is the resolved *daemon-autonomous*
+control model (not qits-instructed), so it **reframes Parts 4 and 5** rather than slotting beside
+them — the initial clone leaves Part 4 (now autonomous), and Part 5's supervision handover becomes
+autonomous-triggered. It is kept **under this epic** (not spun into a separate one): the mega-draft
+was split into six dependency-ordered feature-ideas.
 
 - **[daemon-self-provisioning-and-file-only-config](feature-ideas/daemon-self-provisioning-and-file-only-config.md)**
-  — instead of qits driving clone/bootstrap/daemon-start over the socket verb by verb (Parts 4+5),
-  the daemon **self-provisions from its start-time env** (`QITS_WORKSPACE_DAEMON_*`, already shipped
-  in Part 1): on boot it clones `/workspace`, reads `.qits-config.yml` **from the checkout**, runs
-  bootstrap, and starts the dev daemons — autonomously. It also inverts the config source-of-truth
-  (the committed file becomes authoritative; the UI writes back to it; the DB store degrades to a
-  derived projection). This is a *different control model* (daemon-autonomous vs qits-instructed)
-  than Parts 4/5 assume, so it's tracked as a candidate to **reframe those parts** — or spin its own
-  epic — rather than a slot-in part. Read it before designing Parts 4/5.
+  — the **overview / index** (vision diagram, the autonomous decision, the settled config
+  scope-decisions).
+- The six parts, in build order:
+  1. **[autonomous-self-clone-on-boot](feature-ideas/autonomous-self-clone-on-boot.md)** (absorbs the
+     clone piece of Part 4).
+  2. **[in-container-config-discovery](feature-ideas/in-container-config-discovery.md)** (`.qits-config.yml`
+     read from the checkout — the file-as-truth pivot).
+  3. **[daemon-run-bootstrap-chain](feature-ideas/daemon-run-bootstrap-chain.md)** (re-homes
+     `WorkspaceBootstrapRunner`; absorbs
+     [workspace-bootstrap-commands](../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)).
+  4. **[daemon-supervised-dev-daemons](feature-ideas/daemon-supervised-dev-daemons.md)** (autonomous
+     reframing of **Part 5**).
+  5. **[config-as-single-source-of-truth](feature-ideas/config-as-single-source-of-truth.md)**
+     (host-side removal of the repo-scoped config/DB/MCP/feature-flow surface; reverses
+     [`.qits-config` in-repo configuration](../qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md)).
+  6. **[config-write-back-from-ui](feature-ideas/config-write-back-from-ui.md)** (UI writes edits into
+     the file; uses the [Part 3](feature-ideas/container-file-access-over-socket.md) transport).
+
+The step-by-step build order across all six is in
+**[`docs/implementation-plan.md`](../../implementation-plan.md)**. Read this track before designing
+Parts 4/5.
 
 ### Terminal condition (eventual, tracked here — not its own part yet)
 
@@ -163,3 +187,6 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
   passes unchanged; `workspace-daemon` ships dark (holds the socket open, migrates no `docker exec` call
   site). See [the feature](features/2026-07-22_workspace-daemon-binary-and-control-socket.md).
 - Parts 2–7 — **drafts, parked.** Out of scope; now unblocked by Part 1.
+- **Provisioning-inversion track (reframes Parts 4/5)** — **planned (2026-07-23).** The mega-draft was
+  split into six dependency-ordered feature-ideas (autonomous / option 1); the step-by-step build
+  order lives in [`docs/implementation-plan.md`](../../implementation-plan.md). No code yet.

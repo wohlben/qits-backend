@@ -1,12 +1,20 @@
 # In-container git verbs over the `workspace-daemon` socket
 
+> **Partly superseded — the initial clone is now owned by
+> [autonomous-self-clone-on-boot](autonomous-self-clone-on-boot.md)** (the provisioning-inversion
+> track's Part 1, autonomous / option 1). The daemon self-clones `/workspace` + wires submodules
+> from its start-time env on boot, so the clone is no longer a qits-instructed verb. This Part 4
+> keeps the **on-demand** verbs (fetch / ff-merge / push / `rev-parse HEAD` / submodule-wire),
+> qits-instructed over the socket. See the [overview](daemon-self-provisioning-and-file-only-config.md).
+
 ## Introduction
 
 Part 4 of [qits-workspace-daemon](../epic.md). **Out of scope until
-[Part 1](workspace-daemon-binary-and-control-socket.md) lands.** Delegates the workspace-local git verbs —
-fetch, ff-only merge of the parent, push, `rev-parse HEAD`, submodule wiring, and the initial
-clone — from host-side `docker exec git …` to `workspace-daemon`, which runs them in-container against
-`/workspace` and reports results over the socket.
+[Part 1](../features/2026-07-22_workspace-daemon-binary-and-control-socket.md) lands** (shipped
+2026-07-22). Delegates the workspace-local git verbs — fetch, ff-only merge of the parent, push,
+`rev-parse HEAD`, submodule wiring (and, historically, the initial clone — now autonomous, see the
+banner above) — from host-side `docker exec git …` to `workspace-daemon`, which runs them
+in-container against `/workspace` and reports results over the socket.
 
 Related/dependent plans:
 

@@ -1,152 +1,286 @@
-# Implementation plan: sketch/image prompt attachments via MCP prompt delivery
+# Implementation plan — provisioning inversion + `.qits-config.yml` as single source of truth
 
-Ordering for the three plans that together let a user attach a drawing (or any image) to the
-coding agent, delivered to every launch shape — including the must-have interactive PTY session —
-by having the agent **fetch** its prompt over MCP rather than being pushed it.
+A step-by-step build order for the **provisioning-inversion track** of the
+[qits-workspace-daemon epic](epics/qits-workspace-daemon/epic.md). The design is split across six
+dependency-ordered feature-ideas (overview:
+[daemon-self-provisioning-and-file-only-config](epics/qits-workspace-daemon/feature-ideas/daemon-self-provisioning-and-file-only-config.md)).
+Build in the order below; each part is independently reviewable and, on completion, moves its
+feature-idea to `features/YYYY-MM-DD_*.md` and flips the epic Status.
 
-The chain is a hard dependency line: the persisted prompt draft *is* what the agent fetches, and
-the sketch is one source of the attachments that ride that draft.
+## Ground rules (apply to every part)
 
-- [refresh-resilient-prompt-building](epics/qits-workspace-detail/feature-ideas/refresh-resilient-prompt-building.md)
-- [mcp-task-prompt-delivery](epics/qits-coding-agents/feature-ideas/mcp-task-prompt-delivery.md)
-- [sketch-tab-and-image-prompt-attachments](epics/qits-workspace-detail/feature-ideas/sketch-tab-and-image-prompt-attachments.md)
+- **Autonomous control model (option 1).** The daemon self-initiates provisioning from its injected
+  `QITS_WORKSPACE_DAEMON_*` env (`WorkspaceContainerFactory.java:182`). qits does not issue per-step
+  clone/bootstrap/daemon instructions for *first* provisioning; it awaits socket events. qits issues
+  only *subsequent* on-demand operations.
+- **Degradation contract.** Socket down (stale image, no `Hello`) ⇒ **exactly today's behaviour**:
+  each migrated call site keeps its `docker exec` fallback until that verb is retired. Enforce
+  structurally via `WorkspaceDaemonLiveness.isDaemonLive(workspaceId)` + a bounded await.
+- **Protocol changes are compiler-enforced on both sides.** A new verb = a `DaemonMessage` record +
+  `permits` entry + `DaemonProtocol.Type`/`Field` constant + `DaemonCodec.encode`/`decode` arm. Both
+  `switch`es are exhaustive over the sealed type, so the compiler forces both the `service` (Jackson)
+  and `workspace-daemon` (Vert.x `JsonObject`) sides. Files:
+  `workspace-daemon-protocol/src/main/java/eu/wohlben/qits/workspacedaemon/protocol/`.
+- **Backend send/await pattern.** New qits→daemon verbs mirror `WorkspaceDaemonRegistry.runCommand`
+  (`service/.../workspacedaemonhost/WorkspaceDaemonRegistry.java`): generate a correlationId, register
+  a pending future on the `DaemonConnection`, `sendTextAndAwait(codec.encode(msg))`, complete on the
+  correlated reply arm in `onMessage`.
+- **In-container work uses CLI `git`/`ProcessBuilder`, not JGit** — the `workspace-daemon` module
+  deliberately excludes `domain` (native-image leanness). Build on `CommandExecutor`
+  (`workspace-daemon/.../CommandExecutor.java`) and `WorkspaceDescriber` (CLI `git status`).
+- **Never exit the daemon on failure** — the Part-1 invariant (`ControlSocket` reconnect/idle).
+  Provisioning failures surface as socket events (`ProvisionFailed`, `Bootstrapped{ok:false}`), not
+  process exit.
+- **The `workspace-daemon` binary is native-compiled** (`docker/qits/Dockerfile` `workspace-daemon-build`
+  stage). Any new daemon dependency must be native-image-safe; on a ≤4 GiB builder pass
+  `-Dquarkus.native.additional-build-args=--parallelism=1`.
 
-The mechanism the whole chain rests on — an MCP tool result carrying mixed text + image content,
-rendered to the model in both `-p` and the interactive TUI — is proven (throwaway spike run
-2026-07-20, documented in the feature-ideas above; no committed test kept — the committed IT lands
-against the real Java `taskPrompt` tool in step 4). There is no research risk left to retire before
-step 1.
+---
 
-## Steps
+## Part 1 — [autonomous-self-clone-on-boot](epics/qits-workspace-daemon/feature-ideas/autonomous-self-clone-on-boot.md)
 
-### 1. `refresh-resilient-prompt-building` — draft persistence backend
+The daemon clones `/workspace` + wires submodules from its env on boot; the host stops driving the
+clone and awaits `Provisioned`.
 
-`WorkspacePromptDraft` entity + Flyway migration + `GET/PUT/DELETE …/prompt-draft`, carrying the
-opaque composition blob **and** the server-readable `serializedPrompt` column. This is the
-foundation everything else reads, and it already delivers standalone user value (refresh survival
-for prompt text, picks, and references). No dependency on anything below.
+**Protocol**
+- [ ] Add `Provisioned { workspaceId, head }` and `ProvisionFailed { workspaceId, message }`
+      (daemon → qits). Optionally `ProvisionRequest { correlationId, submoduleClosure }` (qits →
+      daemon) if the submodule edge closure is handed over rather than discovered in-container.
+- [ ] Reuse `RunCommand`/`CommandChunk`/`CommandExit` for the in-container `git clone`, or fork `git`
+      in a dedicated daemon `Provisioner` (a dedicated verb keeps clone output tagged for the `clone`
+      `TechnicalProcess` segment).
 
-### 2. `refresh-resilient-prompt-building` — attachment rows backend
+**Daemon binary (`workspace-daemon/`)**
+- [ ] In `ControlSocket.onConnected` (after `Hello`), off the event loop (worker pool), derive the
+      git-host URL from the dial-home URL host/port (`ws://qits:8080/…` → `http://qits:8080/git/<repoId>`)
+      and run `git clone --branch <branch> <url> /workspace`.
+- [ ] Reproduce `WorkspaceService.wireSubmodules`/`submoduleWiringCommands` semantics per level
+      (config `submodule.<name>.url` to the id-addressed child git-host URL, then non-recursive
+      path-scoped `submodule update --init`), capped at depth 10. Submodule closure source: **prefer
+      qits handing the imported-edge closure over the socket** (the daemon can't query
+      `repositorySubmoduleRepository`).
+- [ ] Emit `Provisioned{head}` on success (`git rev-parse HEAD`), `ProvisionFailed{message}` on
+      failure; stream clone output as `CommandChunk`/`DaemonLog`.
 
-`WorkspacePromptAttachment` entity + `POST/DELETE …/prompt-draft/attachments`, with the per-image
-cap and PNG/JPEG magic-byte sniff on ingest (the guardrails that moved here from the sketch doc's
-old dispatch section). Backend only, no UI yet — but this is what the MCP tool turns into image
-blocks.
+**Backend socket (`service/.../workspacedaemonhost/`)**
+- [ ] `WorkspaceDaemonRegistry`: handle inbound `Provisioned`/`ProvisionFailed`, completing a
+      `CompletableFuture<ProvisionResult> awaitProvisioned(workspaceId, timeout)`; expose the
+      submodule closure hand-off if used.
 
-### 3. `refresh-resilient-prompt-building` — frontend store + sync
+**Host wiring (`domain`)**
+- [ ] `WorkspaceService.provisionContainer` (`WorkspaceService.java:192`): after `containers.run`,
+      **if a client is/soon becomes live**, await `Provisioned` (feed the `clone` segment from socket
+      events) instead of running `containers.exec("git","clone",…)` + `wireSubmodules`. On
+      `ProvisionFailed`/timeout → `containers.rm` + `FAILED` (parity).
+- [ ] **Fallback branch**: no live client within the await ⇒ run today's host-driven clone +
+      `wireSubmodules` unchanged.
+- [ ] `WorkspaceContainerStarted` still fires after the checkout exists (now gated on `Provisioned`,
+      not the host clone returning).
 
-Workspace-scoped `PromptContextStore`, hydrate-on-load, debounced/coalesced autosave, SSE
-invalidation, `promptText` moved into the bucket. This completes and ships the whole
-refresh-resilience feature — worth landing as its own increment because it de-risks the store
-rework (the one deliberate behavior change: cross-workspace pick carry-over stops) before any
-agent wiring depends on it.
+**Tests**
+- [ ] `FakeContainerRuntime` (`domain`/`service`/`cli` `src/test`): a daemon-provisioned workspace
+      still yields the checkout the suite expects; assert no host `docker exec git clone`.
+- [ ] Degradation: no live client ⇒ host clone fallback, byte-for-byte argv for a submodule-free repo.
+- [ ] Extended real-docker IT (`-Pextended`): a real container self-clones a depth-2 submodule closure
+      (`submodule-super.git`) with no host `docker exec git`.
 
-### 4. `mcp-task-prompt-delivery` — the `taskPrompt` tool
+**Docs move** → `features/2026-…_autonomous-self-clone-on-boot.md`; epic Status.
 
-Tool bean on the existing `repository` MCP server + `TaskPromptToolFilter` (mirroring
-`TelemetryToolFilter`) + entry in `READ_ONLY_REPOSITORY_TOOLS`. Returns `serializedPrompt` as a
-text block plus the attachment rows as `ImageContent` blocks. Unit-testable with
-`quarkus-mcp-server-test`, no frontend needed — reads what steps 1–2 persist.
+---
 
-### 5. `mcp-task-prompt-delivery` — bootstrap-turn rewiring ✅ shipped 2026-07-20
+## Part 2 — [in-container-config-discovery](epics/qits-workspace-daemon/feature-ideas/in-container-config-discovery.md)
 
-The push→fetch switch in `AgentLaunchService`, per launch shape (interactive, chat, autonomous).
-Delivery is gated on a real persisted draft via a `deliverTaskPrompt` launch flag; autonomous
-(conflict resolution) was rewired to persist its prompt as the resolution workspace's draft + attach
-the `repository` MCP server. Added a monotonic `prompt_version` + `last_run_*` run-tracking on the
-draft (migration V38) so the Agents tab picks up an un-run draft exactly once, and a synchronous
-`flushNow()` before launch closes the same-tab autosave race. Acceptance gate: the extended
-`TaskPromptDeliveryIT` against the real `taskPrompt` tool (print + tmux-PTY nonce read-back). See the
-"Implementation notes (as shipped)" in the feature doc.
+The daemon reads/parses `.qits-config.yml` from the checkout (its own branch). Pivot to file-as-truth.
 
-### 6. `sketch-tab-and-image-prompt-attachments` — store slice + paste handler ✅ shipped 2026-07-20
+**Shared parser decision**
+- [ ] Decide the parser home (feature-idea "Shared parser location"): **prefer moving the
+      framework-free `QitsConfig` record tree + a SnakeYAML parse into a small shared module** both
+      `domain` and `workspace-daemon` depend on (must stay framework-free — degrade the entity-enum
+      references to strings or relocate them). Fallback: a self-contained parse in `workspace-daemon`.
 
-`images` slice (backed by the attachment rows from step 2), Chat-tab attachment rows, and the
-clipboard-paste handler. **Paste before the canvas** — it's the cheapest way to get a real image
-through the full pipeline and prove delivery end-to-end with any screenshot.
+**Protocol**
+- [ ] `ConfigView`/`ConfigDiscovered { workspaceId, actions[], daemons[], bootstrap[], warning? }`
+      (daemon → qits) — the parsed config surfaced for UI display + on-demand run. A `Describe`-style
+      request/reply.
 
-Implementation notes (as shipped):
+**Daemon binary**
+- [ ] After the Part-1 clone, read+parse `/workspace/.qits-config.yml`; absent/invalid ⇒ empty +
+      warning (never blocks). Hold the parsed config in-daemon for parts 3/4; answer `ConfigView`.
 
-- **New read path**: a `GET …/prompt-draft/attachments` endpoint returning each row's metadata **plus
-  `dataBase64`** (`WorkspacePromptAttachmentDataDto`; the byte-free `WorkspacePromptAttachmentDto`
-  stays the agent-facing shape). Forced by a config reality — image bytes can't live in the draft
-  blob (its 2 MiB cap < one encoded image at the 2 MiB attachment cap) — so thumbnails are restored
-  from the rows, not the blob. OpenAPI + the Angular client regenerated.
-- **`images` slice** on `PromptContextStore`, deliberately **orthogonal to the draft autosave**: not
-  serialized into `content`, not in `isEmpty`; patched directly (no `dirty`/`revision` churn). Managed
-  by `PromptDraftSyncService` via POST-on-attach / DELETE-on-remove + a `['workspace-prompt-attachments']`
-  GET-list query that hydrates on load and SSE-refetch. `clearAttachments()` (paired with `clear()`)
-  deletes the rows, covering the attachments-only case the draft-DELETE cascade would miss.
-- **Compose UX**: thumbnail Remove rows + a clipboard-`(paste)` handler (`shared/utils/image-attach.ts`
-  — downscale long-edge ≤ 1568 px, white-backfill, PNG-encode, strip prefix) on `speak-to-prompt`
-  (pre-launch) **and** `command-chat` (mid-session, gated on workspace context passed from
-  `workspace-chat`). Mid-session delivery is a **`taskPrompt` re-fetch nudge** appended to the outgoing
-  turn — no transport change, since `taskPrompt` reads the live rows (product decision: cover
-  mid-session too, not just launch).
-- **SSE**: attachment add/remove fire the existing `PROMPT_DRAFT` hint; the frontend invalidates both
-  the draft and attachments queries on that topic.
-- Tests: backend GET-list roundtrip; store slice (add/remove/setImages/label numbering/clear/switch,
-  no dirty bump); sync-service attach/hydrate/clearAttachments; `speak-to-prompt` + `command-chat` rows
-  + nudge; `image-attach` downscale math. Full suite green (backend + 506 frontend specs, lint clean).
+**Backend / host**
+- [ ] `WorkspaceDaemonRegistry.describeConfig(workspaceId)` → `ConfigView`; a workspace-detail read
+      path consumes it (replaces the DB-derived list once Part 5 lands).
 
-Post-review hardening (high-effort `/code-review`, all findings resolved):
+**Tests**
+- [ ] Parse parity vs `QitsConfigParser` on the `testing-repo-quarkus-angular` `.qits-config.yml`.
+- [ ] Branch divergence: a workspace on an edited branch reports the edited config; a `main` workspace
+      reports the original.
+- [ ] Empty/invalid file ⇒ green provision + expected warning.
 
-- **Data-loss fix**: `isPromptContextEmpty` now counts images, so clearing the prompt text with an
-  image attached PUTs (keeps the draft) instead of DELETE-cascading the attachment rows away. Same
-  fix un-hides the launch section for an images-only draft.
-- **Paste errors surfaced**: `onPaste` (both surfaces) catches a failed attach (oversize 413/encode)
-  and shows a message instead of swallowing it.
-- **Collision-free labels**: `nextImageLabel` numbers past the highest existing suffix, not the count.
-- **Attachment SSE split**: a dedicated `PROMPT_ATTACHMENTS` hint topic (not `PROMPT_DRAFT`), so a
-  prompt-text autosave no longer refetches image bytes or flickers a mid-POST thumbnail.
-- **Security**: `runAction` added to `ReadOnlyRepositoryToolFilter`'s mutating set (regression test in
-  `RepositoryMcpToolsTest`) — an unattended read-only run can no longer execute action scripts.
-- **Cleanups**: deleted the dead byte-free DTO + mapper; extracted the shared `prompt-draft` fetch
-  (`prompt-draft-query.ts`) used by the sync service and the Agents tab.
-- Two PLAUSIBLE step-5 delivery-model gaps (no-seed on undeliverable prompt; autonomous task loss on
-  unreachable MCP) got a diagnostic WARN and an issue doc
-  (`docs/issues/2026-07-20_fetch-model-prompt-delivery-robustness.md`); a full fix is deferred there.
+**Docs move** → `features/2026-…_in-container-config-discovery.md`; epic Status.
 
-### 7. `sketch-tab-and-image-prompt-attachments` — the Sketch tab itself ✅ shipped 2026-07-20
+---
 
-The atrament canvas + toolbar + "Attach to prompt". Deliberately last: by now the pipeline is
-proven, so this is pure compose-side UX.
+## Part 3 — [daemon-run-bootstrap-chain](epics/qits-workspace-daemon/feature-ideas/daemon-run-bootstrap-chain.md)
 
-Implementation notes (as shipped):
+The bootstrap chain runs inside the daemon's startup, from the in-container config; ordering by
+construction.
 
-- **`atrament` dependency** (the doc's pick — vanilla-JS canvas lib, no shipped types, so a minimal
-  `shared/types/atrament.d.ts` module declaration rides along).
-- **`WorkspaceSketchComponent`** (`pattern/workspace/workspace-sketch.component.ts`), standalone
-  OnPush, wraps atrament the way `web-terminal.component.ts` wraps xterm: grab the host `<canvas>`
-  via `viewChild`, init once in a one-shot `effect` guard, tear down in `ngOnDestroy`. Toolbar
-  (pen/eraser, three colours, three widths, undo, clear) is ours (`z-button` + Tailwind).
-  **Undo** is a `toDataURL` snapshot stack pushed on atrament's `strokeend` event (atrament has no
-  built-in undo). The canvas is white-backfilled, and "Attach to prompt" exports via
-  `canvas.toBlob` → the existing `blobToAttachment` (white background + downscale) →
-  `PromptDraftSyncService.attachImage(dataBase64, mime, 'sketch')` — the *same* path a pasted
-  screenshot takes, so no store/sync/backend change was needed (step 6 already wired the `'sketch'`
-  source). A defensive guard skips atrament init when the canvas has no 2D context (jsdom/tests).
-- **Tab wiring** (`workspace-detail.page.ts`): added `WorkspaceSketchComponent` to `imports`,
-  `['Sketch','sketch']` to `TAB_SLUG_BY_LABEL` (URL-pinned/shareable; the route matcher already
-  accepts any non-`wip` slug), and a `<z-tab label="Sketch">` after Files. The panel stays mounted
-  while hidden, so a half-finished drawing survives tab switches.
-- Tests: `workspace-sketch.component.spec.ts` (atrament mocked via `vi.hoisted`; jsdom canvas
-  stubbed) covers the toolbar state machine, undo/clear snapshot stack, the `'sketch'` attach call +
-  confirmation flash, surfaced attach errors, and teardown. `workspace-detail.page.spec.ts` tab-row
-  assertions updated. Full suite green (backend untouched; frontend 520 specs, lint clean).
+**Protocol**
+- [ ] `BootstrapStep { workspaceId, name, phase }`, `BootstrapOutcome { workspaceId, name, outcome,
+      exitCode }`, `Bootstrapped { workspaceId, ok }` (daemon → qits); `RunBootstrap { correlationId,
+      … }` (qits → daemon, manual re-run).
 
-Post-review hardening (high-effort `/code-review`):
+**Daemon binary**
+- [ ] Run the chain in file/`orderIndex` order from the Part-2 config: per command, optional `check`
+      (non-zero ⇒ SKIPPED, no run), else `execute` to completion via `CommandExecutor`; abort the rest
+      on first failure; generous timeout → terminate. Emit `BootstrapStep`/`BootstrapOutcome`, then
+      `Bootstrapped{ok}`. A failed chain **stops the sequence before daemons**.
 
-- **Undo baseline fix**: `pushSnapshot`'s cap evicted the blank baseline (`history[0]`) after 30
-  strokes, so undo could no longer reach a clean canvas — it now evicts the oldest *stroke* (index 1)
-  and keeps the baseline pinned (regression test added).
-- **Repaint race**: `undo()` advanced `history` synchronously but repainted via async `Image.onload`;
-  a `repaintSeq` generation stamp now makes a superseded repaint bail, so the last-requested snapshot
-  always wins (rapid double-undo can't leave the canvas out of sync with `history`).
-- **Single-encode export**: attach previously round-tripped `canvas.toBlob` → `blobToAttachment`
-  (decode + white-fill + re-encode); it now composites the canvas onto a white-backed export canvas
-  once (`exportSketch`, reusing the shared `scaledDimensions`/`stripDataUrlPrefix`), keeping the same
-  white-backfill + downscale result without the extra decode.
+**Host wiring (`domain`)**
+- [ ] Retire the provision-time trigger of `WorkspaceBootstrapRunner`
+      (`domain/.../bootstrap/control/WorkspaceBootstrapRunner.java` `onContainerStarted`). Keep the
+      **outcome/log surface** (`BootstrapRunService.recordOutcome`, BOOTSTRAP SSE hints, the Bootstrap
+      tab, `TechnicalProcess` segments) fed from the socket events instead of host `docker exec`.
+- [ ] Collapse the `WorkspaceContainerStarted` → `WorkspaceReadyForDaemons` hinge: the daemon's
+      `Provisioned`→`Bootstrapped` progression now carries the ordering. Keep the streamed Start
+      verdict wiring.
+- [ ] Manual re-run (`runChainAsync`/`runSingleAsync`) becomes a `RunBootstrap` socket instruction.
 
-The whole three-plan chain (steps 1–7) is now complete: a user can attach a drawing (or any image)
-to the coding agent, delivered to every launch shape via the `taskPrompt` MCP fetch.
+**Tests**
+- [ ] Fake-client: ordered run, `check` skip, fail-fast abort, timeout-terminate, "failed chain ⇒ no
+      daemons" gate.
+- [ ] Ordering: daemons never start before the chain completes (the qits-in-qits build-guard
+      requirement — bootstrap before anything listens on `:8080`).
+- [ ] `seed-webapp` regression: the fixture's bootstrap runs; Build & Verify still works.
+
+**Docs move** → `features/2026-…_daemon-run-bootstrap-chain.md`; epic Status. Also note the absorbed
+`../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md`.
+
+---
+
+## Part 4 — [daemon-supervised-dev-daemons](epics/qits-workspace-daemon/feature-ideas/daemon-supervised-dev-daemons.md)
+
+Dev daemons start as the tail of the daemon's startup, supervised in-container. Autonomous reframing
+of epic Part 5 (`daemon-supervision-handover.md`).
+
+**Protocol** (carried from Part 5 draft)
+- [ ] `StartDaemon { id, script, env }`, `SignalDaemon { id, signal }` (qits → daemon,
+      manual/subsequent); `DaemonEvent { id, state, exitCode }` + daemon log chunks (daemon → qits).
+      Auto-start needs no `StartDaemon` — the daemon self-starts the auto-start set from the Part-2
+      config.
+
+**Daemon binary**
+- [ ] Once `Bootstrapped{ok:true}`, start each auto-start dev daemon as a supervised **child of PID 1**
+      (no tmux): honour `restartPolicy`/`maxRestarts`/`stopSignal`/`readyPattern`; stream child logs
+      over the socket (`CommandChunk` tagged by daemon id); push `DaemonEvent` liveness/exit;
+      group-kill + reap escaped forks natively (no `/proc` scan). Re-report running daemons on
+      reconnect (replaces tmux `adoptIfRunning`).
+
+**Host wiring (`domain`)**
+- [ ] `DaemonSupervisor` (`domain/.../daemon/control/DaemonSupervisor.java`) → thin coordinator: state
+      machine, backoff, status/SSE events, segment settling, web-view proxy origin
+      (`resolveTarget`→`ProxyOrigin`→`DaemonProxyRoute`) fed by `DaemonEvent`; **falls back to tmux
+      `startDaemon`** when the socket is absent.
+- [ ] `DaemonLifecycleCoupler` (`onReadyForDaemons`) no longer drives auto-start via docker; keep the
+      stop coupling (`settleForWorkspace`) and `qits.daemons.*` knobs.
+
+**Tests**
+- [ ] Fake-client supervision: start/ready/crash/exit, log streaming, group-kill of a forked child.
+- [ ] Extended real-docker IT: `quarkus:dev` under the daemon; forked JVM reaped on stop **without**
+      `/proc`; web-view proxy resolves; adoption after a qits restart.
+
+**Docs move** → `features/2026-…_daemon-supervised-dev-daemons.md`; retire the Part-5 draft; epic
+Status.
+
+---
+
+## Part 5 — [config-as-single-source-of-truth](epics/qits-workspace-daemon/feature-ideas/config-as-single-source-of-truth.md)
+
+Host-side inversion: remove the repo-scoped DB config store + its MCP/feature-flow/UI surface. Only
+after parts 2–4 make the in-container read the live source.
+
+**Remove (`domain`/`service`)**
+- [ ] `QitsConfigReconciler` + its triggers in `RepositoryService.cloneOne`/`pullRepository` + the
+      `POST /repositories/{id}/config/reload` endpoint (`RepositoryController`). Keep `QitsConfig`/
+      `QitsConfigParser` only if reused by the shared parser (Part 2); otherwise delete the host copy.
+- [ ] Repo scope of `ActionConfiguration` (`listByRepositoryId`/`listEffective` → global-only;
+      `ActionResolutionService.effectiveActions` returns only code-based global actions — the seeded
+      `Bash` (`ActionConfigurationSeeder.java:36`) + the agent path). `RepositoryActionsController`
+      returns global-only (or is removed).
+- [ ] `RepositoryDaemon` (entity + `RepositoryDaemonService` + `RepositoryDaemonController` +
+      `DaemonLifecycleCoupler` repo-level query `findByRepositoryId`) and `BootstrapCommand` (entity +
+      service + controller). **Flyway migration drops** those tables/columns (`domain/.../db/migration`).
+- [ ] MCP: `RepositoryMcpTools.listActions/runAction` (`:251/:268`), `ActionConfigurationMcpTools`
+      repository tools.
+- [ ] Feature-flow binding to config actions: the project-scoped guard + `isActionBound` in
+      `FeatureFlowPhaseActionService.create`. Only code-based actions remain bindable.
+
+**Ids**
+- [ ] Adopt explicit string `id:` per declared entry (replaces `@qits-config` name-namespacing);
+      duplicate id = allowed user error. Update the parser + any `configName`/`baseName` usage.
+
+**UI**
+- [ ] Remove the repo-detail config-warning banner + "Reload config" button + Daemons/Bootstrap pages;
+      the repo Actions list shows only code-based actions. The workspace's config list comes from the
+      Part-2 `ConfigView`.
+
+**Tests / cross-copies**
+- [ ] Removal regressions (list, picker, endpoints/MCP absent); Flyway drop applies on a seeded DB.
+- [ ] Regenerate **both** `docs/openapi.yml` and `service/src/main/webui/openapi.yml` (see memory
+      `openapi-two-copies`) after controller removals; then `pnpm generate:api`; UI build green.
+- [ ] `seed-webapp` shrinks (no reconcile); assert Build & Verify binds code-based actions.
+
+**Docs move** → `features/2026-…_config-as-single-source-of-truth.md`; note the reversed
+`../qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md`; epic Status.
+
+---
+
+## Part 6 — [config-write-back-from-ui](epics/qits-workspace-daemon/feature-ideas/config-write-back-from-ui.md)
+
+The config UI writes edits back into `/workspace/.qits-config.yml` as a working-tree change (never an
+auto-commit). **Depends on the Part-3 file transport**
+([container-file-access-over-socket](epics/qits-workspace-daemon/feature-ideas/container-file-access-over-socket.md)) —
+land that (or its `ReadFile`/`WriteFile` verbs) first.
+
+**Daemon / backend**
+- [ ] Use the file-access verbs to read `/workspace/.qits-config.yml` for the form and write the
+      re-serialized file on save. No commit.
+
+**UI (`service/src/main/webui`)**
+- [ ] Flip the config cards/forms from read-only badge (`shared/utils/config-origin.ts`) to editable,
+      under the **workspace-detail** view: `ui/components/{action-configuration,daemon,bootstrap}/…`
+      cards + `pattern/{action-configuration,daemon,bootstrap}/…` forms. Serialize the form to YAML
+      (stable key order, `version: 1`, explicit ids preserved).
+
+**Tests**
+- [ ] Round-trip: UI edit → file written → daemon re-reads → config view reflects it, working tree
+      dirty, no commit.
+- [ ] Try-before-commit: edit a daemon `start`, re-run against the live container, new definition
+      takes effect pre-commit.
+- [ ] Browser/screenshot coverage for the editable affordance; both `openapi.yml` copies if the API
+      surface changes.
+
+**Docs move** → `features/2026-…_config-write-back-from-ui.md`; epic Status → track done.
+
+---
+
+## Cross-cutting risks / reminders
+
+- **Suite OOM (memory `quarkus-suite-oom-batching`)** — the full `domain`/`service` suites OOM
+  (exit 137) under the 4 GiB cgroup. Run in package batches with capped forks; don't run the whole
+  suite at once.
+- **OpenAPI two copies (memory `openapi-two-copies`)** — `docs/openapi.yml` and
+  `service/src/main/webui/openapi.yml` are separate committed copies; sync both (Part 5/6) before
+  `pnpm generate:api`. Regenerate via `./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest`.
+- **Never build the reactor while `quarkus:dev` runs** — the build guard fails at `pre-clean` if
+  `:8080` listens. Stop dev first (`pkill -f quarkus:dev; pkill -f 'target/.*-dev.jar'`).
+- **Native builder memory** — on ≤4 GiB, `-Dquarkus.native.additional-build-args=--parallelism=1`
+  for the `workspace-daemon-build` stage.
+- **Fixture round-trip is two-level** — `testing-repo-quarkus-angular`'s `.qits-config.yml` edits:
+  commit in the fixture repo → bump the `webui` gitlink → bump that gitlink in qits.
+- **`FakeContainerRuntime` in three modules** — keep the `domain`/`service`/`cli` `src/test` copies in
+  sync when the container/daemon seam changes.
+- **Extended ITs are opt-in** (`-Pextended`) and self-skip without docker + the `qits/workspace`
+  image; build the image first:
+  `docker build -t qits/workspace --target workspace -f docker/qits/Dockerfile .`

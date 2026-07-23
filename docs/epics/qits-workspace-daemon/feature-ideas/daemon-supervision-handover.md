@@ -1,9 +1,19 @@
 # Daemon supervision handover to `workspace-daemon`
 
+> **Superseded / merged by
+> [daemon-supervised-dev-daemons](daemon-supervised-dev-daemons.md)** — the provisioning-inversion
+> track's autonomous reframing of this handover. Instead of qits *instructing* the daemon to start
+> each dev daemon after the handshake, the daemon **starts the declared dev daemons itself, as the
+> tail of its own startup sequence**, from the in-container config. The re-homing described here
+> (launch / liveness / log mirroring / straggler reaping / group-kill move into PID 1;
+> `DaemonSupervisor` shrinks to a thin coordinator) is unchanged — only the *trigger* becomes
+> autonomous. Build from the superseding doc; this draft is kept for its message-shape and
+> knob-preservation notes. See the [overview](daemon-self-provisioning-and-file-only-config.md).
+
 ## Introduction
 
 Part 5 of [qits-workspace-daemon](../epic.md). **Out of scope until
-[Part 1](workspace-daemon-binary-and-control-socket.md) lands** (and best after
+[Part 1](../features/2026-07-22_workspace-daemon-binary-and-control-socket.md) lands** (and best after
 [Part 2](command-execution-over-socket.md), whose spawn/signal seam daemons build on). Moves the
 in-container half of [daemon](../../qits-workspace-daemons/epic.md) supervision — process launch,
 liveness, log mirroring, straggler reaping, and group-kill — from the host into `workspace-daemon`, which
