@@ -135,6 +135,18 @@ Ordered by dependency; each removes its slice of the docker-CLI surface.
   runs the periodic/maintenance work locally (checkpoint push, straggler reaping, cache
   hygiene, health probes) on socket instruction instead of host-scheduled `docker exec`.
 
+### Cross-cutting evolution (candidate to restructure the later parts)
+
+- **[daemon-self-provisioning-and-file-only-config](feature-ideas/daemon-self-provisioning-and-file-only-config.md)**
+  — instead of qits driving clone/bootstrap/daemon-start over the socket verb by verb (Parts 4+5),
+  the daemon **self-provisions from its start-time env** (`QITS_WORKSPACE_DAEMON_*`, already shipped
+  in Part 1): on boot it clones `/workspace`, reads `.qits-config.yml` **from the checkout**, runs
+  bootstrap, and starts the dev daemons — autonomously. It also inverts the config source-of-truth
+  (the committed file becomes authoritative; the UI writes back to it; the DB store degrades to a
+  derived projection). This is a *different control model* (daemon-autonomous vs qits-instructed)
+  than Parts 4/5 assume, so it's tracked as a candidate to **reframe those parts** — or spin its own
+  epic — rather than a slot-in part. Read it before designing Parts 4/5.
+
 ### Terminal condition (eventual, tracked here — not its own part yet)
 
 Once Parts 2–7 land, `DockerExecutor` shrinks to `run`/`start`/`stop`/`rm`/network; every
