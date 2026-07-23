@@ -11,8 +11,10 @@ feature-idea to `features/YYYY-MM-DD_*.md` and flips the epic Status.
 
 - **Autonomous control model (option 1).** The daemon self-initiates provisioning from its injected
   `QITS_WORKSPACE_DAEMON_*` env (`WorkspaceContainerFactory.java:182`). qits does not issue per-step
-  clone/bootstrap/daemon instructions for *first* provisioning; it awaits socket events. qits issues
-  only *subsequent* on-demand operations.
+  clone/bootstrap/daemon instructions for *first* provisioning; it **sends the daemon nothing** and
+  awaits socket events (`Provisioned`/`ProvisionFailed`, etc.). qits issues only *subsequent*
+  on-demand operations. **(Part 1 confirmed this literally: no `ProvisionRequest`, no closure
+  hand-off — the daemon discovers submodules in-container from `.gitmodules`.)**
 - **Degradation contract.** Socket down (stale image, no `Hello`) ⇒ **exactly today's behaviour**:
   each migrated call site keeps its `docker exec` fallback until that verb is retired. Enforce
   structurally via `WorkspaceDaemonLiveness.isDaemonLive(workspaceId)` + a bounded await.
@@ -58,11 +60,14 @@ consumer). See that feature-idea for the full design.
 
 ---
 
-## Part 1 — [autonomous-self-clone-on-boot](epics/qits-workspace-daemon/feature-ideas/autonomous-self-clone-on-boot.md)
+## Part 1 — [autonomous-self-clone-on-boot](epics/qits-workspace-daemon/features/2026-07-23_autonomous-self-clone-on-boot.md) ✅ implemented 2026-07-23
 
 The daemon clones `/workspace` (+ the name-addressed submodule walk — see **Part 0**) from its env on
-boot; the host stops driving the clone and awaits `Provisioned`. **Part 0 shrinks the hand-off** to a
-lighter imported-edge closure (no id→url map, no override for relative submodules).
+boot; the host stops driving the clone and awaits `Provisioned`. **As shipped, fully autonomous:** no
+`ProvisionRequest`/closure hand-off — the daemon discovers submodules in-container from `.gitmodules`
+(Part-0 name-addressing resolves them natively), and `WorkspaceContainerFactory` injects
+`QITS_WORKSPACE_DAEMON_PROJECT_ID`/`…_REPO_NAME` so the self-clone is name-addressed. The checklist
+below is retained as the record; the settled decisions live in the moved feature doc.
 
 **Protocol**
 - [ ] Add `Provisioned { workspaceId, head }` and `ProvisionFailed { workspaceId, message }`

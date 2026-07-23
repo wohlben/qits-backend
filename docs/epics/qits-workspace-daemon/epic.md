@@ -152,8 +152,8 @@ was split into six dependency-ordered feature-ideas.
   — the **overview / index** (vision diagram, the autonomous decision, the settled config
   scope-decisions).
 - The six parts, in build order:
-  1. **[autonomous-self-clone-on-boot](feature-ideas/autonomous-self-clone-on-boot.md)** (absorbs the
-     clone piece of Part 4).
+  1. **[autonomous-self-clone-on-boot](features/2026-07-23_autonomous-self-clone-on-boot.md)**
+     (**implemented 2026-07-23**; absorbs the clone piece of Part 4).
   2. **[in-container-config-discovery](feature-ideas/in-container-config-discovery.md)** (`.qits-config.yml`
      read from the checkout — the file-as-truth pivot).
   3. **[daemon-run-bootstrap-chain](feature-ideas/daemon-run-bootstrap-chain.md)** (re-homes
@@ -187,6 +187,12 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
   passes unchanged; `workspace-daemon` ships dark (holds the socket open, migrates no `docker exec` call
   site). See [the feature](features/2026-07-22_workspace-daemon-binary-and-control-socket.md).
 - Parts 2–7 — **drafts, parked.** Out of scope; now unblocked by Part 1.
-- **Provisioning-inversion track (reframes Parts 4/5)** — **planned (2026-07-23).** The mega-draft was
-  split into six dependency-ordered feature-ideas (autonomous / option 1); the step-by-step build
-  order lives in [`docs/implementation-plan.md`](../../implementation-plan.md). No code yet.
+- **Provisioning-inversion track (reframes Parts 4/5)** — **planned (2026-07-23)**, split into six
+  dependency-ordered feature-ideas (autonomous / option 1); build order in
+  [`docs/implementation-plan.md`](../../implementation-plan.md).
+  - **Part 1 — [autonomous-self-clone-on-boot](features/2026-07-23_autonomous-self-clone-on-boot.md)
+    — implemented (2026-07-23).** The daemon self-clones `/workspace` + materializes submodules on
+    boot from its injected env (no inbound message), reporting `Provisioned`/`ProvisionFailed`;
+    `provisionContainer` awaits it and falls back to the host clone when no daemon is live. New
+    `Provisioner` (daemon), `WorkspaceDaemonProvisioner`/`RepositoryNameResolver` (domain), the
+    registry's `awaitProvision`, and the `…_PROJECT_ID`/`…_REPO_NAME` env. Parts 2–6 still parked.
