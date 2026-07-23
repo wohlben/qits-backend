@@ -91,12 +91,19 @@ terminal event that beats the awaiter isn't lost.
 
 ## Degradation contract (socket-down ⇒ today's behaviour)
 
-A container from a **stale image** (built before Part 1) has no daemon, never sends `Hello`, and
-never sends `Provisioned`. `WorkspaceService.provisionContainer` must **fall back to the existing
-host-driven `docker exec git clone` + `wireSubmodules`** when no client is live for the workspace
-within a bounded wait (`WorkspaceDaemonLiveness.isDaemonLive` + a provisioned-await timeout). This
-keeps the epic invariant: *socket down ⇒ exactly today's behaviour*. The fallback path is deleted
-only when Part 4 retires the host-side git verbs entirely.
+> **Superseded by Part 2 (2026-07-23): the clone/provision fallback is retired.** Per the directive
+> that provisioning is the daemon's responsibility, `WorkspaceService.provisionContainer` no longer
+> falls back to a host-driven clone — the daemon is the **sole** provisioner. A stale, pre-daemon
+> image now **fails to provision** (`rm` + `FAILED`) instead of degrading, recoverable by rebuilding
+> the image. `hostDrivenClone` + the host-side `materializeSubmodules` walk (and the `cloneUrl` /
+> `RepositorySubmoduleRepository` wiring they used) are deleted. See
+> `2026-07-23_in-container-config-discovery.md` (Workstream B) and `docs/implementation-plan.md`.
+
+As originally shipped in Part 1: a container from a **stale image** (built before Part 1) has no
+daemon, never sends `Hello`, and never sends `Provisioned`. `WorkspaceService.provisionContainer`
+fell back to the host-driven `docker exec git clone` + submodule walk when no client became live
+within a bounded wait — keeping *socket down ⇒ exactly today's behaviour*. Part 2 removed that
+fallback (above).
 
 ## Design questions — resolved
 

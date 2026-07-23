@@ -1,5 +1,13 @@
 # In-container config discovery — `.qits-config.yml` read from the checkout
 
+> **Implemented 2026-07-23.** The daemon reads/parses `.qits-config.yml` from its own checkout and
+> answers an id-correlated `DescribeConfig`→`ConfigView` (config as `QitsConfig`-shaped JSON); the
+> backend exposes it via a framework-free `WorkspaceConfigReader` SPI (capability only — the UI/read
+> path rewire is Part 5). **Parser home = daemon-local (Option A):** no shared module; the daemon owns
+> a SnakeYAML parse (`ConfigParser` + `DaemonQitsConfig`), `domain`'s `QitsConfig`/`QitsConfigParser`
+> stay put until Part 5. This change **also retired the host provisioning fallback** (see *Workstream
+> B* at the end) — the daemon is now the sole provisioner. See `docs/implementation-plan.md` Part 2.
+
 ## Introduction
 
 Part 2 of the **provisioning-inversion** track of [qits-workspace-daemon](../epic.md) (see the
@@ -78,3 +86,45 @@ bootstrap → daemons), self-initiated after the clone completes. qits is not in
   model couldn't express.
 - **Empty / invalid** — a config-free branch and a malformed file both leave provisioning green with
   the expected empty/warning outcome.
+
+## Code map (as shipped)
+
+- **Protocol** (`workspace-daemon-protocol/.../protocol/`): `DescribeConfig` (qits → daemon) +
+  `ConfigView{workspaceId, correlationId, configJson, warning}` (daemon → qits); `DaemonProtocol`
+  `CONFIG_VIEW`/`DESCRIBE_CONFIG` types + `CONFIG_JSON`/`WARNING` fields; `DaemonCodec` arms; both
+  added to the sealed `DaemonMessage`. `configJson` is a JSON string whose keys match `QitsConfig`, so
+  `DaemonCodec` stays flat-string-only.
+- **Daemon** (`workspace-daemon/`): `DaemonQitsConfig` (framework-free record tree mirroring
+  `QitsConfig`, enum-ish fields as strings), `ConfigParser` (SnakeYAML `SafeConstructor`, ported from
+  `QitsConfigParser.parse`), `ConfigJson` (record → `JsonObject` with `QitsConfig` keys + non-null
+  collection defaults, hand-built — no Jackson databind in the native image), `ConfigReader` (file IO
+  + degrade-to-warning). `ControlSocket` reads the config right after the clone (`configState`), and
+  answers `DescribeConfig` on the worker pool. `snakeyaml` added to `workspace-daemon/pom.xml`.
+- **Backend** (`service/.../workspacedaemonhost/`): `WorkspaceDaemonRegistry.describeConfig` +
+  `readConfig` (implements the SPI; deserializes `configJson` → `QitsConfig`, surfaces the warning);
+  id-keyed `pendingConfigs`; `qits.workspace.config.describe-timeout-ms`.
+- **Domain SPI**: `WorkspaceConfigReader` + `WorkspaceConfigView(QitsConfig, warning)`.
+- **Tests**: daemon `ConfigParserTest` (output-shape lock + empty/invalid), `DaemonCodecTest`
+  round-trips, backend `readConfig` deserialize/warning/no-daemon in `DaemonControlSocketTest`. True
+  cross-boundary parity vs `QitsConfigParser` + branch-divergence ride the extended real-docker path.
+
+## Workstream B — the host provisioning fallback is retired
+
+A directive accompanying this part: **provisioning is the daemon's responsibility** — so the Part-1
+host-driven clone fallback is removed. `WorkspaceService.provisionContainer` now *always* awaits the
+daemon; a missing provisioner or a daemon that never dials home is a provision **FAILURE** (`rm` +
+`FAILED`), not a degradation to a host `docker exec git clone`.
+
+- **Deleted** (`domain/.../WorkspaceService.java`): `hostDrivenClone`, the host `materializeSubmodules`
+  walk + its `submoduleCheckedOut`/`gitlinkOnBranch`/`committedUrlIsRelative` helpers, `cloneUrl`,
+  `MAX_SUBMODULE_DEPTH`, and the now-dead `RepositorySubmoduleRepository`/`QitsHostResolver`/
+  `RepositoryNameResolver`/`qits-port` injections. `containerGit` stays (the on-demand fetch/merge/push
+  verbs). `WorkspaceDaemonProvisioner.awaitProvision` gained a leading `repoId` (the container key —
+  `workspaceId` alone repeats across repos).
+- **Test seam**: `FakeWorkspaceDaemonProvisioner` (a `@Mock`, in `domain` + `service` `src/test`; cli
+  never provisions) plays the daemon — clones the branch through `FakeContainerRuntime` and runs the
+  daemon's bounded `.gitmodules` walk (native resolution, per-submodule skip, **no DB import-scoping**).
+- **Behaviour change**: with no import-scoping, an un-imported submodule whose basename collides with a
+  served sibling now materializes (the accepted Part-1 limitation, documented on
+  `Provisioner.materializeSubmodules`). `WorkspaceSubmoduleProvisionTest`'s scoping test was rewritten
+  to pin this (`collidingUnimportedSubmoduleMaterializesWithoutImportScoping`).

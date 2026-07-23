@@ -18,6 +18,11 @@ feature-idea to `features/YYYY-MM-DD_*.md` and flips the epic Status.
 - **Degradation contract.** Socket down (stale image, no `Hello`) ⇒ **exactly today's behaviour**:
   each migrated call site keeps its `docker exec` fallback until that verb is retired. Enforce
   structurally via `WorkspaceDaemonLiveness.isDaemonLive(workspaceId)` + a bounded await.
+  **Exception — the clone/provision verb is retired as of Part 2** (per the directive that
+  provisioning is the daemon's responsibility): `WorkspaceService.provisionContainer` no longer falls
+  back to a host-driven `docker exec git clone`. A container with no live daemon (a stale, pre-daemon
+  image) now **fails to provision** (rm + `FAILED`) instead of degrading — recoverable by rebuilding
+  the image so the daemon is present.
 - **Protocol changes are compiler-enforced on both sides.** A new verb = a `DaemonMessage` record +
   `permits` entry + `DaemonProtocol.Type`/`Field` constant + `DaemonCodec.encode`/`decode` arm. Both
   `switch`es are exhaustive over the sealed type, so the compiler forces both the `service` (Jackson)
@@ -115,36 +120,50 @@ below is retained as the record; the settled decisions live in the moved feature
 
 ---
 
-## Part 2 — [in-container-config-discovery](epics/qits-workspace-daemon/feature-ideas/in-container-config-discovery.md)
+## Part 2 — [in-container-config-discovery](epics/qits-workspace-daemon/features/2026-07-23_in-container-config-discovery.md) ✅ implemented 2026-07-23
 
 The daemon reads/parses `.qits-config.yml` from the checkout (its own branch). Pivot to file-as-truth.
+**Also retired the host provisioning fallback** (Workstream B — the daemon is now the sole
+provisioner; per directive). See the moved feature doc for the settled design.
 
-**Shared parser decision**
-- [ ] Decide the parser home (feature-idea "Shared parser location"): **prefer moving the
-      framework-free `QitsConfig` record tree + a SnakeYAML parse into a small shared module** both
-      `domain` and `workspace-daemon` depend on (must stay framework-free — degrade the entity-enum
-      references to strings or relocate them). Fallback: a self-contained parse in `workspace-daemon`.
+**Shared parser decision → daemon-local (Option A).** The daemon owns the file; no shared module.
+`domain`'s `QitsConfig`/`QitsConfigParser` stay put (still used by the reconciler until Part 5). The
+daemon got its own SnakeYAML parse (`ConfigParser` + framework-free `DaemonQitsConfig`, enum-ish
+fields as strings) — moving the 6 config enums into a shared module would have touched ~36 files for a
+schema Part 5 partly dismantles.
 
 **Protocol**
-- [ ] `ConfigView`/`ConfigDiscovered { workspaceId, actions[], daemons[], bootstrap[], warning? }`
-      (daemon → qits) — the parsed config surfaced for UI display + on-demand run. A `Describe`-style
-      request/reply.
+- [x] `DescribeConfig{correlationId}` (qits → daemon) + `ConfigView{workspaceId, correlationId,
+      configJson, warning}` (daemon → qits) — the parsed config as a **JSON string of `QitsConfig`'s
+      shape** (single wire schema; `DaemonCodec` unchanged, all flat strings). Id-correlated (fixes the
+      Part-1 FIFO `WorkspaceInfo` stub).
 
 **Daemon binary**
-- [ ] After the Part-1 clone, read+parse `/workspace/.qits-config.yml`; absent/invalid ⇒ empty +
-      warning (never blocks). Hold the parsed config in-daemon for parts 3/4; answer `ConfigView`.
+- [x] After the Part-1 clone, read+parse `/workspace/.qits-config.yml` (`ConfigReader`); absent/blank
+      ⇒ empty, invalid ⇒ empty + warning (never blocks). Held in-daemon (`ControlSocket.configState`)
+      for parts 3/4; answers `DescribeConfig` on the worker pool.
 
 **Backend / host**
-- [ ] `WorkspaceDaemonRegistry.describeConfig(workspaceId)` → `ConfigView`; a workspace-detail read
-      path consumes it (replaces the DB-derived list once Part 5 lands).
+- [x] `WorkspaceDaemonRegistry.describeConfig(workspaceId)` → `ConfigView`; new framework-free
+      `WorkspaceConfigReader` SPI (`readConfig → Optional<WorkspaceConfigView(QitsConfig, warning)>`)
+      the registry implements by deserializing the wire JSON into `QitsConfig`. **Capability + SPI
+      only** — the UI/read-path rewire to consume it is Part 5.
 
 **Tests**
-- [ ] Parse parity vs `QitsConfigParser` on the `testing-repo-quarkus-angular` `.qits-config.yml`.
-- [ ] Branch divergence: a workspace on an edited branch reports the edited config; a `main` workspace
-      reports the original.
-- [ ] Empty/invalid file ⇒ green provision + expected warning.
+- [x] Daemon `ConfigParserTest` (output shape lock, empty/invalid), `DaemonCodecTest` round-trips,
+      backend `readConfig` deserialize + warning + no-daemon.
+- [ ] Branch divergence + true cross-boundary parity vs `QitsConfigParser` on the shared fixture ride
+      the extended real-docker path (a Part-3+ IT; the JVM suite pins each side).
 
-**Docs move** → `features/2026-…_in-container-config-discovery.md`; epic Status.
+**Workstream B — retire the host provisioning fallback**
+- [x] `provisionContainer` always awaits the daemon; deleted `hostDrivenClone`,
+      `materializeSubmodules` + helpers, `cloneUrl`, the `RepositorySubmoduleRepository`/`qitsHost`
+      injections. `awaitProvision` gained `repoId` (unique container key). No live daemon ⇒ `FAILED`.
+- [x] Test seam: `FakeWorkspaceDaemonProvisioner` (`@Mock`, domain + service) plays the daemon's
+      clone + `.gitmodules` walk. `WorkspaceSubmoduleProvisionTest` updated (no import-scoping — the
+      collision now materializes, the accepted Part-1 limitation).
+
+**Docs move** → `features/2026-07-23_in-container-config-discovery.md`; epic Status.
 
 ---
 

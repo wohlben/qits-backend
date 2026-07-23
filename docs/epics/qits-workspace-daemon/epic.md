@@ -193,6 +193,15 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
   - **Part 1 — [autonomous-self-clone-on-boot](features/2026-07-23_autonomous-self-clone-on-boot.md)
     — implemented (2026-07-23).** The daemon self-clones `/workspace` + materializes submodules on
     boot from its injected env (no inbound message), reporting `Provisioned`/`ProvisionFailed`;
-    `provisionContainer` awaits it and falls back to the host clone when no daemon is live. New
-    `Provisioner` (daemon), `WorkspaceDaemonProvisioner`/`RepositoryNameResolver` (domain), the
-    registry's `awaitProvision`, and the `…_PROJECT_ID`/`…_REPO_NAME` env. Parts 2–6 still parked.
+    `provisionContainer` awaits it and (as shipped) fell back to the host clone when no daemon is
+    live. New `Provisioner` (daemon), `WorkspaceDaemonProvisioner`/`RepositoryNameResolver` (domain),
+    the registry's `awaitProvision`, and the `…_PROJECT_ID`/`…_REPO_NAME` env.
+  - **Part 2 — [in-container-config-discovery](features/2026-07-23_in-container-config-discovery.md)
+    — implemented (2026-07-23).** The daemon reads/parses `.qits-config.yml` **from its checkout**
+    (daemon-local `ConfigParser`/`DaemonQitsConfig` + SnakeYAML) and answers a new id-correlated
+    `DescribeConfig`→`ConfigView` (config as `QitsConfig`-shaped JSON); the registry implements a
+    framework-free `WorkspaceConfigReader` SPI (capability only — the UI rewire is Part 5). **Also
+    retired the host provisioning fallback** (Workstream B, per directive): the daemon is now the
+    sole provisioner — `hostDrivenClone`/host `materializeSubmodules` deleted, a `@Mock`
+    `FakeWorkspaceDaemonProvisioner` stands in for tests, and a no-daemon container now `FAILED`s
+    instead of degrading. Parts 3–6 still parked.
