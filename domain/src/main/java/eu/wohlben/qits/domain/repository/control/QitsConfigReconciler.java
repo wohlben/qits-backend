@@ -17,9 +17,9 @@ import eu.wohlben.qits.domain.featureflow.entity.ActionConfiguration;
 import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationRepository;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.ActionDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.BootstrapDecl;
-import eu.wohlben.qits.domain.repository.control.QitsConfig.DaemonDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.HealthCheckDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.ObserverDecl;
+import eu.wohlben.qits.domain.repository.control.QitsConfig.ServiceDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.SourceDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.WebViewDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfigParser.QitsConfigException;
@@ -122,7 +122,7 @@ public class QitsConfigReconciler {
     }
 
     reconcileActions(repo, config.actions(), warnings);
-    reconcileDaemons(repo, config.daemons(), warnings);
+    reconcileDaemons(repo, config.services(), warnings);
     reconcileBootstrap(repo, config.bootstrap(), warnings);
 
     repo.configWarning = warnings.isEmpty() ? null : String.join("\n", warnings);
@@ -197,12 +197,13 @@ public class QitsConfigReconciler {
     }
   }
 
-  private void reconcileDaemons(Repository repo, List<DaemonDecl> declared, List<String> warnings) {
+  private void reconcileDaemons(
+      Repository repo, List<ServiceDecl> declared, List<String> warnings) {
     Map<String, RepositoryDaemon> existing =
         configOrigin(repositoryDaemonRepository.findByRepositoryId(repo.id), d -> d.name);
 
     Set<String> declaredNames = new LinkedHashSet<>();
-    for (DaemonDecl d : declared) {
+    for (ServiceDecl d : declared) {
       String stored = QitsConfig.configName(d.name());
       if (!declaredNames.add(stored)) {
         warnings.add("daemon '" + d.name() + "': duplicate name, only the first is applied");
