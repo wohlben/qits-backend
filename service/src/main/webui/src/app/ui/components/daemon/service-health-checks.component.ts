@@ -4,13 +4,13 @@ import { HealthCheckState } from '@/api/model/healthCheckState';
 import { HealthCheckStatusDto } from '@/api/model/healthCheckStatusDto';
 
 /**
- * The glanceable health row of one daemon instance: one labelled dot per declared healthcheck
+ * The glanceable health row of one service instance: one labelled dot per declared healthcheck
  * (green HEALTHY / red UNHEALTHY / grey UNKNOWN), rendered beside the lifecycle status chip. Health
- * is a display sidecar — a daemon can be READY while one of its services is down, and these dots
+ * is a display sidecar — a service can be READY while one of its checks is down, and these dots
  * are what reveal it. Latency and failing evidence ride the native title tooltip.
  */
 @Component({
-  selector: 'app-daemon-health-checks',
+  selector: 'app-service-health-checks',
   template: `
     <ul class="flex flex-wrap items-center gap-2" aria-label="Health checks">
       @for (check of health(); track check.name) {
@@ -28,7 +28,7 @@ import { HealthCheckStatusDto } from '@/api/model/healthCheckStatusDto';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DaemonHealthChecksComponent {
+export class ServiceHealthChecksComponent {
   readonly health = input.required<HealthCheckStatusDto[]>();
 
   dotClasses(check: HealthCheckStatusDto): string {

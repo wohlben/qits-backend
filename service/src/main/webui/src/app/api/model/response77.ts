@@ -10,8 +10,6 @@
 
 
 export interface Response77 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+    output?: string;
 }
 

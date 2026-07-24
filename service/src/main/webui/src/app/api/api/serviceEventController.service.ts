@@ -17,9 +17,9 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { DaemonEventSeverity } from '../model/daemonEventSeverity';
+import { Response88 } from '../model/response88';
 // @ts-ignore
-import { Response19 } from '../model/response19';
+import { ServiceEventSeverity } from '../model/serviceEventSeverity';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -31,7 +31,7 @@ import { BaseService } from '../api.base.service';
 @Injectable({
   providedIn: 'root'
 })
-export class DaemonEventControllerService extends BaseService {
+export class ServiceEventControllerService extends BaseService {
 
     constructor(protected httpClient: HttpClient, @Optional() @Inject(BASE_PATH) basePath: string|string[], @Optional() configuration?: Configuration) {
         super(basePath, configuration);
@@ -39,7 +39,7 @@ export class DaemonEventControllerService extends BaseService {
 
     /**
      * List
-     * @endpoint get /api/daemon-events
+     * @endpoint get /api/service-events
      * @param page 
      * @param pageSize 
      * @param repoId 
@@ -51,10 +51,10 @@ export class DaemonEventControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response19>;
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response19>>;
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response19>>;
-    public apiDaemonEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: DaemonEventSeverity, since?: string, source?: string, workspaceId?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response88>;
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response88>>;
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response88>>;
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
 
@@ -146,9 +146,9 @@ export class DaemonEventControllerService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/daemon-events`;
+        let localVarPath = `/api/service-events`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response19>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response88>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),

@@ -4,34 +4,34 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
-import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
-import { DaemonStatus } from '@/api/model/daemonStatus';
-import { WorkspaceDaemonsComponent } from './workspace-daemons.component';
+import { WorkspaceServiceControllerService } from '@/api/api/workspaceServiceController.service';
+import { ServiceInstanceDto } from '@/api/model/serviceInstanceDto';
+import { ServiceStatus } from '@/api/model/serviceStatus';
+import { WorkspaceServicesComponent } from './workspace-services.component';
 
 /** Mutation callbacks land on the next macrotask; flush before asserting. */
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function instance(overrides: Partial<DaemonInstanceDto>): DaemonInstanceDto {
+function instance(overrides: Partial<ServiceInstanceDto>): ServiceInstanceDto {
   return {
     daemon: { id: 'daemon-1', name: 'dev server', restartPolicy: 'ON_FAILURE' },
-    status: DaemonStatus.Stopped,
+    status: ServiceStatus.Stopped,
     restartCount: 0,
     ...overrides,
-  } as DaemonInstanceDto;
+  } as ServiceInstanceDto;
 }
 
-describe('WorkspaceDaemonsComponent', () => {
-  const daemonService = {
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet: vi
+describe('WorkspaceServicesComponent', () => {
+  const serviceApi = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesGet: vi
       .fn()
       .mockReturnValue(of({ entries: [] })),
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost: vi
       .fn()
       .mockReturnValue(of({})),
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost: vi
       .fn()
       .mockReturnValue(of({})),
   };
@@ -46,31 +46,31 @@ describe('WorkspaceDaemonsComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      imports: [WorkspaceDaemonsComponent],
+      imports: [WorkspaceServicesComponent],
       providers: [
         provideRouter([]),
         provideTanStackQuery(queryClient),
-        { provide: WorkspaceDaemonControllerService, useValue: daemonService },
+        { provide: WorkspaceServiceControllerService, useValue: serviceApi },
       ],
     }).compileComponents();
   });
 
   function createComponent() {
-    const fixture = TestBed.createComponent(WorkspaceDaemonsComponent);
+    const fixture = TestBed.createComponent(WorkspaceServicesComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.detectChanges();
     return fixture;
   }
 
-  it('shows every effective daemon with status chip and the right start/stop control', () => {
+  it('shows every effective service with status chip and the right start/stop control', () => {
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
+      ['workspace-services', 'repo-1', 'wt-1'],
       [
         instance({}),
         instance({
           daemon: { id: 'daemon-2', name: 'watcher' },
-          status: DaemonStatus.Ready,
+          status: ServiceStatus.Ready,
           restartCount: 2,
           commandId: 'cmd-9',
         }),
@@ -79,7 +79,7 @@ describe('WorkspaceDaemonsComponent', () => {
     const fixture = createComponent();
     const element = fixture.nativeElement as HTMLElement;
 
-    // Everything-visible: the stopped daemon still shows, with a Start button.
+    // Everything-visible: the stopped service still shows, with a Start button.
     expect(element.textContent).toContain('dev server');
     expect(element.textContent).toContain('STOPPED');
     // The running one shows READY with its restart count, a Stop button and a logs link.
@@ -93,15 +93,15 @@ describe('WorkspaceDaemonsComponent', () => {
 
   it('renders the health dots beside the status chip and omits them without checks', () => {
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
+      ['workspace-services', 'repo-1', 'wt-1'],
       [
         instance({
-          status: DaemonStatus.Ready,
+          status: ServiceStatus.Ready,
           health: [
             { name: 'Quarkus', kind: 'HTTP', state: 'HEALTHY' },
             { name: 'Angular', kind: 'HTTP', state: 'UNHEALTHY' },
           ],
-        } as Partial<DaemonInstanceDto>),
+        } as Partial<ServiceInstanceDto>),
         instance({ daemon: { id: 'daemon-2', name: 'checkless' } }),
       ],
     );
@@ -110,15 +110,15 @@ describe('WorkspaceDaemonsComponent', () => {
 
     // The crux of the feature: the chip says READY while a health dot shows Angular down.
     expect(element.textContent).toContain('READY');
-    const healthRows = element.querySelectorAll('app-daemon-health-checks');
+    const healthRows = element.querySelectorAll('app-service-health-checks');
     expect(healthRows).toHaveLength(1);
     expect(healthRows[0].textContent).toContain('Quarkus');
     expect(healthRows[0].textContent).toContain('Angular');
     expect(healthRows[0].querySelector('.bg-red-500')).not.toBeNull();
   });
 
-  it('starting a daemon posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
-    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], [instance({})]);
+  it('starting a service posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
+    queryClient.setQueryData(['workspace-services', 'repo-1', 'wt-1'], [instance({})]);
     const fixture = createComponent();
 
     const startButton = Array.from(
@@ -130,14 +130,14 @@ describe('WorkspaceDaemonsComponent', () => {
     // The generated client orders path params alphabetically (daemonId, repoId, workspaceId), not in
     // path order — asserting the exact order guards against the scrambled-URL 404 regression.
     expect(
-      daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost,
+      serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost,
     ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
   });
 
-  it('stopping a daemon posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
+  it('stopping a service posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
-      [instance({ status: DaemonStatus.Ready })],
+      ['workspace-services', 'repo-1', 'wt-1'],
+      [instance({ status: ServiceStatus.Ready })],
     );
     const fixture = createComponent();
 
@@ -148,7 +148,7 @@ describe('WorkspaceDaemonsComponent', () => {
     await flush();
 
     expect(
-      daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost,
+      serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost,
     ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
   });
 

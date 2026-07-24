@@ -75,8 +75,8 @@ export class WorkspaceLiveService {
    */
   private topicKeys(repoId: string, workspaceId: string): Record<string, QueryKey[]> {
     return {
-      daemons: [['workspace-daemons', repoId, workspaceId]],
-      'daemon-events': [['workspace-daemon-events', repoId, workspaceId]],
+      daemons: [['workspace-services', repoId, workspaceId]],
+      'daemon-events': [['workspace-service-events', repoId, workspaceId]],
       telemetry: [
         ['telemetry-errors', repoId, workspaceId],
         ['telemetry-spans', repoId, workspaceId],

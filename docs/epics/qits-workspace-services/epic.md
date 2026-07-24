@@ -9,9 +9,15 @@ runtime, log observation, and the daemon↔workspace lifecycle coupling.
 
 > **Renamed from `qits-workspace-daemons`** to avoid collision with the singular
 > [qits-workspace-daemon](../qits-workspace-daemon/epic.md) — the in-container `workspace-daemon`
-> control-plane binary (PID 1), a different concept. Only the epic slug changed; the code domain
-> (packages `eu.wohlben.qits.domain.daemon`, `RepositoryDaemon`, `DaemonSupervisor`) keeps its
-> "daemon" naming.
+> control-plane binary (PID 1), a different concept. **As of the daemon-supervised-dev-daemons work
+> ([qits-workspace-daemon](../qits-workspace-daemon/epic.md) Part 4, 2026-07-24) the code domain was
+> renamed too**: the runtime-supervision packages moved `eu.wohlben.qits.domain.daemon.*` →
+> `eu.wohlben.qits.domain.service.*` (`ServiceSupervisor`, `ServiceProxyRoute`, `ServiceStatus`,
+> `ServiceEvent*`), `qits.daemons.*` → `qits.services.*`, and the REST/UI surface became
+> `/services` — removing the collision the earlier note tolerated. The Part-5-doomed
+> `RepositoryDaemon*` config store keeps its "daemon" name until that store is deleted; the
+> `.qits-config.yml` `daemons:` key rename is a tracked follow-up (it needs the fixture repos'
+> two-level submodule round-trip).
 
 **Builds on [qits-workspaces](../qits-workspaces/epic.md)**:
 a daemon runs inside a workspace container, and its lifecycle is coupled to the workspace's

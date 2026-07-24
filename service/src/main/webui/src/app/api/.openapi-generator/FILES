@@ -12,7 +12,6 @@ api/authController.service.ts
 api/bootstrapCommandController.service.ts
 api/commandController.service.ts
 api/contextPropagationController.service.ts
-api/daemonEventController.service.ts
 api/featureFlowConfigurationController.service.ts
 api/featureFlowPhaseActionController.service.ts
 api/featureFlowPhaseController.service.ts
@@ -24,13 +23,14 @@ api/repositoryActionsController.service.ts
 api/repositoryController.service.ts
 api/repositoryDaemonController.service.ts
 api/repositorySubmoduleController.service.ts
+api/serviceEventController.service.ts
 api/settingController.service.ts
 api/speechController.service.ts
 api/workspaceBootstrapController.service.ts
 api/workspaceController.service.ts
-api/workspaceDaemonController.service.ts
 api/workspaceHistoryController.service.ts
 api/workspacePromptDraftController.service.ts
+api/workspaceServiceController.service.ts
 api/workspaceTelemetryController.service.ts
 configuration.ts
 encoder.ts
@@ -75,11 +75,6 @@ model/createProjectRepositoryRequest.ts
 model/createProjectRequest.ts
 model/createRepositoryDaemonRequest.ts
 model/createWorkspaceRequest.ts
-model/daemonEventDto.ts
-model/daemonEventKind.ts
-model/daemonEventSeverity.ts
-model/daemonInstanceDto.ts
-model/daemonStatus.ts
 model/detectedProjectDto.ts
 model/detectionDto.ts
 model/discardWorkspaceRequest.ts
@@ -244,6 +239,11 @@ model/response98.ts
 model/response99.ts
 model/restartPolicy.ts
 model/saveDraftRequest.ts
+model/serviceEventDto.ts
+model/serviceEventKind.ts
+model/serviceEventSeverity.ts
+model/serviceInstanceDto.ts
+model/serviceStatus.ts
 model/setMainBranchRequest.ts
 model/settingDto.ts
 model/spanEvent.ts

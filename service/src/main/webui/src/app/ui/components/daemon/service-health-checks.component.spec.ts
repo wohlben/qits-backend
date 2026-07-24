@@ -3,17 +3,17 @@ import { TestBed } from '@angular/core/testing';
 import { HealthCheckKind } from '@/api/model/healthCheckKind';
 import { HealthCheckState } from '@/api/model/healthCheckState';
 import { HealthCheckStatusDto } from '@/api/model/healthCheckStatusDto';
-import { DaemonHealthChecksComponent } from './daemon-health-checks.component';
+import { ServiceHealthChecksComponent } from './service-health-checks.component';
 
-describe('DaemonHealthChecksComponent', () => {
+describe('ServiceHealthChecksComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DaemonHealthChecksComponent],
+      imports: [ServiceHealthChecksComponent],
     }).compileComponents();
   });
 
   function createComponent(health: HealthCheckStatusDto[]) {
-    const fixture = TestBed.createComponent(DaemonHealthChecksComponent);
+    const fixture = TestBed.createComponent(ServiceHealthChecksComponent);
     fixture.componentRef.setInput('health', health);
     fixture.detectChanges();
     return fixture;

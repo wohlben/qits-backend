@@ -15,15 +15,15 @@ import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 
 /**
- * The daemon interactive terminal: a per-daemon "Terminal" button that opens a fullscreen dialog
- * framing an xterm.js attached to the daemon's tmux session through the
+ * The service interactive terminal: a per-service "Terminal" button that opens a fullscreen dialog
+ * framing an xterm.js attached to the service's tmux session through the
  * `/api/terminal/daemons/{repoId}/{workspaceId}/{daemonId}` socket (the interactive half of
- * Increment 2 of tmux-backed daemons — real input/resize, e.g. Quarkus dev's `[r]`/`[e]` keys).
- * Rendered only for a live daemon; closing the dialog detaches the tmux client and leaves the
- * daemon running. Mirrors the daemon web-view's overlay recipe.
+ * Increment 2 of tmux-backed services — real input/resize, e.g. Quarkus dev's `[r]`/`[e]` keys).
+ * Rendered only for a live service; closing the dialog detaches the tmux client and leaves the
+ * service running. Mirrors the service web-view's overlay recipe.
  */
 @Component({
-  selector: 'app-daemon-terminal',
+  selector: 'app-service-terminal',
   imports: [NgIcon, ZardButtonComponent, WebTerminalComponent],
   template: `
     <button
@@ -65,7 +65,7 @@ import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
   viewProviders: [provideIcons({ lucideSquareTerminal, lucideX })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DaemonTerminalComponent {
+export class ServiceTerminalComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
   readonly daemonId = input.required<string>();
@@ -75,7 +75,7 @@ export class DaemonTerminalComponent {
   private readonly terminalTpl = viewChild<TemplateRef<unknown>>('terminalTpl');
   private dialogRef: ZardDialogRef<unknown> | null = null;
 
-  /** The interactive-attach WS path (relative to origin; the backend gates on daemon liveness). */
+  /** The interactive-attach WS path (relative to origin; the backend gates on service liveness). */
   readonly socketPath = computed(
     () => `api/terminal/daemons/${this.repoId()}/${this.workspaceId()}/${this.daemonId()}`,
   );
@@ -86,7 +86,7 @@ export class DaemonTerminalComponent {
       return;
     }
     // Fullscreen, no backdrop-close (losing an interactive terminal to a stray click is jarring;
-    // the header has an explicit close) — same overlay recipe as the daemon web view.
+    // the header has an explicit close) — same overlay recipe as the service web view.
     this.dialogRef = this.dialog.create({
       zContent: content,
       zHideFooter: true,

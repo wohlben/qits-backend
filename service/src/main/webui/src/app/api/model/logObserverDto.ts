@@ -8,13 +8,13 @@
  * Do not edit the class manually.
  */
 import { LogObserverKind } from './logObserverKind';
-import { DaemonEventSeverity } from './daemonEventSeverity';
+import { ServiceEventSeverity } from './serviceEventSeverity';
 
 
 export interface LogObserverDto { 
     kind?: LogObserverKind;
     pattern?: string;
-    severity?: DaemonEventSeverity;
+    severity?: ServiceEventSeverity;
 }
 export namespace LogObserverDto {
 }

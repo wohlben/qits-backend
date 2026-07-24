@@ -12,6 +12,5 @@ import { RepositoryDto } from './repositoryDto';
 
 export interface Response59 { 
     repository?: RepositoryDto;
-    projectId?: string;
 }
 

@@ -9,7 +9,7 @@
  */
 
 
-export const DaemonStatus = {
+export const ServiceStatus = {
     Starting: 'STARTING',
     Ready: 'READY',
     Degraded: 'DEGRADED',
@@ -17,5 +17,5 @@ export const DaemonStatus = {
     Crashed: 'CRASHED',
     Stopped: 'STOPPED'
 } as const;
-export type DaemonStatus = typeof DaemonStatus[keyof typeof DaemonStatus];
+export type ServiceStatus = typeof ServiceStatus[keyof typeof ServiceStatus];
 

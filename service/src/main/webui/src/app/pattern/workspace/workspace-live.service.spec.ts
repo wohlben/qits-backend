@@ -83,11 +83,11 @@ describe('WorkspaceLiveService', () => {
     invalidate.mockClear();
 
     source.emitTopic('daemons');
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1'])]);
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspace-services', 'repo-1', 'wt-1'])]);
 
     invalidate.mockClear();
     source.emitTopic('daemon-events');
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1'])]);
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspace-service-events', 'repo-1', 'wt-1'])]);
 
     invalidate.mockClear();
     source.emitTopic('commands');
@@ -148,9 +148,9 @@ describe('WorkspaceLiveService', () => {
     const keys = invalidatedKeys();
     expect(keys).toContain(JSON.stringify(['workspace-prompt-draft', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-prompt-attachments', 'repo-1', 'wt-1']));
-    expect(keys).toContain(JSON.stringify(['workspace-daemons', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-services', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-bootstrap', 'repo-1', 'wt-1']));
-    expect(keys).toContain(JSON.stringify(['workspace-daemon-events', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspace-service-events', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['telemetry-logs', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['commands']));
     expect(keys).toContain(JSON.stringify(['workspace-agent-sessions', 'repo-1', 'wt-1']));

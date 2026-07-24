@@ -9,10 +9,9 @@
  */
 
 
-export const DaemonEventSeverity = {
-    Info: 'INFO',
-    Warning: 'WARNING',
-    Error: 'ERROR'
+export const ServiceEventKind = {
+    StatusChanged: 'STATUS_CHANGED',
+    ErrorDetected: 'ERROR_DETECTED'
 } as const;
-export type DaemonEventSeverity = typeof DaemonEventSeverity[keyof typeof DaemonEventSeverity];
+export type ServiceEventKind = typeof ServiceEventKind[keyof typeof ServiceEventKind];
 

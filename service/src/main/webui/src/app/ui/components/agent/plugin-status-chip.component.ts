@@ -6,7 +6,7 @@ export type PluginInstallStatus = 'installed' | 'disabled' | 'available';
 /**
  * The colored status pill for one coding-agent plugin: green when installed on the shared volume,
  * amber when installed-but-disabled, muted when available to install. Presentational only — mirrors
- * {@link DaemonStatusChipComponent}.
+ * {@link ServiceStatusChipComponent}.
  */
 @Component({
   selector: 'app-plugin-status-chip',

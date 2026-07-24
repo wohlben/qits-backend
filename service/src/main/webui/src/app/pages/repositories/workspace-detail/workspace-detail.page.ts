@@ -15,13 +15,13 @@ import { lastValueFrom } from 'rxjs';
 import { CommandControllerService } from '@/api/api/commandController.service';
 import { WorkspaceBootstrapControllerService } from '@/api/api/workspaceBootstrapController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
-import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
+import { WorkspaceServiceControllerService } from '@/api/api/workspaceServiceController.service';
 import { BootstrapOutcome } from '@/api/model/bootstrapOutcome';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
-import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
-import { DaemonStatus } from '@/api/model/daemonStatus';
+import { ServiceInstanceDto } from '@/api/model/serviceInstanceDto';
+import { ServiceStatus } from '@/api/model/serviceStatus';
 import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import {
@@ -29,12 +29,12 @@ import {
   newestRunningInteractiveAgent,
 } from '@/pattern/command/running-chat';
 import { WorkspaceBootstrapComponent } from '@/pattern/bootstrap/workspace-bootstrap.component';
-import { DaemonWebviewComponent } from '@/pattern/daemon/webview/daemon-webview.component';
+import { ServiceWebviewComponent } from '@/pattern/service/webview/service-webview.component';
 import {
-  DaemonEventFileAnchor,
-  WorkspaceDaemonEventsComponent,
-} from '@/pattern/daemon/workspace-daemon-events.component';
-import { WorkspaceDaemonsComponent } from '@/pattern/daemon/workspace-daemons.component';
+  ServiceEventFileAnchor,
+  WorkspaceServiceEventsComponent,
+} from '@/pattern/service/workspace-service-events.component';
+import { WorkspaceServicesComponent } from '@/pattern/service/workspace-services.component';
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
 import { WorkspaceActionsComponent } from '@/pattern/workspace/workspace-actions.component';
 import { WorkspaceAgentSessionComponent } from '@/pattern/workspace/workspace-agent-session.component';
@@ -62,7 +62,7 @@ const TAB_SLUG_BY_LABEL = new Map([
   ['Chat', 'chat'],
   ['Files', 'files'],
   ['Sketch', 'sketch'],
-  ['Daemons', 'daemons'],
+  ['Services', 'services'],
   ['Bootstrap', 'bootstrap'],
   ['Actions', 'actions'],
   ['Web view', 'web-view'],
@@ -80,7 +80,7 @@ const PROCESS_TAB_LABEL = 'Starting';
 
 /**
  * The workspace detail page: everything the workspace offers as one tab row — Chat, Files,
- * Daemons (controls + events feed), Actions (effective actions + run history), Web view,
+ * Services (controls + events feed), Actions (effective actions + run history), Web view,
  * Telemetry, Agents (the embedded agent session + session history + plugins). All panels
  * rely on the tab
  * group keeping hidden tabs mounted: the file browser's openFile anchors, the chat's WebSocket,
@@ -96,14 +96,14 @@ const PROCESS_TAB_LABEL = 'Starting';
 @Component({
   selector: 'app-workspace-detail-page',
   imports: [
-    DaemonWebviewComponent,
+    ServiceWebviewComponent,
     PageLayoutComponent,
     WorkspaceActionsComponent,
     WorkspaceBootstrapComponent,
     WorkspaceAgentSessionComponent,
     WorkspaceChatComponent,
-    WorkspaceDaemonEventsComponent,
-    WorkspaceDaemonsComponent,
+    WorkspaceServiceEventsComponent,
+    WorkspaceServicesComponent,
     WorkspaceFileBrowserComponent,
     WorkspacePluginsComponent,
     WorkspaceSessionTreeComponent,
@@ -162,15 +162,15 @@ const PROCESS_TAB_LABEL = 'Starting';
           <app-workspace-sketch [repoId]="repoId" [workspaceId]="workspaceId" />
         </z-tab>
         <z-tab
-          label="Daemons"
-          [indicator]="daemonIndicator()"
-          [indicatorLabel]="daemonIndicatorLabel()"
+          label="Services"
+          [indicator]="serviceIndicator()"
+          [indicatorLabel]="serviceIndicatorLabel()"
         >
           <div class="flex flex-col gap-6">
-            <app-workspace-daemons [repoId]="repoId" [workspaceId]="workspaceId" />
-            <section class="flex flex-col gap-3" aria-label="Daemon events">
+            <app-workspace-services [repoId]="repoId" [workspaceId]="workspaceId" />
+            <section class="flex flex-col gap-3" aria-label="Service events">
               <h2 class="text-lg font-semibold">Events</h2>
-              <app-workspace-daemon-events
+              <app-workspace-service-events
                 [repoId]="repoId"
                 [workspaceId]="workspaceId"
                 (openFile)="openFileFromEvent($event)"
@@ -193,7 +193,7 @@ const PROCESS_TAB_LABEL = 'Starting';
           <app-workspace-actions [repoId]="repoId" [workspaceId]="workspaceId" />
         </z-tab>
         <z-tab label="Web view">
-          <app-daemon-webview
+          <app-service-webview
             [repoId]="repoId"
             [workspaceId]="workspaceId"
             [activated]="webviewActivated()"
@@ -232,7 +232,7 @@ export class WorkspaceDetailPage {
   private readonly router = inject(Router);
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly commandService = inject(CommandControllerService);
-  private readonly daemonService = inject(WorkspaceDaemonControllerService);
+  private readonly serviceApi = inject(WorkspaceServiceControllerService);
   private readonly bootstrapService = inject(WorkspaceBootstrapControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly live = inject(WorkspaceLiveService);
@@ -401,7 +401,7 @@ export class WorkspaceDetailPage {
 
   /**
    * "Something is running here" for the Actions tab: a RUNNING TERMINAL command in this workspace
-   * — action-launched runs, not chats (the Chat dot), daemons (the Daemons dot), or agent runs
+   * — action-launched runs, not chats (the Chat dot), services (the Services dot), or agent runs
    * (the Agents dot; a session lineage marks a command as agent-driven). Each dot points at its
    * owner tab; the run-history list still shows everything.
    */
@@ -429,40 +429,40 @@ export class WorkspaceDetailPage {
     return sessions[sessions.length - 1]?.sessionId ?? null;
   });
 
-  // Same key AND shape as the Daemons/Web view tabs' queries, so all three share one cache entry.
-  readonly daemonsQuery = injectQuery(() => ({
-    queryKey: ['workspace-daemons', this.repoId, this.workspaceId],
+  // Same key AND shape as the Services/Web view tabs' queries, so all three share one cache entry.
+  readonly servicesQuery = injectQuery(() => ({
+    queryKey: ['workspace-services', this.repoId, this.workspaceId],
     queryFn: () =>
       lastValueFrom(
-        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesGet(
           this.repoId,
           this.workspaceId,
         ),
       ).then(
-        (r) => r.entries?.map((e) => e.instance).filter((i): i is DaemonInstanceDto => !!i) ?? [],
+        (r) => r.entries?.map((e) => e.instance).filter((i): i is ServiceInstanceDto => !!i) ?? [],
       ),
   }));
 
-  /** Aggregate daemon status on the tab label — the glance the always-visible panel used to give. */
-  readonly daemonIndicator = computed<ZardTabIndicator | null>(() => {
-    const instances = this.daemonsQuery.data() ?? [];
+  /** Aggregate service status on the tab label — the glance the always-visible panel used to give. */
+  readonly serviceIndicator = computed<ZardTabIndicator | null>(() => {
+    const instances = this.servicesQuery.data() ?? [];
     if (
       instances.some(
-        (i) => i.status === DaemonStatus.Degraded || i.status === DaemonStatus.Restarting,
+        (i) => i.status === ServiceStatus.Degraded || i.status === ServiceStatus.Restarting,
       )
     ) {
       return 'warning';
     }
     const live = instances.some(
-      (i) => i.status === DaemonStatus.Ready || i.status === DaemonStatus.Starting,
+      (i) => i.status === ServiceStatus.Ready || i.status === ServiceStatus.Starting,
     );
     return live ? 'success' : null;
   });
 
-  readonly daemonIndicatorLabel = computed(() =>
-    this.daemonIndicator() === 'warning'
-      ? 'A daemon is degraded or restarting'
-      : 'A daemon is running',
+  readonly serviceIndicatorLabel = computed(() =>
+    this.serviceIndicator() === 'warning'
+      ? 'A service is degraded or restarting'
+      : 'A service is running',
   );
 
   // Same key AND shape as the Bootstrap tab panel's query, so both share one cache entry.
@@ -498,7 +498,7 @@ export class WorkspaceDetailPage {
       : 'The bootstrap chain is running',
   );
 
-  /** Latched on the Web view tab's first selection; gates the iframe (see DaemonWebviewComponent). */
+  /** Latched on the Web view tab's first selection; gates the iframe (see ServiceWebviewComponent). */
   readonly webviewActivated = signal(false);
 
   /**
@@ -543,7 +543,7 @@ export class WorkspaceDetailPage {
     });
     void this.queryClient.invalidateQueries({ queryKey: ['workspaces', this.repoId] });
     void this.queryClient.invalidateQueries({
-      queryKey: ['workspace-daemons', this.repoId, this.workspaceId],
+      queryKey: ['workspace-services', this.repoId, this.workspaceId],
     });
   }
 
@@ -553,7 +553,7 @@ export class WorkspaceDetailPage {
   }
 
   /** An event's "open in source": make the jump visible by switching to Files, then anchor. */
-  openFileFromEvent(anchor: DaemonEventFileAnchor): void {
+  openFileFromEvent(anchor: ServiceEventFileAnchor): void {
     this.tabGroup()?.selectTabByLabel('Files');
     this.fileBrowser()?.openAtLine(anchor.path, anchor.startLine, anchor.endLine);
   }

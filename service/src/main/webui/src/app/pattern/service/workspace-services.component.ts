@@ -3,42 +3,42 @@ import { RouterLink } from '@angular/router';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
-import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
-import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
-import { DaemonStatus } from '@/api/model/daemonStatus';
-import { DaemonTerminalComponent } from '@/pattern/daemon/daemon-terminal.component';
+import { WorkspaceServiceControllerService } from '@/api/api/workspaceServiceController.service';
+import { ServiceInstanceDto } from '@/api/model/serviceInstanceDto';
+import { ServiceStatus } from '@/api/model/serviceStatus';
+import { ServiceTerminalComponent } from '@/pattern/service/service-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { DaemonHealthChecksComponent } from '@/ui/components/daemon/daemon-health-checks.component';
-import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-chip.component';
+import { ServiceHealthChecksComponent } from '@/ui/components/daemon/service-health-checks.component';
+import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-status-chip.component';
 
 /**
- * The workspace's daemons panel: every effective daemon (running or not — the everything-visible
+ * The workspace's services panel: every effective service (running or not — the everything-visible
  * convention) with its supervised status chip, start/stop, and a logs link re-attaching to the
- * instance's registry command. The events feed ({@link WorkspaceDaemonEventsComponent}) renders
- * below this panel in the same Daemons tab; this panel's mutations still invalidate its query key.
+ * instance's registry command. The events feed ({@link WorkspaceServiceEventsComponent}) renders
+ * below this panel in the same Services tab; this panel's mutations still invalidate its query key.
  */
 @Component({
-  selector: 'app-workspace-daemons',
+  selector: 'app-workspace-services',
   imports: [
     RouterLink,
     ZardButtonComponent,
-    DaemonHealthChecksComponent,
-    DaemonStatusChipComponent,
-    DaemonTerminalComponent,
+    ServiceHealthChecksComponent,
+    ServiceStatusChipComponent,
+    ServiceTerminalComponent,
   ],
   template: `
-    <section class="flex flex-col gap-3" aria-label="Daemons">
-      <h2 class="text-lg font-semibold">Daemons</h2>
+    <section class="flex flex-col gap-3" aria-label="Services">
+      <h2 class="text-lg font-semibold">Services</h2>
 
-      @if (daemonsQuery.isPending()) {
-        <div class="text-sm text-muted-foreground">Loading daemons…</div>
-      } @else if (daemonsQuery.isError()) {
-        <div class="text-sm text-destructive">Failed to load daemons</div>
+      @if (servicesQuery.isPending()) {
+        <div class="text-sm text-muted-foreground">Loading services…</div>
+      } @else if (servicesQuery.isError()) {
+        <div class="text-sm text-destructive">Failed to load services</div>
       } @else {
-        @let instances = daemonsQuery.data() ?? [];
+        @let instances = servicesQuery.data() ?? [];
         @if (instances.length === 0) {
           <p class="text-sm text-muted-foreground">
-            No daemons defined for this repository.
+            No services defined for this repository.
           </p>
         } @else {
           <ul class="flex flex-col divide-y rounded-md border">
@@ -52,12 +52,12 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
                     </span>
                   }
                 </div>
-                <app-daemon-status-chip
+                <app-service-status-chip
                   [status]="instance.status ?? 'STOPPED'"
                   [restartCount]="instance.restartCount ?? 0"
                 />
                 @if (instance.health?.length) {
-                  <app-daemon-health-checks [health]="instance.health!" />
+                  <app-service-health-checks [health]="instance.health!" />
                 }
                 @if (instance.commandId) {
                   <a
@@ -70,7 +70,7 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
                   </a>
                 }
                 @if (isLive(instance)) {
-                  <app-daemon-terminal
+                  <app-service-terminal
                     [repoId]="repoId()"
                     [workspaceId]="workspaceId()"
                     [daemonId]="instance.daemon!.id!"
@@ -106,18 +106,18 @@ import { DaemonStatusChipComponent } from '@/ui/components/daemon/daemon-status-
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkspaceDaemonsComponent {
+export class WorkspaceServicesComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
 
-  private readonly daemonService = inject(WorkspaceDaemonControllerService);
+  private readonly serviceApi = inject(WorkspaceServiceControllerService);
   private readonly queryClient = inject(QueryClient);
 
-  readonly daemonsQuery = injectQuery(() => ({
-    queryKey: ['workspace-daemons', this.repoId(), this.workspaceId()],
+  readonly servicesQuery = injectQuery(() => ({
+    queryKey: ['workspace-services', this.repoId(), this.workspaceId()],
     queryFn: () =>
       lastValueFrom(
-        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesGet(
           this.repoId(),
           this.workspaceId(),
         ),
@@ -125,7 +125,7 @@ export class WorkspaceDaemonsComponent {
         (r) =>
           r.entries
             ?.map((e) => e.instance)
-            .filter((i): i is DaemonInstanceDto => !!i) ?? [],
+            .filter((i): i is ServiceInstanceDto => !!i) ?? [],
       ),
   }));
 
@@ -134,7 +134,7 @@ export class WorkspaceDaemonsComponent {
       lastValueFrom(
         // NB: the generated client orders path params alphabetically (daemonId, repoId, workspaceId),
         // not in path order — pass them in that order or the URL segments get scrambled (404).
-        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStartPost(
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost(
           daemonId,
           this.repoId(),
           this.workspaceId(),
@@ -146,7 +146,7 @@ export class WorkspaceDaemonsComponent {
   readonly stopMutation = injectMutation(() => ({
     mutationFn: (daemonId: string) =>
       lastValueFrom(
-        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsDaemonIdStopPost(
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost(
           daemonId,
           this.repoId(),
           this.workspaceId(),
@@ -155,21 +155,21 @@ export class WorkspaceDaemonsComponent {
     onSettled: () => this.invalidate(),
   }));
 
-  isLive(instance: DaemonInstanceDto): boolean {
+  isLive(instance: ServiceInstanceDto): boolean {
     return (
-      instance.status === DaemonStatus.Starting ||
-      instance.status === DaemonStatus.Ready ||
-      instance.status === DaemonStatus.Degraded ||
-      instance.status === DaemonStatus.Restarting
+      instance.status === ServiceStatus.Starting ||
+      instance.status === ServiceStatus.Ready ||
+      instance.status === ServiceStatus.Degraded ||
+      instance.status === ServiceStatus.Restarting
     );
   }
 
   private invalidate() {
     this.queryClient.invalidateQueries({
-      queryKey: ['workspace-daemons', this.repoId(), this.workspaceId()],
+      queryKey: ['workspace-services', this.repoId(), this.workspaceId()],
     });
     this.queryClient.invalidateQueries({
-      queryKey: ['workspace-daemon-events', this.repoId(), this.workspaceId()],
+      queryKey: ['workspace-service-events', this.repoId(), this.workspaceId()],
     });
   }
 }

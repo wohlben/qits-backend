@@ -4,16 +4,16 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import { of } from 'rxjs';
 import { vi } from 'vitest';
 
-import { DaemonEventControllerService } from '@/api/api/daemonEventController.service';
-import { DaemonEventSeverity } from '@/api/model/daemonEventSeverity';
+import { ServiceEventControllerService } from '@/api/api/serviceEventController.service';
+import { ServiceEventSeverity } from '@/api/model/serviceEventSeverity';
 import {
-  DaemonEventFileAnchor,
-  WorkspaceDaemonEventsComponent,
-} from './workspace-daemon-events.component';
+  ServiceEventFileAnchor,
+  WorkspaceServiceEventsComponent,
+} from './workspace-service-events.component';
 
-describe('WorkspaceDaemonEventsComponent', () => {
+describe('WorkspaceServiceEventsComponent', () => {
   const eventService = {
-    apiDaemonEventsGet: vi.fn().mockReturnValue(of({ events: [] })),
+    apiServiceEventsGet: vi.fn().mockReturnValue(of({ events: [] })),
   };
   let queryClient: QueryClient;
 
@@ -26,17 +26,17 @@ describe('WorkspaceDaemonEventsComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      imports: [WorkspaceDaemonEventsComponent],
+      imports: [WorkspaceServiceEventsComponent],
       providers: [
         provideRouter([]),
         provideTanStackQuery(queryClient),
-        { provide: DaemonEventControllerService, useValue: eventService },
+        { provide: ServiceEventControllerService, useValue: eventService },
       ],
     }).compileComponents();
   });
 
   function createComponent() {
-    const fixture = TestBed.createComponent(WorkspaceDaemonEventsComponent);
+    const fixture = TestBed.createComponent(WorkspaceServiceEventsComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.detectChanges();
@@ -44,26 +44,26 @@ describe('WorkspaceDaemonEventsComponent', () => {
   }
 
   it('renders an honest empty state when no events have been recorded', () => {
-    queryClient.setQueryData(['workspace-daemon-events', 'repo-1', 'wt-1'], []);
+    queryClient.setQueryData(['workspace-service-events', 'repo-1', 'wt-1'], []);
     const fixture = createComponent();
 
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No daemon events yet');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No service events yet');
   });
 
   it('renders the events feed severity-colored with expandable excerpts and source badges', () => {
     queryClient.setQueryData(
-      ['workspace-daemon-events', 'repo-1', 'wt-1'],
+      ['workspace-service-events', 'repo-1', 'wt-1'],
       [
         {
-          daemonName: 'dev server',
-          severity: DaemonEventSeverity.Error,
+          serviceName: 'dev server',
+          severity: ServiceEventSeverity.Error,
           summary: 'crashed (exit 1)',
           logExcerpt: 'stacktrace-here',
           timestamp: '2026-07-04T10:00:00Z',
         },
         {
-          daemonName: 'dev server',
-          severity: DaemonEventSeverity.Error,
+          serviceName: 'dev server',
+          severity: ServiceEventSeverity.Error,
           summary: 'NPE in handler',
           logExcerpt: 'boom',
           source: 'output',
@@ -89,11 +89,11 @@ describe('WorkspaceDaemonEventsComponent', () => {
 
   it('file events emit an openFile anchor instead of routing', () => {
     queryClient.setQueryData(
-      ['workspace-daemon-events', 'repo-1', 'wt-1'],
+      ['workspace-service-events', 'repo-1', 'wt-1'],
       [
         {
-          daemonName: 'dev server',
-          severity: DaemonEventSeverity.Error,
+          serviceName: 'dev server',
+          severity: ServiceEventSeverity.Error,
           summary: 'kaboom',
           logExcerpt: 'ERROR: kaboom',
           source: 'logs/app.log',
@@ -107,7 +107,7 @@ describe('WorkspaceDaemonEventsComponent', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(element.textContent).toContain('logs/app.log:7');
-    const anchors: DaemonEventFileAnchor[] = [];
+    const anchors: ServiceEventFileAnchor[] = [];
     fixture.componentInstance.openFile.subscribe((a) => anchors.push(a));
     const openButton = Array.from(element.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Open logs/app.log:7'),

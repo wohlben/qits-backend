@@ -16,9 +16,9 @@ import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
-import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
-import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
-import { DaemonStatus } from '@/api/model/daemonStatus';
+import { WorkspaceServiceControllerService } from '@/api/api/workspaceServiceController.service';
+import { ServiceInstanceDto } from '@/api/model/serviceInstanceDto';
+import { ServiceStatus } from '@/api/model/serviceStatus';
 import { ZardButtonComponent } from '@/shared/components/button';
 import { ZardInputDirective } from '@/shared/components/input';
 import { NewSnippet, PromptContextStore } from '@/shared/state/prompt-context.store';
@@ -26,30 +26,30 @@ import { parseAppPath, stripProxyPrefix, toProxyUrl } from './app-path';
 import { createComponentMatcher } from './component-matcher';
 import { DomPicker, PickOptions } from './dom-picker';
 
-const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
-  DaemonStatus.Ready,
-  DaemonStatus.Degraded,
-  DaemonStatus.Starting,
-  DaemonStatus.Restarting,
+const LIVE_STATUSES: (ServiceStatus | undefined)[] = [
+  ServiceStatus.Ready,
+  ServiceStatus.Degraded,
+  ServiceStatus.Starting,
+  ServiceStatus.Restarting,
 ];
 
 /**
- * The workspace's Web view tab: frames the daemon's app through the same-origin
- * `/daemon/{workspaceId}/{daemonId}/` proxy. Always present — without a live web-viewable daemon
+ * The workspace's Web view tab: frames the service's app through the same-origin
+ * `/daemon/{workspaceId}/{daemonId}/` proxy. Always present — without a live web-viewable service
  * it renders an empty state instead of a dead frame. The iframe mounts on the tab's first
- * activation (the page passes `activated`) and then stays mounted while a live daemon exists, so
+ * activation (the page passes `activated`) and then stays mounted while a live service exists, so
  * the framed app doesn't reload on every tab switch. Pick mode turns on the {@link DomPicker};
  * picked elements land in the root {@link PromptContextStore}, where the Chat tab's
  * speak-to-prompt and command chats pick them up. A plain pick is one-shot — it drops pick mode —
  * while shift-click (or a touch long press) keeps the mode on for multi-pick.
  */
 @Component({
-  selector: 'app-daemon-webview',
+  selector: 'app-service-webview',
   imports: [NgIcon, ZardButtonComponent, ZardInputDirective],
   template: `
     @if (webViewable().length === 0) {
       <p class="py-8 text-center text-sm text-muted-foreground">
-        No web-viewable daemon is running — start one from the Daemons tab.
+        No web-viewable service is running — start one from the Services tab.
       </p>
     } @else if (activated()) {
       <div class="flex h-[70vh] min-h-0 flex-col overflow-hidden rounded-md border">
@@ -108,9 +108,9 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
             @if (webViewable().length > 1) {
               <select
                 class="h-8 rounded-md border bg-transparent px-2 text-sm"
-                [value]="selectedDaemonId()"
-                (change)="selectedDaemonId.set($any($event.target).value)"
-                aria-label="Framed daemon"
+                [value]="selectedServiceId()"
+                (change)="selectedServiceId.set($any($event.target).value)"
+                aria-label="Framed service"
               >
                 @for (instance of webViewable(); track instance.daemon?.id) {
                   <option [value]="instance.daemon?.id">{{ instance.daemon?.name }}</option>
@@ -162,7 +162,7 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
           class="min-h-0 w-full flex-1 border-0"
           [src]="frameSrc()"
           (load)="onFrameLoad(frame)"
-          title="Daemon web view"
+          title="Service web view"
         ></iframe>
       </div>
     }
@@ -172,7 +172,7 @@ const LIVE_STATUSES: (DaemonStatus | undefined)[] = [
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DaemonWebviewComponent {
+export class ServiceWebviewComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
   /**
@@ -182,42 +182,42 @@ export class DaemonWebviewComponent {
    */
   readonly activated = input(false);
 
-  private readonly daemonService = inject(WorkspaceDaemonControllerService);
+  private readonly serviceApi = inject(WorkspaceServiceControllerService);
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly promptContext = inject(PromptContextStore);
 
   private readonly frame = viewChild<ElementRef<HTMLIFrameElement>>('frame');
 
-  // Same key AND result shape as WorkspaceDaemonsComponent's daemonsQuery — they share the cache
+  // Same key AND result shape as WorkspaceServicesComponent's servicesQuery — they share the cache
   // entry, so the queryFn must stay identical.
-  readonly daemonsQuery = injectQuery(() => ({
-    queryKey: ['workspace-daemons', this.repoId(), this.workspaceId()],
+  readonly servicesQuery = injectQuery(() => ({
+    queryKey: ['workspace-services', this.repoId(), this.workspaceId()],
     queryFn: () =>
       lastValueFrom(
-        this.daemonService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet(
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesGet(
           this.repoId(),
           this.workspaceId(),
         ),
       ).then(
         (r) =>
-          r.entries?.map((e) => e.instance).filter((i): i is DaemonInstanceDto => !!i) ?? [],
+          r.entries?.map((e) => e.instance).filter((i): i is ServiceInstanceDto => !!i) ?? [],
       ),
   }));
 
   readonly webViewable = computed(() =>
-    (this.daemonsQuery.data() ?? []).filter(
+    (this.servicesQuery.data() ?? []).filter(
       (i) => !!i.proxyPath && LIVE_STATUSES.includes(i.status),
     ),
   );
 
-  readonly selectedDaemonId = signal<string | null>(null);
+  readonly selectedServiceId = signal<string | null>(null);
   readonly selected = computed(() => {
     const candidates = this.webViewable();
-    return candidates.find((i) => i.daemon?.id === this.selectedDaemonId()) ?? candidates[0] ?? null;
+    return candidates.find((i) => i.daemon?.id === this.selectedServiceId()) ?? candidates[0] ?? null;
   });
   /**
-   * The relative proxied path off the DTO plus the definition's entry path — no daemon origin, no
+   * The relative proxied path off the DTO plus the definition's entry path — no service origin, no
    * port. proxyPath is trailing-slashed and entryPath is stored slash-less (both validated
    * backend-side), so the join is a plain concatenation. Trusted as a resource URL: it is
    * backend-provided registry/definition state (never user input), and the whole point is framing
@@ -270,7 +270,7 @@ export class DaemonWebviewComponent {
   );
 
   constructor() {
-    // When the last live daemon goes away the iframe unmounts with the empty state — drop pick
+    // When the last live service goes away the iframe unmounts with the empty state — drop pick
     // mode and the picker's stale document with it.
     effect(() => {
       if (this.webViewable().length === 0) {

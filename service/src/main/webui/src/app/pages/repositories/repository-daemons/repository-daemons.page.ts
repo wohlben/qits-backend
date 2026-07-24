@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
-import { RepositoryDaemonListComponent } from '@/pattern/daemon/repository-daemon-list.component';
+import { RepositoryDaemonListComponent } from '@/pattern/service/repository-daemon-list.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 
 @Component({

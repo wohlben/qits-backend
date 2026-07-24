@@ -10,6 +10,6 @@
 
 
 export interface Response69 { 
-    success?: boolean;
+    technicalProcessId?: string;
 }
 

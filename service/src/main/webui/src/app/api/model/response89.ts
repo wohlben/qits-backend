@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceHistoryDetailDto } from './workspaceHistoryDetailDto';
+import { ServiceInstanceDto } from './serviceInstanceDto';
 
 
 export interface Response89 { 
-    workspace?: WorkspaceHistoryDetailDto;
+    instance?: ServiceInstanceDto;
 }
 

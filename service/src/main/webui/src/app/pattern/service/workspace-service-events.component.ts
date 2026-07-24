@@ -4,37 +4,37 @@ import { RouterLink } from '@angular/router';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { lastValueFrom } from 'rxjs';
 
-import { DaemonEventControllerService } from '@/api/api/daemonEventController.service';
-import { DaemonEventDto } from '@/api/model/daemonEventDto';
-import { DaemonEventSeverity } from '@/api/model/daemonEventSeverity';
+import { ServiceEventControllerService } from '@/api/api/serviceEventController.service';
+import { ServiceEventDto } from '@/api/model/serviceEventDto';
+import { ServiceEventSeverity } from '@/api/model/serviceEventSeverity';
 import { ZardButtonComponent } from '@/shared/components/button';
 
 /** An event's "open in source" target for a tailed file: the path plus the anchored line range. */
-export interface DaemonEventFileAnchor {
+export interface ServiceEventFileAnchor {
   path: string;
   startLine: number;
   endLine: number;
 }
 
 /**
- * The workspace's daemon events feed, read from the durable store: severity-colored, each
+ * The workspace's service events feed, read from the durable store: severity-colored, each
  * expandable to its log excerpt, with "open in source" jumping to the anchored place in the
- * command log or the tailed file. A separate component from the daemons panel (it renders below
- * it in the Daemons tab); it shares the `workspace-daemon-events` query key with the daemons
- * panel's start/stop invalidation, so daemon actions still refresh it.
+ * command log or the tailed file. A separate component from the services panel (it renders below
+ * it in the Services tab); it shares the `workspace-service-events` query key with the services
+ * panel's start/stop invalidation, so service actions still refresh it.
  */
 @Component({
-  selector: 'app-workspace-daemon-events',
+  selector: 'app-workspace-service-events',
   imports: [DatePipe, RouterLink, ZardButtonComponent],
   template: `
-    <div class="flex flex-col gap-1" aria-label="Recent daemon events">
+    <div class="flex flex-col gap-1" aria-label="Recent service events">
       @if (eventsQuery.isPending()) {
         <p class="text-sm text-muted-foreground">Loading events…</p>
       } @else if (eventsQuery.isError()) {
         <p class="text-sm text-destructive">Failed to load events</p>
       } @else if (recentEvents().length === 0) {
         <p class="text-sm text-muted-foreground">
-          No daemon events yet — start a daemon and its status changes and detected errors land
+          No service events yet — start a service and its status changes and detected errors land
           here.
         </p>
       } @else {
@@ -51,7 +51,7 @@ export interface DaemonEventFileAnchor {
                   <span class="text-xs text-muted-foreground">
                     {{ event.timestamp | date: 'HH:mm:ss' }}
                   </span>
-                  <span class="font-medium">{{ event.daemonName }}</span>
+                  <span class="font-medium">{{ event.serviceName }}</span>
                   @if (event.source) {
                     <span class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                       {{ sourceLabel(event) }}
@@ -101,20 +101,20 @@ export interface DaemonEventFileAnchor {
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WorkspaceDaemonEventsComponent {
+export class WorkspaceServiceEventsComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
   /** A file event's "open in source" click — the page routes it into the file browser. */
-  readonly openFile = output<DaemonEventFileAnchor>();
+  readonly openFile = output<ServiceEventFileAnchor>();
 
-  private readonly eventService = inject(DaemonEventControllerService);
+  private readonly eventService = inject(ServiceEventControllerService);
 
   readonly eventsQuery = injectQuery(() => ({
-    queryKey: ['workspace-daemon-events', this.repoId(), this.workspaceId()],
+    queryKey: ['workspace-service-events', this.repoId(), this.workspaceId()],
     queryFn: () =>
       lastValueFrom(
         // Durable store, newest first: page 0 of 20 is exactly the feed's window.
-        this.eventService.apiDaemonEventsGet(
+        this.eventService.apiServiceEventsGet(
           0,
           20,
           this.repoId(),
@@ -128,22 +128,22 @@ export class WorkspaceDaemonEventsComponent {
 
   readonly recentEvents = computed(() => this.eventsQuery.data() ?? []);
 
-  sourceLabel(event: DaemonEventDto): string {
+  sourceLabel(event: ServiceEventDto): string {
     if (event.source === 'output') {
       return 'output';
     }
     return event.anchorFrom != null ? `${event.source}:${event.anchorFrom}` : (event.source ?? '');
   }
 
-  isOutputAnchor(event: DaemonEventDto): boolean {
+  isOutputAnchor(event: ServiceEventDto): boolean {
     return event.source === 'output' && !!event.commandId && event.anchorFrom != null;
   }
 
-  isFileAnchor(event: DaemonEventDto): boolean {
+  isFileAnchor(event: ServiceEventDto): boolean {
     return !!event.source && event.source !== 'output' && event.anchorFrom != null;
   }
 
-  emitFileAnchor(event: DaemonEventDto): void {
+  emitFileAnchor(event: ServiceEventDto): void {
     this.openFile.emit({
       path: event.source!,
       startLine: event.anchorFrom!,
@@ -151,11 +151,11 @@ export class WorkspaceDaemonEventsComponent {
     });
   }
 
-  severityDot(event: DaemonEventDto): string {
+  severityDot(event: ServiceEventDto): string {
     switch (event.severity) {
-      case DaemonEventSeverity.Error:
+      case ServiceEventSeverity.Error:
         return 'bg-red-500';
-      case DaemonEventSeverity.Warning:
+      case ServiceEventSeverity.Warning:
         return 'bg-amber-500';
       default:
         return 'bg-muted-foreground/50';

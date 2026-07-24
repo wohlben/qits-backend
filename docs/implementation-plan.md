@@ -216,31 +216,35 @@ construction.
 Dev daemons start as the tail of the daemon's startup, supervised in-container. Autonomous reframing
 of epic Part 5 (`daemon-supervision-handover.md`).
 
+> **Implemented 2026-07-24** (host projection + daemon-side + rename). Deferred: log-observer/
+> DEGRADED derivation in daemon-backed mode (anchored to the audit-log sequence the projection
+> bypasses — the tmux fallback keeps it); the `.qits-config.yml` `daemons:`→`services:` key (needs
+> the fixture repos' two-level submodule round-trip).
+
 **Protocol** (carried from Part 5 draft)
-- [ ] `StartDaemon { id, script, env }`, `SignalDaemon { id, signal }` (qits → daemon,
+- [x] `StartDaemon { id, script, env }`, `SignalDaemon { id, signal }` (qits → daemon,
       manual/subsequent); `DaemonEvent { id, state, exitCode }` + daemon log chunks (daemon → qits).
       Auto-start needs no `StartDaemon` — the daemon self-starts the auto-start set from the Part-2
       config.
 
 **Daemon binary**
-- [ ] Once `Bootstrapped{ok:true}`, start each auto-start dev daemon as a supervised **child of PID 1**
+- [x] Once `Bootstrapped{ok:true}`, start each auto-start dev daemon as a supervised **child of PID 1**
       (no tmux): honour `restartPolicy`/`maxRestarts`/`stopSignal`/`readyPattern`; stream child logs
       over the socket (`CommandChunk` tagged by daemon id); push `DaemonEvent` liveness/exit;
       group-kill + reap escaped forks natively (no `/proc` scan). Re-report running daemons on
       reconnect (replaces tmux `adoptIfRunning`).
 
 **Host wiring (`domain`)**
-- [ ] `DaemonSupervisor` (`domain/.../daemon/control/DaemonSupervisor.java`) → thin coordinator: state
+- [x] `ServiceSupervisor` (`domain/.../service/control/ServiceSupervisor.java`, renamed) → thin coordinator: state
       machine, backoff, status/SSE events, segment settling, web-view proxy origin
       (`resolveTarget`→`ProxyOrigin`→`DaemonProxyRoute`) fed by `DaemonEvent`; **falls back to tmux
       `startDaemon`** when the socket is absent.
-- [ ] `DaemonLifecycleCoupler` (`onReadyForDaemons`) no longer drives auto-start via docker; keep the
+- [x] `ServiceLifecycleCoupler` (`onReadyForDaemons`) branches internally (daemon-backed vs tmux); keeps the
       stop coupling (`settleForWorkspace`) and `qits.daemons.*` knobs.
 
 **Tests**
-- [ ] Fake-client supervision: start/ready/crash/exit, log streaming, group-kill of a forked child.
-- [ ] Extended real-docker IT: `quarkus:dev` under the daemon; forked JVM reaped on stop **without**
-      `/proc`; web-view proxy resolves; adoption after a qits restart.
+- [x] Fake-client supervision: daemon `ServiceSupervisorTest` (real-process start/ready/crash/exit, group-kill of a forked child); host `ServiceSupervisorProjectionTest` (event projection, start/stop, adoption).
+- [x] Extended real-docker IT (`DaemonServiceIT`, self-skips without docker): auto-start service reaches READY over the socket; a `SignalDaemon` reaps the whole session incl. a backgrounded fork **without** `/proc`. (Web-view-proxy + adoption-after-restart assertions are a follow-up.)
 
 **Docs move** → `features/2026-…_daemon-supervised-dev-daemons.md`; retire the Part-5 draft; epic
 Status.

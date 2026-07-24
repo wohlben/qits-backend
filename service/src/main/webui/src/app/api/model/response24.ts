@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { ActionConfigurationDto } from './actionConfigurationDto';
 
 
 export interface Response24 { 
-    daemon?: RepositoryDaemonDto;
+    actionConfiguration?: ActionConfigurationDto;
 }
 

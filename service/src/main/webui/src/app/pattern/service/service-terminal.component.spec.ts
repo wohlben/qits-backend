@@ -1,16 +1,16 @@
 import { TestBed } from '@angular/core/testing';
 
-import { DaemonTerminalComponent } from './daemon-terminal.component';
+import { ServiceTerminalComponent } from './service-terminal.component';
 
-describe('DaemonTerminalComponent', () => {
+describe('ServiceTerminalComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DaemonTerminalComponent],
+      imports: [ServiceTerminalComponent],
     }).compileComponents();
   });
 
   function createComponent() {
-    const fixture = TestBed.createComponent(DaemonTerminalComponent);
+    const fixture = TestBed.createComponent(ServiceTerminalComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.componentRef.setInput('daemonId', 'd-1');
@@ -26,7 +26,7 @@ describe('DaemonTerminalComponent', () => {
     expect(button.textContent).toContain('Terminal');
   });
 
-  it('computes the daemon interactive-attach socket path from its inputs', () => {
+  it('computes the service interactive-attach socket path from its inputs', () => {
     const fixture = createComponent();
     expect(fixture.componentInstance.socketPath()).toBe('api/terminal/daemons/repo-1/wt-1/d-1');
   });

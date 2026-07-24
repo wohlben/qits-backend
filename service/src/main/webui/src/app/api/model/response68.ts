@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDto } from './repositoryDto';
+import { BranchDto } from './branchDto';
 
 
 export interface Response68 { 
-    repository?: RepositoryDto;
+    branches?: Array<BranchDto>;
 }
 

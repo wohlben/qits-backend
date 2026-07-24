@@ -10,6 +10,6 @@
 
 
 export interface Response81 { 
-    output?: string;
+    files?: Array<string>;
 }
 

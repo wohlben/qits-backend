@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceDto } from './workspaceDto';
+import { WorkspaceHistoryDto } from './workspaceHistoryDto';
 
 
 export interface Entry16 { 
-    workspace?: WorkspaceDto;
+    workspace?: WorkspaceHistoryDto;
 }
 

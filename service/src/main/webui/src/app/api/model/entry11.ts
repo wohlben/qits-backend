@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ActionConfigurationDto } from './actionConfigurationDto';
+import { RepositoryDto } from './repositoryDto';
 
 
 export interface Entry11 { 
-    action?: ActionConfigurationDto;
+    repository?: RepositoryDto;
 }
 

@@ -10,6 +10,8 @@
 
 
 export interface Response73 { 
-    technicalProcessId?: string;
+    workspaceId?: string;
+    branch?: string;
+    commandId?: string;
 }
 

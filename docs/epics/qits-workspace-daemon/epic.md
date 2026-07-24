@@ -211,5 +211,17 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
     + `BootstrapStep`/`BootstrapOutcome`/`Bootstrapped`/`RunBootstrap` protocol). `WorkspaceBootstrapRunner`
     became a thin awaiter of a new `WorkspaceBootstrapDriver` SPI (registry-backed, event-buffering) —
     it records outcomes, settles `bootstrap:<name>` segments, and still gates daemon auto-start on the
-    result. Bootstrap steps run in-container, so they no longer leave host `Command` audit rows. Parts
-    4–6 still parked.
+    result. Bootstrap steps run in-container, so they no longer leave host `Command` audit rows.
+  - **Part 4 — [daemon-supervised-dev-daemons](features/2026-07-24_daemon-supervised-dev-daemons.md)
+    — implemented (2026-07-24).** Dev-server supervision moved into the PID-1 daemon: a new
+    in-container `ServiceSupervisor` starts the auto-start services as the boot-sequence tail (gated
+    on `Bootstrapped{ok}`), owns restart/backoff/policy/`readyPattern` and group-kills by session
+    (`setsid` + `pkill -s`, reaping escaped forks with no `/proc` scan), streams `DaemonEvent` +
+    `service:<name>` output, and re-reports on reconnect. New `StartDaemon`/`SignalDaemon`/
+    `DaemonEvent` protocol; a `WorkspaceServiceDriver` SPI (registry impl) the host **projects** onto
+    the (renamed) host `ServiceSupervisor`'s state machine/segments/proxy while **keeping the tmux
+    path as the fallback**. **Also folded in the `daemon`→`service` rename** of the surviving runtime
+    domain (`domain.daemon.*`→`domain.service.*`, `/services` REST, `qits.services.*`); the
+    Part-5-doomed `RepositoryDaemon*` store keeps its name. Deferred: observer/DEGRADED in
+    daemon-backed mode (audit-log-sequence-anchored — the tmux path keeps it) and the
+    `.qits-config.yml` `daemons:`→`services:` key (fixture round-trip). Parts 5–6 still parked.

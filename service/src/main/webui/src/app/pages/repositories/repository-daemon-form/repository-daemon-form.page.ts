@@ -5,7 +5,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { RepositoryDaemonControllerService } from '@/api/api/repositoryDaemonController.service';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
-import { RepositoryDaemonCreateUpdateFormComponent } from '@/pattern/daemon/repository-daemon-create-update-form.component';
+import { RepositoryDaemonCreateUpdateFormComponent } from '@/pattern/service/repository-daemon-create-update-form.component';
 
 @Component({
   selector: 'app-repository-daemon-form-page',

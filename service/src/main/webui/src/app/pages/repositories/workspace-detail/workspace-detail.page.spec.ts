@@ -14,7 +14,7 @@ import { WorkspaceControllerService } from '@/api/api/workspaceController.servic
 import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
-import { DaemonStatus } from '@/api/model/daemonStatus';
+import { ServiceStatus } from '@/api/model/serviceStatus';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
 import { EDarkModes, ZardDarkMode } from '@/shared/services/dark-mode';
 import { WorkspaceDetailPage } from './workspace-detail.page';
@@ -119,7 +119,7 @@ describe('WorkspaceDetailPage', () => {
       [{ workspaceId: 'wt-1', branch: 'feature/x', preamble: 'Do the thing' }],
     );
     queryClient.setQueryData(['workspace-files', 'repo-1', 'wt-1'], { paths: [], lazyDirs: [] });
-    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], []);
+    queryClient.setQueryData(['workspace-services', 'repo-1', 'wt-1'], []);
     queryClient.setQueryData(['workspace-agent-sessions', 'repo-1', 'wt-1'], []);
 
     await TestBed.configureTestingModule({
@@ -167,7 +167,7 @@ describe('WorkspaceDetailPage', () => {
       'Chat',
       'Files',
       'Sketch',
-      'Daemons',
+      'Services',
       'Bootstrap',
       'Actions',
       'Web view',
@@ -175,18 +175,18 @@ describe('WorkspaceDetailPage', () => {
       'Agents',
     ]);
     expect(el.querySelector('[role="tabpanel"] app-workspace-sketch')).not.toBeNull();
-    // Chat, daemons and web view live in tab panels — not in the header, not floating.
+    // Chat, services and web view live in tab panels — not in the header, not floating.
     expect(el.querySelector('[role="tabpanel"] app-workspace-chat')).not.toBeNull();
-    expect(el.querySelector('[role="tabpanel"] app-workspace-daemons')).not.toBeNull();
+    expect(el.querySelector('[role="tabpanel"] app-workspace-services')).not.toBeNull();
     expect(el.querySelector('[role="tabpanel"] app-workspace-bootstrap')).not.toBeNull();
     expect(el.querySelector('[role="tabpanel"] app-workspace-actions')).not.toBeNull();
-    expect(el.querySelector('[role="tabpanel"] app-daemon-webview')).not.toBeNull();
+    expect(el.querySelector('[role="tabpanel"] app-service-webview')).not.toBeNull();
     expect(el.querySelector('header app-workspace-chat')).toBeNull();
-    expect(el.querySelector('[aria-label="Open the daemon web view"]')).toBeNull();
-    // The events feed shares the Daemons tab panel, rendered beside (not inside) the panel.
-    const daemonsPanel = el.querySelector('app-workspace-daemons')!.closest('[role="tabpanel"]')!;
-    expect(daemonsPanel.querySelector('app-workspace-daemon-events')).not.toBeNull();
-    expect(el.querySelector('app-workspace-daemons app-workspace-daemon-events')).toBeNull();
+    expect(el.querySelector('[aria-label="Open the service web view"]')).toBeNull();
+    // The events feed shares the Services tab panel, rendered beside (not inside) the panel.
+    const servicesPanel = el.querySelector('app-workspace-services')!.closest('[role="tabpanel"]')!;
+    expect(servicesPanel.querySelector('app-workspace-service-events')).not.toBeNull();
+    expect(el.querySelector('app-workspace-services app-workspace-service-events')).toBeNull();
   });
 
   it('restores a drag-reordered tab row persisted in localStorage', () => {
@@ -208,7 +208,7 @@ describe('WorkspaceDetailPage', () => {
       'Web view',
       'Files',
       'Sketch',
-      'Daemons',
+      'Services',
       'Bootstrap',
       'Actions',
       'Telemetry',
@@ -228,11 +228,11 @@ describe('WorkspaceDetailPage', () => {
     ).componentInstance;
     const openAtLine = vi.spyOn(fileBrowser, 'openAtLine').mockImplementation(() => undefined);
 
-    // Start on the Daemons tab (where the events feed lives) so the jump to Files is observable.
-    const daemonsTab = tabButton(el, 'Daemons');
-    daemonsTab.click();
+    // Start on the Services tab (where the events feed lives) so the jump to Files is observable.
+    const servicesTab = tabButton(el, 'Services');
+    servicesTab.click();
     fixture.detectChanges();
-    expect(daemonsTab.getAttribute('aria-selected')).toBe('true');
+    expect(servicesTab.getAttribute('aria-selected')).toBe('true');
 
     fixture.componentInstance.openFileFromEvent({ path: 'src/app.ts', startLine: 3, endLine: 5 });
     fixture.detectChanges();
@@ -363,30 +363,30 @@ describe('WorkspaceDetailPage', () => {
     expect(agentService.apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentsPost).toHaveBeenCalledTimes(1);
   });
 
-  it('marks the Daemons tab with an aggregate status dot', async () => {
+  it('marks the Services tab with an aggregate status dot', async () => {
     const fixture = TestBed.createComponent(WorkspaceDetailPage);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
     // All stopped → no dot.
-    expect(tabButton(el, 'Daemons').querySelector('span[title]')).toBeNull();
+    expect(tabButton(el, 'Services').querySelector('span[title]')).toBeNull();
 
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
-      [{ daemon: { id: 'd-1', name: 'dev server' }, status: DaemonStatus.Ready, restartCount: 0 }],
+      ['workspace-services', 'repo-1', 'wt-1'],
+      [{ daemon: { id: 'd-1', name: 'dev server' }, status: ServiceStatus.Ready, restartCount: 0 }],
     );
     await flush();
     fixture.detectChanges();
     expect(
-      tabButton(el, 'Daemons').querySelector('[title="A daemon is running"]'),
+      tabButton(el, 'Services').querySelector('[title="A service is running"]'),
     ).not.toBeNull();
 
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
+      ['workspace-services', 'repo-1', 'wt-1'],
       [
         {
           daemon: { id: 'd-1', name: 'dev server' },
-          status: DaemonStatus.Degraded,
+          status: ServiceStatus.Degraded,
           restartCount: 0,
         },
       ],
@@ -394,17 +394,17 @@ describe('WorkspaceDetailPage', () => {
     await flush();
     fixture.detectChanges();
     expect(
-      tabButton(el, 'Daemons').querySelector('[title="A daemon is degraded or restarting"]'),
+      tabButton(el, 'Services').querySelector('[title="A service is degraded or restarting"]'),
     ).not.toBeNull();
   });
 
   it('mounts the web view iframe on first tab activation, then keeps it across switches', () => {
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
+      ['workspace-services', 'repo-1', 'wt-1'],
       [
         {
           daemon: { id: 'd-1', name: 'dev server' },
-          status: DaemonStatus.Ready,
+          status: ServiceStatus.Ready,
           restartCount: 0,
           proxyPath: '/daemon/wt-1/d-1/',
         },
@@ -415,25 +415,25 @@ describe('WorkspaceDetailPage', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     // Hidden-but-mounted panels must not load the framed app before the tab is opened.
-    expect(el.querySelector('app-daemon-webview iframe')).toBeNull();
+    expect(el.querySelector('app-service-webview iframe')).toBeNull();
 
     tabButton(el, 'Web view').click();
     fixture.detectChanges();
-    expect(el.querySelector('app-daemon-webview iframe')).not.toBeNull();
+    expect(el.querySelector('app-service-webview iframe')).not.toBeNull();
 
     // Switching away keeps the iframe mounted (hidden), so the framed app doesn't reload.
     tabButton(el, 'Files').click();
     fixture.detectChanges();
-    expect(el.querySelector('app-daemon-webview iframe')).not.toBeNull();
+    expect(el.querySelector('app-service-webview iframe')).not.toBeNull();
   });
 
   it('deep-links a tab: the :tab slug selects it and trips its activation latch', () => {
     queryClient.setQueryData(
-      ['workspace-daemons', 'repo-1', 'wt-1'],
+      ['workspace-services', 'repo-1', 'wt-1'],
       [
         {
           daemon: { id: 'd-1', name: 'dev server' },
-          status: DaemonStatus.Ready,
+          status: ServiceStatus.Ready,
           restartCount: 0,
           proxyPath: '/daemon/wt-1/d-1/',
         },
@@ -449,7 +449,7 @@ describe('WorkspaceDetailPage', () => {
 
     expect(tabButton(el, 'Web view').getAttribute('aria-selected')).toBe('true');
     // The latch tripped: the deep link mounts the iframe just like a click would.
-    expect(el.querySelector('app-daemon-webview iframe')).not.toBeNull();
+    expect(el.querySelector('app-service-webview iframe')).not.toBeNull();
     // The URL already says web-view — the echoed selection must not navigate again.
     expect(router.navigate).not.toHaveBeenCalled();
   });
@@ -487,11 +487,11 @@ describe('WorkspaceDetailPage', () => {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
-    paramMap$.next(convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1', tab: 'daemons' }));
+    paramMap$.next(convertToParamMap({ repoId: 'repo-1', workspaceId: 'wt-1', tab: 'services' }));
     fixture.detectChanges();
     fixture.detectChanges();
 
-    expect(tabButton(el, 'Daemons').getAttribute('aria-selected')).toBe('true');
+    expect(tabButton(el, 'Services').getAttribute('aria-selected')).toBe('true');
     expect(router.navigate).not.toHaveBeenCalled();
   });
 

@@ -7,19 +7,19 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { DaemonStatus } from './daemonStatus';
-import { DaemonEventKind } from './daemonEventKind';
-import { DaemonEventSeverity } from './daemonEventSeverity';
+import { ServiceEventKind } from './serviceEventKind';
+import { ServiceStatus } from './serviceStatus';
+import { ServiceEventSeverity } from './serviceEventSeverity';
 
 
-export interface DaemonEventDto { 
+export interface ServiceEventDto { 
     repoId?: string;
     workspaceId?: string;
-    daemonId?: string;
-    daemonName?: string;
-    kind?: DaemonEventKind;
-    severity?: DaemonEventSeverity;
-    status?: DaemonStatus;
+    serviceId?: string;
+    serviceName?: string;
+    kind?: ServiceEventKind;
+    severity?: ServiceEventSeverity;
+    status?: ServiceStatus;
     summary?: string;
     logExcerpt?: string;
     commandId?: string;
@@ -29,7 +29,7 @@ export interface DaemonEventDto {
     sourceEpoch?: string;
     timestamp?: string;
 }
-export namespace DaemonEventDto {
+export namespace ServiceEventDto {
 }
 
 

@@ -10,6 +10,6 @@
 
 
 export interface Response86 { 
-    technicalProcessId?: string;
+    updatedAt?: string;
 }
 

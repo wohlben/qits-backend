@@ -1,5 +1,15 @@
 # Daemon-supervised dev daemons (autonomous supervision handover)
 
+> **Implemented 2026-07-24.** In-container `ServiceSupervisor` (setsid + `pkill -s` group-kill sans
+> `/proc`, restart/backoff/policy/`readyPattern`, reconnect re-report) started as the boot-sequence
+> tail; `StartDaemon`/`SignalDaemon`/`DaemonEvent` protocol; `WorkspaceServiceDriver` SPI + registry
+> impl; the host `ServiceSupervisor` gained a daemon-backed **projection** mode with the tmux path
+> kept as the fallback. Folded in the `daemon`→`service` rename of the surviving runtime domain.
+> **Deferred:** log-observer/DEGRADED derivation in daemon-backed mode (anchored to the audit-log
+> line sequence the projection bypasses — the tmux fallback keeps full observer fidelity); the
+> `.qits-config.yml` `daemons:`→`services:` key (needs the fixture repos' two-level submodule
+> round-trip). See [`docs/implementation-plan.md`](../../../implementation-plan.md) Part 4.
+
 ## Introduction
 
 Part 4 of the **provisioning-inversion** track of [qits-workspace-daemon](../epic.md) (see the

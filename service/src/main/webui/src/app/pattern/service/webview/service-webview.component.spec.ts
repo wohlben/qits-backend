@@ -4,11 +4,11 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
-import { WorkspaceDaemonControllerService } from '@/api/api/workspaceDaemonController.service';
-import { DaemonInstanceDto } from '@/api/model/daemonInstanceDto';
-import { DaemonStatus } from '@/api/model/daemonStatus';
+import { WorkspaceServiceControllerService } from '@/api/api/workspaceServiceController.service';
+import { ServiceInstanceDto } from '@/api/model/serviceInstanceDto';
+import { ServiceStatus } from '@/api/model/serviceStatus';
 import { NewSnippet, PromptContextStore } from '@/shared/state/prompt-context.store';
-import { DaemonWebviewComponent } from './daemon-webview.component';
+import { ServiceWebviewComponent } from './service-webview.component';
 
 const snippet: NewSnippet = {
   html: '<button>Go</button>',
@@ -18,20 +18,20 @@ const snippet: NewSnippet = {
   textPreview: 'Go',
 };
 
-function instance(overrides: Partial<DaemonInstanceDto> = {}): DaemonInstanceDto {
+function instance(overrides: Partial<ServiceInstanceDto> = {}): ServiceInstanceDto {
   return {
     daemon: { id: 'd-1', name: 'dev server' },
-    status: DaemonStatus.Ready,
+    status: ServiceStatus.Ready,
     restartCount: 0,
     commandId: 'cmd-1',
     proxyPath: '/daemon/wt-1/d-1/',
     ...overrides,
-  } as DaemonInstanceDto;
+  } as ServiceInstanceDto;
 }
 
-describe('DaemonWebviewComponent', () => {
-  const daemonService = {
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdDaemonsGet: vi
+describe('ServiceWebviewComponent', () => {
+  const serviceApi = {
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesGet: vi
       .fn()
       .mockReturnValue(of({ entries: [] })),
   };
@@ -55,18 +55,18 @@ describe('DaemonWebviewComponent', () => {
       },
     });
     await TestBed.configureTestingModule({
-      imports: [DaemonWebviewComponent],
+      imports: [ServiceWebviewComponent],
       providers: [
         provideTanStackQuery(queryClient),
-        { provide: WorkspaceDaemonControllerService, useValue: daemonService },
+        { provide: WorkspaceServiceControllerService, useValue: serviceApi },
         { provide: WorkspaceControllerService, useValue: workspaceService },
       ],
     }).compileComponents();
   });
 
-  function createComponent(instances: DaemonInstanceDto[], activated = true) {
-    queryClient.setQueryData(['workspace-daemons', 'repo-1', 'wt-1'], instances);
-    const fixture = TestBed.createComponent(DaemonWebviewComponent);
+  function createComponent(instances: ServiceInstanceDto[], activated = true) {
+    queryClient.setQueryData(['workspace-services', 'repo-1', 'wt-1'], instances);
+    const fixture = TestBed.createComponent(ServiceWebviewComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
     fixture.componentRef.setInput('activated', activated);
@@ -74,7 +74,7 @@ describe('DaemonWebviewComponent', () => {
     return fixture;
   }
 
-  it('frames a live web-viewable daemon once the tab has been activated', () => {
+  it('frames a live web-viewable service once the tab has been activated', () => {
     const fixture = createComponent([instance()]);
 
     expect(fixture.componentInstance.webViewable().length).toBe(1);
@@ -95,30 +95,30 @@ describe('DaemonWebviewComponent', () => {
   it('shows the empty state without a proxyPath or without a live status', () => {
     const fixture = createComponent([
       instance({ proxyPath: undefined }),
-      instance({ daemon: { id: 'd-2', name: 'stopped one' }, status: DaemonStatus.Stopped }),
-      instance({ daemon: { id: 'd-3', name: 'crashed one' }, status: DaemonStatus.Crashed }),
+      instance({ daemon: { id: 'd-2', name: 'stopped one' }, status: ServiceStatus.Stopped }),
+      instance({ daemon: { id: 'd-3', name: 'crashed one' }, status: ServiceStatus.Crashed }),
     ]);
 
     expect(fixture.componentInstance.webViewable().length).toBe(0);
     expect(fixture.nativeElement.querySelector('iframe')).toBeNull();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
-      'No web-viewable daemon is running',
+      'No web-viewable service is running',
     );
   });
 
-  it('selects the first web-viewable daemon and lets a picked id override it', () => {
+  it('selects the first web-viewable service and lets a picked id override it', () => {
     const fixture = createComponent([
       instance({ daemon: { id: 'd-0', name: 'not web' }, proxyPath: undefined }),
       instance(),
       instance({
         daemon: { id: 'd-2', name: 'second' },
         proxyPath: '/daemon/wt-1/d-2/',
-        status: DaemonStatus.Starting,
+        status: ServiceStatus.Starting,
       }),
     ]);
 
     expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-1');
-    fixture.componentInstance.selectedDaemonId.set('d-2');
+    fixture.componentInstance.selectedServiceId.set('d-2');
     expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-2');
   });
 
@@ -240,7 +240,7 @@ describe('DaemonWebviewComponent', () => {
     expect(resetButton()).toBeNull();
   });
 
-  it("rejects a URL outside this daemon's proxy prefix: inline error, apply disabled", () => {
+  it("rejects a URL outside this service's proxy prefix: inline error, apply disabled", () => {
     const fixture = createComponent([instance()]);
     const component = fixture.componentInstance;
     component.toggleUrlBar();
@@ -286,7 +286,7 @@ describe('DaemonWebviewComponent', () => {
 
     expect(String(fixture.componentInstance.frameSrc())).toContain('/daemon/wt-1/d-1/greeting');
 
-    fixture.componentInstance.selectedDaemonId.set('d-2');
+    fixture.componentInstance.selectedServiceId.set('d-2');
     expect(frameUrl()).toContain('/daemon/wt-1/d-2/');
     expect(frameUrl()).not.toContain('greeting');
   });

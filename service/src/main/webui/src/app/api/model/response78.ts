@@ -7,11 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { WorkspaceDto } from './workspaceDto';
 
 
 export interface Response78 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    workspace?: WorkspaceDto;
+    technicalProcessId?: string;
 }
 

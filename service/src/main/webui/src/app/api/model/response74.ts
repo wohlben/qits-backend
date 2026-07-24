@@ -7,12 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Available } from './available';
-import { Entry15 } from './entry15';
 
 
 export interface Response74 { 
-    entries?: Array<Entry15>;
-    available?: Array<Available>;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
 }
 
