@@ -46,6 +46,11 @@ public class AgentAuthStatus {
 
   private boolean probeKimi(String container) {
     String kimiHome = claudeMount + "/.kimi-code";
+    // Kimi 0.28+ stores the OAuth token as $KIMI_CODE_HOME/credentials/kimi-code.json (a
+    // directory layout); earlier builds wrote a flat `credentials` file. Accept either — a
+    // `-f` probe on `credentials` alone always fails against the directory layout, which
+    // misreads a signed-in volume as logged out and redirects every launch to `kimi login`
+    // (which then exits immediately on the existing login — the "flicker").
     ContainerRuntime.ExecResult result =
         containers.exec(
             container,
@@ -53,7 +58,8 @@ public class AgentAuthStatus {
             Map.of("KIMI_CODE_HOME", kimiHome),
             "bash",
             "-c",
-            "test -f \"$KIMI_CODE_HOME/credentials\"");
+            "test -f \"$KIMI_CODE_HOME/credentials\" "
+                + "|| test -f \"$KIMI_CODE_HOME/credentials/kimi-code.json\"");
     return result.exitCode() == 0;
   }
 

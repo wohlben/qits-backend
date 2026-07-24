@@ -49,9 +49,34 @@ public class AgentAuthStatusKimiTest {
 
     Files.createDirectories(credentials.getParent());
     Files.writeString(credentials, "{}");
-    assertTrue(agentAuthStatus.isLoggedIn(repoId, "work", AgentType.KIMI), "credentials present");
+    assertTrue(
+        agentAuthStatus.isLoggedIn(repoId, "work", AgentType.KIMI),
+        "legacy flat credentials file present");
 
     Files.deleteIfExists(credentials);
+  }
+
+  /**
+   * Regression: kimi 0.28+ stores the token as {@code credentials/kimi-code.json} — {@code
+   * credentials} is a directory there, so a plain {@code test -f} on it misreads a signed-in volume
+   * as logged out (every launch redirected to an instantly-exiting {@code kimi login}).
+   */
+  @Test
+  public void directoryLayoutCredentialsCountAsLoggedIn() throws IOException {
+    String repoId = "33333333-3333-3333-3333-333333333333";
+    containers.run(repoId, "work", "master", null);
+    Files.createDirectories(
+        Path.of("data/repositories", repoId, "workspaces", "work").toAbsolutePath());
+    Path tokenFile = Path.of(KIMI_HOME, "credentials", "kimi-code.json");
+    Files.createDirectories(tokenFile.getParent());
+
+    Files.writeString(tokenFile, "{}");
+    assertTrue(
+        agentAuthStatus.isLoggedIn(repoId, "work", AgentType.KIMI),
+        "credentials/kimi-code.json present");
+
+    Files.deleteIfExists(tokenFile);
+    Files.deleteIfExists(tokenFile.getParent());
   }
 
   @Test
