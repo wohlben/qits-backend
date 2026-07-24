@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { WorkspaceHistoryDetailDto } from './workspaceHistoryDetailDto';
 
 
 export interface Response74 { 
-    commitHash?: string;
-    hasConflicts?: boolean;
-    output?: string;
+    workspace?: WorkspaceHistoryDetailDto;
 }
 

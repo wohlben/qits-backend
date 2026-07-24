@@ -5,12 +5,12 @@ import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
-import { RepositoryActionsControllerService } from '@/api/api/repositoryActionsController.service';
-import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
-import { ActionScope } from '@/api/model/actionScope';
+import { WorkspaceActionsControllerService } from '@/api/api/workspaceActionsController.service';
+import { ActionOrigin } from '@/api/model/actionOrigin';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
+import { WorkspaceActionDto } from '@/api/model/workspaceActionDto';
 import { WorkspaceActionsComponent } from './workspace-actions.component';
 
 /** Mutation callbacks land on the next macrotask; flush before asserting. */
@@ -18,15 +18,15 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function action(overrides: Partial<ActionConfigurationDto>): ActionConfigurationDto {
+function action(overrides: Partial<WorkspaceActionDto>): WorkspaceActionDto {
   return {
     id: 'action-1',
     name: 'build-project',
-    executeScript: './mvnw package',
+    origin: ActionOrigin.Code,
     interactive: false,
-    scope: ActionScope.Global,
+    runnable: true,
     ...overrides,
-  } as ActionConfigurationDto;
+  } as WorkspaceActionDto;
 }
 
 function command(overrides: Partial<CommandDto>): CommandDto {
@@ -44,7 +44,12 @@ function command(overrides: Partial<CommandDto>): CommandDto {
 
 describe('WorkspaceActionsComponent', () => {
   const actionsService = {
-    apiRepositoriesRepositoryIdActionsGet: vi.fn().mockReturnValue(of({ entries: [] })),
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsGet: vi
+      .fn()
+      .mockReturnValue(of({ actions: [] })),
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsActionIdRunPost: vi
+      .fn()
+      .mockReturnValue(of({ exitCode: 0, stdout: 'built ok', stderr: '' })),
   };
   const commandService = {
     apiCommandsGet: vi.fn().mockReturnValue(of({ entries: [] })),
@@ -67,7 +72,7 @@ describe('WorkspaceActionsComponent', () => {
       providers: [
         provideRouter([]),
         provideTanStackQuery(queryClient),
-        { provide: RepositoryActionsControllerService, useValue: actionsService },
+        { provide: WorkspaceActionsControllerService, useValue: actionsService },
         { provide: CommandControllerService, useValue: commandService },
       ],
     }).compileComponents();
@@ -81,17 +86,17 @@ describe('WorkspaceActionsComponent', () => {
     return fixture;
   }
 
-  it('renders both scopes with their badges and an interactive badge', () => {
+  it('renders both origins with their badges and an interactive badge', () => {
     queryClient.setQueryData(
-      ['repository-actions', 'repo-1'],
+      ['workspace-actions', 'repo-1', 'wt-1'],
       [
         action({}),
         action({
           id: 'action-2',
           name: 'stack-info',
-          scope: ActionScope.Repository,
-          repositoryId: 'repo-1',
+          origin: ActionOrigin.Config,
           interactive: true,
+          runnable: false,
         }),
       ],
     );
@@ -99,14 +104,14 @@ describe('WorkspaceActionsComponent', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(element.textContent).toContain('build-project');
-    expect(element.textContent).toContain('global');
+    expect(element.textContent).toContain('code');
     expect(element.textContent).toContain('stack-info');
-    expect(element.textContent).toContain('repository');
+    expect(element.textContent).toContain('config');
     expect(element.textContent).toContain('interactive');
   });
 
-  it('Run launches the action into this workspace', async () => {
-    queryClient.setQueryData(['repository-actions', 'repo-1'], [action({})]);
+  it('Run launches a code action into this workspace', async () => {
+    queryClient.setQueryData(['workspace-actions', 'repo-1', 'wt-1'], [action({})]);
     const fixture = createComponent();
 
     const runButton = Array.from(
@@ -126,7 +131,7 @@ describe('WorkspaceActionsComponent', () => {
 
   it('an interactive launch navigates to the command terminal page', async () => {
     queryClient.setQueryData(
-      ['repository-actions', 'repo-1'],
+      ['workspace-actions', 'repo-1', 'wt-1'],
       [action({ interactive: true })],
     );
     const fixture = createComponent();
@@ -139,6 +144,48 @@ describe('WorkspaceActionsComponent', () => {
     await flush();
 
     expect(navigate).toHaveBeenCalledWith(['/commands', 'cmd-new']);
+  });
+
+  it('Run on a config action calls the workspace run endpoint and shows the captured output', async () => {
+    queryClient.setQueryData(
+      ['workspace-actions', 'repo-1', 'wt-1'],
+      [action({ origin: ActionOrigin.Config })],
+    );
+    const fixture = createComponent();
+    const element = fixture.nativeElement as HTMLElement;
+
+    const runButton = Array.from(element.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Run',
+    );
+    runButton!.click();
+    await flush();
+    fixture.detectChanges();
+
+    expect(
+      actionsService.apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsActionIdRunPost,
+    ).toHaveBeenCalledWith('action-1', 'repo-1', 'wt-1');
+    expect(element.textContent).toContain('exit 0');
+    expect(element.textContent).toContain('built ok');
+    // Fire-and-await: no Command history entry is created for config runs.
+    expect(commandService.apiCommandsPost).not.toHaveBeenCalled();
+  });
+
+  it('disables Run for a non-runnable (interactive config) action', () => {
+    queryClient.setQueryData(
+      ['workspace-actions', 'repo-1', 'wt-1'],
+      [action({ origin: ActionOrigin.Config, interactive: true, runnable: false })],
+    );
+    const fixture = createComponent();
+
+    const runButton = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((b) => b.textContent?.trim() === 'Run') as HTMLButtonElement;
+    expect(runButton.disabled).toBe(true);
+    runButton.click();
+
+    expect(
+      actionsService.apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsActionIdRunPost,
+    ).not.toHaveBeenCalled();
   });
 
   it('renders the workspace run history with status, kind badge and exit code', () => {

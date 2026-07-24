@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceHistoryDetailDto } from './workspaceHistoryDetailDto';
+import { TelemetryTraceDto } from './telemetryTraceDto';
 
 
 export interface Response85 { 
-    workspace?: WorkspaceHistoryDetailDto;
+    trace?: TelemetryTraceDto;
 }
 

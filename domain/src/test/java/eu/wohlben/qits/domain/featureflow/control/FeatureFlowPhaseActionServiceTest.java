@@ -11,7 +11,6 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.featureflow.persistence.FeatureFlowPhaseActionRepository;
 import eu.wohlben.qits.domain.project.control.ProjectService;
-import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -51,8 +50,6 @@ public class FeatureFlowPhaseActionServiceTest {
 
   @Inject ProjectService projectService;
 
-  @Inject RepositoryService repositoryService;
-
   private FeatureFlowPhaseStep createStep() {
     var project = projectService.create("Action Project", null);
     return createStepUnderProject(project.id);
@@ -63,12 +60,6 @@ public class FeatureFlowPhaseActionServiceTest {
         featureFlowConfigurationService.createUnderProject(projectId, "Test Flow");
     FeatureFlowPhase phase = featureFlowPhaseService.create(config.id, "Phase", null, 0, null);
     return featureFlowPhaseStepService.create(phase.id, "Build", 0);
-  }
-
-  private String createRepoUnderProject(String projectId) throws Exception {
-    String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
-    var project = projectService.get(projectId);
-    return repositoryService.cloneRepository(fixtureUrl, null, project).id;
   }
 
   private ActionConfiguration createAction(String suffix) {
@@ -168,39 +159,6 @@ public class FeatureFlowPhaseActionServiceTest {
         () ->
             featureFlowPhaseActionService.create(
                 step.id, action.id, ActionType.QUALITY_GATE, 1, null));
-  }
-
-  @Test
-  public void bindsARepositoryScopedActionOfTheSameProject() throws Exception {
-    var project = projectService.create("Same Project Binding", null);
-    var step = createStepUnderProject(project.id);
-    String repoId = createRepoUnderProject(project.id);
-    var action =
-        actionConfigurationService.createForRepository(
-            repoId, "repo-build", null, "./mvnw package", null, false, null);
-
-    var link =
-        featureFlowPhaseActionService.create(step.id, action.id, ActionType.PREREQUISITE, 0, null);
-
-    assertEquals(action.id, link.actionConfiguration.id);
-    assertEquals(repoId, link.actionConfiguration.repository.id);
-  }
-
-  @Test
-  public void bindingARepositoryScopedActionOfAnotherProjectThrows() throws Exception {
-    var flowProject = projectService.create("Flow Project", null);
-    var repoProject = projectService.create("Repo Project", null);
-    var step = createStepUnderProject(flowProject.id);
-    String repoId = createRepoUnderProject(repoProject.id);
-    var action =
-        actionConfigurationService.createForRepository(
-            repoId, "foreign-build", null, "./mvnw package", null, false, null);
-
-    assertThrows(
-        BadRequestException.class,
-        () ->
-            featureFlowPhaseActionService.create(
-                step.id, action.id, ActionType.PREREQUISITE, 0, null));
   }
 
   @Test

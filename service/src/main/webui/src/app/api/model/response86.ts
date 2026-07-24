@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { TelemetrySpanDto } from './telemetrySpanDto';
 
 
 export interface Response86 { 
-    updatedAt?: string;
+    spans?: Array<TelemetrySpanDto>;
 }
 

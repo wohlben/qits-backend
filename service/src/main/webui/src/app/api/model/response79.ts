@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ServiceInstanceDto } from './serviceInstanceDto';
 
 
 export interface Response79 { 
-    success?: boolean;
+    instance?: ServiceInstanceDto;
 }
 

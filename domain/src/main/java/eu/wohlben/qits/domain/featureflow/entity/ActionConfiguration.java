@@ -1,6 +1,5 @@
 package eu.wohlben.qits.domain.featureflow.entity;
 
-import eu.wohlben.qits.domain.repository.entity.Repository;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -11,7 +10,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapKeyColumn;
 import java.time.Instant;
 import java.util.HashMap;
@@ -20,13 +18,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 /**
- * An action — a preconfigured process a workspace can run. One table holds both scopes: {@code
- * repository == null} means <strong>global</strong> (available in every repository, e.g. a shell),
- * a set {@code repository} means <strong>repository-scoped</strong> (owned by that repository and
- * only available there, e.g. its build/test commands; cascade-deleted with it, see {@link
- * Repository#actions}). {@link ActionScope} is derived from that null-ness at mapping time, never
- * persisted. Because scope is a column rather than a table identity, {@link FeatureFlowPhaseAction}
- * can bind actions of either scope.
+ * An action — a preconfigured process a workspace can run. Actions are <strong>global</strong>
+ * (code-based, available in every repository, e.g. a shell); the repo-scoped DB config store was
+ * removed in Part 5 (config-as-single-source-of-truth) — config-declared actions live only in the
+ * workspace's committed {@code .qits-config.yml} and are never persisted.
  */
 @Entity
 public class ActionConfiguration extends PanacheEntityBase {
@@ -53,11 +48,6 @@ public class ActionConfiguration extends PanacheEntityBase {
    */
   @Column(nullable = false)
   public boolean interactive = false;
-
-  /** The owning repository, or {@code null} for a global action. */
-  @ManyToOne
-  @JoinColumn(name = "repository_id")
-  public Repository repository;
 
   /**
    * Environment variables injected into the process when this action runs in a workspace terminal.

@@ -85,9 +85,11 @@ All Maven commands use the wrapper.
 ./mvnw -pl cli quarkus:run -Dcli.args=seed
 
 # Seed the servable Quarkus+Angular demo: a project + repo cloned from the testing-repo-quarkus-angular
-# fixture, a web-viewable OTEL-enabled `quarkus:dev` daemon (LOG_LEVEL + PATTERN observers, a FILE log
-# source), a `greeting` workspace, and a "Build & Verify" feature-flow blueprint. Exercises the
-# stack-specific feature surface (framework detection, web view, observability, log observation,
+# fixture, a `greeting` workspace, and a "Build & Verify" feature-flow blueprint binding the
+# code-seeded global `Bash` action. The fixture's committed `.qits-config.yml` (a web-viewable
+# OTEL-enabled `quarkus:dev` service, the bootstrap chain, actions) is the workspace-scoped source
+# of truth — read in-container per workspace by the workspace-daemon, never ingested into DB rows.
+# Exercises the stack-specific feature surface (framework detection, web view, observability,
 # feature-flows, the coding agent) — the counterpart to `seed` (which owns git merge/divergence).
 # Idempotent by RESET — re-running deletes and recreates the project, so it always returns to the same
 # known-good state (use it as the fixture for manual UI poking and automated regression tests).
@@ -156,7 +158,7 @@ Every workspace executes inside a **per-workspace Docker container** — the sol
 - `Workspace.branch` is a **stored column** (no host checkout to read it from). Workspace-local git verbs (`status`, `fetch`+`merge`) run as `docker exec` in the container; `CommandRegistry`'s two spawn seams prepend a `docker exec` prefix; termination reads a pid file and `kill`s the in-container process group.
 - **Build the fat default image locally** before running the app end-to-end: `docker build -t qits/workspace --target workspace -f docker/qits/Dockerfile .` (config `qits.workspace.image`; the `workspace` stage of the single docker/qits/Dockerfile, which also holds the prod app image's stages). The container runs as your host uid.
 - **Tests** don't need docker: `FakeContainerRuntime` (a Quarkus `@Mock` in each module's `src/test`) emulates a container as a host clone at the old workspace path. Because it runs real host processes, process-group termination works end-to-end. Tests that create branch divergence must **push** (origin-side ahead/behind/conflict probes only see pushed commits).
-- **Seeding is pure host-side data setup** (rows, branch refs, host-side worktree merges — daemons are definitions only): the `cli` `seed`/`seed-webapp` commands run standalone, with no docker and no running service. Docker + the git server are needed only when a container actually materializes — on first use, via `ensureContainer`.
+- **Seeding is pure host-side data setup** (rows, branch refs, host-side worktree merges — services/actions come from the fixture's `.qits-config.yml`, read in-container on first use): the `cli` `seed`/`seed-webapp` commands run standalone, with no docker and no running service. Docker + the git server are needed only when a container actually materializes — on first use, via `ensureContainer`.
 
 ### Frontend
 

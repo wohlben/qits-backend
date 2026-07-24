@@ -1,6 +1,5 @@
 package eu.wohlben.qits.mcp;
 
-import eu.wohlben.qits.domain.featureflow.mcp.RepositoryScope;
 import eu.wohlben.qits.domain.repository.mcp.ProjectScope;
 import eu.wohlben.qits.domain.telemetry.mcp.WorkspaceScope;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -67,12 +66,10 @@ public class ContextServerRegistry {
             true),
         new ContextServer(
             "actions",
-            "CRUD over actions: the preconfigured processes workspaces can run (an interactive"
-                + " shell/Claude Code, or a one-off command like 'mvn test'). Unscoped, it manages"
-                + " the global library (the *GlobalAction tools). Send the '"
-                + RepositoryScope.REPOSITORY_HEADER
-                + "' header set to a repository id to also manage that repository's own actions (the"
-                + " *RepositoryAction tools).",
+            "CRUD over the global action library: the preconfigured, code-based processes"
+                + " workspaces can run (an interactive shell/Claude Code, or a one-off command like"
+                + " 'mvn test'). Config-declared workspace actions live in .qits-config.yml and are"
+                + " managed by editing that file, not via MCP.",
             actionsPath,
             actionsPath + "/sse",
             null,

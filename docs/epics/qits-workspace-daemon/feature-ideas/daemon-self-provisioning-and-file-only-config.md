@@ -39,20 +39,20 @@ plus reading the socket. Steps 2–5 all happen **in-container, driven by the da
 
 ## The split (dependency order = build order)
 
-1. **[autonomous-self-clone-on-boot](autonomous-self-clone-on-boot.md)** — the daemon self-clones
+1. **[autonomous-self-clone-on-boot](../features/2026-07-23_autonomous-self-clone-on-boot.md)** — the daemon self-clones
    `/workspace` + wires submodules from its env; `provisionContainer` stops driving the clone and
    awaits a `Provisioned` event; socket-down ⇒ host-clone fallback. Absorbs the clone piece of
    [Part 4](in-container-git-verbs-over-socket.md).
-2. **[in-container-config-discovery](in-container-config-discovery.md)** — the daemon reads/parses
+2. **[in-container-config-discovery](../features/2026-07-23_in-container-config-discovery.md)** — the daemon reads/parses
    `.qits-config.yml` from the checkout (its own branch), making config workspace/branch-scoped. The
    pivot enabling file-as-truth.
 3. **[daemon-run-bootstrap-chain](../features/2026-07-23_daemon-run-bootstrap-chain.md)** — the bootstrap chain runs inside
    the daemon's startup, from the in-container config; ordering preserved by construction. Re-homes
    `WorkspaceBootstrapRunner`; absorbs [workspace-bootstrap-commands](../../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md).
-4. **[daemon-supervised-dev-daemons](daemon-supervised-dev-daemons.md)** — dev daemons start as the
+4. **[daemon-supervised-dev-daemons](../features/2026-07-24_daemon-supervised-dev-daemons.md)** — dev daemons start as the
    tail of the daemon's startup and are supervised in-container; `DaemonSupervisor` shrinks to a thin
    coordinator. The autonomous reframing of [Part 5](daemon-supervision-handover.md).
-5. **[config-as-single-source-of-truth](config-as-single-source-of-truth.md)** — the host-side
+5. **[config-as-single-source-of-truth](../features/2026-07-24_config-as-single-source-of-truth.md)** — the host-side
    inversion: remove `QitsConfigReconciler`→DB, the repo-scoped
    `ActionConfiguration`/`RepositoryDaemon`/`BootstrapCommand` store + its MCP tools + feature-flow
    binding; config is workspace-only; only code-based actions (agent + `Bash`) stay at repo/global
@@ -84,7 +84,7 @@ image with no daemon never sends `Hello`/`Provisioned`, so each migrated call si
 
 The **file** is authoritative and **workspace-scoped**; there is no UI-only config and no DB store
 that is the source of truth. The scope decisions (detailed in
-[config-as-single-source-of-truth](config-as-single-source-of-truth.md)):
+[config-as-single-source-of-truth](../features/2026-07-24_config-as-single-source-of-truth.md)):
 
 - Config is **workspace-scoped**, read in-container from the checkout — not projected to repo-level
   DB rows. It no longer appears in the repository/global Actions list or the feature-flow picker.

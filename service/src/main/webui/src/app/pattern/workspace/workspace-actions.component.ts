@@ -5,24 +5,26 @@ import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-quer
 import { lastValueFrom } from 'rxjs';
 
 import { CommandControllerService } from '@/api/api/commandController.service';
-import { RepositoryActionsControllerService } from '@/api/api/repositoryActionsController.service';
-import { ActionConfigurationDto } from '@/api/model/actionConfigurationDto';
-import { ActionScope } from '@/api/model/actionScope';
+import { WorkspaceActionsControllerService } from '@/api/api/workspaceActionsController.service';
+import { ActionOrigin } from '@/api/model/actionOrigin';
 import { CommandDto } from '@/api/model/commandDto';
 import { CommandKind } from '@/api/model/commandKind';
 import { CommandStatus } from '@/api/model/commandStatus';
+import { WorkspaceActionDto } from '@/api/model/workspaceActionDto';
 import { commandStatusBadgeType, commandStatusLabel } from '@/pattern/command/command-status';
 import { CommandLogComponent } from '@/pattern/command/command-log.component';
 import { ZardBadgeComponent } from '@/shared/components/badge';
 import { ZardButtonComponent } from '@/shared/components/button';
 
 /**
- * The workspace's Actions tab: the repository's effective action set (global + repo-scoped, the
- * merge the branch-list "Run…" dialog never sees) with one-click launch into THIS workspace, and
- * the workspace's command run history below. One fetch per query on load; freshness after that is
- * push-only — the history key sits under the `['commands']` prefix the page's SSE `commands` hint
- * already invalidates, so nothing here polls. The action list refreshes on the usual mutation
- * invalidations (definitions change rarely, and never from this tab).
+ * The workspace's Actions tab: the workspace action set (global code-based actions plus the actions
+ * declared in the committed .qits-config.yml) with one-click launch into THIS workspace, and the
+ * workspace's command run history below. Code actions launch through the regular command pipeline
+ * (history + re-attach); config actions run fire-and-await through the workspace daemon and show
+ * their captured exit code/stdout/stderr inline (no history). One fetch per query on load;
+ * freshness after that is push-only — the history key sits under the `['commands']` prefix the
+ * page's SSE `commands` hint already invalidates, so nothing here polls. The action list refreshes
+ * on the usual mutation invalidations (definitions change rarely, and never from this tab).
  */
 @Component({
   selector: 'app-workspace-actions',
@@ -40,35 +42,75 @@ import { ZardButtonComponent } from '@/shared/components/button';
           @let actions = actionsQuery.data() ?? [];
           @if (actions.length === 0) {
             <p class="text-sm text-muted-foreground">
-              No actions configured — define global ones under Action Configurations.
+              No actions configured — define global ones under Action Configurations or declare them
+              in the repository's .qits-config.yml.
             </p>
           } @else {
             <ul class="flex flex-col divide-y rounded-md border">
               @for (action of actions; track action.id) {
-                <li class="flex flex-wrap items-center gap-3 px-3 py-2">
-                  <div class="flex min-w-0 flex-1 flex-col">
-                    <span class="truncate font-medium">{{ action.name }}</span>
-                    @if (action.description) {
-                      <span class="truncate text-xs text-muted-foreground">
-                        {{ action.description }}
-                      </span>
+                <li class="flex flex-col gap-2 px-3 py-2">
+                  <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex min-w-0 flex-1 flex-col">
+                      <span class="truncate font-medium">{{ action.name }}</span>
+                      @if (action.description) {
+                        <span class="truncate text-xs text-muted-foreground">
+                          {{ action.description }}
+                        </span>
+                      }
+                    </div>
+                    <z-badge [zType]="isConfigAction(action) ? 'outline' : 'secondary'">
+                      {{ isConfigAction(action) ? 'config' : 'code' }}
+                    </z-badge>
+                    @if (action.interactive) {
+                      <z-badge zType="default">interactive</z-badge>
                     }
+                    <button
+                      z-button
+                      zSize="sm"
+                      type="button"
+                      [zLoading]="isLaunching(action)"
+                      [zDisabled]="action.runnable === false"
+                      [title]="
+                        action.runnable === false
+                          ? 'Interactive config actions cannot be run from here'
+                          : ''
+                      "
+                      (click)="run(action)"
+                    >
+                      Run
+                    </button>
                   </div>
-                  <z-badge [zType]="isRepositoryScoped(action) ? 'outline' : 'secondary'">
-                    {{ isRepositoryScoped(action) ? 'repository' : 'global' }}
-                  </z-badge>
-                  @if (action.interactive) {
-                    <z-badge zType="default">interactive</z-badge>
+                  @if (expandedResultActionId() === action.id) {
+                    @if (configRunResults()[action.id!]; as result) {
+                      <div class="flex flex-col gap-1 rounded-md border bg-muted/40 px-3 py-2">
+                        <div class="flex items-center gap-2 text-xs">
+                          <span
+                            class="font-medium"
+                            [class.text-destructive]="(result.exitCode ?? 1) !== 0"
+                          >
+                            {{ result.error ?? 'exit ' + result.exitCode }}
+                          </span>
+                          <button
+                            z-button
+                            zType="ghost"
+                            zSize="sm"
+                            type="button"
+                            (click)="expandedResultActionId.set(null)"
+                          >
+                            Hide
+                          </button>
+                        </div>
+                        @if (result.stdout) {
+                          <pre class="max-h-64 overflow-auto text-xs">{{ result.stdout }}</pre>
+                        }
+                        @if (result.stderr) {
+                          <pre
+                            class="max-h-64 overflow-auto text-xs text-destructive"
+                          >{{ result.stderr }}</pre>
+                        }
+                      </div>
+                    }
                   }
-                  <button
-                    z-button
-                    zSize="sm"
-                    type="button"
-                    [zLoading]="isLaunching(action)"
-                    (click)="launchMutation.mutate(action)"
-                  >
-                    Run
-                  </button>
                 </li>
               }
             </ul>
@@ -152,18 +194,20 @@ export class WorkspaceActionsComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
 
-  private readonly actionsService = inject(RepositoryActionsControllerService);
+  private readonly actionsService = inject(WorkspaceActionsControllerService);
   private readonly commandService = inject(CommandControllerService);
   private readonly queryClient = inject(QueryClient);
   private readonly router = inject(Router);
 
   readonly actionsQuery = injectQuery(() => ({
-    queryKey: ['repository-actions', this.repoId()],
+    queryKey: ['workspace-actions', this.repoId(), this.workspaceId()],
     queryFn: () =>
-      lastValueFrom(this.actionsService.apiRepositoriesRepositoryIdActionsGet(this.repoId())).then(
-        (r) =>
-          r.entries?.map((e) => e.action).filter((a): a is ActionConfigurationDto => !!a) ?? [],
-      ),
+      lastValueFrom(
+        this.actionsService.apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsGet(
+          this.repoId(),
+          this.workspaceId(),
+        ),
+      ).then((r) => r.actions?.filter((a): a is WorkspaceActionDto => !!a) ?? []),
   }));
 
   // Under the ['commands'] prefix so the SSE `commands` hint (and every sibling surface's
@@ -177,7 +221,7 @@ export class WorkspaceActionsComponent {
   }));
 
   readonly launchMutation = injectMutation(() => ({
-    mutationFn: (action: ActionConfigurationDto) =>
+    mutationFn: (action: WorkspaceActionDto) =>
       lastValueFrom(
         this.commandService.apiCommandsPost({
           repoId: this.repoId(),
@@ -195,6 +239,36 @@ export class WorkspaceActionsComponent {
     },
   }));
 
+  /** Result of a fire-and-await config-action run (no Command history), keyed by action id. */
+  readonly configRunResults = signal<
+    Record<string, { exitCode?: number; stdout?: string; stderr?: string; error?: string }>
+  >({});
+
+  /** The action whose inline run result is expanded (one at a time; set on each finished run). */
+  readonly expandedResultActionId = signal<string | null>(null);
+
+  readonly runConfigMutation = injectMutation(() => ({
+    mutationFn: (action: WorkspaceActionDto) =>
+      lastValueFrom(
+        this.actionsService.apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsActionIdRunPost(
+          action.id!,
+          this.repoId(),
+          this.workspaceId(),
+        ),
+      ).then((result) => ({ action, result })),
+    onSuccess: ({ action, result }) => {
+      this.configRunResults.update((results) => ({ ...results, [action.id!]: result }));
+      this.expandedResultActionId.set(action.id ?? null);
+    },
+    onError: (error, action) => {
+      this.configRunResults.update((results) => ({
+        ...results,
+        [action.id!]: { error: this.errorMessage(error) },
+      }));
+      this.expandedResultActionId.set(action.id ?? null);
+    },
+  }));
+
   readonly terminateMutation = injectMutation(() => ({
     mutationFn: (commandId: string) =>
       lastValueFrom(this.commandService.apiCommandsCommandIdTerminatePost(commandId)),
@@ -204,8 +278,11 @@ export class WorkspaceActionsComponent {
   /** The finished command whose audit log is expanded inline (one at a time). */
   readonly expandedLogCommandId = signal<string | null>(null);
 
-  isLaunching(action: ActionConfigurationDto): boolean {
-    return this.launchMutation.isPending() && this.launchMutation.variables()?.id === action.id;
+  isLaunching(action: WorkspaceActionDto): boolean {
+    return (
+      (this.launchMutation.isPending() && this.launchMutation.variables()?.id === action.id) ||
+      (this.runConfigMutation.isPending() && this.runConfigMutation.variables()?.id === action.id)
+    );
   }
 
   isTerminating(command: CommandDto): boolean {
@@ -226,8 +303,29 @@ export class WorkspaceActionsComponent {
     }
   }
 
-  isRepositoryScoped(action: ActionConfigurationDto): boolean {
-    return action.scope === ActionScope.Repository;
+  isConfigAction(action: WorkspaceActionDto): boolean {
+    return action.origin === ActionOrigin.Config;
+  }
+
+  /** CODE actions go through the command pipeline; CONFIG actions run fire-and-await via the daemon. */
+  run(action: WorkspaceActionDto): void {
+    if (this.isConfigAction(action)) {
+      this.runConfigMutation.mutate(action);
+    } else {
+      this.launchMutation.mutate(action);
+    }
+  }
+
+  /** A human-readable message from a failed config run: the backend {@code {message}} body, or fallback. */
+  private errorMessage(error: unknown): string {
+    const httpError = error as { error?: unknown; message?: string } | null;
+    const body = httpError?.error;
+    if (typeof body === 'string' && body.trim()) return body;
+    if (body && typeof body === 'object') {
+      const message = (body as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return httpError?.message ?? 'Failed to run the action';
   }
 
   commandName(command: CommandDto): string {

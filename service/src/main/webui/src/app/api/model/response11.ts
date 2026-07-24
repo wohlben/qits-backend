@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { CommandDto } from './commandDto';
 
 
 export interface Response11 { 
-    started?: boolean;
+    command?: CommandDto;
 }
 

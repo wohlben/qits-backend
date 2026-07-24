@@ -89,7 +89,7 @@ started.
 ## Non-goals
 
 - Daemon start — [next part](daemon-supervised-dev-daemons.md).
-- Removing the DB `BootstrapCommand` rows / repo-scope — [Part 5](config-as-single-source-of-truth.md)
+- Removing the DB `BootstrapCommand` rows / repo-scope — [Part 5](2026-07-24_config-as-single-source-of-truth.md)
   (this part re-homes the *runner*; Part 5 removes the *store*).
 - Write-back — [Part 6](config-write-back-from-ui.md).
 

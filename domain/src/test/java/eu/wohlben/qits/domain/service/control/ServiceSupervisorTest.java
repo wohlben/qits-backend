@@ -9,12 +9,13 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
-import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.FakeContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.FakeWorkspaceConfigReader;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.service.dto.ServiceEventDto;
@@ -30,12 +31,16 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
  * Drives the supervisor state machine against real processes in a cloned-fixture workspace:
  * readiness via pattern and grace, the restart policies (with new Command rows per relaunch),
- * graceful stop, and the singleton-per-(workspace, daemon) rule.
+ * graceful stop, and the singleton-per-(workspace, daemon) rule. Definitions are config-declared:
+ * each test stages the workspace's services into the {@link FakeWorkspaceConfigReader} (the
+ * in-container {@code .qits-config.yml} stand-in) and the supervisor keys everything by the
+ * declared {@code id:} (which defaults to the name).
  */
 @QuarkusTest
 @TestProfile(ServiceSupervisorTest.TestProfile.class)
@@ -68,7 +73,7 @@ public class ServiceSupervisorTest {
 
   @Inject WorkspaceService workspaceService;
 
-  @Inject RepositoryDaemonService repositoryDaemonService;
+  @Inject FakeWorkspaceConfigReader configReader;
 
   @Inject ServiceSupervisor supervisor;
 
@@ -79,6 +84,11 @@ public class ServiceSupervisorTest {
   @Inject CommandService commandService;
 
   @Inject ContainerRuntime containers;
+
+  @BeforeEach
+  void resetConfig() {
+    configReader.clear(); // the fake is a shared singleton across this class's test methods
+  }
 
   /** Clones the fixture and adds a {@code work} workspace (off master) to run daemons in. */
   private String repoWithWorkspace() throws Exception {
@@ -92,6 +102,12 @@ public class ServiceSupervisorTest {
     return repo.id;
   }
 
+  /** Stage one service as the workspace's whole config-declared set; returns its id. */
+  private String stageService(QitsConfig.ServiceDecl decl) {
+    configReader.setConfig("work", new QitsConfig(null, null, null, List.of(decl), null));
+    return decl.id();
+  }
+
   private String createDaemon(
       String repoId,
       String name,
@@ -99,23 +115,21 @@ public class ServiceSupervisorTest {
       String readyPattern,
       RestartPolicy policy,
       int maxRestarts) {
-    return repositoryDaemonService.create(
-            repoId,
+    return stageService(
+        new QitsConfig.ServiceDecl(
+            name,
             name,
             null,
             script,
             readyPattern,
-            "TERM",
+            null,
+            null,
             policy,
-            null, // autoStart (default true)
             maxRestarts,
+            "TERM",
             null,
             null,
-            null,
-            null,
-            null,
-            null)
-        .id;
+            null));
   }
 
   private ServiceEventDto awaitEvent(String repoId, Predicate<ServiceEventDto> predicate)
@@ -265,34 +279,27 @@ public class ServiceSupervisorTest {
 
   @Test
   public void webViewableDaemonExposesProxyTargetAndPath() throws Exception {
-    // Definition first: the container (created with the workspace below) publishes the port only
-    // when the daemon already declares it at creation time.
-    String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
-    var project = projectService.create("Proxy Daemon Project", null);
-    var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
+    String repoId = repoWithWorkspace();
     String daemonId =
-        repositoryDaemonService.create(
-                repo.id,
+        stageService(
+            new QitsConfig.ServiceDecl(
+                "web",
                 "web",
                 null,
                 "sleep 300",
                 null,
-                "TERM",
+                null,
+                null,
                 RestartPolicy.NEVER,
-                null, // autoStart (default true)
                 0,
+                "TERM",
                 null,
-                8123,
-                "greeting",
-                "app",
-                null,
-                null)
-            .id;
-    workspaceService.createWorkspace(repo.id, "work", "master", "work");
+                new QitsConfig.WebViewDecl(8123, "greeting", "app"),
+                null));
 
-    supervisor.start(repo.id, "work", daemonId);
+    supervisor.start(repoId, "work", daemonId);
     try {
-      ServiceInstanceDto ready = awaitStatus(repo.id, daemonId, ServiceStatus.READY);
+      ServiceInstanceDto ready = awaitStatus(repoId, daemonId, ServiceStatus.READY);
       assertEquals(
           "/service/work/" + daemonId + "/app/",
           ready.proxyPath(),
@@ -315,8 +322,8 @@ public class ServiceSupervisorTest {
           supervisor.proxyTarget("work", "no-such-daemon").isEmpty(),
           "unknown daemon id resolves to nothing");
     } finally {
-      supervisor.stop(repo.id, "work", daemonId);
-      awaitStatus(repo.id, daemonId, ServiceStatus.STOPPED);
+      supervisor.stop(repoId, "work", daemonId);
+      awaitStatus(repoId, daemonId, ServiceStatus.STOPPED);
     }
 
     var stopped = supervisor.proxyTarget("work", daemonId);
@@ -343,30 +350,28 @@ public class ServiceSupervisorTest {
   @Test
   public void webViewPortDeclaredAfterTheContainerExistsIsReachableWithNoRecreation()
       throws Exception {
-    // Regression for the frozen-port bug: workspace (and thus container) first, web-view definition
-    // second. Because qits reaches the container's port by its DNS name on the shared network — not
-    // a host port frozen at `docker run` — the web view resolves immediately, with no recreation
-    // and
-    // no "recreate the container" warning.
+    // Regression for the frozen-port bug: the web-view port only enters the definition (staged
+    // here) after the workspace (and thus container) already exists. Because qits reaches the
+    // container's port by its DNS name on the shared network — not a host port frozen at
+    // `docker run` — the web view resolves immediately, with no recreation and no "recreate the
+    // container" warning.
     String repoId = repoWithWorkspace();
     String daemonId =
-        repositoryDaemonService.create(
-                repoId,
+        stageService(
+            new QitsConfig.ServiceDecl(
+                "late-port",
                 "late-port",
                 null,
                 "sleep 300",
                 null,
-                "TERM",
+                null,
+                null,
                 RestartPolicy.NEVER,
-                null, // autoStart (default true)
                 0,
+                "TERM",
                 null,
-                8124,
-                null,
-                null,
-                null,
-                null)
-            .id;
+                new QitsConfig.WebViewDecl(8124, null, null),
+                null));
 
     supervisor.start(repoId, "work", daemonId);
     try {
@@ -541,12 +546,11 @@ public class ServiceSupervisorTest {
 
   @Test
   public void automaticRelaunchPicksUpADefinitionEditedMidRun() throws Exception {
-    // Regression: a daemon running with no webView is edited to add one, then crash-restarts (the
-    // container-recreate flow the web-view feature prescribes looks like a crash to ON_FAILURE).
-    // The
-    // relaunch must re-read the definition so the proxy — whose only lookup reads the supervisor's
-    // pinned copy — sees the new webView, instead of answering from the stale launch-time snapshot
-    // while the REST list (which prefers the DB definition) reports a proxyPath. See
+    // Regression: a daemon running with no webView has one added to its config declaration, then
+    // crash-restarts. The relaunch must re-read the definition so the proxy — whose only lookup
+    // reads the supervisor's pinned copy — sees the new webView, instead of answering from the
+    // stale launch-time snapshot while the REST list (which prefers the config definition) reports
+    // a proxyPath. See
     // docs/issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md.
     String repoId = repoWithWorkspace();
     String daemonId =
@@ -564,10 +568,22 @@ public class ServiceSupervisorTest {
         supervisor.proxyTarget("work", daemonId).isEmpty(),
         "no web view yet: the proxy has no target");
 
-    // Add a webView to the running daemon's definition.
-    repositoryDaemonService.update(
-        repoId, daemonId, null, null, null, null, null, null, null, null, null, 8125, null, null,
-        null, null);
+    // Add a webView to the running daemon's config declaration.
+    stageService(
+        new QitsConfig.ServiceDecl(
+            "editme",
+            "editme",
+            null,
+            "while true; do echo up; sleep 0.2; done",
+            "up",
+            null,
+            null,
+            RestartPolicy.ON_FAILURE,
+            3,
+            "TERM",
+            null,
+            new QitsConfig.WebViewDecl(8125, null, null),
+            null));
 
     // Kill the detached session — the liveness poll sees a crash and ON_FAILURE relaunches it. The
     // relaunch must read the just-added webView.

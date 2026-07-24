@@ -4,7 +4,7 @@
 
 Part 6 of the **provisioning-inversion** track of [qits-workspace-daemon](../epic.md) (see the
 [overview](daemon-self-provisioning-and-file-only-config.md)). With config now
-[file-authoritative and workspace-scoped](config-as-single-source-of-truth.md), the configuration UI
+[file-authoritative and workspace-scoped](../features/2026-07-24_config-as-single-source-of-truth.md), the configuration UI
 must **write its edits into the file in the workspace** — configuring a repository *is* editing its
 committed `.qits-config.yml`. This closes the loop: the UI stays a form over actions/daemons/bootstrap
 steps, but the output of an edit is `/workspace/.qits-config.yml` written into the container, not a DB
@@ -21,7 +21,7 @@ experimental tweak.
 
 ### Related / dependent plans
 
-- **Hard dependency** — [config-as-single-source-of-truth](config-as-single-source-of-truth.md) (the
+- **Hard dependency** — [config-as-single-source-of-truth](../features/2026-07-24_config-as-single-source-of-truth.md) (the
   file must be authoritative before the UI edits it) and [Part 1](../features/2026-07-22_workspace-daemon-binary-and-control-socket.md).
 - **Depends on the transport of [Part 3 — container-file-access-over-socket](container-file-access-over-socket.md)**
   — the daemon's `WriteFile`/`ReadFile` verbs are how the UI's edit reaches `/workspace/.qits-config.yml`
@@ -36,17 +36,16 @@ experimental tweak.
   daemon file-read verb / the [in-container config view](in-container-config-discovery.md)), populate
   the form, and on save **re-serialize the whole file** (or the edited section) and write it back to
   the working tree.
-- **The UI surfaces that flip from read-only to editing** (they currently render a `.qits-config`
-  badge + suppressed edit affordance via `shared/utils/config-origin.ts`):
+- **The UI surfaces that flip from read-only to editing** — the repo-detail config cards/forms
+  below were **deleted in Part 5** (with `shared/utils/config-origin.ts`); the write-back UI is
+  built fresh under the **workspace-detail** view (config is per-workspace), reading the
+  ConfigView-sourced Services/Bootstrap/Actions tabs. The deleted surfaces were:
   - `ui/components/action-configuration/action-configuration-card.component.ts` + the
     `pattern/action-configuration/` create/update form.
   - `ui/components/daemon/repository-daemon-card.component.ts` + `pattern/daemon/` form +
     `pages/repositories/repository-daemons/`.
   - `ui/components/bootstrap/bootstrap-command-card.component.ts` + `pattern/bootstrap/` form +
     `pages/repositories/repository-bootstrap/`.
-  - The now workspace-scoped surfacing moves these under the **workspace-detail** view (config is
-    per-workspace), not repo-detail (which lost its config sections in
-    [Part 5](config-as-single-source-of-truth.md)).
 - **YAML (de)serialization contract** — round-trip stability: the written file must re-parse to the
   same config the daemon reads; preserve key order and the `version: 1` discriminator; ids are
   explicit and preserved on edit (per the Part-5 id decision).

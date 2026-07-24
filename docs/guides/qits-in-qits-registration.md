@@ -5,7 +5,7 @@
 qits now conforms to its own managed-app convention
 ([feature doc](../epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md)): the real
 `wohlben/qits-backend` repository can be registered on a qits deployment (dev or prod) and managed
-like any other Quarkus+Angular app — framed web view, health dots, log observation, full-stack
+like any other Quarkus+Angular app — framed web view, health dots, full-stack
 telemetry into the parent's Telemetry tab, and the SPA capture button. This guide is the exact
 registration recipe; the general walk it specializes is
 [quarkus-angular-integration.md](quarkus-angular-integration.md).
@@ -34,8 +34,10 @@ Related: [workspace submodule support](../epics/qits-project-repository-submodul
 prod image) self-seeds at startup
 ([startup self-seed feature](../epics/qits-live-deployment/features/2026-07-19_startup-qits-self-seed.md)): it boots into a
 `"qits"` project with `wohlben/qits-backend` and `wohlben/qits-angular-integration` already
-registered, the qits-backend submodules imported (including the one second-level import on the
-`testing-repo-quarkus-angular` child), and each repo's `.qits-config.yml` ingested. Nothing below is
+registered, and the qits-backend submodules imported (including the one second-level import on the
+`testing-repo-quarkus-angular` child). Each repo's committed `.qits-config.yml` is **not ingested**
+anywhere — it is the single, workspace-scoped source of truth, read in-container per workspace
+(see step 3). Nothing below is
 needed there — pick up at step 2 (the workspace / first-build walk). The seed is reconciled
 additively on every boot and can be turned off with `qits.startup-seed.enabled=false` or redirected
 with `qits.startup-seed.repo-url` (mirror/fork/air-gap).
@@ -60,8 +62,9 @@ it links back to the already-imported `qits-fixture-angular` sibling rather than
 ## 2. The bootstrap chain — the child self-bootstraps
 
 `.qits-config.yml` also declares a **`bootstrap:` chain**
-([feature doc](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)) that qits runs inside a
-freshly provisioned workspace container **before the dev-server daemon auto-starts**:
+([feature doc](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)) that the **workspace-daemon runs
+in-container** in a freshly provisioned workspace container **before the dev-server service
+auto-starts** (the chain is read from the workspace's own checkout — no host-side ingestion):
 
 1. `install` — `./mvnw install -DskipTests -Dqits.variant=forwardauth` (so the cli jar exists; this
    is the heavy first build the prerequisites warn about).
@@ -79,19 +82,18 @@ daemons come up.
 
 ## 3. The dev-server daemon
 
-**qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this daemon
-(and the build/test/lint actions), and qits ingests it on clone**
-([config-in-repo feature](../epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md)). So after
-step 1 the daemon **already exists** — stored as **`qits dev server@qits-config`** with
-`origin: CONFIG`, rendered read-only in the UI with a `.qits-config` badge. You do **not** create it
-by hand; the fields below document what the file declares (and what to verify). To change any of
-them, edit `.qits-config.yml` in a workspace and let the next sync re-ingest — an accidental UI edit
-to a config-origin entry self-heals on the next reconcile. (A repository registered before this file
-existed, or one whose file you removed, still supports the manual *Daemons → New* path with the same
-fields.)
+**qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this service
+(and the build/test/lint actions) — and that file is the only place the service exists**
+([config-as-single-source-of-truth](../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)):
+config is **workspace-scoped, file-only, read in-container** by the workspace-daemon from its own
+checkout. There is no DB copy, no ingestion on clone, and no UI editor — the service shows up on a
+workspace's **Services** tab because the workspace's branch declares it. You do **not** create it by
+hand; the fields below document what the file declares (and what to verify). To change any of them,
+edit `.qits-config.yml` in a workspace (that workspace then sees its own branch's version; merge it
+to change every future workspace).
 
-**Name**: `qits dev server` — stored as `qits dev server@qits-config` (the reserved config-origin
-suffix). Becomes `OTEL_SERVICE_NAME`; the browser side reports `qits dev server@qits-config-browser`
+**Name**: `qits dev server` — the service's identity is its config `id:` (absent, so it defaults to
+the name). Becomes `OTEL_SERVICE_NAME`; the browser side reports `qits dev server-browser`
 and the backend reports its artifact name `qits-forwardauth`.
 
 **Start script** (one line; shown wrapped):
@@ -133,21 +135,16 @@ child's `config.json` relays so the child's *browser* telemetry flows to the par
 **Web view**: port **8080**, entryPath `projects` (frame Quarkus, not `:4200`: qits' UI is
 SSE/websocket-heavy on `/api`; Quarkus serves those natively and Quinoa dev-proxies the SPA).
 
-**Log observers**:
-
-- `LOG_LEVEL` (defaults) — classifies Java stack traces / `*Exception`s.
-- `PATTERN`, severity `ERROR`: `(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)`
-
-**Log source** (FILE): path `service/quarkus.log`, label `Quarkus dev log`
-(`quarkus.log.file.path=quarkus.log` is CWD-relative; verify the location on first run and adjust
-to `quarkus.log` if the dev JVM ran from the repo root).
-
 **Health checks**:
 
 - `Quarkus` — COMMAND: `curl -fsS -m 2 "http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health"`
   (COMMAND, not HTTP: the path needs the env-expanded root path).
 - `Angular` — HTTP on port `4200`, path `/` (any HTTP answer means ng serve is up; it may 302/404
   bare paths under the serve path — connection-refused-while-compiling is the red-then-green).
+
+(Log observers and log sources no longer exist — that subsystem was removed with the daemon-backed
+service supervision, 2026-07-24; `readyPattern`, health checks and crash excerpts are the surviving
+surface.)
 
 Remember the two standing rules: daemon-definition changes apply on the next (re)launch, and
 `webView.port` changes need a container recreate (stop-container → ensure-container → start).
@@ -156,9 +153,10 @@ Remember the two standing rules: daemon-definition changes apply on the next (re
 
 0. **Packaged deployment only** — boot a packaged image (with outbound HTTPS to GitHub): with no UI
    steps, a `"qits"` project appears holding `qits-backend` + `qits-angular-integration`, the
-   qits-backend submodule siblings imported (incl. the second-level `webui` edge), and the
-   `qits dev server@qits-config` daemon + build/test/lint actions + `bootstrap:` chain ingested from
-   `.qits-config.yml`. No workspace is provisioned (lazy by design). A second boot is a fast
+   qits-backend submodule siblings imported (incl. the second-level `webui` edge). The
+   `qits dev server` service + build/test/lint actions + `bootstrap:` chain live only in the
+   committed `.qits-config.yml`, read in-container per workspace — nothing is ingested at this
+   point. No workspace is provisioned (lazy by design). A second boot is a fast
    all-present no-op. (On a dev instance you did steps 1–3 by hand instead.)
 1. First workspace Start: the `bootstrap:*` segments run (install → seeds) and settle green, then
    the daemon phase begins; the Bootstrap tab shows `SUCCEEDED`/`SKIPPED` per command.
@@ -166,12 +164,10 @@ Remember the two standing rules: daemon-definition changes apply on the next (re
 3. Web view renders the qits UI under `/daemon/{ws}/{d}/` — navigate, open a project, watch the
    child's own SSE-driven pages work in the frame.
 4. Parent workspace Telemetry tab: full-stack traces from the child — browser CLIENT spans
-   (`qits dev server@qits-config-browser`, `app.route.*`, `code.function.name`) rooting the child's
+   (`qits dev server-browser`, `app.route.*`, `code.function.name`) rooting the child's
    Quarkus SERVER spans (service `qits-forwardauth`); no `/otel/v1/*`, `/daemon/*`, `/git/*` or
    `/mcp/*` self-spans (suppressed).
-5. Events tab: provoke a build failure (edit a `.java` file to junk via the file browser) → the
-   PATTERN observer flags it; the FILE source tails the dev log.
-6. Capture: in the framed child UI, use the floaty capture button → a new workspace appears in
+5. Capture: in the framed child UI, use the floaty capture button → a new workspace appears in
    the **parent** whose goal carries the child UI snapshot (DOM + selected component). The
    `promptContext` **state** entry rides along only if `PromptContextStore` was instantiated in the
    session (a lazy `providedIn: 'root'` store — only the file-browser / command-chat /

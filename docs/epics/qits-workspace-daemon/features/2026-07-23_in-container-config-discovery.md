@@ -27,7 +27,7 @@ its branch — the "branch-divergent config" the `.qits-config` feature explicit
 workspace's config is its *branch's* config. A feature branch that edits `.qits-config.yml` (via the
 coding agent or a human) changes that workspace's actions/daemons/bootstrap with no merge/precedence
 machinery. This is the pivot that makes config **workspace-scoped** and enables
-[file-as-single-source-of-truth](config-as-single-source-of-truth.md).
+[file-as-single-source-of-truth](2026-07-24_config-as-single-source-of-truth.md).
 
 ### Autonomous control model (option 1)
 
@@ -43,11 +43,11 @@ bootstrap → daemons), self-initiated after the clone completes. qits is not in
   — the YAML schema (`version: 1`, `actions`/`daemons`/`bootstrap`/`frameworks`/`repository`) and the
   `QitsConfig` record tree are unchanged as a *format*. What changes is *where* it is read (checkout,
   not bare origin) and that it is **no longer reconciled into DB rows** (that removal is
-  [Part 5](config-as-single-source-of-truth.md)).
+  [Part 5](2026-07-24_config-as-single-source-of-truth.md)).
 - **Feeds [daemon-run-bootstrap-chain](2026-07-23_daemon-run-bootstrap-chain.md) and
   [daemon-supervised-dev-daemons](daemon-supervised-dev-daemons.md)** — the in-container config is
   the source those two steps run from.
-- **Enables [config-as-single-source-of-truth](config-as-single-source-of-truth.md)** — the read
+- **Enables [config-as-single-source-of-truth](2026-07-24_config-as-single-source-of-truth.md)** — the read
   moving in-container is precisely what lets the host drop its DB config store.
 
 ## What this defines
@@ -71,7 +71,7 @@ bootstrap → daemons), self-initiated after the clone completes. qits is not in
 
 ## Non-goals
 
-- Removing the host DB config store — [Part 5](config-as-single-source-of-truth.md).
+- Removing the host DB config store — [Part 5](2026-07-24_config-as-single-source-of-truth.md).
 - Running bootstrap/daemons — [parts 3](2026-07-23_daemon-run-bootstrap-chain.md) /
   [4](daemon-supervised-dev-daemons.md).
 - Write-back from the UI — [Part 6](config-write-back-from-ui.md).

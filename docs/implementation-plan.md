@@ -211,7 +211,7 @@ construction.
 
 ---
 
-## Part 4 — [daemon-supervised-dev-daemons](epics/qits-workspace-daemon/feature-ideas/daemon-supervised-dev-daemons.md)
+## Part 4 — [daemon-supervised-dev-daemons](epics/qits-workspace-daemon/features/2026-07-24_daemon-supervised-dev-daemons.md) ✅ implemented 2026-07-24
 
 Dev daemons start as the tail of the daemon's startup, supervised in-container. Autonomous reframing
 of epic Part 5 (`daemon-supervision-handover.md`).
@@ -253,43 +253,58 @@ Status.
 
 ---
 
-## Part 5 — [config-as-single-source-of-truth](epics/qits-workspace-daemon/feature-ideas/config-as-single-source-of-truth.md)
+## Part 5 — [config-as-single-source-of-truth](epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md) ✅ implemented 2026-07-24
 
 Host-side inversion: remove the repo-scoped DB config store + its MCP/feature-flow/UI surface. Only
-after parts 2–4 make the in-container read the live source.
+after parts 2–4 make the in-container read the live source. **As shipped:** everything below landed
+(`V43__drop_repo_config_store.sql` drops the store; existing repo-scoped rows deleted, not
+migrated). Additions/deviations: a **new workspace-scoped actions surface**
+(`GET/POST /repositories/{repoId}/workspaces/{workspaceId}/actions[/…/run]`) that runs config
+actions over the control socket **reusing the existing `RunCommand` verb** (no new `DaemonMessage`;
+runs are not recorded as `Command` rows — no history/re-attach in the interim; interactive config
+actions listed but not runnable — both user decisions); `id:` is **optional, defaulting to `name`**
+until the fixtures' two-level round-trip declares them (the `daemons:`→`services:` `@JsonAlias`
+stopgap pattern); service identity re-keyed from DB UUID to the config `id:` string via
+`ServiceDefinitionDto` (replacing `RepositoryDaemonDto`); the bootstrap list is ConfigView-sourced
+(`BootstrapStepDto`), with `runSingleAsync` 404ing only when the config is readable and the id
+absent (pass-through on a cold workspace); V43 also deletes the repo-scoped
+`action_configuration_env` rows before the actions; the host `ServiceSupervisor` reap marker is
+shell-escaped now that ids are user-declared strings; and `QitsConfigParser` was **kept**
+(`DetectionService`'s `frameworks` hint + test fakes), `QitsConfig` stays the wire schema. The
+checklist below is retained as the record; the settled decisions live in the moved feature doc.
 
 **Remove (`domain`/`service`)**
-- [ ] `QitsConfigReconciler` + its triggers in `RepositoryService.cloneOne`/`pullRepository` + the
+- [x] `QitsConfigReconciler` + its triggers in `RepositoryService.cloneOne`/`pullRepository` + the
       `POST /repositories/{id}/config/reload` endpoint (`RepositoryController`). Keep `QitsConfig`/
       `QitsConfigParser` only if reused by the shared parser (Part 2); otherwise delete the host copy.
-- [ ] Repo scope of `ActionConfiguration` (`listByRepositoryId`/`listEffective` → global-only;
+- [x] Repo scope of `ActionConfiguration` (`listByRepositoryId`/`listEffective` → global-only;
       `ActionResolutionService.effectiveActions` returns only code-based global actions — the seeded
       `Bash` (`ActionConfigurationSeeder.java:36`) + the agent path). `RepositoryActionsController`
       returns global-only (or is removed).
-- [ ] `RepositoryDaemon` (entity + `RepositoryDaemonService` + `RepositoryDaemonController` +
+- [x] `RepositoryDaemon` (entity + `RepositoryDaemonService` + `RepositoryDaemonController` +
       `DaemonLifecycleCoupler` repo-level query `findByRepositoryId`) and `BootstrapCommand` (entity +
       service + controller). **Flyway migration drops** those tables/columns (`domain/.../db/migration`).
-- [ ] MCP: `RepositoryMcpTools.listActions/runAction` (`:251/:268`), `ActionConfigurationMcpTools`
+- [x] MCP: `RepositoryMcpTools.listActions/runAction` (`:251/:268`), `ActionConfigurationMcpTools`
       repository tools.
-- [ ] Feature-flow binding to config actions: the project-scoped guard + `isActionBound` in
+- [x] Feature-flow binding to config actions: the project-scoped guard + `isActionBound` in
       `FeatureFlowPhaseActionService.create`. Only code-based actions remain bindable.
 
 **Ids**
-- [ ] Adopt explicit string `id:` per declared entry (replaces `@qits-config` name-namespacing);
+- [x] Adopt explicit string `id:` per declared entry (replaces `@qits-config` name-namespacing);
       duplicate id = allowed user error. Update the parser + any `configName`/`baseName` usage.
 
 **UI**
-- [ ] Remove the repo-detail config-warning banner + "Reload config" button + Daemons/Bootstrap pages;
+- [x] Remove the repo-detail config-warning banner + "Reload config" button + Daemons/Bootstrap pages;
       the repo Actions list shows only code-based actions. The workspace's config list comes from the
       Part-2 `ConfigView`.
 
 **Tests / cross-copies**
-- [ ] Removal regressions (list, picker, endpoints/MCP absent); Flyway drop applies on a seeded DB.
-- [ ] Regenerate **both** `docs/openapi.yml` and `service/src/main/webui/openapi.yml` (see memory
+- [x] Removal regressions (list, picker, endpoints/MCP absent); Flyway drop applies on a seeded DB.
+- [x] Regenerate **both** `docs/openapi.yml` and `service/src/main/webui/openapi.yml` (see memory
       `openapi-two-copies`) after controller removals; then `pnpm generate:api`; UI build green.
-- [ ] `seed-webapp` shrinks (no reconcile); assert Build & Verify binds code-based actions.
+- [x] `seed-webapp` shrinks (no reconcile); assert Build & Verify binds code-based actions.
 
-**Docs move** → `features/2026-…_config-as-single-source-of-truth.md`; note the reversed
+**Docs move** → `features/2026-07-24_config-as-single-source-of-truth.md` (done); noted the reversed
 `../qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md`; epic Status.
 
 ---
@@ -306,8 +321,9 @@ land that (or its `ReadFile`/`WriteFile` verbs) first.
       re-serialized file on save. No commit.
 
 **UI (`service/src/main/webui`)**
-- [ ] Flip the config cards/forms from read-only badge (`shared/utils/config-origin.ts`) to editable,
-      under the **workspace-detail** view: `ui/components/{action-configuration,daemon,bootstrap}/…`
+- [ ] Build the editable config cards/forms under the **workspace-detail** view (the old repo-detail
+      read-only badge machinery, `shared/utils/config-origin.ts`, was deleted in Part 5):
+      `ui/components/{action-configuration,daemon,bootstrap}/…`
       cards + `pattern/{action-configuration,daemon,bootstrap}/…` forms. Serialize the form to YAML
       (stable key order, `version: 1`, explicit ids preserved).
 

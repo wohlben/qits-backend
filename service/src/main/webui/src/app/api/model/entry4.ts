@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { FeatureFlowPhaseActionDto } from './featureFlowPhaseActionDto';
 
 
 export interface Entry4 { 
-    daemon?: RepositoryDaemonDto;
+    featureFlowPhaseAction?: FeatureFlowPhaseActionDto;
 }
 

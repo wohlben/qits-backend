@@ -7,8 +7,10 @@ A packaged ("real", non-devserver) qits deployment starts empty: registering
 (`docs/guides/qits-in-qits-registration.md` — create the "qits" project, add the repository with
 submodule import ON, run one second-level import on the quarkus-angular fixture child). This
 feature makes the packaged instance do that walk **itself, automatically at startup**: the main
-deployment boots into a seeded "qits" project with the qits repositories registered, their
-daemons/actions/bootstrap already ingested from `.qits-config.yml`.
+deployment boots into a seeded "qits" project with the qits repositories registered; their
+committed `.qits-config.yml` (services/actions/bootstrap) is read **in-container per workspace** —
+nothing is ingested into DB rows
+([reversed model](../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)).
 
 The preexisting cli seeds (`seed`, `seed-webapp`) are untouched and are **not** run by the main
 deployment — they live on *inside* the seeded project: `.qits-config.yml`'s `bootstrap:` chain
@@ -21,11 +23,14 @@ Related/dependent plans:
 - **Automates the manual recipe** — `docs/guides/qits-in-qits-registration.md` steps 1 (project
   + repository + submodule import) become startup behavior; the guide shrinks to the
   workspace/first-build walk and must be updated in the same commit.
-- **Rides `.qits-config.yml` ingestion** —
-  `docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md`: clone-time ingestion is what
-  keeps this seed *thin* (project + repo rows only — daemons, actions, bootstrap, stack hints
-  all arrive declaratively from the repo). Contrast `SeedService`, which must define its demo
-  daemon programmatically because the tiny fixture carries no config file.
+- **Rides `.qits-config.yml`** —
+  `docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md`: the committed config is what
+  keeps this seed *thin* (project + repo rows only — services, actions, bootstrap, stack hints all
+  arrive declaratively from the repo). **Update (2026-07-24):** the clone-time *ingestion* this
+  relied on was reversed by
+  [config-as-single-source-of-truth](../../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md) —
+  the file is now read in-container per workspace, never reconciled into DB rows; the seed is
+  unchanged and just as thin.
 - **Presupposes the dogfooding convention** —
   `docs/epics/qits-integration-quarkus/features/2026-07-18_qits-dogfooding-managed-app-convention.md` made qits registrable as
   a managed app in the first place.
@@ -65,8 +70,9 @@ Related/dependent plans:
      `createRepositoryUnderProject(projectId, url, SERVICE, importSubmodules=true)` if absent,
      skipped untouched if present. For qits-backend the creation-time import registers
      `testing-repo`, `qits-fixture-angular` and `testing-repo-quarkus-angular` as sibling
-     repositories, and the clone ingests `.qits-config.yml` (dev-server daemon, actions,
-     bootstrap chain, framework hints).
+     repositories. (The committed `.qits-config.yml` — dev-server service, actions, bootstrap
+     chain, framework hints — is no longer ingested on clone; it is read in-container per
+     workspace, 2026-07-24.)
    - Each declared **second-level submodule import** (for qits-backend: one on the
      `testing-repo-quarkus-angular` child, linking its nested `webui` gitlink back to the
      already-imported `qits-fixture-angular` sibling — the follow-up the registration guide
@@ -85,10 +91,11 @@ Related/dependent plans:
    leaves a usable instance — the next boot's reconciliation retries exactly the failed items.
 5. **Demo seeds unchanged.** `seed`/`seed-webapp` stay cli-only commands; nothing on the main
    deployment invokes them.
-6. **No pull on reconcile — out of scope *for now*.** The seed registers; config updates to an
-   already-seeded repo arrive through the normal pull-triggered re-ingestion, not at boot
-   (pull is user-visible behavior). Revisit if redeploys routinely need a manual pull just to
-   pick up `.qits-config.yml` changes.
+6. **No pull on reconcile — out of scope *for now*.** The seed registers; pulling an already-seeded
+   repo stays a user-visible action, not a boot behavior. (Since 2026-07-24 there is no
+   pull-triggered re-ingestion either: a workspace always reads its own branch's
+   `.qits-config.yml` in-container, so config updates reach each workspace the moment its branch
+   carries them.)
 
 ## Design sketch
 
@@ -138,7 +145,8 @@ Related/dependent plans:
 - Service-side gate test: startup under test launch mode never seeds; the enabled flag is
   honored.
 - The real-deployment walk moves into the registration guide's acceptance section (packaged
-  image boots → "qits" project appears with daemons/actions ingested, no UI steps).
+  image boots → "qits" project appears with the repos registered, no UI steps; the config surface
+  is file-only, read in-container per workspace).
 
 ## Status — implemented 2026-07-19
 

@@ -13,6 +13,5 @@ export interface Response63 {
     commitHash?: string;
     hasConflicts?: boolean;
     output?: string;
-    cleanedUp?: boolean;
 }
 

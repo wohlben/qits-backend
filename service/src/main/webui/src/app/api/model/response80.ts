@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceDto } from './workspaceDto';
+import { Entry13 } from './entry13';
 
 
 export interface Response80 { 
-    workspace?: WorkspaceDto;
+    entries?: Array<Entry13>;
 }
 

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositorySubmoduleDto } from './repositorySubmoduleDto';
+import { SettingDto } from './settingDto';
 
 
 export interface Entry14 { 
-    submodule?: RepositorySubmoduleDto;
+    setting?: SettingDto;
 }
 

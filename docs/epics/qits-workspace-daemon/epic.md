@@ -154,15 +154,16 @@ was split into six dependency-ordered feature-ideas.
 - The six parts, in build order:
   1. **[autonomous-self-clone-on-boot](features/2026-07-23_autonomous-self-clone-on-boot.md)**
      (**implemented 2026-07-23**; absorbs the clone piece of Part 4).
-  2. **[in-container-config-discovery](feature-ideas/in-container-config-discovery.md)** (`.qits-config.yml`
+  2. **[in-container-config-discovery](features/2026-07-23_in-container-config-discovery.md)** (`.qits-config.yml`
      read from the checkout — the file-as-truth pivot).
   3. **[daemon-run-bootstrap-chain](features/2026-07-23_daemon-run-bootstrap-chain.md)** (re-homes
      `WorkspaceBootstrapRunner`; absorbs
      [workspace-bootstrap-commands](../qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md)).
-  4. **[daemon-supervised-dev-daemons](feature-ideas/daemon-supervised-dev-daemons.md)** (autonomous
+  4. **[daemon-supervised-dev-daemons](features/2026-07-24_daemon-supervised-dev-daemons.md)** (autonomous
      reframing of **Part 5**).
-  5. **[config-as-single-source-of-truth](feature-ideas/config-as-single-source-of-truth.md)**
-     (host-side removal of the repo-scoped config/DB/MCP/feature-flow surface; reverses
+  5. **[config-as-single-source-of-truth](features/2026-07-24_config-as-single-source-of-truth.md)**
+     (**implemented 2026-07-24**; host-side removal of the repo-scoped config/DB/MCP/feature-flow
+     surface; reverses
      [`.qits-config` in-repo configuration](../qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md)).
   6. **[config-write-back-from-ui](feature-ideas/config-write-back-from-ui.md)** (UI writes edits into
      the file; uses the [Part 3](feature-ideas/container-file-access-over-socket.md) transport).
@@ -225,3 +226,15 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
     Part-5-doomed `RepositoryDaemon*` store keeps its name. Deferred: observer/DEGRADED in
     daemon-backed mode (audit-log-sequence-anchored — the tmux path keeps it) and the
     `.qits-config.yml` `daemons:`→`services:` key (fixture round-trip). Parts 5–6 still parked.
+  - **Part 5 — [config-as-single-source-of-truth](features/2026-07-24_config-as-single-source-of-truth.md)
+    — implemented (2026-07-24).** The host repo-scoped DB config store is **removed**: the
+    `QitsConfigReconciler` (+ clone/pull/push triggers + `config/reload`), the `RepositoryDaemon`/
+    `BootstrapCommand` stacks, the repo scope of `ActionConfiguration` (global-only; the code-seeded
+    `Bash` + the agent path remain), the repo-scoped MCP tools, the feature-flow config-action binding
+    guard, and the `@qits-config` name-suffix machinery — all dropped by Flyway `V43` (repo-scoped
+    rows deleted, not migrated). `.qits-config.yml`, read in-container per workspace, is the single
+    source of truth; service identity re-keyed from DB UUID to the config `id:` string
+    (`ServiceDefinitionDto`), and the bootstrap list is ConfigView-sourced. New workspace-scoped
+    actions surface (`…/workspaces/{id}/actions[/run]`) runs config actions over the socket **reusing
+    `RunCommand`** (no new protocol verb; runs not recorded as `Command` rows). Part 6 (write-back)
+    still parked.

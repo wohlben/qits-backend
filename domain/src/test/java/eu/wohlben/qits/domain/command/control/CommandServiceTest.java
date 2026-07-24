@@ -68,9 +68,7 @@ public class CommandServiceTest {
   }
 
   private String createAction(String repoId, String name, String script, boolean interactive) {
-    return actionConfigurationService.createForRepository(
-            repoId, name, null, script, null, interactive, null)
-        .id;
+    return actionConfigurationService.create(name, null, script, null, interactive, null).id;
   }
 
   @Test

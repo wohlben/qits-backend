@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ServiceInstanceDto } from './serviceInstanceDto';
+import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
 
 
 export interface Response89 { 
-    instance?: ServiceInstanceDto;
+    groups?: Array<TelemetryErrorGroupDto>;
 }
 

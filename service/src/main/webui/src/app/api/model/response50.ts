@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry11 } from './entry11';
 
 
 export interface Response50 { 
-    entries?: Array<Entry11>;
+    technicalProcessId?: string;
 }
 

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ServiceEventDto } from './serviceEventDto';
+import { TelemetryLogDto } from './telemetryLogDto';
 
 
 export interface Response88 { 
-    events?: Array<ServiceEventDto>;
+    logs?: Array<TelemetryLogDto>;
 }
 

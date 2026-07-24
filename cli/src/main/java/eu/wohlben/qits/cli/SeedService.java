@@ -1,9 +1,5 @@
 package eu.wohlben.qits.cli;
 
-import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
-import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
-import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
-import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
@@ -14,7 +10,6 @@ import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Optional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -50,8 +45,6 @@ public class SeedService {
 
   @Inject WorkspaceService workspaceService;
 
-  @Inject RepositoryDaemonService repositoryDaemonService;
-
   /** Override the clone source; defaults to the in-repo testing-repo.git fixture. */
   @ConfigProperty(name = "qits.seed.repo-url")
   Optional<String> repoUrlOverride;
@@ -78,51 +71,10 @@ public class SeedService {
         projectService.createRepositoryUnderProject(
             project.id, url, RepositoryArchetype.SERVICE, true);
 
-    // A demo daemon on the repository (daemons only exist at repository scope): a Python static
-    // file server with a ready pattern — enough to watch the whole supervised lifecycle in any of
-    // the workspaces below. Created BEFORE the workspaces:
-    // containers
-    // publish web-view ports (httpPort) only when the definition already declares them at
-    // container-creation time, and http.server binds 0.0.0.0 so the published port reaches it.
-    repositoryDaemonService.create(
-        repo.id,
-        "Python HTTP server",
-        "Serves the workspace over HTTP on :8000 — a demo daemon for the supervisor,"
-            + " web-viewable through the qits proxy",
-        // The web-view base-path contract: the app must serve itself under $QITS_PUBLIC_BASE
-        // (the proxy forwards paths verbatim). http.server has no prefix option, so a symlink
-        // shim mounts /workspace at the prefix. Real dev servers use their native flag instead,
-        // e.g. `vite --host 0.0.0.0 --base "$QITS_PUBLIC_BASE"`.
-        "ROOT=/tmp/qits-web; rm -rf \"$ROOT\";"
-            + " mkdir -p \"$ROOT$(dirname \"${QITS_PUBLIC_BASE%/}\")\";"
-            + " ln -sfn /workspace \"$ROOT${QITS_PUBLIC_BASE%/}\";"
-            + " python3 -m http.server 8000 --directory \"$ROOT\"",
-        "Serving HTTP",
-        "TERM",
-        RestartPolicy.ON_FAILURE,
-        true, // autoStart: comes up with the workspace container
-        3,
-        null,
-        8000,
-        // Land the frame straight on the file instead of http.server's directory listing.
-        "hello.txt",
-        null,
-        null,
-        // The dependency-free healthcheck kind: a bash /dev/tcp connect proving :8000 accepts
-        // connections — one green dot next to the READY chip, no curl needed.
-        List.of(
-            new HealthCheck(
-                "HTTP :8000",
-                HealthCheckKind.TCP,
-                8000,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null)));
+    // No demo service is seeded: services are declared in a repository's committed
+    // .qits-config.yml (read in-container per workspace), not in any host-side store, and
+    // testing-repo declares none. seed owns git merge/divergence; service supervision demos live
+    // in seed-webapp's fixture config.
 
     // Build the branch tree.
     workspaceService.createWorkspace(repo.id, "mainline", "master", "mainline");

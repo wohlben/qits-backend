@@ -91,7 +91,7 @@ behaviour.*
 
 ## Non-goals
 
-- Removing the DB `RepositoryDaemon` rows / repo-scope — [Part 5](config-as-single-source-of-truth.md)
+- Removing the DB `RepositoryDaemon` rows / repo-scope — [Part 5](2026-07-24_config-as-single-source-of-truth.md)
   (this part re-homes the *supervisor*; that part removes the *store* and the repo-level auto-start
   coupler query).
 - MCP / tokens — [Part 6 of the epic](mcp-termination-and-token-provisioning.md).

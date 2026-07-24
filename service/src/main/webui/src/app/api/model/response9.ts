@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { BootstrapCommandDto } from './bootstrapCommandDto';
+import { CommandLogLineDto } from './commandLogLineDto';
 
 
 export interface Response9 { 
-    command?: BootstrapCommandDto;
+    lines?: Array<CommandLogLineDto>;
 }
 

@@ -1,5 +1,12 @@
 # Daemon kinds (deployment by default, devserver optional) & workspace-scoped daemon MCP
 
+> **Stale premise note (2026-07-24).** Parts 4–5 of
+> [qits-workspace-daemon](../../qits-workspace-daemon/epic.md) reshaped the ground this idea stands
+> on: supervision moved in-container (no tmux/`/proc` reap in daemon-backed mode), the
+> log-observer/`DEGRADED`/log-source subsystem was removed, and the DB `RepositoryDaemon` store was
+> deleted — definitions now live only in `.qits-config.yml`, read in-container per workspace. The
+> `kind:` would be a config-declared field today; read the below as pre-Part-4/5 design.
+
 ## Introduction
 
 Daemons today are framework-agnostic in code — a verbatim foreground script supervised in a tmux

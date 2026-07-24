@@ -35,7 +35,7 @@ underlying repository.
 
 - **Simplifies the workspace-daemon provisioning-inversion track**
   ([`docs/implementation-plan.md`](../../../implementation-plan.md), Part 1
-  [autonomous-self-clone-on-boot](../../qits-workspace-daemon/feature-ideas/autonomous-self-clone-on-boot.md)).
+  [autonomous-self-clone-on-boot](../../qits-workspace-daemon/features/2026-07-23_autonomous-self-clone-on-boot.md)).
   Native relative resolution removes the **id→url mapping / per-level override** from the daemon's
   job: relative submodules just work off the name-addressed origin. The daemon still receives the
   **imported-edge closure** (to scope the walk and redirect any absolute urls), so the

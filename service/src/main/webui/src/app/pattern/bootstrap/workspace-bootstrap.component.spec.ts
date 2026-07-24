@@ -21,7 +21,7 @@ describe('WorkspaceBootstrapComponent', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdBootstrapCommandsRunPost: vi
       .fn()
       .mockReturnValue(of({ started: true })),
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdBootstrapCommandsCommandIdRunPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdBootstrapCommandsStepIdRunPost: vi
       .fn()
       .mockReturnValue(of({ started: true })),
   };
@@ -53,29 +53,29 @@ describe('WorkspaceBootstrapComponent', () => {
     return fixture;
   }
 
-  it('lists the chain in order with last-run outcome, timestamp and logs link', () => {
+  it('lists the chain in order with step name, last-run outcome, timestamp and logs link', () => {
     queryClient.setQueryData(['workspace-bootstrap', 'repo-1', 'wt-1'], {
       chainRunning: false,
       entries: [
         {
-          command: { id: 'cmd-1', name: 'install@qits-config', description: 'build it' },
+          step: { id: 'install', name: 'install', description: 'build it' },
           lastRun: {
-            bootstrapCommandId: 'cmd-1',
+            bootstrapCommandId: 'install',
             outcome: BootstrapOutcome.Succeeded,
             commandId: 'audit-1',
             exitCode: 0,
             ranAt: '2026-07-18T10:00:00Z',
           },
         },
-        { command: { id: 'cmd-2', name: 'seed' }, lastRun: null },
+        { step: { id: 'seed', name: 'seed' }, lastRun: null },
       ],
     });
     const fixture = createComponent();
     const element = fixture.nativeElement as HTMLElement;
 
-    // Config-suffixed names render as their base name; the never-ran entry says so.
+    // Step names render as declared; the never-ran entry says so.
     expect(element.textContent).toContain('install');
-    expect(element.textContent).not.toContain('@qits-config');
+    expect(element.textContent).toContain('seed');
     expect(element.textContent).toContain('SUCCEEDED');
     expect(element.textContent).toContain('never ran');
     expect(element.querySelector('a[href="/commands/audit-1"]')).not.toBeNull();
@@ -87,7 +87,7 @@ describe('WorkspaceBootstrapComponent', () => {
   it('a running chain disables the triggers and shows the transient indicator', () => {
     queryClient.setQueryData(['workspace-bootstrap', 'repo-1', 'wt-1'], {
       chainRunning: true,
-      entries: [{ command: { id: 'cmd-1', name: 'install' }, lastRun: null }],
+      entries: [{ step: { id: 'install', name: 'install' }, lastRun: null }],
     });
     const fixture = createComponent();
     const element = fixture.nativeElement as HTMLElement;
@@ -102,9 +102,9 @@ describe('WorkspaceBootstrapComponent', () => {
       chainRunning: false,
       entries: [
         {
-          command: { id: 'cmd-1', name: 'install' },
+          step: { id: 'install', name: 'install' },
           lastRun: {
-            bootstrapCommandId: 'cmd-1',
+            bootstrapCommandId: 'install',
             outcome: BootstrapOutcome.Failed,
             commandId: 'audit-2',
             exitCode: 7,
@@ -123,7 +123,7 @@ describe('WorkspaceBootstrapComponent', () => {
   it('Run all posts the chain trigger with the (repoId, workspaceId) arg order', async () => {
     queryClient.setQueryData(['workspace-bootstrap', 'repo-1', 'wt-1'], {
       chainRunning: false,
-      entries: [{ command: { id: 'cmd-1', name: 'install' }, lastRun: null }],
+      entries: [{ step: { id: 'install', name: 'install' }, lastRun: null }],
     });
     const fixture = createComponent();
 
@@ -138,10 +138,10 @@ describe('WorkspaceBootstrapComponent', () => {
     ).toHaveBeenCalledWith('repo-1', 'wt-1');
   });
 
-  it('a single Run posts with the generated (commandId, repoId, workspaceId) arg order', async () => {
+  it('a single Run posts the step id with the generated (repoId, stepId, workspaceId) arg order', async () => {
     queryClient.setQueryData(['workspace-bootstrap', 'repo-1', 'wt-1'], {
       chainRunning: false,
-      entries: [{ command: { id: 'cmd-1', name: 'install' }, lastRun: null }],
+      entries: [{ step: { id: 'install', name: 'install' }, lastRun: null }],
     });
     const fixture = createComponent();
 
@@ -154,7 +154,7 @@ describe('WorkspaceBootstrapComponent', () => {
     // The generated client orders path params alphabetically — the arg order guards against the
     // scrambled-URL 404 regression.
     expect(
-      bootstrapService.apiRepositoriesRepoIdWorkspacesWorkspaceIdBootstrapCommandsCommandIdRunPost,
-    ).toHaveBeenCalledWith('cmd-1', 'repo-1', 'wt-1');
+      bootstrapService.apiRepositoriesRepoIdWorkspacesWorkspaceIdBootstrapCommandsStepIdRunPost,
+    ).toHaveBeenCalledWith('repo-1', 'install', 'wt-1');
   });
 });

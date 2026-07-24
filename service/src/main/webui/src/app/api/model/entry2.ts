@@ -7,12 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { BootstrapCommandDto } from './bootstrapCommandDto';
-import { BootstrapRunDto } from './bootstrapRunDto';
+import { ActionConfigurationDto } from './actionConfigurationDto';
 
 
 export interface Entry2 { 
-    command?: BootstrapCommandDto;
-    lastRun?: BootstrapRunDto;
+    actionConfiguration?: ActionConfigurationDto;
 }
 

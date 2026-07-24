@@ -1,5 +1,14 @@
 # Unified action scope: one action table, feature flows bind repository-scoped actions
 
+> **Reversed 2026-07-24** by
+> [config-as-single-source-of-truth](../../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md):
+> the repository scope this feature added is **gone** — Flyway `V43` drops the
+> `ActionConfiguration.repository_id` column (V27) and deletes the repo-scoped rows. Actions are
+> **global-only** again; the only repository-scope actions are code-based (the seeded global
+> `Bash` + the coding-agent path), flows bind only code-based actions, the repo-scoped MCP tools
+> are removed, and `seed-webapp` now binds `Bash` instead of seeding repo-scoped rows. The doc
+> below is the historical record of the repo-scope model.
+
 ## Introduction
 
 Action scope used to be a **table identity**: global actions were `ActionConfiguration` rows,

@@ -1,5 +1,16 @@
 # `.qits-config` — in-repo repository configuration
 
+> **Reversed 2026-07-24** by
+> [config-as-single-source-of-truth](../../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)
+> (Part 5 of the qits-workspace-daemon provisioning-inversion track). This feature's model — the
+> file as a declarative *input* reconciled into DB rows — no longer applies: the
+> `QitsConfigReconciler` and its clone/pull/push ingestion triggers, the repo-scoped DB config
+> store (repo-scoped `ActionConfiguration`, `RepositoryDaemon`, `BootstrapCommand`, the
+> `config/reload` endpoint), and the `@qits-config` name suffix are all **gone** (Flyway `V43`).
+> `.qits-config.yml` is now **authoritative, workspace-scoped, and read in-container** from each
+> workspace's own checkout — never ingested. The doc below is kept as the historical record of the
+> superseded model.
+
 ## Introduction
 
 Everything qits knows about a repository beyond its git content — which actions ("commands")

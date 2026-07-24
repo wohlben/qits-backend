@@ -1,8 +1,8 @@
-# qits' own in-repo configuration (docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md).
-# qits conforms to its own managed-app convention, so registering wohlben/qits-backend on a qits
-# deployment (qits-in-qits) ingests this file on clone — the dev-server daemon, build/test/lint
-# actions, and stack hints that docs/guides/qits-in-qits-registration.md used to describe as manual
-# UI steps. Editing qits' managed config is now a commit like any other.
+# qits' own in-repo configuration — the single source of truth for its managed services, bootstrap
+# chain and actions (docs/epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md).
+# qits conforms to its own managed-app convention: on a qits deployment (qits-in-qits) each workspace's
+# daemon reads this file in-container from its own branch's checkout — nothing is ingested host-side.
+# Editing qits' managed config is a commit like any other.
 version: 1
 
 repository:
@@ -17,7 +17,7 @@ frameworks:
   - kind: ts-angular
     root: service/src/main/webui
 
-daemons:
+services:
   # The qits dev server: `quarkus:dev` serving the REST API on :8080 and the Angular SPA (Quinoa),
   # live-reloaded and web-viewable through the parent qits' proxy. The web view frames QUARKUS
   # (:8080, entry /projects) — qits' UI is SSE/websocket-heavy on /api, which Quarkus serves
@@ -52,14 +52,6 @@ daemons:
     web-view:
       port: 8080
       entry-path: projects
-    observers:
-      - kind: LOG_LEVEL
-      - kind: PATTERN
-        pattern: "(?i)(BUILD FAILURE|Failed to start Quarkus|Live reload failed)"
-        severity: ERROR
-    sources:
-      - path: service/quarkus.log
-        label: Quarkus dev log
     health-checks:
       # COMMAND, not HTTP: /q/health sits under the env-expanded root path.
       - name: Quarkus

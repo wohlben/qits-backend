@@ -10,6 +10,6 @@
 
 
 export interface Response61 { 
-    technicalProcessId?: string;
+    output?: string;
 }
 

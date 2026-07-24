@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry16 } from './entry16';
 
 
 export interface Response84 { 
-    entries?: Array<Entry16>;
+    text?: string;
 }
 

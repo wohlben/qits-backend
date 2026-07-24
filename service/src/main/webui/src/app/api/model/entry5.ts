@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ActionConfigurationDto } from './actionConfigurationDto';
+import { FeatureFlowPhaseDto } from './featureFlowPhaseDto';
 
 
 export interface Entry5 { 
-    actionConfiguration?: ActionConfigurationDto;
+    featureFlowPhase?: FeatureFlowPhaseDto;
 }
 

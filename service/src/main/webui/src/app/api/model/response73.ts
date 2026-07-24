@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Entry12 } from './entry12';
 
 
 export interface Response73 { 
-    workspaceId?: string;
-    branch?: string;
-    commandId?: string;
+    entries?: Array<Entry12>;
 }
 

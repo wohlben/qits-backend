@@ -10,9 +10,11 @@ multi-step chain no longer trips it, and a try/catch guard around the bootstrap 
 a `recordOutcome` failure can't tear down the control socket). The rest are documented here for
 careful follow-up — they are correctness/observability gaps, not blockers.
 
-Related: this whole surface is reshaped by [config-as-single-source-of-truth](../epics/qits-workspace-daemon/feature-ideas/config-as-single-source-of-truth.md)
-(Part 5), which removes the repo-scoped DB `BootstrapCommand` store and its create API — that
-subsumes items 1–2 below.
+Related: this whole surface was reshaped by [config-as-single-source-of-truth](../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)
+(Part 5, implemented 2026-07-24), which removed the repo-scoped DB `BootstrapCommand` store and its
+create API — that **resolved item 2** below (the bootstrap list is now ConfigView-sourced, so a
+DB-only command that isn't in the checkout's file can no longer exist). Item 1 (the fresh-provision
+double-run) is unaffected and still open.
 
 ## 1. Manual re-run of a torn-down workspace double-executes the chain (correctness, high)
 
@@ -35,7 +37,15 @@ freshProvision boolean is the reliable discriminator.
 
 ## 2. Single re-run of a UI-created command is a silent no-op (correctness, medium)
 
-**Observed:** a bootstrap command created via `POST /api/repositories/{id}/bootstrap-commands`
+> **Resolved by Part 5 (2026-07-24).** The `BootstrapCommand` DB store, its create API
+> (`POST /api/repositories/{id}/bootstrap-commands`) and the repo-detail Bootstrap UI are gone; the
+> workspace bootstrap list comes from the workspace's own ConfigView
+> ([config-as-single-source-of-truth](../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)),
+> so a runnable command that isn't in the checkout's `.qits-config.yml` can no longer exist. A
+> single re-run of an id absent from a readable config is now a loud **404** (pass-through only
+> when no daemon is live yet to read the config).
+
+**Observed (pre-Part-5):** a bootstrap command created via `POST /api/repositories/{id}/bootstrap-commands`
 (`BootstrapCommandController.create`, DB-only, no `@qits-config` suffix) is **not** in the checkout's
 `.qits-config.yml`. Clicking "Run" → `runSingleAsync` → `RunBootstrap(baseName)`; the daemon
 (`BootstrapRunner.run`) iterates only its in-container config, finds no step of that name, runs
@@ -69,8 +79,9 @@ longer than the reconnect-backoff max** (a grace window > 30s), fail early; othe
 the workspace Start process view (the failed step is shown; later steps just vanish). The old runner
 appended "Skipped — an earlier bootstrap command failed." and settled each remaining segment failed.
 
-**Fix direction:** on `Bootstrapped{ok:false}`, have `RecordingSink` settle the ordered DB-chain
-segments (`bootstrapCommandService.resolveAll`) that were never opened as failed/aborted, for parity
+**Fix direction:** on `Bootstrapped{ok:false}`, have `RecordingSink` settle the ordered chain
+segments (the list is now ConfigView-sourced — `bootstrapCommandService.resolveAll` was removed in
+Part 5) that were never opened as failed/aborted, for parity
 with the old "abort loudly" behaviour.
 
 ## 5. Bootstrap tab "view command log" link is now always dead (frontend, low)

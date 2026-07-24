@@ -9,7 +9,7 @@ import { AgentControllerService } from '@/api/api/agentController.service';
 import { AgentPluginControllerService } from '@/api/api/agentPluginController.service';
 import { AgentSessionControllerService } from '@/api/api/agentSessionController.service';
 import { CommandControllerService } from '@/api/api/commandController.service';
-import { RepositoryActionsControllerService } from '@/api/api/repositoryActionsController.service';
+import { WorkspaceActionsControllerService } from '@/api/api/workspaceActionsController.service';
 import { WorkspaceControllerService } from '@/api/api/workspaceController.service';
 import { WorkspacePromptDraftControllerService } from '@/api/api/workspacePromptDraftController.service';
 import { CommandKind } from '@/api/model/commandKind';
@@ -31,7 +31,12 @@ describe('WorkspaceDetailPage', () => {
   };
   const commandService = { apiCommandsGet: vi.fn().mockReturnValue(of({ entries: [] })) };
   const actionsService = {
-    apiRepositoriesRepositoryIdActionsGet: vi.fn().mockReturnValue(of({ entries: [] })),
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsGet: vi
+      .fn()
+      .mockReturnValue(of({ actions: [] })),
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdActionsActionIdRunPost: vi
+      .fn()
+      .mockReturnValue(of({ exitCode: 0, stdout: '', stderr: '' })),
   };
   const pluginService = {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdAgentPluginsGet: vi
@@ -130,7 +135,7 @@ describe('WorkspaceDetailPage', () => {
         { provide: Router, useValue: router },
         { provide: WorkspaceControllerService, useValue: workspaceService },
         { provide: CommandControllerService, useValue: commandService },
-        { provide: RepositoryActionsControllerService, useValue: actionsService },
+        { provide: WorkspaceActionsControllerService, useValue: actionsService },
         { provide: AgentPluginControllerService, useValue: pluginService },
         { provide: AgentControllerService, useValue: agentService },
         { provide: AgentSessionControllerService, useValue: agentSessionService },

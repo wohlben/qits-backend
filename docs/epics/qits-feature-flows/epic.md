@@ -27,9 +27,12 @@ Related epics / cross-cutting concerns:
 - **A deferred gate reads a daemon healthcheck** — [qits-workspace-services](../qits-workspace-services/epic.md):
   "gate this phase on the dev server being healthy" is the concrete predicate a healthcheck
   provides.
-- **Reconciled from `.qits-config`** — [qits-project-repositories](../qits-project-repositories/epic.md):
-  a repo's committed config declares repository-scoped actions/daemons that upsert into these
-  tables.
+- **~~Reconciled from `.qits-config`~~ (removed 2026-07-24)** —
+  [qits-project-repositories](../qits-project-repositories/epic.md):
+  a repo's committed config used to declare repository-scoped actions/daemons that upserted into
+  these tables. [config-as-single-source-of-truth](../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)
+  removed the repo scope and the reconciler — actions are global-only (code-based), and config
+  actions live workspace-scoped in the file, never in these tables.
 - **Action execution runtime** rides the workspace container + the command substrate
   ([qits-workspace-commands](../qits-workspace-commands/epic.md)); the definitions here predate
   that runtime (the original `actions` doc noted execution was "out of scope, needs a missing

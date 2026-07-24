@@ -14,8 +14,10 @@ runtime, log observation, and the daemon↔workspace lifecycle coupling.
 > renamed too**: the runtime-supervision packages moved `eu.wohlben.qits.domain.daemon.*` →
 > `eu.wohlben.qits.domain.service.*` (`ServiceSupervisor`, `ServiceProxyRoute`, `ServiceStatus`,
 > `ServiceEvent*`), `qits.daemons.*` → `qits.services.*`, and the REST/UI surface became
-> `/services` — removing the collision the earlier note tolerated. The Part-5-doomed
-> `RepositoryDaemon*` config store keeps its "daemon" name until that store is deleted; the
+> `/services` — removing the collision the earlier note tolerated. The `RepositoryDaemon*` config
+> store was then **deleted in Part 5** (2026-07-24,
+> [config-as-single-source-of-truth](../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)):
+> service definitions now live only in `.qits-config.yml`, read in-container per workspace. The
 > `.qits-config.yml` `daemons:` key rename is a tracked follow-up (it needs the fixture repos'
 > two-level submodule round-trip).
 

@@ -7,13 +7,13 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDaemonDto } from './repositoryDaemonDto';
+import { ServiceDefinitionDto } from './serviceDefinitionDto';
 import { HealthCheckStatusDto } from './healthCheckStatusDto';
 import { ServiceStatus } from './serviceStatus';
 
 
 export interface ServiceInstanceDto { 
-    daemon?: RepositoryDaemonDto;
+    daemon?: ServiceDefinitionDto;
     status?: ServiceStatus;
     restartCount?: number;
     commandId?: string;

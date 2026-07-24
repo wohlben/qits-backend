@@ -1,13 +1,9 @@
 package eu.wohlben.qits.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
-import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowPhaseActionService;
@@ -22,7 +18,6 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
-import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
@@ -58,7 +53,6 @@ public class SeedWebappServiceTest {
   @Inject ProjectService projectService;
   @Inject WorkspaceService workspaceService;
   @Inject ContainerRuntime containers;
-  @Inject RepositoryDaemonService repositoryDaemonService;
   @Inject FeatureFlowConfigurationService featureFlowConfigurationService;
   @Inject FeatureFlowPhaseService featureFlowPhaseService;
   @Inject FeatureFlowPhaseStepService featureFlowPhaseStepService;
@@ -100,7 +94,8 @@ public class SeedWebappServiceTest {
     Repository repo = projectService.getRepositories(project.id).get(0);
     assertEquals("main", repo.mainBranch, "fixture's default branch is 'main'");
 
-    assertObservableDaemon(repo.id);
+    // TODO(Part 5): the observable-daemon assertion went away with the DB definition store; the
+    // seed rework (workstream 7) re-anchors it to the fixture's .qits-config.yml.
     assertGreetingWorkspace(repo.id);
     assertBuildAndVerifyFeatureFlow(project.id, repo.id);
 
@@ -118,12 +113,12 @@ public class SeedWebappServiceTest {
   }
 
   /**
-   * The seed's build/lint/test actions are <b>repository-scoped</b> now (their commands are this
-   * stack's — meaningless elsewhere), so the reset must (a) recreate them exactly once on the new
-   * repository, (b) delete the stale <b>global</b> copies earlier seed versions created (incl. the
-   * pre-1529f10 leak, docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md), and (c)
-   * spare a global copy some other project's flow still binds (its FK has no cascade — deleting
-   * would break that flow).
+   * The seed's build/lint/test actions are declared in the fixture's {@code .qits-config.yml} (read
+   * in-container, never stored host-side), so the reset only has to delete the stale <b>global</b>
+   * copies earlier seed versions created (incl. the pre-1529f10 leak,
+   * docs/issues/resolved/2026-07-09_seed-webapp-leaks-global-actions.md) while sparing a global
+   * copy some other project's flow still binds (its FK has no cascade — deleting would break that
+   * flow).
    */
   @Test
   public void resetRescopesSeedActionsAndCleansStaleGlobals() {
@@ -147,30 +142,10 @@ public class SeedWebappServiceTest {
 
     Repository repo = seedWebappService.seed();
 
-    // The stale unbound global copy is deleted, not reconciled — the action lives on the
-    // repository now.
+    // The stale unbound global copy is deleted, not reconciled.
     assertTrue(
         globalActionsNamed("build-project").isEmpty(),
         "stale global seed actions are cleaned up on reset");
-
-    // Each config-ingested action exists exactly once, owned by the (re-created) repository, and
-    // carries the reserved @qits-config suffix (its origin is the fixture's .qits-config.yml).
-    List<ActionConfiguration> repoActions = actionConfigurationService.listForRepository(repo.id);
-    for (String name :
-        List.of("build-project", "lint-backend", "lint-frontend", "run-unit-tests", "Stack info")) {
-      assertEquals(
-          1,
-          repoActions.stream().filter(a -> QitsConfig.configName(name).equals(a.name)).count(),
-          "'" + name + "' should be ingested exactly once, repository-scoped");
-    }
-    ActionConfiguration build =
-        repoActions.stream()
-            .filter(a -> QitsConfig.configName("build-project").equals(a.name))
-            .findFirst()
-            .orElseThrow();
-    assertEquals("./mvnw package", build.executeScript, "the declared script, not the drifted one");
-    assertNull(build.checkScript);
-    assertFalse(build.interactive);
 
     // The flow-bound global copy survives (deleting it would break the user's flow).
     List<ActionConfiguration> tests = globalActionsNamed("run-unit-tests");
@@ -180,22 +155,6 @@ public class SeedWebappServiceTest {
 
   private List<ActionConfiguration> globalActionsNamed(String name) {
     return actionConfigurationService.list().stream().filter(a -> name.equals(a.name)).toList();
-  }
-
-  /** The dev-server daemon is web-viewable, OTEL-enabled, and fully wired for log observation. */
-  private void assertObservableDaemon(String repoId) {
-    List<RepositoryDaemon> daemons = repositoryDaemonService.list(repoId);
-    RepositoryDaemon devServer =
-        daemons.stream()
-            .filter(d -> QitsConfig.configName("Quarkus dev server").equals(d.name))
-            .findFirst()
-            .orElse(null);
-    assertNotNull(devServer, "Quarkus dev server daemon should be ingested from .qits-config.yml");
-    assertNotNull(devServer.webView, "dev server daemon should be web-viewable");
-    assertEquals(
-        4200, devServer.webView.port, "the web view frames the Angular dev server (:4200)");
-    assertEquals("greeting", devServer.webView.entryPath, "the frame opens on the greeting screen");
-    assertTrue(devServer.otel, "dev server daemon should export OTEL");
   }
 
   /** A plain feature workspace off feature/greeting exists and is active. */
@@ -230,23 +189,17 @@ public class SeedWebappServiceTest {
         steps.stream().map(s -> s.name).toList(),
         "steps in order");
 
-    // The Lint step's two actions share a parallel group.
+    // The Lint step binds the code-seeded global Bash action once in the 'lint' parallel group
+    // (config-declared actions are no longer bindable; a same-action pair in one step is rejected).
     FeatureFlowPhaseStep lint =
         steps.stream().filter(s -> "Lint".equals(s.name)).findFirst().orElseThrow();
     List<FeatureFlowPhaseAction> lintActions = featureFlowPhaseActionService.listByStep(lint.id);
-    assertEquals(2, lintActions.size(), "Lint has two actions");
+    assertEquals(1, lintActions.size(), "Lint has one action");
     assertTrue(
         lintActions.stream().allMatch(a -> "lint".equals(a.parallelGroup)),
         "Lint actions share the 'lint' parallel group");
     assertTrue(
         lintActions.stream().allMatch(a -> a.actionType == ActionType.QUALITY_GATE),
         "Lint actions are quality gates");
-
-    // The flow binds the repository-scoped actions (the commands are this stack's, not globals).
-    List<String> repoActionIds =
-        actionConfigurationService.listForRepository(repoId).stream().map(a -> a.id).toList();
-    assertTrue(
-        lintActions.stream().allMatch(a -> repoActionIds.contains(a.actionConfiguration.id)),
-        "flow-bound actions belong to the seeded repository");
   }
 }

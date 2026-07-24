@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { CommandDto } from './commandDto';
+import { FeatureFlowConfigurationDto } from './featureFlowConfigurationDto';
 
 
 export interface Entry3 { 
-    command?: CommandDto;
+    featureFlowConfiguration?: FeatureFlowConfigurationDto;
 }
 

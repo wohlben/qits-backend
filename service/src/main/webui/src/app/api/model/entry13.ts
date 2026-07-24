@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ProjectDto } from './projectDto';
+import { ServiceInstanceDto } from './serviceInstanceDto';
 
 
 export interface Entry13 { 
-    project?: ProjectDto;
+    instance?: ServiceInstanceDto;
 }
 

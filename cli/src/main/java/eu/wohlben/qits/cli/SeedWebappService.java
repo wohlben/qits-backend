@@ -12,7 +12,6 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhase;
 import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
-import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
@@ -38,20 +37,19 @@ import org.jboss.logging.Logger;
  * <p>It drives the real domain services (not raw SQL), so it always matches the current model. This
  * fixture is the <b>stack-specific</b> substrate (the counterpart to {@code testing-repo}, which
  * owns git-mechanics/merge/divergence): it exercises the logic {@code hello.txt} can't — framework
- * detection, a real {@code quarkus:dev} web-view daemon, OTEL observability, daemon log
- * observation, a Java+node feature-flow blueprint, and the coding agent against a real app. It
- * builds this tree:
+ * detection, a real {@code quarkus:dev} web-view service, OTEL observability, a Java+node
+ * feature-flow blueprint, and the coding agent against a real app. It builds this tree:
  *
  * <pre>
  *   Quarkus + Angular Demo
  *     ├─ Repository (testing-repo-quarkus-angular)
- *     │    + the daemon and build/lint/test actions ingested from the fixture's committed
- *     │      .qits-config.yml on clone (a web-viewable "Quarkus dev server" on :4200 → /greeting,
- *     │      otel) — see
- *     │      docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md
+ *     │    + the service and build/lint/test actions declared in the fixture's committed
+ *     │      .qits-config.yml — read in-container per workspace by the workspace-daemon (a
+ *     │      web-viewable "Quarkus dev server" on :4200 → /greeting, otel), not ingested host-side
  *     │    main       the default workspace (created at clone time)
  *     │    greeting   a plain workspace off feature/greeting (a fast-forward over main)
- *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only)
+ *     └─ "Build & Verify" feature-flow configuration (Build / Lint / Test — blueprint only,
+ *        binding the code-seeded global Bash action)
  * </pre>
  *
  * <p>No merge/divergence tree is manufactured here — that is {@code testing-repo}'s job (see the
@@ -111,8 +109,9 @@ public class SeedWebappService {
               projectService.delete(p.id);
             });
     // Earlier seed versions created the build/lint/test set (and, before 1529f10, per-run
-    // duplicates of it) as GLOBAL actions; they are repository-scoped now, so clean up what those
-    // versions left behind in long-lived dev databases.
+    // duplicates of it) as GLOBAL actions; the repo-scoped action store is gone entirely now
+    // (config-declared actions live only in .qits-config.yml), so clean up what those versions
+    // left behind in long-lived dev databases.
     cleanupStaleSeedGlobals();
 
     String url = resolveRepoUrl();
@@ -122,25 +121,21 @@ public class SeedWebappService {
         projectService.create(
             PROJECT_NAME,
             "Servable Quarkus 3 + Angular demo (testing-repo-quarkus-angular fixture)");
-    // Cloning ingests the fixture's committed .qits-config.yml (docs/epics/
-    // qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md): the
-    // web-viewable "Quarkus dev server"
-    // daemon
-    // (web view :4200 → /greeting, otel, Quarkus COMMAND + Angular HTTP health checks) and the
-    // build/lint/test + Stack info actions.
-    // Those rows are declared in the file, not built here — the seed only wires them into a
-    // project.
     Repository repo =
         projectService.createRepositoryUnderProject(
             project.id, url, RepositoryArchetype.SERVICE, true);
+    // The fixture's committed .qits-config.yml (the dev-server service, the build/lint/test
+    // actions, the bootstrap chain) is the workspace-scoped source of truth: the workspace-daemon
+    // reads it in-container per workspace — there is no host-side ingestion on clone.
 
     // One plain feature workspace so the detail view has more than one workspace to browse and run
     // the dev server in — no divergence manufacturing (that's testing-repo's job). feature/greeting
     // is a fast-forward over main.
     workspaceService.createWorkspace(repo.id, "greeting", "feature/greeting", "greeting");
 
-    // A feature-flow configuration expressing the stack's build/lint/test actions. Blueprint only —
-    // qits does not execute these; it binds the config-ingested actions by their declared name.
+    // A feature-flow configuration blueprint for the stack's build/lint/test flow. Blueprint only —
+    // qits does not execute these; config-declared actions are not bindable, so the steps bind the
+    // code-seeded global Bash action.
     seedFeatureFlow(project.id, repo.id);
 
     LOG.infof("Seeded project '%s' (%s), repository %s.", PROJECT_NAME, project.id, repo.id);
@@ -155,22 +150,23 @@ public class SeedWebappService {
 
   /**
    * Seeds a "Build &amp; Verify" feature-flow configuration under the project: a single
-   * "Development" phase with Build (prerequisite) → Lint (two quality-gate actions sharing a
-   * parallel group) → Test (quality gate). Configurations hang off the <em>project</em> (not the
-   * repository). This is a blueprint — qits never executes these scripts.
+   * "Development" phase with Build (prerequisite) → Lint (quality gate) → Test (quality gate).
+   * Configurations hang off the <em>project</em> (not the repository). This is a blueprint — qits
+   * never executes these scripts.
    *
-   * <p>The bound actions are <b>repository-scoped</b>: their commands are this stack's ({@code
-   * ./mvnw}, {@code pnpm}), meaningless in a repository that isn't Quarkus + Angular. They
-   * cascade-delete with the repository, so the project reset keeps this idempotent with no
-   * reconcile bookkeeping.
+   * <p>Only code-based actions are feature-flow-bindable (config-declared actions live in the
+   * workspace's {@code .qits-config.yml} and have no DB row to FK to), so every step binds the
+   * code-seeded global {@code Bash} action — the flow shape survives without the removed
+   * repo-scoped action store. The historical parallel lint pair collapsed to one binding (two
+   * bindings of the same action in one step are rejected).
    */
   private void seedFeatureFlow(String projectId, String repositoryId) {
-    // The build/lint/test actions were ingested from the fixture's .qits-config.yml on clone (their
-    // stored names carry the reserved @qits-config suffix); bind those existing rows by id.
-    ActionConfiguration build = configAction(repositoryId, "build-project");
-    ActionConfiguration lintBackend = configAction(repositoryId, "lint-backend");
-    ActionConfiguration lintFrontend = configAction(repositoryId, "lint-frontend");
-    ActionConfiguration test = configAction(repositoryId, "run-unit-tests");
+    ActionConfiguration bash =
+        actionConfigurationService.list().stream()
+            .filter(a -> "Bash".equals(a.name))
+            .findFirst()
+            .orElseThrow(
+                () -> new IllegalStateException("Global 'Bash' action not seeded at startup"));
 
     FeatureFlowConfiguration config =
         featureFlowConfigurationService.createUnderProject(projectId, "Build & Verify");
@@ -179,36 +175,13 @@ public class SeedWebappService {
             config.id, "Development", "Build, lint and test the Quarkus + Angular app.", 0, null);
 
     FeatureFlowPhaseStep buildStep = featureFlowPhaseStepService.create(development.id, "Build", 0);
-    featureFlowPhaseActionService.create(buildStep.id, build.id, ActionType.PREREQUISITE, 0, null);
+    featureFlowPhaseActionService.create(buildStep.id, bash.id, ActionType.PREREQUISITE, 0, null);
 
-    // Two actions in one step sharing a parallel group => they may run concurrently.
     FeatureFlowPhaseStep lintStep = featureFlowPhaseStepService.create(development.id, "Lint", 1);
-    featureFlowPhaseActionService.create(
-        lintStep.id, lintBackend.id, ActionType.QUALITY_GATE, 0, "lint");
-    featureFlowPhaseActionService.create(
-        lintStep.id, lintFrontend.id, ActionType.QUALITY_GATE, 1, "lint");
+    featureFlowPhaseActionService.create(lintStep.id, bash.id, ActionType.QUALITY_GATE, 0, "lint");
 
     FeatureFlowPhaseStep testStep = featureFlowPhaseStepService.create(development.id, "Test", 2);
-    featureFlowPhaseActionService.create(testStep.id, test.id, ActionType.QUALITY_GATE, 0, null);
-  }
-
-  /**
-   * The config-ingested repository action declared under {@code baseName} (stored with the reserved
-   * {@code @qits-config} suffix). Fails loudly if ingestion didn't produce it — the fixture's
-   * {@code .qits-config.yml} is the source of truth for these, so a miss means the file drifted.
-   */
-  private ActionConfiguration configAction(String repositoryId, String baseName) {
-    String stored = QitsConfig.configName(baseName);
-    return actionConfigurationService.listForRepository(repositoryId).stream()
-        .filter(a -> stored.equals(a.name))
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    "Expected .qits-config.yml to declare action '"
-                        + baseName
-                        + "' but it was not ingested for repository "
-                        + repositoryId));
+    featureFlowPhaseActionService.create(testStep.id, bash.id, ActionType.QUALITY_GATE, 0, null);
   }
 
   /**

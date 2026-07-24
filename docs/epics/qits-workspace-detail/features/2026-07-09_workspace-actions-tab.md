@@ -1,5 +1,15 @@
 # Actions tab: run and observe configured actions from the workspace detail route
 
+> **Updated 2026-07-24** by
+> [config-as-single-source-of-truth](../../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md):
+> the tab no longer reads the repository-effective set described below. It now reads the
+> workspace-scoped `GET /repositories/{repoId}/workspaces/{workspaceId}/actions` — the union of the
+> code-based globals (`origin: CODE`) and the workspace's own `.qits-config.yml` actions
+> (`origin: CONFIG`, read in-container over the control socket) — and runs a config action via
+> `POST …/actions/{actionId}/run` over the socket (inline result, no `Command` row/history;
+> interactive config actions are listed but not runnable). The repo-scoped `RepositoryAction`
+> tier, the MCP effective-set tools, and the global/repo scope badges this doc describes are gone.
+
 ## Introduction
 
 Actions are the preconfigured processes a workspace can run — named

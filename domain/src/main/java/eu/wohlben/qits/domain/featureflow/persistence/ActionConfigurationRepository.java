@@ -10,27 +10,17 @@ import java.util.Optional;
 public class ActionConfigurationRepository
     implements PanacheRepositoryBase<ActionConfiguration, String> {
 
-  // Global rows are matched with "repository is null" (not "repository.id is null", which would
-  // join through the association and silently drop them).
+  // Every row is global (code-based) — the repo-scoped store was dropped in Part 5.
 
   public Optional<ActionConfiguration> findGlobalByName(String name) {
-    return find("name = ?1 and repository is null", name).firstResultOptional();
+    return find("name", name).firstResultOptional();
   }
 
   public List<ActionConfiguration> listGlobal() {
-    return list("repository is null");
+    return listAll();
   }
 
   public List<ActionConfiguration> listGlobalByName(String name) {
-    return list("name = ?1 and repository is null", name);
-  }
-
-  public List<ActionConfiguration> listByRepositoryId(String repositoryId) {
-    return list("repository.id", repositoryId);
-  }
-
-  /** Every action available in a repository: the globals plus the repository's own. */
-  public List<ActionConfiguration> listEffective(String repositoryId) {
-    return list("repository is null or repository.id = ?1", repositoryId);
+    return list("name", name);
   }
 }

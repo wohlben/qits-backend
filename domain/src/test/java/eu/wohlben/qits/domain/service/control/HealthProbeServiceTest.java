@@ -5,14 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.dto.HealthCheckState;
 import eu.wohlben.qits.domain.daemon.dto.HealthCheckStatusDto;
-import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
+import eu.wohlben.qits.domain.repository.control.FakeWorkspaceConfigReader;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.service.dto.ServiceEventDto;
@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -38,7 +39,9 @@ import org.junit.jupiter.api.Test;
  * TCP connects against a really-bound port, HTTP status matching against a real server), threshold
  * debouncing, the display-only invariant (a red check never moves {@code ServiceStatus} and never
  * writes a {@code daemon_event} row), stop/adopt lifecycle, and UNKNOWN-vs-UNHEALTHY
- * classification.
+ * classification. Checks are config-declared ({@link QitsConfig.HealthCheckDecl} entries on the
+ * staged {@link QitsConfig.ServiceDecl}); the probe runtime applies the same defaults the old DB
+ * store did.
  */
 @QuarkusTest
 @TestProfile(HealthProbeServiceTest.TestProfile.class)
@@ -75,13 +78,18 @@ public class HealthProbeServiceTest {
 
   @Inject WorkspaceService workspaceService;
 
-  @Inject RepositoryDaemonService repositoryDaemonService;
+  @Inject FakeWorkspaceConfigReader configReader;
 
   @Inject ServiceSupervisor supervisor;
 
   @Inject ServiceEventService daemonEventService;
 
   @Inject ContainerRuntime containers;
+
+  @BeforeEach
+  void resetConfig() {
+    configReader.clear(); // the fake is a shared singleton across this class's test methods
+  }
 
   private String repoWithWorkspace() throws Exception {
     String fixtureUrl = getClass().getResource("/fixtures/testing-repo.git").toURI().getPath();
@@ -92,30 +100,38 @@ public class HealthProbeServiceTest {
     return repo.id;
   }
 
-  private String createDaemon(String repoId, String name, List<HealthCheck> healthChecks) {
-    return repositoryDaemonService.create(
-            repoId,
-            name,
-            null,
-            IDLE_SCRIPT,
-            "tick",
-            "TERM",
-            RestartPolicy.NEVER,
-            null,
-            0,
+  private String createDaemon(
+      String repoId, String name, List<QitsConfig.HealthCheckDecl> healthChecks) {
+    configReader.setConfig(
+        "work",
+        new QitsConfig(
             null,
             null,
             null,
-            null,
-            null,
-            healthChecks)
-        .id;
+            List.of(
+                new QitsConfig.ServiceDecl(
+                    name,
+                    name,
+                    null,
+                    IDLE_SCRIPT,
+                    "tick",
+                    null,
+                    null,
+                    RestartPolicy.NEVER,
+                    0,
+                    "TERM",
+                    null,
+                    null,
+                    healthChecks)),
+            null));
+    return name;
   }
 
   /** A check with instant first probe and single-failure flips, unless a test tunes thresholds. */
-  private static HealthCheck check(
+  private static QitsConfig.HealthCheckDecl check(
       String name, HealthCheckKind kind, Integer port, String path, String expect, String command) {
-    return new HealthCheck(name, kind, port, path, expect, command, null, null, null, 1, 0L);
+    return new QitsConfig.HealthCheckDecl(
+        name, kind, port, path, expect, command, null, null, null, 1, 0L);
   }
 
   private HealthCheckStatusDto awaitHealth(
@@ -171,8 +187,8 @@ public class HealthProbeServiceTest {
     String repoId = repoWithWorkspace();
     Path flag = Files.createTempDirectory("qits-health-flag").resolve("healthy");
     // unhealthyThreshold 3: the flip to red needs three consecutive failed ticks.
-    HealthCheck flagCheck =
-        new HealthCheck(
+    QitsConfig.HealthCheckDecl flagCheck =
+        new QitsConfig.HealthCheckDecl(
             "flag",
             HealthCheckKind.COMMAND,
             null,

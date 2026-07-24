@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { FeatureFlowConfigurationDto } from './featureFlowConfigurationDto';
+import { WorkspaceHistoryDto } from './workspaceHistoryDto';
 
 
 export interface Entry12 { 
-    featureFlowConfiguration?: FeatureFlowConfigurationDto;
+    workspace?: WorkspaceHistoryDto;
 }
 

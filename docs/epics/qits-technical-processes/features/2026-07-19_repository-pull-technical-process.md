@@ -21,10 +21,12 @@ Related/dependent plans:
   introduced the imported-submodule sibling graph; the pull's recursion over it
   (`RepositoryService.pullRepository` + `withImportedChildPulls`) is what turned pull into a
   multi-step operation worth streaming.
-- **Config re-ingestion rides the pull** —
+- **~~Config re-ingestion rides the pull~~ (removed 2026-07-24)** —
   `docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md`: a main-branch advance
-  re-ingests `.qits-config.yml`; its outcome line belongs in the same segment as the pull that
-  triggered it.
+  used to re-ingest `.qits-config.yml` into DB rows, its outcome line in the same segment. That
+  ingestion was removed by
+  [config-as-single-source-of-truth](../../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)
+  (config is now read in-container per workspace), so pull no longer touches config at all.
 
 ## Contract
 
@@ -53,9 +55,9 @@ that repo's own pull completes:
    `visited` dedup means a shared child gets exactly one segment, under the first edge that
    reached it; a cycle never reopens a segment).
 
-Each segment carries that repo's fetch output, the fast-forward/up-to-date/locally-ahead
-verdict, and (root/child alike) the `.qits-config.yml` re-ingestion outcome when its main branch
-advanced.
+Each segment carries that repo's fetch output and the fast-forward/up-to-date/locally-ahead
+verdict. (It used to also carry the `.qits-config.yml` re-ingestion outcome on a main-branch
+advance — removed with the config DB store, 2026-07-24.)
 
 ### Failure semantics — preserved, but visible
 
@@ -92,7 +94,7 @@ the pair to something scope-neutral, e.g. `expectAsyncSegments`; not worth it fo
   process parameter threaded through `withImportedChildPulls`; the existing public
   `pullRepository(String)` passes a no-op sink so `syncRepository` is untouched. Worker-thread
   caveat as in `beginEnsureContainer`: no request context, so DB touches
-  (`get`, the submodule-edge query, config ingestion) must open their own transactions.
+  (`get`, the submodule-edge query) must open their own transactions.
 - **Line delivery is post-hoc per git command**: `GitExecutor.exec` returns captured output;
   split it into lines and append to the segment when each command returns. That is the
   `FakeContainerRuntime` fidelity level and is fine here — the segment-open frame already
@@ -136,8 +138,8 @@ Each deferral above is captured as its own feature idea rather than left as a no
 - `RepositoryPullProcessTest` (domain, `@QuarkusTest`): the segmented walk over the
   `submodule-super` fixture family — segment-per-repo ordering, diamond dedup (one segment for
   the shared child), cycle termination, child-failure settles `failed` while later children
-  still pull and `done` is `failed`, root divergence → `failProvision`, config re-ingestion
-  line present on a main-branch advance.
+  still pull and `done` is `failed`, root divergence → `failProvision`. (The old "config
+  re-ingestion line present on a main-branch advance" assertion went with the ingestion itself.)
 - `RepositoryControllerTest`: `POST …/pull` returns `{technicalProcessId}` immediately; unknown
   repo is still 404 in-request.
 - `repository-sync.component.spec.ts` / view spec: dialog opens on mutate success, invalidation

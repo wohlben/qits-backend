@@ -1,5 +1,14 @@
 # Workspace bootstrap commands: ordered one-shot runs after provisioning
 
+> **Superseded 2026-07-23 / store removed 2026-07-24.** The chain moved in-container with
+> [daemon-run-bootstrap-chain](../../qits-workspace-daemon/features/2026-07-23_daemon-run-bootstrap-chain.md)
+> (the workspace-daemon runs it from the checkout's `.qits-config.yml`), and the DB
+> `BootstrapCommand` store + create API described below was **removed** by
+> [config-as-single-source-of-truth](../../qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)
+> — bootstrap steps are declared only in the file (workspace-scoped, no UI-created rows, no
+> `@qits-config` suffix); the workspace Bootstrap tab reads the ConfigView. This doc remains as the
+> historical record of the DB-backed model.
+
 ## Introduction
 
 A freshly provisioned workspace container is a bare checkout: dependencies not installed, demo

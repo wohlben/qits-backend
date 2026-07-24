@@ -17,11 +17,11 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response92 } from '../model/response92';
+import { Response81 } from '../model/response81';
 // @ts-ignore
-import { Response93 } from '../model/response93';
+import { Response82 } from '../model/response82';
 // @ts-ignore
-import { Response94 } from '../model/response94';
+import { Response83 } from '../model/response83';
 // @ts-ignore
 import { UpdateSettingRequest } from '../model/updateSettingRequest';
 
@@ -48,9 +48,9 @@ export class SettingControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiSettingsGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response93>;
-    public apiSettingsGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response93>>;
-    public apiSettingsGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response93>>;
+    public apiSettingsGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response82>;
+    public apiSettingsGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response82>>;
+    public apiSettingsGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response82>>;
     public apiSettingsGet(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
@@ -80,7 +80,7 @@ export class SettingControllerService extends BaseService {
 
         let localVarPath = `/api/settings`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response93>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response82>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -101,9 +101,9 @@ export class SettingControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiSettingsKeyGet(key: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response94>;
-    public apiSettingsKeyGet(key: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response94>>;
-    public apiSettingsKeyGet(key: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response94>>;
+    public apiSettingsKeyGet(key: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response83>;
+    public apiSettingsKeyGet(key: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response83>>;
+    public apiSettingsKeyGet(key: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response83>>;
     public apiSettingsKeyGet(key: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (key === null || key === undefined) {
             throw new Error('Required parameter key was null or undefined when calling apiSettingsKeyGet.');
@@ -136,7 +136,7 @@ export class SettingControllerService extends BaseService {
 
         let localVarPath = `/api/settings/${this.configuration.encodeParam({name: "key", value: key, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response94>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response83>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -158,9 +158,9 @@ export class SettingControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response92>;
-    public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response92>>;
-    public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response92>>;
+    public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response81>;
+    public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response81>>;
+    public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response81>>;
     public apiSettingsKeyPut(key: string, updateSettingRequest: UpdateSettingRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (key === null || key === undefined) {
             throw new Error('Required parameter key was null or undefined when calling apiSettingsKeyPut.');
@@ -205,7 +205,7 @@ export class SettingControllerService extends BaseService {
 
         let localVarPath = `/api/settings/${this.configuration.encodeParam({name: "key", value: key, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response92>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response81>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateSettingRequest,

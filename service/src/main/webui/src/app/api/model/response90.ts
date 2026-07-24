@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ServiceInstanceDto } from './serviceInstanceDto';
 
 
 export interface Response90 { 
-    instance?: ServiceInstanceDto;
+    variant?: string;
+    username?: string;
 }
 

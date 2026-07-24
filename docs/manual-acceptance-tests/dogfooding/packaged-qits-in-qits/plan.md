@@ -110,24 +110,24 @@ already exist), so the nested edge must be imported on the child that declares i
 and the pass on the quarkus-angular child imports its `src/main/webui` edge (which links back to
 the already-imported `qits-fixture-angular` sibling rather than adding a new one).
 
-### 7. Verify the auto-provisioned daemon, then start it
+### 7. Verify the config-declared service, then start it
 
-The daemon is **not created by hand any more**: qits-backend commits a root
-[`.qits-config.yml`](../../../../.qits-config.yml) that declares the `qits dev server` daemon (start
-script, otel, web view 8080/`projects`, ready pattern `(?i)Listening on: http`, LOG_LEVEL + PATTERN
-observers, the `service/quarkus.log` FILE source, both health checks) plus the build/test/lint
-actions. That file is **ingested on clone**
-([config-in-repo feature](../../../epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md)), so
-after step 6 the daemon and actions already exist, config-managed and read-only.
+The service is **not created by hand any more**: qits-backend commits a root
+[`.qits-config.yml`](../../../../.qits-config.yml) that declares the `qits dev server` service (start
+script, otel, web view 8080/`projects`, ready pattern `(?i)Listening on: http`, both health
+checks) plus the build/test/lint actions. That file is the **single, workspace-scoped source of
+truth** — it is **not ingested into DB rows**; the workspace-daemon reads it in-container from each
+workspace's own checkout
+([config-as-single-source-of-truth](../../../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)).
 
-Confirm on the repository detail page (or via the API) that a daemon named **`qits dev
-server@qits-config`** is present with a `.qits-config` badge, `origin: CONFIG`, web view 8080 /
-`projects`, otel on — and that the six actions `build`, `test-domain`, `test-service`, `test-cli`,
-`format-check`, `lint-frontend` arrived with the reserved `@qits-config` name suffix. Then **start
-it on the `main` workspace** (Daemons panel → start; the workspace container materializes lazily on
-this first use).
+Start (or open) the **`main` workspace** — the container materializes lazily on this first use, the
+daemon reads the config, and the auto-start service comes up on its own after the bootstrap chain.
+Confirm on the workspace's **Services** tab that **`qits dev server`** is present with web view
+8080 / `projects` and otel on, and on the **Actions** tab that the config actions `build`,
+`test-domain`, `test-service`, `test-cli`, `format-check`, `lint-frontend` appear with a **CONFIG**
+badge (alongside the code-based `Bash`).
 
-*Expect:* the daemon and actions appear with no manual data entry (config warning empty). First
+*Expect:* the service and actions appear with no manual data entry. First
 launch takes long (full in-container reactor + pnpm build; warm shared `m2`/`pnpm` caches speed it a
 lot). Status reaches `READY`; both health dots (Quarkus COMMAND, Angular HTTP) go green.
 
@@ -153,10 +153,10 @@ curl -s -H 'Remote-User: tester' \
 
 *Expect:*
 
-- spans from **`qits dev server@qits-config-browser`** (the child SPA: `documentLoad`,
+- spans from **`qits dev server-browser`** (the child SPA: `documentLoad`,
   `documentFetch`/`resourceFetch`, `Navigation`, `click`) — the browser half of the relay. The
-  service name carries the daemon's `@qits-config` suffix because the daemon was ingested from the
-  config file (§7); the `-browser` suffix is the SPA half;
+  service name is the config-declared service's `id:` (its name; §7) with the `-browser` suffix
+  for the SPA half;
 - spans from the child **backend** — Quarkus server spans under service name **`qits-forwardauth`**
   (from its artifact): `HTTP GET`, `GET /auth/me`, `GET /projects`, …;
 - **no** spans for `/otel/v1/*`, `/daemon/*`, `/git/*`, `/mcp/*` (the suppress list);
@@ -183,8 +183,9 @@ section); reach one of those routes first to see it. Tracked in
 - [ ] Packaged container healthy; `401` without `Remote-User`, identity echoed with it.
 - [ ] qits-backend registered with two-level submodule import (nested edge on the child); workspace
       container materializes.
-- [ ] `.qits-config.yml` ingested on clone: `qits dev server@qits-config` daemon + the six
-      `@qits-config` actions present, config-managed, `configWarning` empty.
+- [ ] `.qits-config.yml` is the only config source: the `qits dev server` service and the six
+      config actions appear on the `main` workspace's Services/Actions tabs, read in-container —
+      no DB rows, no ingestion, no config warning.
 - [ ] Daemon reaches `READY`; both health dots green.
 - [ ] Framed child UI usable through the web view, all requests under the proxy prefix.
 - [ ] Parent telemetry shows child browser **and** backend spans + logs; suppressed paths absent.

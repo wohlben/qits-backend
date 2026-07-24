@@ -3,12 +3,12 @@ package eu.wohlben.qits.domain.service.control;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.dto.HealthCheckState;
-import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.control.ProjectService;
+import eu.wohlben.qits.domain.repository.control.FakeWorkspaceConfigReader;
+import eu.wohlben.qits.domain.repository.control.QitsConfig;
 import eu.wohlben.qits.domain.repository.control.RepositoryService;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.service.dto.ServiceInstanceDto;
@@ -55,7 +55,7 @@ public class HealthProbeKillSwitchTest {
 
   @Inject WorkspaceService workspaceService;
 
-  @Inject RepositoryDaemonService repositoryDaemonService;
+  @Inject FakeWorkspaceConfigReader configReader;
 
   @Inject ServiceSupervisor supervisor;
 
@@ -66,36 +66,41 @@ public class HealthProbeKillSwitchTest {
     var repo = repositoryService.cloneRepository(fixtureUrl, null, project);
     workspaceService.createWorkspace(repo.id, "work", "master", "work");
     workspaceService.ensureContainer(repo.id, "work");
-    String daemonId =
-        repositoryDaemonService.create(
-                repo.id,
-                "unprobed",
-                null,
-                "while true; do echo tick; sleep 0.2; done",
-                "tick",
-                "TERM",
-                RestartPolicy.NEVER,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(
-                    new HealthCheck(
-                        "always",
-                        HealthCheckKind.COMMAND,
-                        null,
-                        null,
-                        null,
-                        "true",
-                        null,
-                        null,
-                        null,
-                        1,
-                        0L)))
-            .id;
+    String daemonId = "unprobed";
+    configReader.setConfig(
+        "work",
+        new QitsConfig(
+            null,
+            null,
+            null,
+            List.of(
+                new QitsConfig.ServiceDecl(
+                    daemonId,
+                    "unprobed",
+                    null,
+                    "while true; do echo tick; sleep 0.2; done",
+                    "tick",
+                    null,
+                    null,
+                    RestartPolicy.NEVER,
+                    0,
+                    "TERM",
+                    null,
+                    null,
+                    List.of(
+                        new QitsConfig.HealthCheckDecl(
+                            "always",
+                            HealthCheckKind.COMMAND,
+                            null,
+                            null,
+                            null,
+                            "true",
+                            null,
+                            null,
+                            null,
+                            1,
+                            0L)))),
+            null));
 
     supervisor.start(repo.id, "work", daemonId);
     try {

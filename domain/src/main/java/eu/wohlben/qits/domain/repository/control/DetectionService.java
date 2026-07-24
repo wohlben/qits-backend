@@ -174,12 +174,12 @@ public class DetectionService {
         continue; // unknown kind — ignored (detection is a read path with no warning surface)
       }
       String root = normalizeRoot(decl.root());
-      if (seen.add(descriptor.id() + " " + root)) {
+      if (seen.add(descriptor.id() + "\u0000" + root)) {
         merged.add(new DetectedProject(root, descriptor));
       }
     }
     for (DetectedProject p : detected) {
-      if (seen.add(p.descriptor().id() + " " + p.root())) {
+      if (seen.add(p.descriptor().id() + "\u0000" + p.root())) {
         merged.add(p);
       }
     }

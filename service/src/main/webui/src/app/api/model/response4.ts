@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { BootstrapCommandDto } from './bootstrapCommandDto';
 
 
 export interface Response4 { 
-    command?: BootstrapCommandDto;
+    started?: boolean;
 }
 

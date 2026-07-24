@@ -61,8 +61,9 @@ All in `RepositoryService` (`domain`, `repository.control`):
     from the `--name-only` section) and the resolution path.
 - **Pull** (`pullRepository`, also the pull half of sync): the diverged case calls the helper
   instead of throwing; on a clean merge the walk continues exactly like a fast-forward
-  (`.qits-config.yml` re-ingested from the new tip, imported submodule children pulled, segment
-  settles ok). The conflict throw reaches the process as before (`done failed`, message in
+  (imported submodule children pulled, segment
+  settles ok — the `.qits-config.yml` re-ingestion this list used to include was removed in
+  Part 5, 2026-07-24). The conflict throw reaches the process as before (`done failed`, message in
   stream); for a diverged submodule *child* it degrades to the WARNING-line path while the walk
   continues.
 - **Push** (`pushRepository`): a failed push whose output matches git's remote-is-ahead rejection
@@ -73,9 +74,10 @@ All in `RepositoryService` (`domain`, `repository.control`):
   the helper's parking throw. If the fetched tip turns out to be already contained locally (a
   racing pull), the original rejection is rethrown untouched.
 
-Tests: `RepositoryPullProcessTest` (clean divergence auto-merges with correct parent order +
-config re-ingest; conflicting divergence parks the tip, leaves the branch untouched, and a retry
-after further remote commits overwrites the parked branch), `RepositorySyncProcessTest` (clean
+Tests: `RepositoryPullProcessTest` (clean divergence auto-merges with correct parent order;
+conflicting divergence parks the tip, leaves the branch untouched, and a retry
+after further remote commits overwrites the parked branch — the config re-ingest assertion went
+with the ingestion itself, 2026-07-24), `RepositorySyncProcessTest` (clean
 divergence merges then pushes the merge commit; conflict fails before the push segment opens),
 `RepositoryPushProcessTest` (behind-remote push fast-forwards the mirror; diverged push merges
 and pushes; conflicting push parks and fails). All host-side against bare origins — no docker.

@@ -7,12 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Available } from './available';
-import { Entry14 } from './entry14';
 
 
 export interface Response70 { 
-    entries?: Array<Entry14>;
-    available?: Array<Available>;
+    files?: Array<string>;
 }
 

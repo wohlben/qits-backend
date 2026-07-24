@@ -29,46 +29,6 @@ export const repositoriesRoutes: Routes = [
       import('./repository-detail/repository-detail.page').then((m) => m.RepositoryDetailPage),
   },
   {
-    path: ':repoId/daemons',
-    loadComponent: () =>
-      import('./repository-daemons/repository-daemons.page').then((m) => m.RepositoryDaemonsPage),
-  },
-  {
-    path: ':repoId/daemons/new',
-    loadComponent: () =>
-      import('./repository-daemon-form/repository-daemon-form.page').then(
-        (m) => m.RepositoryDaemonFormPage,
-      ),
-  },
-  {
-    path: ':repoId/daemons/:daemonId/edit',
-    loadComponent: () =>
-      import('./repository-daemon-form/repository-daemon-form.page').then(
-        (m) => m.RepositoryDaemonFormPage,
-      ),
-  },
-  {
-    path: ':repoId/bootstrap',
-    loadComponent: () =>
-      import('./repository-bootstrap/repository-bootstrap.page').then(
-        (m) => m.RepositoryBootstrapPage,
-      ),
-  },
-  {
-    path: ':repoId/bootstrap/new',
-    loadComponent: () =>
-      import('./repository-bootstrap-form/repository-bootstrap-form.page').then(
-        (m) => m.RepositoryBootstrapFormPage,
-      ),
-  },
-  {
-    path: ':repoId/bootstrap/:commandId/edit',
-    loadComponent: () =>
-      import('./repository-bootstrap-form/repository-bootstrap-form.page').then(
-        (m) => m.RepositoryBootstrapFormPage,
-      ),
-  },
-  {
     path: ':repoId/branch/:branchName/commits',
     loadComponent: () =>
       import('./branch-commits/branch-commits.page').then((m) => m.BranchCommitsPage),
