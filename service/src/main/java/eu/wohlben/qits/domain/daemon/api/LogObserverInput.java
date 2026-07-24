@@ -1,14 +1,14 @@
 package eu.wohlben.qits.domain.daemon.api;
 
-import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
 import eu.wohlben.qits.domain.daemon.entity.LogObserver;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
+import eu.wohlben.qits.domain.service.entity.ServiceEventSeverity;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /** One observer as submitted by clients; shared by the global and repo-scoped daemon requests. */
 public record LogObserverInput(
-    @NotNull LogObserverKind kind, String pattern, DaemonEventSeverity severity) {
+    @NotNull LogObserverKind kind, String pattern, ServiceEventSeverity severity) {
 
   public LogObserver toEntity() {
     return new LogObserver(kind, pattern, severity);

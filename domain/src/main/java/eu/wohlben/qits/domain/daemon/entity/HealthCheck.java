@@ -41,7 +41,7 @@ public class HealthCheck {
   @Column(length = 4000)
   public String command;
 
-  /** Poll cadence; null falls back to {@code qits.daemons.health-poll-ms}. */
+  /** Poll cadence; null falls back to {@code qits.services.health-poll-ms}. */
   @Column(name = "interval_ms")
   public Long intervalMs;
 

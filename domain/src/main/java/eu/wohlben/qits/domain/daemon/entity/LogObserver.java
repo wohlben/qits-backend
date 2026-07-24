@@ -1,5 +1,6 @@
 package eu.wohlben.qits.domain.daemon.entity;
 
+import eu.wohlben.qits.domain.service.entity.ServiceEventSeverity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
@@ -24,11 +25,11 @@ public class LogObserver {
 
   /** Severity stamped on PATTERN events; LOG_LEVEL observers classify severity themselves. */
   @Enumerated(EnumType.STRING)
-  public DaemonEventSeverity severity;
+  public ServiceEventSeverity severity;
 
   public LogObserver() {}
 
-  public LogObserver(LogObserverKind kind, String pattern, DaemonEventSeverity severity) {
+  public LogObserver(LogObserverKind kind, String pattern, ServiceEventSeverity severity) {
     this.kind = kind;
     this.pattern = pattern;
     this.severity = severity;

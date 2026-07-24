@@ -353,7 +353,7 @@ public class CommandService {
   /**
    * Prepare a daemon run without spawning: validate the workspace, snapshot branch/commit, persist
    * a RUNNING {@code DAEMON} row, and resolve the env overlay (OTEL, {@code QITS_PUBLIC_BASE}, and
-   * the caller's env). The {@link DaemonSupervisor} starts the detached daemon session with the
+   * the caller's env). The {@link ServiceSupervisor} starts the detached daemon session with the
    * returned {@code environment}, then attaches a log follower to the returned command id via
    * {@link #followDaemon}. The row's {@code script} is the daemon's own startScript (meaningful
    * history), even though the process qits streams is the follower tail.

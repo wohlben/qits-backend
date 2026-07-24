@@ -26,7 +26,7 @@ import org.jboss.logging.Logger;
  * {@code pom.xml}, or a test <em>without a commit</em> — the case a commit-SHA-keyed cache would go
  * stale on.
  *
- * <p>Its lifecycle follows the container's, mirroring {@code DaemonLifecycleCoupler}:
+ * <p>Its lifecycle follows the container's, mirroring {@code ServiceLifecycleCoupler}:
  *
  * <ul>
  *   <li><b>start</b> — on {@link WorkspaceContainerStarted} (a cold&#8594;RUNNING transition in

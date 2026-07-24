@@ -9,7 +9,7 @@ package eu.wohlben.qits.domain.repository.control;
  *
  * <p>This exists because CDI gives two async observers of one event no ordering: bootstrap must
  * finish before daemon auto-start, so the sequencing is structural — {@code
- * WorkspaceBootstrapRunner} observes the container start and {@code DaemonLifecycleCoupler}
+ * WorkspaceBootstrapRunner} observes the container start and {@code ServiceLifecycleCoupler}
  * observes this. It lives in {@code repository.control} beside its trigger so both areas depend
  * only on the repository area.
  *

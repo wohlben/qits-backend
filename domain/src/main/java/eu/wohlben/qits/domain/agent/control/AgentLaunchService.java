@@ -10,7 +10,6 @@ import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
 import eu.wohlben.qits.domain.command.entity.AgentSessionSource;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
-import eu.wohlben.qits.domain.daemon.control.DaemonEventSpool;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.repository.control.QitsHostResolver;
@@ -18,6 +17,7 @@ import eu.wohlben.qits.domain.repository.control.WorkspacePromptDraftService;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
+import eu.wohlben.qits.domain.service.control.ServiceEventSpool;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -102,7 +102,7 @@ public class AgentLaunchService {
 
   @Inject RepositoryRepository repositoryRepository;
 
-  @Inject DaemonEventSpool daemonEventSpool;
+  @Inject ServiceEventSpool daemonEventSpool;
 
   @Inject AgentAuthStatus agentAuthStatus;
 

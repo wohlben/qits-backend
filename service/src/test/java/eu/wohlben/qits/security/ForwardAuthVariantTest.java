@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
  * docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md; the fine-grained
  * mechanism coverage lives in the auth modules' own suites). The %test dev-user fallback is blanked
  * here so the real prod posture shows: protected paths 401 without the proxy header — including
- * /daemon/*, a raw router route — while the container-facing public surface (git host, OTLP ingest,
- * agent-session hook, health) stays token-free.
+ * /service/*, a raw router route — while the container-facing public surface (git host, OTLP
+ * ingest, agent-session hook, health) stays token-free.
  */
 @QuarkusTest
 @TestProfile(ForwardAuthVariantTest.Profile.class)
@@ -42,7 +42,7 @@ class ForwardAuthVariantTest {
         .redirects()
         .follow(false)
         .when()
-        .get("/daemon/some-workspace/some-daemon/")
+        .get("/service/some-workspace/some-daemon/")
         .then()
         .statusCode(401);
   }

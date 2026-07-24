@@ -6,11 +6,11 @@ import static org.hamcrest.Matchers.hasItem;
 
 import eu.wohlben.qits.domain.daemon.api.RepositoryDaemonController.CreateRepositoryDaemonRequest;
 import eu.wohlben.qits.domain.daemon.api.RepositoryDaemonController.UpdateRepositoryDaemonRequest;
-import eu.wohlben.qits.domain.daemon.entity.DaemonEventSeverity;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
 import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.api.ProjectController;
+import eu.wohlben.qits.domain.service.entity.ServiceEventSeverity;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -86,7 +86,7 @@ public class RepositoryDaemonControllerTest {
                 Map.of("PORT", "3000"),
                 List.of(
                     new LogObserverInput(
-                        LogObserverKind.PATTERN, "ERROR", DaemonEventSeverity.ERROR),
+                        LogObserverKind.PATTERN, "ERROR", ServiceEventSeverity.ERROR),
                     new LogObserverInput(LogObserverKind.LOG_LEVEL, null, null)),
                 List.of(new LogSourceInput("logs/app.log", "app log")),
                 List.of(
@@ -180,7 +180,7 @@ public class RepositoryDaemonControllerTest {
                 null,
                 List.of(
                     new LogObserverInput(
-                        LogObserverKind.PATTERN, "FATAL", DaemonEventSeverity.WARNING)),
+                        LogObserverKind.PATTERN, "FATAL", ServiceEventSeverity.WARNING)),
                 null,
                 null))
         .put("/api/repositories/" + repoId + "/daemons/" + id)
