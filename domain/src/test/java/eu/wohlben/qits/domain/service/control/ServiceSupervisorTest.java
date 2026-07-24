@@ -419,7 +419,7 @@ public class ServiceSupervisorTest {
     try {
       ServiceInstanceDto ready = awaitStatus(repo.id, daemonId, ServiceStatus.READY);
       assertEquals(
-          "/daemon/work/" + daemonId + "/app/",
+          "/service/work/" + daemonId + "/app/",
           ready.proxyPath(),
           "the served base is the proxy prefix plus the basePath (entryPath is not part of it)");
       assertEquals(
