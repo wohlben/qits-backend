@@ -28,7 +28,6 @@ import { DomPicker, PickOptions } from './dom-picker';
 
 const LIVE_STATUSES: (ServiceStatus | undefined)[] = [
   ServiceStatus.Ready,
-  ServiceStatus.Degraded,
   ServiceStatus.Starting,
   ServiceStatus.Restarting,
 ];

@@ -14,7 +14,6 @@ import {
   DaemonFormComponent,
   DaemonFormData,
   DaemonHealthCheckRow,
-  DaemonObserverRow,
 } from '@/ui/forms/daemon/daemon-form.component';
 
 @Component({
@@ -71,15 +70,6 @@ export class RepositoryDaemonCreateUpdateFormComponent {
           webViewEntryPath: d.webView?.entryPath ?? '',
           webViewBasePath: d.webView?.basePath ?? '',
           environment: Object.entries(d.environment ?? {}).map(([key, value]) => ({ key, value })),
-          observers: (d.observers ?? []).map((o) => ({
-            kind: o.kind ?? 'PATTERN',
-            pattern: o.pattern ?? '',
-            severity: o.severity ?? 'ERROR',
-          })),
-          sources: (d.sources ?? []).map((s) => ({
-            path: s.path ?? '',
-            label: s.label ?? '',
-          })),
           healthChecks: (d.healthChecks ?? []).map((c) => ({
             name: c.name ?? '',
             kind: c.kind ?? 'HTTP',
@@ -142,10 +132,6 @@ export class RepositoryDaemonCreateUpdateFormComponent {
       otel: data.otel,
       webView: this.toWebView(data),
       environment: this.toEnvMap(data.environment),
-      observers: data.observers.map((row) => this.toObserver(row)),
-      sources: data.sources
-        .filter((row) => row.path.trim().length > 0)
-        .map((row) => ({ path: row.path.trim(), label: row.label.trim() || undefined })),
       healthChecks: data.healthChecks
         .filter((row) => row.name.trim().length > 0)
         .map((row) => this.toHealthCheck(row)),
@@ -218,13 +204,6 @@ export class RepositoryDaemonCreateUpdateFormComponent {
   private parseOptionalInt(value: string): number | undefined {
     const parsed = Number.parseInt(value, 10);
     return Number.isNaN(parsed) ? undefined : parsed;
-  }
-
-  /** Only the fields of the selected kind travel; LOG_LEVEL needs no configuration. */
-  private toObserver(row: DaemonObserverRow) {
-    return row.kind === 'PATTERN'
-      ? { kind: row.kind, pattern: row.pattern, severity: row.severity }
-      : { kind: row.kind };
   }
 
   /** Collapse the editor rows into a map, dropping rows with a blank key and keeping the last dup. */

@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
-import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.featureflow.control.ActionConfigurationService;
 import eu.wohlben.qits.domain.featureflow.control.FeatureFlowConfigurationService;
@@ -197,16 +196,6 @@ public class SeedWebappServiceTest {
         4200, devServer.webView.port, "the web view frames the Angular dev server (:4200)");
     assertEquals("greeting", devServer.webView.entryPath, "the frame opens on the greeting screen");
     assertTrue(devServer.otel, "dev server daemon should export OTEL");
-
-    assertTrue(
-        devServer.observers.stream().anyMatch(o -> o.kind == LogObserverKind.LOG_LEVEL),
-        "should have a LOG_LEVEL observer");
-    assertTrue(
-        devServer.observers.stream().anyMatch(o -> o.kind == LogObserverKind.PATTERN),
-        "should have a PATTERN observer");
-    assertTrue(
-        devServer.sources.stream().anyMatch(s -> "quarkus.log".equals(s.path)),
-        "should tail the quarkus.log file source");
   }
 
   /** A plain feature workspace off feature/greeting exists and is active. */

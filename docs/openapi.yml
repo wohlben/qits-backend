@@ -532,14 +532,6 @@ components:
           type: object
           additionalProperties:
             type: string
-        observers:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogObserverInput"
-        sources:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogSourceInput"
         healthChecks:
           type: array
           items:
@@ -957,54 +949,12 @@ components:
       - OUTPUT
       - STDERR
       - TRANSCRIPT
-    LogObserverDto:
-      type: object
-      properties:
-        kind:
-          $ref: "#/components/schemas/LogObserverKind"
-        pattern:
-          type: string
-        severity:
-          $ref: "#/components/schemas/ServiceEventSeverity"
-    LogObserverInput:
-      type: object
-      required:
-      - kind
-      properties:
-        kind:
-          $ref: "#/components/schemas/LogObserverKind"
-        pattern:
-          type: string
-        severity:
-          $ref: "#/components/schemas/ServiceEventSeverity"
-    LogObserverKind:
-      type: string
-      enum:
-      - PATTERN
-      - LOG_LEVEL
     LogSeverity:
       type: string
       enum:
       - INFO
       - WARNING
       - ERROR
-    LogSourceDto:
-      type: object
-      properties:
-        path:
-          type: string
-        label:
-          type: string
-    LogSourceInput:
-      type: object
-      required:
-      - path
-      properties:
-        path:
-          type: string
-          pattern: \S
-        label:
-          type: string
     MergeBranchRequest:
       type: object
       required:
@@ -1110,14 +1060,6 @@ components:
           type: object
           additionalProperties:
             type: string
-        observers:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogObserverDto"
-        sources:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogSourceDto"
         healthChecks:
           type: array
           items:
@@ -1810,7 +1752,6 @@ components:
       type: string
       enum:
       - STATUS_CHANGED
-      - ERROR_DETECTED
     ServiceEventSeverity:
       type: string
       enum:
@@ -1840,7 +1781,6 @@ components:
       enum:
       - STARTING
       - READY
-      - DEGRADED
       - RESTARTING
       - CRASHED
       - STOPPED
@@ -2133,14 +2073,6 @@ components:
           type: object
           additionalProperties:
             type: string
-        observers:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogObserverInput"
-        sources:
-          type: array
-          items:
-            $ref: "#/components/schemas/LogSourceInput"
         healthChecks:
           type: array
           items:

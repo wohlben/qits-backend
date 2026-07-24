@@ -387,42 +387,30 @@ public class CommandService {
 
   /**
    * Attach a follower process (the daemon's {@code tail -F} of its mirror log) to an
-   * already-created command id, streaming its output through the same persistence + observer +
-   * replay pipeline as any command — so the ready-pattern, log observers, per-line persistence, and
-   * terminal re-attach all keep working while the daemon itself runs detached in its session. The
-   * follower carries no daemon env (that rode into the session); its own exit does not drive daemon
-   * lifecycle — the supervisor's liveness poll owns that.
+   * already-created command id, streaming its output through the same persistence + replay pipeline
+   * as any command — so the ready-pattern, per-line persistence, and terminal re-attach all keep
+   * working while the daemon itself runs detached in its session. The follower carries no daemon
+   * env (that rode into the session); its own exit does not drive daemon lifecycle — the
+   * supervisor's liveness poll owns that.
    */
   public void followDaemon(
       String commandId,
       String container,
       String followScript,
       CommandExitListener exitListener,
-      CommandLogWriter logWriterTap,
       CommandOutputSink... observerSinks) {
     CommandExitListener composite =
         (id, exitCode, terminatedManually) -> {
           onExit(id, exitCode, terminatedManually);
           exitListener.onExit(id, exitCode, terminatedManually);
         };
-    CommandLogWriter logWriter =
-        logWriterTap == null
-            ? commandLogService
-            : (id, sequence, channel, content, timestamp) -> {
-              commandLogService.append(id, sequence, channel, content, timestamp);
-              try {
-                logWriterTap.append(id, sequence, channel, content, timestamp);
-              } catch (RuntimeException e) {
-                LOG.debugf(e, "Daemon log tap failed for command %s", id);
-              }
-            };
     registry.spawn(
         commandId,
         container,
         followScript,
         Map.of("TERM", "xterm-256color"),
         composite,
-        logWriter,
+        commandLogService,
         observerSinks);
   }
 

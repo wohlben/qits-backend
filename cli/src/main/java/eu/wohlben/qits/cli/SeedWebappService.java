@@ -47,7 +47,7 @@ import org.jboss.logging.Logger;
  *     ├─ Repository (testing-repo-quarkus-angular)
  *     │    + the daemon and build/lint/test actions ingested from the fixture's committed
  *     │      .qits-config.yml on clone (a web-viewable "Quarkus dev server" on :4200 → /greeting,
- *     │      otel, LOG_LEVEL + PATTERN observers, a quarkus.log FILE source) — see
+ *     │      otel) — see
  *     │      docs/epics/qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md
  *     │    main       the default workspace (created at clone time)
  *     │    greeting   a plain workspace off feature/greeting (a fast-forward over main)
@@ -126,8 +126,8 @@ public class SeedWebappService {
     // qits-project-repositories/features/2026-07-18_qits-config-in-repo-configuration.md): the
     // web-viewable "Quarkus dev server"
     // daemon
-    // (web view :4200 → /greeting, otel, LOG_LEVEL + PATTERN observers, a quarkus.log FILE source,
-    // Quarkus COMMAND + Angular HTTP health checks) and the build/lint/test + Stack info actions.
+    // (web view :4200 → /greeting, otel, Quarkus COMMAND + Angular HTTP health checks) and the
+    // build/lint/test + Stack info actions.
     // Those rows are declared in the file, not built here — the seed only wires them into a
     // project.
     Repository repo =

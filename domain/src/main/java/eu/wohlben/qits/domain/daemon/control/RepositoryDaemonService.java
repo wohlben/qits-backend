@@ -2,8 +2,6 @@ package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.dto.RepositoryDaemonDto;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
-import eu.wohlben.qits.domain.daemon.entity.LogObserver;
-import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.daemon.entity.WebView;
@@ -51,8 +49,6 @@ public class RepositoryDaemonService {
       String webViewEntryPath,
       String webViewBasePath,
       Map<String, String> environment,
-      List<LogObserver> observers,
-      List<LogSource> sources,
       List<HealthCheck> healthChecks) {
     requireNotReservedName(name);
     return upsertFromConfig(
@@ -71,8 +67,6 @@ public class RepositoryDaemonService {
         webViewEntryPath,
         webViewBasePath,
         environment,
-        observers,
-        sources,
         healthChecks);
   }
 
@@ -105,8 +99,6 @@ public class RepositoryDaemonService {
       String webViewEntryPath,
       String webViewBasePath,
       Map<String, String> environment,
-      List<LogObserver> observers,
-      List<LogSource> sources,
       List<HealthCheck> healthChecks) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("name is required");
@@ -118,8 +110,6 @@ public class RepositoryDaemonService {
     WebView webView =
         DaemonDefinitionValidator.requireValidWebView(
             webViewPort, webViewEntryPath, webViewBasePath);
-    DaemonDefinitionValidator.requireValidObservers(observers);
-    DaemonDefinitionValidator.requireValidSources(sources);
     DaemonDefinitionValidator.requireValidHealthChecks(healthChecks);
 
     RepositoryDaemon daemon;
@@ -144,8 +134,6 @@ public class RepositoryDaemonService {
     daemon.otel = otel != null && otel;
     daemon.webView = webView;
     daemon.environment = environment != null ? new HashMap<>(environment) : new HashMap<>();
-    daemon.observers = observers != null ? new ArrayList<>(observers) : new ArrayList<>();
-    daemon.sources = sources != null ? new ArrayList<>(sources) : new ArrayList<>();
     daemon.healthChecks = healthChecks != null ? new ArrayList<>(healthChecks) : new ArrayList<>();
     if (existingId == null) {
       repositoryDaemonRepository.persist(daemon);
@@ -199,8 +187,6 @@ public class RepositoryDaemonService {
       String webViewEntryPath,
       String webViewBasePath,
       Map<String, String> environment,
-      List<LogObserver> observers,
-      List<LogSource> sources,
       List<HealthCheck> healthChecks) {
     RepositoryDaemon daemon = get(repositoryId, daemonId);
 
@@ -251,14 +237,6 @@ public class RepositoryDaemonService {
     }
     if (environment != null) {
       daemon.environment = new HashMap<>(environment);
-    }
-    if (observers != null) {
-      DaemonDefinitionValidator.requireValidObservers(observers);
-      daemon.observers = new ArrayList<>(observers);
-    }
-    if (sources != null) {
-      DaemonDefinitionValidator.requireValidSources(sources);
-      daemon.sources = new ArrayList<>(sources);
     }
     if (healthChecks != null) {
       DaemonDefinitionValidator.requireValidHealthChecks(healthChecks);

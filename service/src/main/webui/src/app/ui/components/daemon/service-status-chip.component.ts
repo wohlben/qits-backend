@@ -30,8 +30,6 @@ export class ServiceStatusChipComponent {
       case ServiceStatus.Starting:
       case ServiceStatus.Restarting:
         return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
-      case ServiceStatus.Degraded:
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300';
       case ServiceStatus.Crashed:
         return 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300';
       default:
@@ -46,8 +44,6 @@ export class ServiceStatusChipComponent {
       case ServiceStatus.Starting:
       case ServiceStatus.Restarting:
         return 'bg-amber-500 animate-pulse';
-      case ServiceStatus.Degraded:
-        return 'bg-orange-500';
       case ServiceStatus.Crashed:
         return 'bg-red-500';
       default:

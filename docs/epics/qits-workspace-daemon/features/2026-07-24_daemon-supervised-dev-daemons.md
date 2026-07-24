@@ -5,10 +5,14 @@
 > tail; `StartDaemon`/`SignalDaemon`/`DaemonEvent` protocol; `WorkspaceServiceDriver` SPI + registry
 > impl; the host `ServiceSupervisor` gained a daemon-backed **projection** mode with the tmux path
 > kept as the fallback. Folded in the `daemon`→`service` rename of the surviving runtime domain.
-> **Deferred:** log-observer/DEGRADED derivation in daemon-backed mode (anchored to the audit-log
-> line sequence the projection bypasses — the tmux fallback keeps full observer fidelity); the
-> `.qits-config.yml` `daemons:`→`services:` key (needs the fixture repos' two-level submodule
-> round-trip). See [`docs/implementation-plan.md`](../../../implementation-plan.md) Part 4.
+> **Follow-ups since resolved (2026-07-24):** (1) rather than re-home the log-observer/`DEGRADED`
+> derivation onto the socket, the whole **log-observation / `DEGRADED` / log-source subsystem was
+> removed** (it was anchored to the tmux audit-log line sequence; removal eliminates the daemon-backed
+> gap on both paths and drops two `DEGRADED` false-positive bugs — services now report only
+> STARTING/READY/RESTARTING/CRASHED/STOPPED + health-check status; `readyPattern`, health checks and
+> crash excerpts stay). (2) the `.qits-config.yml` `daemons:`→`services:` key **landed** via a
+> temporary `@JsonAlias("daemons")` + parser fallback, so the fixtures keep working untouched.
+> See [`docs/implementation-plan.md`](../../../implementation-plan.md) Part 4.
 
 ## Introduction
 

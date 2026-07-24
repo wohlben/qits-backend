@@ -12,7 +12,6 @@
 export const ServiceStatus = {
     Starting: 'STARTING',
     Ready: 'READY',
-    Degraded: 'DEGRADED',
     Restarting: 'RESTARTING',
     Crashed: 'CRASHED',
     Stopped: 'STOPPED'

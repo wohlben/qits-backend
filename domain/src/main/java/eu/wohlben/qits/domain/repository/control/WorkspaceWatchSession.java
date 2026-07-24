@@ -13,9 +13,8 @@ import org.jboss.logging.Logger;
  * once per raw change. Since a workspace's tree lives in the container ({@code /workspace}), not on
  * the host, the watch runs as {@code <runtime> exec … inotifywait -m …} (argv built by {@link
  * ContainerRuntime#execArgv}) and this class streams the process's stdout, invoking the callback
- * per non-blank line. Structurally the sibling of {@code
- * eu.wohlben.qits.domain.service.control.ContainerTailSource} (a long-running {@code docker exec}
- * whose stdout is read on a daemon thread), differing only in what it does with each line.
+ * per non-blank line. Structurally a long-running {@code docker exec} whose stdout is read on a
+ * daemon thread.
  *
  * <p>It does no coalescing or dedup itself — that is {@link WorkspaceWatchService}'s job (it
  * collapses a burst into one working-tree-marker check). A dropped or missed event self-heals: the

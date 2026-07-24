@@ -447,9 +447,7 @@ export class WorkspaceDetailPage {
   readonly serviceIndicator = computed<ZardTabIndicator | null>(() => {
     const instances = this.servicesQuery.data() ?? [];
     if (
-      instances.some(
-        (i) => i.status === ServiceStatus.Degraded || i.status === ServiceStatus.Restarting,
-      )
+      instances.some((i) => i.status === ServiceStatus.Restarting)
     ) {
       return 'warning';
     }
@@ -461,7 +459,7 @@ export class WorkspaceDetailPage {
 
   readonly serviceIndicatorLabel = computed(() =>
     this.serviceIndicator() === 'warning'
-      ? 'A service is degraded or restarting'
+      ? 'A service is restarting'
       : 'A service is running',
   );
 

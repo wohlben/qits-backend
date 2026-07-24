@@ -23,17 +23,6 @@ export interface DaemonEnvVarRow {
   value: string;
 }
 
-export interface DaemonObserverRow {
-  kind: 'PATTERN' | 'LOG_LEVEL';
-  pattern: string;
-  severity: 'INFO' | 'WARNING' | 'ERROR';
-}
-
-export interface DaemonSourceRow {
-  path: string;
-  label: string;
-}
-
 export interface DaemonHealthCheckRow {
   name: string;
   kind: 'HTTP' | 'TCP' | 'COMMAND';
@@ -68,8 +57,6 @@ export interface DaemonFormData {
   /** Advanced: extra sub-path the app pins on top of the proxy prefix; usually empty. */
   webViewBasePath: string;
   environment: DaemonEnvVarRow[];
-  observers: DaemonObserverRow[];
-  sources: DaemonSourceRow[];
   healthChecks: DaemonHealthCheckRow[];
 }
 
@@ -192,106 +179,6 @@ export interface DaemonFormData {
       <z-checkbox [formField]="form.otel">
         OpenTelemetry export (inject OTEL_* env vars at launch)
       </z-checkbox>
-
-      <!-- Observers watch the daemon's output: PATTERN emits an event per matching line,
-           LOG_LEVEL classifies output batches locally off standard severity tokens. -->
-      <fieldset class="flex flex-col gap-2">
-        <legend class="text-sm font-medium">Log observers</legend>
-        @for (row of model().observers; track $index) {
-          <div class="flex flex-wrap items-center gap-2 rounded-md border p-2">
-            <select
-              class="h-9 rounded-md border bg-transparent px-2 text-sm"
-              [value]="row.kind"
-              (change)="updateObserver($index, 'kind', $any($event.target).value)"
-              [attr.aria-label]="'Observer ' + ($index + 1) + ' kind'"
-            >
-              <option value="PATTERN">Pattern</option>
-              <option value="LOG_LEVEL">Log level</option>
-            </select>
-            @if (row.kind === 'PATTERN') {
-              <input
-                z-input
-                class="flex-1"
-                placeholder="regex, e.g. ERROR|Traceback"
-                autocomplete="off"
-                [value]="row.pattern"
-                (input)="updateObserver($index, 'pattern', $any($event.target).value)"
-                [attr.aria-label]="'Observer ' + ($index + 1) + ' pattern'"
-              />
-              <select
-                class="h-9 rounded-md border bg-transparent px-2 text-sm"
-                [value]="row.severity"
-                (change)="updateObserver($index, 'severity', $any($event.target).value)"
-                [attr.aria-label]="'Observer ' + ($index + 1) + ' severity'"
-              >
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="ERROR">Error</option>
-              </select>
-            } @else {
-              <span class="flex-1 text-xs text-muted-foreground">
-                Classifies ERROR/WARN tokens, exception names and stack traces in the output
-              </span>
-            }
-            <button
-              z-button
-              zType="ghost"
-              type="button"
-              (click)="removeObserver($index)"
-              [attr.aria-label]="'Remove observer ' + ($index + 1)"
-            >
-              Remove
-            </button>
-          </div>
-        }
-        <div>
-          <button z-button zType="secondary" type="button" (click)="addObserver()">
-            Add observer
-          </button>
-        </div>
-      </fieldset>
-
-      <!-- FILE log sources: workspace-relative files tailed alongside the process output; every
-           observer above watches these too. -->
-      <fieldset class="flex flex-col gap-2">
-        <legend class="text-sm font-medium">Log sources (tailed files)</legend>
-        @for (row of model().sources; track $index) {
-          <div class="flex items-center gap-2">
-            <input
-              z-input
-              class="flex-1"
-              placeholder="workspace-relative path, e.g. logs/app.log"
-              autocomplete="off"
-              [value]="row.path"
-              (input)="updateSource($index, 'path', $any($event.target).value)"
-              [attr.aria-label]="'Source ' + ($index + 1) + ' path'"
-            />
-            <input
-              z-input
-              class="flex-1"
-              placeholder="label (optional)"
-              autocomplete="off"
-              [value]="row.label"
-              (input)="updateSource($index, 'label', $any($event.target).value)"
-              [attr.aria-label]="'Source ' + ($index + 1) + ' label'"
-            />
-            <button
-              z-button
-              zType="ghost"
-              type="button"
-              (click)="removeSource($index)"
-              [attr.aria-label]="'Remove source ' + ($index + 1)"
-            >
-              Remove
-            </button>
-          </div>
-        }
-        <div>
-          <button z-button zType="secondary" type="button" (click)="addSource()">
-            Add log source
-          </button>
-        </div>
-      </fieldset>
 
       <!-- Healthchecks: named probes run inside the container on an interval, shown as live
            green/red/grey dots beside the status chip. Display-only — they never affect the
@@ -508,8 +395,6 @@ export class DaemonFormComponent {
     webViewEntryPath: '',
     webViewBasePath: '',
     environment: [],
-    observers: [],
-    sources: [],
     healthChecks: [],
   });
   readonly form = form(this.model, (schemaPath) => {
@@ -528,48 +413,6 @@ export class DaemonFormComponent {
       const data = this.initialData();
       if (data) this.model.set(data);
     });
-  }
-
-  addObserver() {
-    this.model.update((m) => ({
-      ...m,
-      observers: [...m.observers, { kind: 'PATTERN', pattern: '', severity: 'ERROR' }],
-    }));
-  }
-
-  removeObserver(index: number) {
-    this.model.update((m) => ({
-      ...m,
-      observers: m.observers.filter((_, i) => i !== index),
-    }));
-  }
-
-  updateObserver(index: number, field: keyof DaemonObserverRow, value: string) {
-    this.model.update((m) => ({
-      ...m,
-      observers: m.observers.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    }));
-  }
-
-  addSource() {
-    this.model.update((m) => ({
-      ...m,
-      sources: [...m.sources, { path: '', label: '' }],
-    }));
-  }
-
-  removeSource(index: number) {
-    this.model.update((m) => ({
-      ...m,
-      sources: m.sources.filter((_, i) => i !== index),
-    }));
-  }
-
-  updateSource(index: number, field: keyof DaemonSourceRow, value: string) {
-    this.model.update((m) => ({
-      ...m,
-      sources: m.sources.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    }));
   }
 
   addHealthCheck() {

@@ -3,8 +3,6 @@ package eu.wohlben.qits.cli;
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
-import eu.wohlben.qits.domain.daemon.entity.LogObserver;
-import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import eu.wohlben.qits.domain.project.entity.Project;
@@ -81,8 +79,8 @@ public class SeedService {
             project.id, url, RepositoryArchetype.SERVICE, true);
 
     // A demo daemon on the repository (daemons only exist at repository scope): a Python static
-    // file server with a ready pattern and a LOG_LEVEL observer — enough to watch the whole
-    // supervised lifecycle in any of the workspaces below. Created BEFORE the workspaces:
+    // file server with a ready pattern — enough to watch the whole supervised lifecycle in any of
+    // the workspaces below. Created BEFORE the workspaces:
     // containers
     // publish web-view ports (httpPort) only when the definition already declares them at
     // container-creation time, and http.server binds 0.0.0.0 so the published port reaches it.
@@ -109,8 +107,6 @@ public class SeedService {
         // Land the frame straight on the file instead of http.server's directory listing.
         "hello.txt",
         null,
-        null,
-        List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
         null,
         // The dependency-free healthcheck kind: a bash /dev/tcp connect proving :8000 accepts
         // connections — one green dot next to the READY chip, no curl needed.

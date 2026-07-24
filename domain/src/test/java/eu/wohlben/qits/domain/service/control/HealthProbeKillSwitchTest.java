@@ -82,8 +82,6 @@ public class HealthProbeKillSwitchTest {
                 null,
                 null,
                 null,
-                null,
-                null,
                 List.of(
                     new HealthCheck(
                         "always",

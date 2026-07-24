@@ -40,7 +40,7 @@ import { configBaseName, isConfigManaged } from '@/shared/utils/config-origin';
         </span>
       }
       <p class="mt-1 text-xs text-muted-foreground">
-        {{ daemon().restartPolicy }} · {{ daemon().observers?.length ?? 0 }} observer(s)
+        {{ daemon().restartPolicy }}
         @if (daemon().healthChecks?.length; as checkCount) {
           · {{ checkCount }} health check(s)
         }

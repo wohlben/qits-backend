@@ -1,9 +1,6 @@
 package eu.wohlben.qits.domain.daemon.control;
 
 import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
-import eu.wohlben.qits.domain.daemon.entity.LogObserver;
-import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
-import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.WebView;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import java.util.HashSet;
@@ -104,50 +101,6 @@ final class DaemonDefinitionValidator {
       }
     }
     return normalized;
-  }
-
-  static void requireValidObservers(List<LogObserver> observers) {
-    if (observers == null) {
-      return;
-    }
-    for (LogObserver observer : observers) {
-      if (observer.kind == null) {
-        throw new BadRequestException("Observer kind is required");
-      }
-      if (observer.kind == LogObserverKind.PATTERN
-          && (observer.pattern == null || observer.pattern.isBlank())) {
-        throw new BadRequestException("PATTERN observers require a pattern");
-      }
-      requireValidRegex(observer.pattern, "observer pattern");
-    }
-  }
-
-  /**
-   * FILE source paths are workspace-relative and untrusted, so traversal is rejected lexically at
-   * definition time (the tail re-checks containment at runtime against the resolved workspace root,
-   * mirroring the file browser's guard).
-   */
-  static void requireValidSources(List<LogSource> sources) {
-    if (sources == null) {
-      return;
-    }
-    for (LogSource source : sources) {
-      if (source.path == null || source.path.isBlank()) {
-        throw new BadRequestException("Log sources require a path");
-      }
-      String path = source.path;
-      if (path.startsWith("/") || path.contains("\\")) {
-        throw new BadRequestException("Log source path must be workspace-relative: " + path);
-      }
-      for (String segment : path.split("/")) {
-        if (segment.isEmpty() || segment.equals("..")) {
-          throw new BadRequestException("Invalid log source path: " + path);
-        }
-      }
-      if (path.equals(".git") || path.startsWith(".git/")) {
-        throw new BadRequestException("Log source path may not point into .git: " + path);
-      }
-    }
   }
 
   private static final Pattern EXPECT_STATUS_TOKEN = Pattern.compile("[1-5]xx|\\d{3}");

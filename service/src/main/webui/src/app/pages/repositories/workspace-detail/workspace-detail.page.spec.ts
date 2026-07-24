@@ -386,7 +386,7 @@ describe('WorkspaceDetailPage', () => {
       [
         {
           daemon: { id: 'd-1', name: 'dev server' },
-          status: ServiceStatus.Degraded,
+          status: ServiceStatus.Restarting,
           restartCount: 0,
         },
       ],
@@ -394,7 +394,7 @@ describe('WorkspaceDetailPage', () => {
     await flush();
     fixture.detectChanges();
     expect(
-      tabButton(el, 'Services').querySelector('[title="A service is degraded or restarting"]'),
+      tabButton(el, 'Services').querySelector('[title="A service is restarting"]'),
     ).not.toBeNull();
   });
 

@@ -8,13 +8,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import eu.wohlben.qits.domain.command.control.CommandService;
 import eu.wohlben.qits.domain.command.dto.CommandDto;
-import eu.wohlben.qits.domain.command.dto.CommandLogLineDto;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
-import eu.wohlben.qits.domain.command.entity.LogSeverity;
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
-import eu.wohlben.qits.domain.daemon.entity.LogObserver;
-import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
-import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.error.BadRequestException;
 import eu.wohlben.qits.domain.project.control.ProjectService;
@@ -25,7 +20,6 @@ import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.service.dto.ServiceEventDto;
 import eu.wohlben.qits.domain.service.dto.ServiceInstanceDto;
 import eu.wohlben.qits.domain.service.entity.ServiceEventKind;
-import eu.wohlben.qits.domain.service.entity.ServiceEventSeverity;
 import eu.wohlben.qits.domain.service.entity.ServiceStatus;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -54,11 +48,10 @@ public class ServiceSupervisorTest {
         Path tempDir = Files.createTempDirectory("qits-daemon-test-repos");
         return Map.of(
             "qits.repositories.data-dir", tempDir.toString(),
-            // Test-speed supervisor timing: fast grace-READY, fast restart backoff, fast tail.
+            // Test-speed supervisor timing: fast grace-READY, fast restart backoff.
             "qits.services.ready-grace-ms", "300",
             "qits.services.stop-grace-ms", "1000",
             "qits.services.restart-backoff-initial-ms", "100",
-            "qits.services.file-tail-poll-ms", "100",
             // Fast crash/exit detection so the state machine tests don't wait on the 2s prod poll.
             "qits.services.liveness-poll-ms", "150");
       } catch (Exception e) {
@@ -106,18 +99,6 @@ public class ServiceSupervisorTest {
       String readyPattern,
       RestartPolicy policy,
       int maxRestarts) {
-    return createDaemon(repoId, name, script, readyPattern, policy, maxRestarts, null, null);
-  }
-
-  private String createDaemon(
-      String repoId,
-      String name,
-      String script,
-      String readyPattern,
-      RestartPolicy policy,
-      int maxRestarts,
-      List<LogObserver> observers,
-      List<LogSource> sources) {
     return repositoryDaemonService.create(
             repoId,
             name,
@@ -133,8 +114,6 @@ public class ServiceSupervisorTest {
             null,
             null,
             null,
-            observers,
-            sources,
             null)
         .id;
   }
@@ -285,108 +264,6 @@ public class ServiceSupervisorTest {
   }
 
   @Test
-  public void fileSourceFindingsCarrySourceAndAnchorAndLateFilesArePickedUp() throws Exception {
-    String repoId = repoWithWorkspace();
-    // The daemon stays quiet on stdout and logs into app.log — which doesn't exist until ~1s in,
-    // covering the late-appearing-file case (its first line must still be observed as line 1).
-    String daemonId =
-        createDaemon(
-            repoId,
-            "filelogger",
-            "sleep 1; { echo 'starting up'; echo 'ERROR: kaboom in module'; } >> app.log;"
-                + " sleep 300",
-            null,
-            RestartPolicy.NEVER,
-            0,
-            List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
-            List.of(new LogSource("app.log", null)));
-
-    supervisor.start(repoId, "work", daemonId);
-    try {
-      ServiceEventDto event = awaitEvent(repoId, e -> "app.log".equals(e.source()));
-      assertEquals(ServiceEventKind.ERROR_DETECTED, event.kind());
-      assertEquals(ServiceEventSeverity.ERROR, event.severity());
-      assertEquals("ERROR: kaboom in module", event.logExcerpt());
-      assertEquals(2, event.anchorFrom().longValue(), "the ERROR is the file's second line");
-      assertEquals(2, event.anchorTo().longValue());
-      assertTrue(event.sourceEpoch() != null, "file anchors carry the tail's rotation epoch");
-      // The agent message names the file the evidence came from.
-      List<String> spooled = daemonEventSpool.drain(repoId, "work");
-      assertTrue(
-          spooled.stream().anyMatch(m -> m.startsWith("[daemon:filelogger:app.log] ERROR")),
-          "agent message carries the source: " + spooled);
-    } finally {
-      supervisor.stop(repoId, "work", daemonId);
-      awaitStatus(repoId, daemonId, ServiceStatus.STOPPED);
-    }
-  }
-
-  @Test
-  public void outputFindingsAnchorToPersistedLogSequencesAndLinesCarrySeverity() throws Exception {
-    String repoId = repoWithWorkspace();
-    String daemonId =
-        createDaemon(
-            repoId,
-            "stdout-logger",
-            "echo 'warming up'; echo 'ERROR: exploded here'; sleep 300",
-            null,
-            RestartPolicy.NEVER,
-            0,
-            List.of(new LogObserver(LogObserverKind.LOG_LEVEL, null, null)),
-            null);
-
-    supervisor.start(repoId, "work", daemonId);
-    try {
-      ServiceEventDto event = awaitEvent(repoId, e -> "output".equals(e.source()));
-      assertEquals(ServiceEventKind.ERROR_DETECTED, event.kind());
-
-      // The anchor references command_log_line sequences: resolving it against the persisted log
-      // yields exactly the excerpt's lines.
-      List<CommandLogLineDto> anchored =
-          awaitLogLines(
-              event.commandId(),
-              line -> line.sequence() >= event.anchorFrom() && line.sequence() <= event.anchorTo());
-      assertEquals(
-          event.logExcerpt(),
-          String.join("\n", anchored.stream().map(CommandLogLineDto::content).toList()),
-          "the excerpt equals the anchored lines' content");
-
-      // Per-line severity is stamped where lines are persisted; ?severity=ERROR is exactly those.
-      List<CommandLogLineDto> errorLines =
-          awaitLogLines(event.commandId(), l -> l.severity() == LogSeverity.ERROR);
-      assertTrue(
-          errorLines.stream().allMatch(l -> l.content().contains("ERROR: exploded here")),
-          "only the classified line carries ERROR: " + errorLines);
-      assertEquals(
-          errorLines,
-          commandService.log(event.commandId(), LogSeverity.ERROR),
-          "the severity filter returns exactly the stamped lines");
-      assertTrue(
-          commandService.log(event.commandId(), null).stream()
-              .filter(l -> l.content().contains("warming up"))
-              .allMatch(l -> l.severity() == null),
-          "routine lines stay unclassified");
-    } finally {
-      supervisor.stop(repoId, "work", daemonId);
-      awaitStatus(repoId, daemonId, ServiceStatus.STOPPED);
-    }
-  }
-
-  private List<CommandLogLineDto> awaitLogLines(
-      String commandId, Predicate<CommandLogLineDto> predicate) throws InterruptedException {
-    long deadline = System.currentTimeMillis() + AWAIT_MILLIS;
-    while (System.currentTimeMillis() < deadline) {
-      List<CommandLogLineDto> matching =
-          commandService.log(commandId, null).stream().filter(predicate).toList();
-      if (!matching.isEmpty()) {
-        return matching;
-      }
-      Thread.sleep(100);
-    }
-    throw new AssertionError("Timed out waiting for matching log lines of " + commandId);
-  }
-
-  @Test
   public void webViewableDaemonExposesProxyTargetAndPath() throws Exception {
     // Definition first: the container (created with the workspace below) publishes the port only
     // when the daemon already declares it at creation time.
@@ -408,8 +285,6 @@ public class ServiceSupervisorTest {
                 8123,
                 "greeting",
                 "app",
-                null,
-                null,
                 null,
                 null)
             .id;
@@ -487,8 +362,6 @@ public class ServiceSupervisorTest {
                 0,
                 null,
                 8124,
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -694,7 +567,7 @@ public class ServiceSupervisorTest {
     // Add a webView to the running daemon's definition.
     repositoryDaemonService.update(
         repoId, daemonId, null, null, null, null, null, null, null, null, null, 8125, null, null,
-        null, null, null, null);
+        null, null);
 
     // Kill the detached session — the liveness poll sees a crash and ON_FAILURE relaunches it. The
     // relaunch must read the just-added webView.

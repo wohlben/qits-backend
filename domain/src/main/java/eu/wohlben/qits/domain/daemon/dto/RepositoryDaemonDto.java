@@ -25,6 +25,4 @@ public record RepositoryDaemonDto(
     QitsConfig.Origin origin,
     String repositoryId,
     Map<String, String> environment,
-    List<LogObserverDto> observers,
-    List<LogSourceDto> sources,
     List<HealthCheckDto> healthChecks) {}

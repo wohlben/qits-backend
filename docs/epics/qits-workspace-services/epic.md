@@ -74,10 +74,18 @@ creation has landed here.
 
 | Part | Status |
 |---|---|
-| [daemons](features/2026-07-04_daemons.md) | implemented |
-| [daemon-log-observation-expansion](features/2026-07-04_daemon-log-observation-expansion.md) | implemented |
+| [daemons](features/2026-07-04_daemons.md) | implemented (log-observation part **removed** 2026-07-24) |
+| [daemon-log-observation-expansion](features/2026-07-04_daemon-log-observation-expansion.md) | **removed** 2026-07-24 |
 | [tmux-backed-daemons](features/2026-07-05_tmux-backed-daemons.md) | implemented |
 | [daemon-healthchecks](features/2026-07-10_daemon-healthchecks.md) | implemented |
 | [daemon-webview-configuration](features/2026-07-06_daemon-webview-configuration.md) | implemented |
 | [daemon-autostart-on-workspace-start](features/2026-07-09_daemon-autostart-on-workspace-start.md) | implemented |
 | [daemon-settling-on-workspace-stop](features/2026-07-09_daemon-settling-on-workspace-stop.md) | implemented |
+
+> **Log observation / `DEGRADED` removed (2026-07-24).** The per-line log **observers** (PATTERN /
+> LOG_LEVEL → `ERROR_DETECTED` events), FILE **log sources**, and the `DEGRADED` service status were
+> removed: they were anchored to the host tmux follower's command audit-log line sequence, which the
+> in-container [workspace-daemon supervision](../qits-workspace-daemon/features/2026-07-24_daemon-supervised-dev-daemons.md)
+> (Part 4) bypasses — so rather than re-home them onto the socket they were dropped. A service now
+> reports only STARTING/READY/RESTARTING/CRASHED/STOPPED plus its **health-check** status;
+> `readyPattern`, health checks, and crash-excerpt evidence to the agent stay.

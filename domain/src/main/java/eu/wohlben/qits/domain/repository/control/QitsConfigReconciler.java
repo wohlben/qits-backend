@@ -5,8 +5,6 @@ import eu.wohlben.qits.domain.bootstrap.entity.BootstrapCommand;
 import eu.wohlben.qits.domain.bootstrap.persistence.BootstrapCommandRepository;
 import eu.wohlben.qits.domain.daemon.control.RepositoryDaemonService;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheck;
-import eu.wohlben.qits.domain.daemon.entity.LogObserver;
-import eu.wohlben.qits.domain.daemon.entity.LogSource;
 import eu.wohlben.qits.domain.daemon.entity.RepositoryDaemon;
 import eu.wohlben.qits.domain.daemon.persistence.RepositoryDaemonRepository;
 import eu.wohlben.qits.domain.error.DomainException;
@@ -18,9 +16,7 @@ import eu.wohlben.qits.domain.featureflow.persistence.ActionConfigurationReposit
 import eu.wohlben.qits.domain.repository.control.QitsConfig.ActionDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.BootstrapDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.HealthCheckDecl;
-import eu.wohlben.qits.domain.repository.control.QitsConfig.ObserverDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.ServiceDecl;
-import eu.wohlben.qits.domain.repository.control.QitsConfig.SourceDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfig.WebViewDecl;
 import eu.wohlben.qits.domain.repository.control.QitsConfigParser.QitsConfigException;
 import eu.wohlben.qits.domain.repository.entity.Repository;
@@ -228,8 +224,6 @@ public class QitsConfigReconciler {
             wv == null ? null : wv.entryPath(),
             wv == null ? null : wv.basePath(),
             d.environment(),
-            observers(d.observers()),
-            sources(d.sources()),
             healthChecks(d.healthChecks()));
       } catch (DomainException e) {
         warnings.add("daemon '" + d.name() + "': " + e.getMessage());
@@ -314,28 +308,6 @@ public class QitsConfigReconciler {
         bootstrapCommandRepository.delete(e.getValue());
       }
     }
-  }
-
-  private static List<LogObserver> observers(List<ObserverDecl> decls) {
-    List<LogObserver> out = new ArrayList<>();
-    if (decls == null) {
-      return out;
-    }
-    for (ObserverDecl o : decls) {
-      out.add(new LogObserver(o.kind(), o.pattern(), o.severity()));
-    }
-    return out;
-  }
-
-  private static List<LogSource> sources(List<SourceDecl> decls) {
-    List<LogSource> out = new ArrayList<>();
-    if (decls == null) {
-      return out;
-    }
-    for (SourceDecl s : decls) {
-      out.add(new LogSource(s.path(), s.label()));
-    }
-    return out;
   }
 
   private static List<HealthCheck> healthChecks(List<HealthCheckDecl> decls) {

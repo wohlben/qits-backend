@@ -108,8 +108,6 @@ public class HealthProbeServiceTest {
             null,
             null,
             null,
-            null,
-            null,
             healthChecks)
         .id;
   }

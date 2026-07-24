@@ -10,8 +10,7 @@
 
 
 export const ServiceEventKind = {
-    StatusChanged: 'STATUS_CHANGED',
-    ErrorDetected: 'ERROR_DETECTED'
+    StatusChanged: 'STATUS_CHANGED'
 } as const;
 export type ServiceEventKind = typeof ServiceEventKind[keyof typeof ServiceEventKind];
 

@@ -87,10 +87,6 @@ public class QitsConfigReconcilerTest {
           otel: true
           web-view:
             port: 4200
-          observers:
-            - kind: LOG_LEVEL
-          sources:
-            - path: quarkus.log
       """;
 
   /**
@@ -157,8 +153,6 @@ public class QitsConfigReconcilerTest {
     assertEquals(QitsConfig.configName("dev-server"), dev.name);
     assertTrue(dev.otel);
     assertEquals(4200, dev.webView.port);
-    assertEquals(1, dev.observers.size());
-    assertEquals(1, dev.sources.size());
 
     // Repository-level field the file owns (file wins).
     assertEquals(RepositoryArchetype.SERVICE_TEMPLATE, freshRepo(repo.id).archetype);
@@ -440,8 +434,6 @@ public class QitsConfigReconcilerTest {
                 "sneaky" + QitsConfig.CONFIG_NAME_SUFFIX,
                 null,
                 "run",
-                null,
-                null,
                 null,
                 null,
                 null,

@@ -116,12 +116,7 @@ model/launchCommandRequest.ts
 model/lazyDirDto.ts
 model/listAgentPluginsResponse.ts
 model/logChannel.ts
-model/logObserverDto.ts
-model/logObserverInput.ts
-model/logObserverKind.ts
 model/logSeverity.ts
-model/logSourceDto.ts
-model/logSourceInput.ts
 model/mergeBranchRequest.ts
 model/mergeWorkspaceRequest.ts
 model/models.ts

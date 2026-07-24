@@ -159,7 +159,6 @@ export class WorkspaceServicesComponent {
     return (
       instance.status === ServiceStatus.Starting ||
       instance.status === ServiceStatus.Ready ||
-      instance.status === ServiceStatus.Degraded ||
       instance.status === ServiceStatus.Restarting
     );
   }

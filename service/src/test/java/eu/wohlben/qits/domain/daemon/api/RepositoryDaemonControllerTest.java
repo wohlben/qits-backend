@@ -7,10 +7,8 @@ import static org.hamcrest.Matchers.hasItem;
 import eu.wohlben.qits.domain.daemon.api.RepositoryDaemonController.CreateRepositoryDaemonRequest;
 import eu.wohlben.qits.domain.daemon.api.RepositoryDaemonController.UpdateRepositoryDaemonRequest;
 import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
-import eu.wohlben.qits.domain.daemon.entity.LogObserverKind;
 import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.project.api.ProjectController;
-import eu.wohlben.qits.domain.service.entity.ServiceEventSeverity;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -85,11 +83,6 @@ public class RepositoryDaemonControllerTest {
                 new WebViewInput(5173, "/greeting/", null),
                 Map.of("PORT", "3000"),
                 List.of(
-                    new LogObserverInput(
-                        LogObserverKind.PATTERN, "ERROR", ServiceEventSeverity.ERROR),
-                    new LogObserverInput(LogObserverKind.LOG_LEVEL, null, null)),
-                List.of(new LogSourceInput("logs/app.log", "app log")),
-                List.of(
                     new HealthCheckInput(
                         "Frontend",
                         HealthCheckKind.HTTP,
@@ -130,11 +123,6 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.webView.basePath", equalTo(null))
         .body("daemon.repositoryId", equalTo(repoId))
         .body("daemon.environment.PORT", equalTo("3000"))
-        .body("daemon.observers[0].kind", equalTo("PATTERN"))
-        .body("daemon.observers[0].pattern", equalTo("ERROR"))
-        .body("daemon.observers[1].kind", equalTo("LOG_LEVEL"))
-        .body("daemon.sources[0].path", equalTo("logs/app.log"))
-        .body("daemon.sources[0].label", equalTo("app log"))
         .body("daemon.healthChecks[0].name", equalTo("Frontend"))
         .body("daemon.healthChecks[0].kind", equalTo("HTTP"))
         .body("daemon.healthChecks[0].expectStatus", equalTo("2xx,3xx,4xx"))
@@ -154,8 +142,7 @@ public class RepositoryDaemonControllerTest {
         .get("/api/repositories/" + repoId + "/daemons/" + id)
         .then()
         .statusCode(200)
-        .body("daemon.id", equalTo(id))
-        .body("daemon.observers.size()", equalTo(2));
+        .body("daemon.id", equalTo(id));
 
     given()
         .get("/api/repositories/" + repoId + "/daemons")
@@ -178,10 +165,6 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
-                List.of(
-                    new LogObserverInput(
-                        LogObserverKind.PATTERN, "FATAL", ServiceEventSeverity.WARNING)),
-                null,
                 null))
         .put("/api/repositories/" + repoId + "/daemons/" + id)
         .then()
@@ -193,9 +176,6 @@ public class RepositoryDaemonControllerTest {
         .body("daemon.webView.entryPath", equalTo("greeting"))
         .body("daemon.restartPolicy", equalTo("NEVER"))
         .body("daemon.autoStart", equalTo(true))
-        .body("daemon.observers.size()", equalTo(1))
-        .body("daemon.observers[0].pattern", equalTo("FATAL"))
-        .body("daemon.sources[0].path", equalTo("logs/app.log")) // null sources = keep as-is
         .body("daemon.healthChecks.size()", equalTo(2)); // null healthChecks = keep as-is
 
     given()
@@ -260,8 +240,6 @@ public class RepositoryDaemonControllerTest {
                 "invalid-checks",
                 null,
                 "npm run dev",
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -374,66 +352,10 @@ public class RepositoryDaemonControllerTest {
                 null,
                 null,
                 null,
-                null,
-                null,
                 null))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
         .statusCode(400);
-  }
-
-  @Test
-  public void rejectsAPatternObserverWithoutAPattern() {
-    String repoId = createRepository();
-    given()
-        .contentType(ContentType.JSON)
-        .body(
-            new CreateRepositoryDaemonRequest(
-                "Observer without pattern",
-                null,
-                "npm run dev",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(new LogObserverInput(LogObserverKind.PATTERN, null, null)),
-                null,
-                null))
-        .post("/api/repositories/" + repoId + "/daemons")
-        .then()
-        .statusCode(400);
-  }
-
-  @Test
-  public void rejectsTraversalInLogSourcePaths() {
-    String repoId = createRepository();
-    for (String path : List.of("../outside.log", "/etc/passwd", ".git/config")) {
-      given()
-          .contentType(ContentType.JSON)
-          .body(
-              new CreateRepositoryDaemonRequest(
-                  "Bad source",
-                  null,
-                  "npm run dev",
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  List.of(new LogSourceInput(path, null)),
-                  null))
-          .post("/api/repositories/" + repoId + "/daemons")
-          .then()
-          .statusCode(400);
-    }
   }
 
   @Test
@@ -447,7 +369,7 @@ public class RepositoryDaemonControllerTest {
         .statusCode(400);
     given()
         .contentType(ContentType.JSON)
-        .body(Map.of("name", "x", "startScript", "run", "observers", List.of(Map.of())))
+        .body(Map.of("name", "x", "startScript", "run", "healthChecks", List.of(Map.of())))
         .post("/api/repositories/" + repoId + "/daemons")
         .then()
         .statusCode(400);

@@ -216,10 +216,12 @@ construction.
 Dev daemons start as the tail of the daemon's startup, supervised in-container. Autonomous reframing
 of epic Part 5 (`daemon-supervision-handover.md`).
 
-> **Implemented 2026-07-24** (host projection + daemon-side + rename). Deferred: log-observer/
-> DEGRADED derivation in daemon-backed mode (anchored to the audit-log sequence the projection
-> bypasses — the tmux fallback keeps it); the `.qits-config.yml` `daemons:`→`services:` key (needs
-> the fixture repos' two-level submodule round-trip).
+> **Implemented 2026-07-24** (host projection + daemon-side + rename). The two initial follow-ups
+> are now resolved: (1) the log-observer/`DEGRADED`/log-source subsystem was **removed entirely**
+> (rather than re-homed onto the socket) — it was anchored to the tmux audit-log sequence, so removal
+> closes the daemon-backed gap on both paths; `readyPattern`, health checks and crash excerpts stay.
+> (2) the `.qits-config.yml` `daemons:`→`services:` key **landed** via a temporary `@JsonAlias`/parser
+> fallback that keeps the fixtures working until their submodule round-trip drops the alias.
 
 **Protocol** (carried from Part 5 draft)
 - [x] `StartDaemon { id, script, env }`, `SignalDaemon { id, signal }` (qits → daemon,
