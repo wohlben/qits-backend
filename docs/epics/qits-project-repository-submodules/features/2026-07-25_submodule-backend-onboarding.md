@@ -82,6 +82,28 @@ sibling. Best-effort by design (keys on the distinctive `/git/` segment).
    submodules** — the reference resolves to the GitHub backend and dedups onto the pre-served
    sibling, linking the edge. Done: qits-gateway is a sister repository pointing at GitHub.
 
+### Gotcha: a sibling's own commits need a push on that sibling
+
+Sync's **pull** walks the imported submodule closure; its **push** is the acted-on repository only
+(`beginSyncRepository` → `pushRepository(repoId)`). That is the intended shape — a submodule is
+normally *consumed* from upstream, so qits has nothing of its own to send back.
+
+It bites only in the unusual case this walkthrough creates: **developing a submodule from inside a
+qits workspace**. The workspace pushes to the qits git host (its `origin`, per the relative
+`.gitmodules` url), which is the sibling's bare origin — not its real backend. Syncing the
+superproject then pushes the superproject alone, so the sibling's commits stay inside qits while
+every step reports success. A recursive-submodule clone from the real backend — GitHub Actions CI,
+a Dokploy deploy — fails on the gitlink:
+
+```
+fatal: remote error: upload-pack: not our ref <sha>
+fatal: Fetched in submodule path 'qits-gateway', but it did not contain <sha>
+```
+
+Fix: run **Push** on the sibling repository itself (`POST /api/repositories/{childId}/push`), which
+sends its bare origin to its real backend. Push the sibling *before* the superproject's pointer bump
+lands upstream, so no gitlink ever outruns the backend it points into.
+
 ## Files
 
 - `domain/.../control/GitSubmoduleParser.java` — `isQitsHostUrl`.
