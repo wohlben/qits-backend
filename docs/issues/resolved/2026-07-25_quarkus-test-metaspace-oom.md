@@ -68,6 +68,17 @@ Bound the number of apps any single fork can accumulate, and make the caps real:
 Result: full `domain` suite peak fork RSS ~0.9 GiB (was: OOM-killed at 4 GiB), total run (Maven +
 fork) within ~1.4 GiB.
 
+**Complementary demand-side fix (merged from `oom-errors`):** 23 of the 35 domain profile classes
+only carried a `@TestProfile` to inject a unique `Files.createTempDirectory()` data-dir — scratch
+isolation smuggled through config, each forcing (and permanently caching) its own app. Those
+profiles are gone: one stable `qits.repositories.data-dir=target/qits-test-repos` shared by the
+suite, per-class isolation restored by the auto-registered `RepoDataDirReset` extension
+(`junit-platform.properties` re-pins Quarkus's required class orderer, which shipping that file
+would otherwise suppress). Domain is down to 12 genuine profiles; the chunk lists shrink
+automatically (the generator scans for the annotations), so most isolated executions are now empty
+no-ops. Combined result: domain 520 tests in ~2:30 with max fork RSS ~570 MB.
+
 When Quarkus ships the upstream fix (shared augmentation classloaders, Quarkus 4), the chunked
 executions can collapse back to a single one — the trigger to revisit is the quarkus platform
-upgrade past that release.
+upgrade past that release. A worthwhile follow-up until then: run the same profile audit on the
+`service` module's 27 profiles — any temp-dir-only ones there would yield the same boot-count win.
