@@ -62,6 +62,15 @@
         <!-- Default so surefire's `@{argLine}` resolves in modules without the quarkus-maven-plugin
              (which sets it). App modules override it at build time. -->
         <argLine></argLine>
+        <!-- Isolated-test chunking (Quarkus per-@TestProfile metaspace pinning, see the surefire
+             pluginManagement note): the domain/service surefire executions split @TestProfile /
+             @WithTestResource classes into per-fork chunks. The single-test-override profile below
+             flips these two when -Dtest=... is given, restoring plain single-execution behaviour. -->
+        <qits.isolated-tests.skip>false</qits.isolated-tests.skip>
+        <qits.default-test.excludes>${project.build.directory}/isolated-tests-all.txt</qits.default-test.excludes>
+        <!-- Per-module override point: the service app needs a bigger test heap than the library
+             modules (its pom sets 512m). -->
+        <qits.test.heap>384m</qits.test.heap>
         <spotless-plugin.version>2.44.5</spotless-plugin.version>
         <google-java-format.version>1.28.0</google-java-format.version>
         <antrun-plugin.version>3.1.0</antrun-plugin.version>
@@ -206,7 +215,18 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${surefire-plugin.version}</version>
                     <configuration>
-                        <argLine>@{argLine}</argLine>
+                        <!-- Explicit caps: without them the fork sizes its heap ergonomically off
+                             the machine/cgroup, and Quarkus's per-@TestProfile app caching (upstream
+                             quarkusio/quarkus#38774) grows metaspace unbounded until the cgroup
+                             OOM-kills the fork (exit 137). ExitOnOutOfMemoryError makes a metaspace
+                             OOME during JUnit discovery kill the fork loudly — otherwise surefire
+                             reports "Tests run: 0" + BUILD SUCCESS. Note the empty `argLine`
+                             property default below shadows any -DargLine on the CLI (surefire's
+                             @{argLine} late binding reads the project property), which is why these
+                             live here and not in run instructions. Sized for the isolated-test
+                             chunking in domain/service (docs/issues/resolved/
+                             2026-07-25_quarkus-test-metaspace-oom.md). -->
+                        <argLine>@{argLine} -Xmx${qits.test.heap} -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=128m -XX:+ExitOnOutOfMemoryError</argLine>
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                             <maven.home>${maven.home}</maven.home>
@@ -360,6 +380,24 @@ Bypass (CI, or :${qits.dev-guard.port} is not a qits dev server):  -Dqits.dev-gu
             <id>extended</id>
             <properties>
                 <skipITs>false</skipITs>
+            </properties>
+        </profile>
+
+        <!-- When a specific test is named with -Dtest=..., collapse the isolated-test chunking back
+             to the plain single execution: the isolated-tests-N executions skip (they would each
+             re-run the named test in their own fork) and the default execution drops its excludes
+             (the named test may BE an isolated one, which the excludesFile would otherwise silently
+             filter to zero tests). Activated by the mere presence of the `test` property. -->
+        <profile>
+            <id>single-test-override</id>
+            <activation>
+                <property>
+                    <name>test</name>
+                </property>
+            </activation>
+            <properties>
+                <qits.isolated-tests.skip>true</qits.isolated-tests.skip>
+                <qits.default-test.excludes>${project.build.directory}/isolated-tests-none.txt</qits.default-test.excludes>
             </properties>
         </profile>
 

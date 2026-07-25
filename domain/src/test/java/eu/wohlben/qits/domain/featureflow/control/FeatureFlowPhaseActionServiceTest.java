@@ -12,29 +12,11 @@ import eu.wohlben.qits.domain.featureflow.entity.FeatureFlowPhaseStep;
 import eu.wohlben.qits.domain.featureflow.persistence.FeatureFlowPhaseActionRepository;
 import eu.wohlben.qits.domain.project.control.ProjectService;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
-@TestProfile(FeatureFlowPhaseActionServiceTest.TestProfile.class)
 public class FeatureFlowPhaseActionServiceTest {
-
-  public static class TestProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      try {
-        Path tempDir = Files.createTempDirectory("qits-phase-action-repos");
-        return Map.of("qits.repositories.data-dir", tempDir.toString());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
 
   @Inject FeatureFlowPhaseActionService featureFlowPhaseActionService;
 
