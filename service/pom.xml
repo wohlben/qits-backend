@@ -12,6 +12,13 @@
     <artifactId>service</artifactId>
     <packaging>quarkus</packaging>
 
+    <properties>
+        <!-- The full web app needs more test-fork heap than the library modules (root default
+             384m): a single service boot (augmentation + REST + MCP + JGit + Quinoa test wiring)
+             OOMs a 384m heap. -->
+        <qits.test.heap>512m</qits.test.heap>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>eu.wohlben</groupId>
@@ -171,8 +178,218 @@
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
             </plugin>
+            <!-- Isolated-test chunking — same mechanism and rationale as in domain/pom.xml: each
+                 @TestProfile/@WithTestResource class pins a full Quarkus app in its fork's
+                 metaspace (quarkusio/quarkus#38774), so the default execution runs the profile-less
+                 remainder against one shared app and the isolated classes run chunked into fresh
+                 forks. Lists from scripts/list-isolated-tests.sh (antrun below); -Dtest=...
+                 collapses to a single plain execution via the root single-test-override profile.
+                 See docs/issues/resolved/2026-07-25_quarkus-test-metaspace-oom.md. -->
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <configuration>
+                            <excludesFile>${qits.default-test.excludes}</excludesFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-1</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-1.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>1</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-2</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-2.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>2</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-3</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-3.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>3</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-4</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-4.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>4</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-5</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-5.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>5</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-6</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-6.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>6</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-7</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-7.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>7</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-8</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-8.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>8</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-9</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-9.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>9</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-10</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-10.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>10</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-11</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-11.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>11</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-12</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-12.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>12</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-13</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-13.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>13</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-14</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-14.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>14</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>isolated-tests-15</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <skip>${qits.isolated-tests.skip}</skip>
+                            <includesFile>${project.build.directory}/isolated-tests-15.txt</includesFile>
+                            <!-- Distinct per execution: surefire skips a repeated run whose config
+                                 hash matches a previous one, and includesFile is not hashed. -->
+                            <systemPropertyVariables>
+                                <qits.isolated-tests.chunk>15</qits.isolated-tests.chunk>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <!-- Every PACKAGED service build must choose an auth variant explicitly — a shipped
@@ -232,6 +449,26 @@ See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</r
                                     <arg value="${maven.multiModuleProjectDirectory}/scripts/derive-fixture-bares.sh"/>
                                     <arg value="${maven.multiModuleProjectDirectory}/domain/src/test/resources/fixtures"/>
                                     <arg value="${project.build.testOutputDirectory}/fixtures"/>
+                                </exec>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <!-- Derive the isolated-test chunk lists consumed by the surefire executions
+                         above (scripts/list-isolated-tests.sh; chunk count matches the number of
+                         isolated-tests-N executions). -->
+                    <execution>
+                        <id>list-isolated-tests</id>
+                        <phase>process-test-classes</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <exec executable="bash" failonerror="true">
+                                    <arg value="${maven.multiModuleProjectDirectory}/scripts/list-isolated-tests.sh"/>
+                                    <arg value="${project.basedir}/src/test/java"/>
+                                    <arg value="${project.build.directory}"/>
+                                    <arg value="15"/>
                                 </exec>
                             </target>
                         </configuration>

@@ -51,7 +51,7 @@ Related/dependent plans:
    `epics/` module: `Epic`/`Feature`/`Task` entities, own **separate-DB** datasource + Flyway lineage,
    the explicit audit-table log, and the REST boundary hosted (for now) by `service`. No dependencies
    inside or outside this epic.
-2. **[project-detail-ui](feature-ideas/project-detail-ui.md)** *(idea)* — the Angular UI: an
+2. **[project-detail-ui](features/2026-07-25_project-detail-ui.md)** *(done)* — the Angular UI: an
    **Epics** section on the project-detail route (above Repositories), and the segmented drill-down
    routes epic → features → feature → tasks → task. Depends on part 1.
 
@@ -66,7 +66,11 @@ service is a later code/deployment move over the same shared DB.
 
 ## Status
 
+**All parts are done — the epic's done-when is met** (the planning spine is a managed domain,
+navigable end-to-end through the segmented project→epic→feature→task UI, with every mutation in the
+audit log).
+
 | Part | Status |
 |---|---|
 | [domain-and-persistence](features/2026-07-25_domain-and-persistence.md) | done |
-| [project-detail-ui](feature-ideas/project-detail-ui.md) | idea |
+| [project-detail-ui](features/2026-07-25_project-detail-ui.md) | done |

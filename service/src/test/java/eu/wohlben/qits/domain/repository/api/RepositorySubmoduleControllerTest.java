@@ -4,15 +4,11 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import jakarta.ws.rs.core.Response;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,20 +16,7 @@ import org.junit.jupiter.api.Test;
  * the layer-by-layer import action.
  */
 @QuarkusTest
-@TestProfile(RepositorySubmoduleControllerTest.TestProfile.class)
 public class RepositorySubmoduleControllerTest {
-
-  public static class TestProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      try {
-        Path tempDir = Files.createTempDirectory("qits-test-submodule-api");
-        return Map.of("qits.repositories.data-dir", tempDir.toString());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
 
   private String importRepository(String fixture) throws Exception {
     return importRepository(fixture, null);
@@ -119,6 +102,49 @@ public class RepositorySubmoduleControllerTest {
         .statusCode(Response.Status.OK.getStatusCode())
         .body("entries", hasSize(2))
         .body("available", empty());
+  }
+
+  @Test
+  public void prepareServesTheBackendAndImportDedupsOntoIt() throws Exception {
+    // A superproject with an unimported `lib` -> ../submodule-shared.git submodule.
+    String superId = importRepository("submodule-simple-super.git", false);
+    String backend = getClass().getResource("/fixtures/submodule-shared.git").toURI().getPath();
+
+    // Pre-serve the backend as a sibling; the response tells the user what to `git submodule add`.
+    given()
+        .contentType(ContentType.JSON)
+        .body(new RepositorySubmoduleController.PrepareSubmoduleBackendRequest(backend))
+        .when()
+        .post("/api/repositories/" + superId + "/submodules/prepare")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("name", is("submodule-shared"))
+        .body("relativeUrl", is("../submodule-shared.git"));
+
+    // The .gitmodules reference is still unimported (prepare only serves the backend), but
+    // importing
+    // now dedups onto the pre-served sibling rather than creating a duplicate.
+    given()
+        .when()
+        .post("/api/repositories/" + superId + "/submodules/import")
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("entries", hasSize(1))
+        .body("entries.submodule.path", containsInAnyOrder("lib"));
+  }
+
+  @Test
+  public void prepareRejectsAQitsHostBackend() throws Exception {
+    String superId = importRepository("submodule-simple-super.git", false);
+    given()
+        .contentType(ContentType.JSON)
+        .body(
+            new RepositorySubmoduleController.PrepareSubmoduleBackendRequest(
+                "http://qits:8080/git/proj/qits-gateway"))
+        .when()
+        .post("/api/repositories/" + superId + "/submodules/prepare")
+        .then()
+        .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
   }
 
   @Test

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TaskDto } from './taskDto';
+import { EpicDto } from './epicDto';
 
 
 export interface Response103 { 
-    task?: TaskDto;
+    epic?: EpicDto;
 }
 

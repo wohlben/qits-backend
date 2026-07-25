@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { TaskDto } from './taskDto';
 
 
 export interface Response105 { 
-    success?: boolean;
+    task?: TaskDto;
 }
 

@@ -19,9 +19,9 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { CreateEpicRequest } from '../model/createEpicRequest';
 // @ts-ignore
-import { Response101 } from '../model/response101';
-// @ts-ignore
 import { Response102 } from '../model/response102';
+// @ts-ignore
+import { Response103 } from '../model/response103';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -47,9 +47,9 @@ export class ProjectEpicsControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsProjectIdEpicsGet(projectId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response101>;
-    public apiProjectsProjectIdEpicsGet(projectId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response101>>;
-    public apiProjectsProjectIdEpicsGet(projectId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response101>>;
+    public apiProjectsProjectIdEpicsGet(projectId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response102>;
+    public apiProjectsProjectIdEpicsGet(projectId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response102>>;
+    public apiProjectsProjectIdEpicsGet(projectId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response102>>;
     public apiProjectsProjectIdEpicsGet(projectId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (projectId === null || projectId === undefined) {
             throw new Error('Required parameter projectId was null or undefined when calling apiProjectsProjectIdEpicsGet.');
@@ -82,7 +82,7 @@ export class ProjectEpicsControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "projectId", value: projectId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/epics`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response101>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response102>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -104,9 +104,9 @@ export class ProjectEpicsControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response102>;
-    public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response102>>;
-    public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response102>>;
+    public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response103>;
+    public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response103>>;
+    public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response103>>;
     public apiProjectsProjectIdEpicsPost(projectId: string, createEpicRequest: CreateEpicRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (projectId === null || projectId === undefined) {
             throw new Error('Required parameter projectId was null or undefined when calling apiProjectsProjectIdEpicsPost.');
@@ -151,7 +151,7 @@ export class ProjectEpicsControllerService extends BaseService {
 
         let localVarPath = `/api/projects/${this.configuration.encodeParam({name: "projectId", value: projectId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/epics`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response102>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response103>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createEpicRequest,

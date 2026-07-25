@@ -8,31 +8,13 @@ import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectReposit
 import eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest;
 import eu.wohlben.qits.domain.repository.api.WorkspaceController.CreateWorkspaceRequest;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import jakarta.ws.rs.core.Response;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
-@TestProfile(CommandControllerTest.TestProfile.class)
 public class CommandControllerTest {
-
-  public static class TestProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      try {
-        Path tempDir = Files.createTempDirectory("qits-command-ctl-repos");
-        return Map.of("qits.repositories.data-dir", tempDir.toString());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
 
   private final String fixtureUrl;
 

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry17 } from './entry17';
+import { TaskDto } from './taskDto';
 
 
 export interface Response101 { 
-    entries?: Array<Entry17>;
+    task?: TaskDto;
 }
 

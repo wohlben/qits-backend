@@ -127,6 +127,7 @@ model/logSeverity.ts
 model/mergeBranchRequest.ts
 model/mergeWorkspaceRequest.ts
 model/models.ts
+model/prepareSubmoduleBackendRequest.ts
 model/projectDto.ts
 model/promptAttachmentSource.ts
 model/refinePromptRequest.ts
@@ -143,6 +144,7 @@ model/response103.ts
 model/response104.ts
 model/response105.ts
 model/response106.ts
+model/response107.ts
 model/response11.ts
 model/response12.ts
 model/response13.ts

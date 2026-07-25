@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { FeatureDto } from './featureDto';
 
 
 export interface Response99 { 
-    success?: boolean;
+    feature?: FeatureDto;
 }
 

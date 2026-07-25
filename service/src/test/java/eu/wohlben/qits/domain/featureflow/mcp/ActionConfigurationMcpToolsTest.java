@@ -8,10 +8,6 @@ import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkiverse.mcp.server.test.McpAssured;
 import io.quarkiverse.mcp.server.test.McpAssured.McpStreamableTestClient;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -22,22 +18,9 @@ import org.junit.jupiter.api.Test;
  * .qits-config.yml} and are edited as the file, not via MCP.
  */
 @QuarkusTest
-@TestProfile(ActionConfigurationMcpToolsTest.TestProfile.class)
 public class ActionConfigurationMcpToolsTest {
 
   /** Isolate any cloned repos in a temp dir, like the other MCP tests. */
-  public static class TestProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      try {
-        Path tempDir = Files.createTempDirectory("qits-actions-mcp-test-repos");
-        return Map.of("qits.repositories.data-dir", tempDir.toString());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
   private static String text(ToolResponse response) {
     return response.content().stream()
         .map(c -> c.asText().text())
