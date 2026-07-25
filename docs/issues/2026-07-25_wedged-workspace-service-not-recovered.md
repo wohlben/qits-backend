@@ -129,6 +129,21 @@ Verification note: the RAM/OOM impact is to be confirmed empirically after deplo
 running service prevented a clean in-situ measurement (this issue's own failure mode). Prong 1
 (health-driven recovery of an alive-but-not-serving service) is still open.
 
+## Update (2026-07-25): supervision now lives in exactly one place
+
+The host `ServiceSupervisor` was collapsed to a **pure projection** of the daemon's events (the
+sibling issue [host-side service supervision should move to the
+daemon](resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md), resolved): the
+host no longer spawns, polls, or restarts anything — the in-container daemon is the sole supervisor.
+This removes the two-overlapping-restart-policies confound this issue named, so **prong 1
+(health-driven liveness + bounded recovery) now has a single, unambiguous home**: the daemon's own
+`ServiceSupervisor` (`workspace-daemon/.../ServiceSupervisor.java`). It should periodically run the
+declared health-checks (which it already parses) and, after a grace/threshold, group-kill and
+restart an alive-but-not-serving service under the existing policy/backoff, and re-validate on
+reconnect adoption. Host-side health *probing* (`HealthProbeService`) was deleted in that collapse,
+so until prong 1 lands the UI health dots read UNKNOWN — one more reason to build it. **Prong 1
+remains open**; prong 2 shipped (above).
+
 ## Notes
 
 - Immediate manual recovery in this environment: `pkill -f quarkus:dev; pkill -f service-dev.jar`,

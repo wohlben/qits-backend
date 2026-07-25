@@ -78,11 +78,11 @@ creation has landed here.
 |---|---|
 | [daemons](features/2026-07-04_daemons.md) | implemented (log-observation part **removed** 2026-07-24) |
 | [daemon-log-observation-expansion](features/2026-07-04_daemon-log-observation-expansion.md) | **removed** 2026-07-24 |
-| [tmux-backed-daemons](features/2026-07-05_tmux-backed-daemons.md) | implemented |
-| [daemon-healthchecks](features/2026-07-10_daemon-healthchecks.md) | implemented |
+| [tmux-backed-daemons](features/2026-07-05_tmux-backed-daemons.md) | implemented (host path **retired** 2026-07-25 — see below) |
+| [daemon-healthchecks](features/2026-07-10_daemon-healthchecks.md) | implemented (host **probing removed** 2026-07-25; health is the daemon's to report — pending) |
 | [daemon-webview-configuration](features/2026-07-06_daemon-webview-configuration.md) | implemented |
-| [daemon-autostart-on-workspace-start](features/2026-07-09_daemon-autostart-on-workspace-start.md) | implemented |
-| [daemon-settling-on-workspace-stop](features/2026-07-09_daemon-settling-on-workspace-stop.md) | implemented |
+| [daemon-autostart-on-workspace-start](features/2026-07-09_daemon-autostart-on-workspace-start.md) | implemented (host is now a projection) |
+| [daemon-settling-on-workspace-stop](features/2026-07-09_daemon-settling-on-workspace-stop.md) | implemented (host is now a projection) |
 
 > **Log observation / `DEGRADED` removed (2026-07-24).** The per-line log **observers** (PATTERN /
 > LOG_LEVEL → `ERROR_DETECTED` events), FILE **log sources**, and the `DEGRADED` service status were
@@ -91,3 +91,15 @@ creation has landed here.
 > (Part 4) bypasses — so rather than re-home them onto the socket they were dropped. A service now
 > reports only STARTING/READY/RESTARTING/CRASHED/STOPPED plus its **health-check** status;
 > `readyPattern`, health checks, and crash-excerpt evidence to the agent stay.
+
+> **Host `ServiceSupervisor` collapsed to a pure projection (2026-07-25).** The tmux/host-exec
+> supervision half — the launcher, host liveness poll, second restart policy with backoff, the
+> `/proc`-marker straggler reaper, boot re-adoption, and the scheduler — was **deleted**; the host now
+> only *projects* the in-container daemon's `DaemonEvent`s (state machine, process segments, web-view
+> proxy origin) and issues manual start/stop over the socket. This retires the tmux fallback the
+> [Part 4 handover](../qits-workspace-daemon/features/2026-07-24_daemon-supervised-dev-daemons.md) had
+> kept, ending the double-supervision hazard (a socket blip could put host and daemon in a port
+> fight). Host-side **health probing** (`HealthProbeService`) went with it — health is now the
+> daemon's to report (reads UNKNOWN until the daemon does; the recovery loop is
+> [wedged-service](../../issues/2026-07-25_wedged-workspace-service-not-recovered.md) prong 1). See
+> [docs/issues/resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md](../../issues/resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md).

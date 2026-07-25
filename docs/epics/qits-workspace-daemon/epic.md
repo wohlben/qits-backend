@@ -226,6 +226,14 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
     Part-5-doomed `RepositoryDaemon*` store keeps its name. Deferred: observer/DEGRADED in
     daemon-backed mode (audit-log-sequence-anchored — the tmux path keeps it) and the
     `.qits-config.yml` `daemons:`→`services:` key (fixture round-trip). Parts 5–6 still parked.
+    - **Follow-up (2026-07-25): host tmux fallback retired.** The host `ServiceSupervisor` collapsed
+      to a **pure projection** — the tmux/host-exec launcher, host liveness poll, second restart
+      policy, and straggler reaper were deleted, and `start`/`stop`/`settleForWorkspace`
+      unconditionally delegate to the daemon over the socket. This ends the double-supervision hazard
+      (a socket blip could put the host and daemon in a port fight) and honours the "container is the
+      sole executor" model. Host-side health *probing* went with it (the daemon owns health now;
+      status reads UNKNOWN until daemon-reported). See
+      [docs/issues/resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md](../../issues/resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md).
   - **Part 5 — [config-as-single-source-of-truth](features/2026-07-24_config-as-single-source-of-truth.md)
     — implemented (2026-07-24).** The host repo-scoped DB config store is **removed**: the
     `QitsConfigReconciler` (+ clone/pull/push triggers + `config/reload`), the `RepositoryDaemon`/

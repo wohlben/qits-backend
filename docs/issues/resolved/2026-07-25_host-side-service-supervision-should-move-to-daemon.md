@@ -1,5 +1,41 @@
 # Host-side service supervision is redundant — the workspace-daemon owns it; collapse the host to a pure projection
 
+> **Resolved 2026-07-25.** The host `ServiceSupervisor`
+> (`domain/.../service/control/ServiceSupervisor.java`) was collapsed to a **pure projection** of the
+> daemon's `DaemonEvent`s, exactly the subtraction this issue proposed:
+>
+> - **Removed** the tmux/host-exec supervision half: `launch`/`launch(adopt)`, the log follower,
+>   `startLivenessPoll`/`checkLiveness`, host `handleExit`/`relaunch`/`refreshDefinition`, the
+>   `reapStragglers` `/proc`-marker reaper, the `graceReady` timer, the whole `ScheduledExecutorService`,
+>   and `adoptIfRunning`/`adoptionProbed` (tmux boot re-adoption — now event-driven via the daemon's
+>   reconnect re-report). The `qits.services.liveness-poll-ms` knob went with it. (`ready-grace-ms`/
+>   `restart-backoff-initial-ms`/`stop-grace-ms` stay — `WorkspaceContainerFactory` forwards them to the
+>   in-container daemon, which does the supervising.)
+> - **`start`/`stop`/`settleForWorkspace` now unconditionally delegate** to the `WorkspaceServiceDriver`
+>   (the control socket); the `daemonBacked(workspaceId)` branch and the `WorkspaceDaemonLiveness` gate
+>   are gone. A workspace with no live daemon can't run a service, so a manual start stays STARTING
+>   ("not available yet") until a daemon connects — no host execution.
+> - **`ProjectionSink`** is all that remains of the runtime: it maps `STARTING/READY/RESTARTING/
+>   CRASHED/STOPPED` onto the display state machine, settles `daemon:<name>` process segments (streamed
+>   lines now flow into the segment too, restoring a UX that had silently regressed in daemon-backed
+>   mode), and resolves the web-view proxy origin. The daemon owns every start/restart/backoff/stop.
+> - **Host-side health probing removed.** `HealthProbeService` only ran on the deleted tmux path (health
+>   already read UNKNOWN in daemon-backed mode), so it and its two tests were deleted; health is now the
+>   daemon's to report — see prong 1 below.
+>
+> This ends the **double-supervision hazard**: a socket blip can no longer flip the host onto a second
+> supervisor that fights the daemon over the process and `:8080`. The observed "kept relaunching" can no
+> longer originate host-side — supervision lives in exactly one place (the daemon).
+>
+> **Deferred (still open):** suggested-fix **point 4 / [wedged-service](2026-07-25_wedged-workspace-service-not-recovered.md)
+> prong 1** — health-check-driven recovery of an alive-but-not-serving service — is a daemon-side
+> feature and stays a follow-up under that issue; the host collapse doesn't implement it.
+>
+> Tests: `ServiceSupervisorProjectionTest` is the projection spec (dup-start, proxy target, adoption);
+> the tmux-only `ServiceSupervisorTest` was deleted, and the auto-start/settle/proxy/bootstrap tests were
+> converted to drive lifecycle through a fake `WorkspaceServiceDriver` (a profile-scoped `@Alternative`
+> in the service module, so the daemon ITs keep the real registry).
+
 ## Introduction
 
 Related / dependent plans:

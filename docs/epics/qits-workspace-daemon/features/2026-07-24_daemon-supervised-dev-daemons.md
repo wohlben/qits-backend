@@ -13,6 +13,16 @@
 > crash excerpts stay). (2) the `.qits-config.yml` `daemons:`→`services:` key **landed** via a
 > temporary `@JsonAlias("daemons")` + parser fallback, so the fixtures keep working untouched.
 > See [`docs/implementation-plan.md`](../../../implementation-plan.md) Part 4.
+>
+> **Follow-up (2026-07-25): the tmux fallback was retired.** The host `ServiceSupervisor` collapsed
+> to a **pure projection** of daemon `DaemonEvent`s — the host-exec/tmux launcher, host liveness
+> poll, second restart policy with backoff, and `/proc`-marker straggler reaper were all deleted, and
+> `start`/`stop`/`settleForWorkspace` now unconditionally delegate to the daemon. There is no
+> live-daemon-less workspace to fall back for (the container is the sole executor), so the honest
+> state for a service with no daemon is "not available yet." Host-side health *probing*
+> (`HealthProbeService`) went with it — health is the daemon's to report (a follow-up), so status
+> reads UNKNOWN meanwhile. See
+> [docs/issues/resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md](../../../issues/resolved/2026-07-25_host-side-service-supervision-should-move-to-daemon.md).
 
 ## Introduction
 
