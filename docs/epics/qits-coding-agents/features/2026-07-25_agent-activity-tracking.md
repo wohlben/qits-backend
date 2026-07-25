@@ -154,8 +154,12 @@ present-but-idle, upgrading today's binary running/not-running dot into a real b
   it opaquely, staying a dumb forwarder.
 - **Both harnesses fully tracked**: Claude (`--settings` hook layer) *and* Kimi (one `[[hooks]]`
   TOML block per event) emit the complete event set when tracking is on. SessionStart is always
-  injected by both (lineage). Kimi's `[[hooks]]` event-name vocabulary should be re-verified against
-  the pinned Kimi CLI — an event Kimi doesn't recognize simply never fires (harmless).
+  injected by both (lineage). **Verified against Kimi CLI 0.28.1**: a `kimi -p "hello"` turn with the
+  rendered 5-hook `config.toml` fires `SessionStart → UserPromptSubmit → Stop → SessionEnd` (same
+  event names as Claude), each POSTing the hook stdin JSON. Its SessionStart payload carries
+  `session_id` in the `session_<uuid>` shape `reportAgentSession` accepts (no `transcript_path`, as
+  before). `Notification` did not fire on a non-blocking `-p` run — expected, since it only fires when
+  the agent blocks on the user (permission / idle input); it is exercised interactively.
 - **Config = instance-level** one key `agent.activity-tracking.enabled` (default `true`,
   canonicalized to `true`/`false`), gating only the turn-boundary events; SessionStart lineage is
   never gated. Per-workspace override is a later refinement if wanted.
