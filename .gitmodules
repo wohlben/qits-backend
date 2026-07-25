@@ -7,3 +7,6 @@
 [submodule "domain/src/test/resources/fixtures/testing-repo-quarkus-angular"]
 	path = domain/src/test/resources/fixtures/testing-repo-quarkus-angular
 	url = ../qits-fixture-quarkus-angular.git
+[submodule "qits-gateway"]
+	path = qits-gateway
+	url = ../qits-gateway.git
