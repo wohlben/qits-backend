@@ -37,6 +37,7 @@ import {
 import { WorkspaceServicesComponent } from '@/pattern/service/workspace-services.component';
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
 import { WorkspaceActionsComponent } from '@/pattern/workspace/workspace-actions.component';
+import { WorkspaceActivityBarComponent } from '@/pattern/workspace/workspace-activity-bar.component';
 import { WorkspaceAgentActivityComponent } from '@/pattern/workspace/workspace-agent-activity.component';
 import { WorkspaceAgentSessionComponent } from '@/pattern/workspace/workspace-agent-session.component';
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
@@ -100,6 +101,7 @@ const PROCESS_TAB_LABEL = 'Starting';
     ServiceWebviewComponent,
     PageLayoutComponent,
     WorkspaceActionsComponent,
+    WorkspaceActivityBarComponent,
     WorkspaceBootstrapComponent,
     WorkspaceAgentActivityComponent,
     WorkspaceAgentSessionComponent,
@@ -136,6 +138,15 @@ const PROCESS_TAB_LABEL = 'Starting';
           }
         </div>
       </ng-template>
+
+      <!-- Sticky row of buttons for every workspace in this repo with a live agent session, newest
+           activity first — jump to whichever one just stopped and needs your next prompt. Bleeds the
+           ancestor page padding (-mx-6 px-6) so it spans the content width when pinned. -->
+      <app-workspace-activity-bar
+        class="sticky top-0 z-20 -mx-6 mb-2 block border-b border-border bg-background/95 px-6 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        [repoId]="repoId"
+        [currentWorkspaceId]="workspaceId"
+      />
 
       <!-- Tabs are drag-reorderable; the chosen order persists per browser (localStorage). -->
       <z-tab-group zReorderKey="qits.workspace-detail.tab-order" (zTabChange)="onTabChange($event.label)">
