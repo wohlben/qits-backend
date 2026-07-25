@@ -1,4 +1,4 @@
-# Epic: qits-ingress — qits as the central request hub that receives and delegates
+# Epic: qits-gateway — qits as the central request hub that receives and delegates
 
 ## Introduction
 
@@ -18,7 +18,7 @@ sibling server (artifacts, telemetry). The thesis is that **qits fundamentally o
 communication across its components**, so the routing hub belongs *inside* qits, built from
 machinery it already runs, rather than bolted on as an external reverse proxy (Traefik/nginx)
 configured statically or dynamically. Every new component we add otherwise grows the tech stack;
-an internal ingress keeps the front door in the app that already owns the addressing model
+an internal gateway keeps the front door in the app that already owns the addressing model
 (`QitsHostResolver`, `qits-net`, `ContainerRuntime.resolveTarget`).
 
 ### This is a generalization, not a new component
@@ -60,14 +60,14 @@ port, no host publishing). The hub is the missing *inbound* half of a resolver p
   [standalone-telemetry-service](../qits-observability/feature-ideas/standalone-telemetry-service.md)):
   those epics pull artifacts/telemetry out of `service` into **their own processes**, and each
   raises the same open questions — *"one deployable or two?"*, *cross-origin CORS for the SPA/diff
-  UI*, *a public surface with no `QitsAuthPolicy`*. **An internal ingress is the answer to all
+  UI*, *a public surface with no `QitsAuthPolicy`*. **An internal gateway is the answer to all
   three**: external clients keep hitting **one origin** (the qits front door), which fans
   `/api/artifacts` and `/api/otel` to the split-out siblings on `qits-net` internally. The split
   becomes a **deployment-topology change invisible to callers** — no new host:port for the SPA to
   reach cross-origin, no per-service auth story exposed to the edge. Part 3 below is precisely this.
 - **Subsumes the edge from [build-variant-auth](../qits-authentication/features/2026-07-16_build-variant-auth.md)** —
   the `forwardauth` variant assumes an **external** reverse proxy in front of qits that terminates
-  TLS, performs auth, and injects trusted headers. **This epic decides qits-ingress subsumes that
+  TLS, performs auth, and injects trusted headers. **This epic decides qits-gateway subsumes that
   edge** (Part 4): qits becomes the public front door itself — it terminates TLS and performs the
   authentication the external proxy used to, so a standard deployment needs **no** external reverse
   proxy at all. The consequence is real and named below: the `forwardauth` variant's whole premise
@@ -99,11 +99,11 @@ earlier it's named, and it reuses `DaemonProxyRoute`'s exact security model.
 canonical backend-prefix list lives in three places that must be kept in sync by hand
 (`PublicPaths.java`, `application.properties:201` Quinoa ignores, `application.properties:151` OTel
 suppress). Every new backend prefix is three edits and a chance to forget one (a missed Quinoa
-ignore serves the SPA over a backend route; a missed OTel suppress spams traces). A single ingress
+ignore serves the SPA over a backend route; a missed OTel suppress spams traces). A single gateway
 registry is the source of truth those three consume.
 
 **It de-risks the splits without committing to them.** The artifacts/telemetry split epics are
-gated on triggers that may or may not fire. An ingress that can front an internal sibling means the
+gated on triggers that may or may not fire. A gateway that can front an internal sibling means the
 day a split lands, it's a config re-point, not an external-surface redesign — and the "one
 deployable or two" tension dissolves, because from outside it's always one.
 
@@ -116,11 +116,11 @@ later part is its own feature-idea. Parts 1–3 preserve the wire contract for e
 
 ### Part 1 — Name and unify the dispatch surface *(behavior-preserving)*
 
-Make the implicit ingress explicit. Introduce a single **route/prefix registry** (the source of
+Make the implicit gateway explicit. Introduce a single **route/prefix registry** (the source of
 truth for the backend prefixes `/api`, `/mcp/*`, `/git/*`, `/daemon/*`, and the SPA fallthrough)
 that `PublicPaths`, `quarkus.quinoa.ignored-path-prefixes`, and the OTel suppress list all derive
 from instead of re-declaring. Document the router-order map (capture-CORS 500, Quinoa dev proxy
-1100, REST 1500, SPA fallback 9000, static 10000) as *the* ingress model, with `QitsAuthPolicy` as
+1100, REST 1500, SPA fallback 9000, static 10000) as *the* gateway model, with `QitsAuthPolicy` as
 the one global gate every route passes. No new routes, no behavior change — this is the prep that
 makes Parts 2–3 safe.
 
@@ -176,10 +176,14 @@ the *complete* front door rather than only the internal dispatcher.
 
 ## Open questions
 
-- **Name: `qits-ingress` vs `qits-proxy`.** Chosen `qits-ingress` — the deliverable is the single
-  *front door that receives and routes*; proxying is one mechanism it uses (alongside in-process
-  dispatch and the OTLP tee). `qits-proxy` undersells the in-process-dispatch and registry halves.
-  Rename the dir if you prefer the other framing.
+- **~~Name: `qits-ingress` vs `qits-proxy`~~ → DECIDED: `qits-gateway`.** The deliverable is the
+  single *front door that receives inbound traffic and delegates to the right internal component* —
+  a **gateway**. `qits-proxy` undersells the in-process-dispatch and registry halves (proxying is
+  only one mechanism it uses, alongside in-process dispatch and the OTLP tee). `qits-ingress`
+  captured "traffic arrives here" but reads as k8s-flavored one-way *inbound* plumbing and collides
+  with the generic "ingress/auth" wording already used in the deployment docs; **gateway** names the
+  whole job — receive, decide, route, subsume the edge — without that overload. Renamed from
+  `qits-ingress`.
 - **~~Behind vs subsume the edge~~ → DECIDED: subsume (Part 4).** qits owns the whole front door —
   terminates TLS, performs edge auth, no external reverse proxy in a standard deploy. The
   consequences this creates, now the open questions:
@@ -203,7 +207,7 @@ the *complete* front door rather than only the internal dispatcher.
   external-edge question. Lean: path-based first (reuses the proven `DaemonProxyRoute` handling),
   revisit subdomains if absolute-URL apps make it painful.
 - **Does this contradict the split epics?** No — it's the counterweight that makes them safe (see
-  cross-cutting). But it does mean the splits should *assume* an internal ingress rather than plan
+  cross-cutting). But it does mean the splits should *assume* an internal gateway rather than plan
   their own cross-origin CORS. If this epic is adopted, the "CORS / same-origin" open questions in
   both split docs are answered here instead of there — note that in those docs when this lands.
 - **`max-body-size` still shared in-process.** Fronting a split artifacts/telemetry via the hub means
