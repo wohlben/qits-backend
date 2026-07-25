@@ -2,7 +2,6 @@ package eu.wohlben.qits.security;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -17,7 +16,7 @@ import org.junit.jupiter.api.Test;
  * mechanism coverage lives in the auth modules' own suites). The %test dev-user fallback is blanked
  * here so the real prod posture shows: protected paths 401 without the proxy header — including
  * /service/*, a raw router route — while the container-facing public surface (git host, OTLP
- * ingest, agent-session hook, health) stays token-free.
+ * ingest, health) stays token-free.
  */
 @QuarkusTest
 @TestProfile(ForwardAuthVariantTest.Profile.class)
@@ -84,19 +83,5 @@ class ForwardAuthVariantTest {
         .post("/api/otel/v1/logs")
         .then()
         .statusCode(200);
-  }
-
-  @Test
-  void agentSessionReportHookStaysTokenFree() {
-    int status =
-        given()
-            .redirects()
-            .follow(false)
-            .contentType("application/json")
-            .body("{\"sessionId\":\"s1\"}")
-            .when()
-            .post("/api/commands/no-such-command/agent-session")
-            .statusCode();
-    assertFalse(status == 401 || status == 403, "was challenged: " + status);
   }
 }

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { FeatureFlowPhaseDto } from './featureFlowPhaseDto';
+import { Entry5 } from './entry5';
 
 
 export interface Response27 { 
-    featureFlowPhase?: FeatureFlowPhaseDto;
+    entries?: Array<Entry5>;
 }
 

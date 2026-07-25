@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { WorkspaceRuntimeStatus } from './workspaceRuntimeStatus';
+import { AgentActivityState } from './agentActivityState';
 import { WorkspaceStatus } from './workspaceStatus';
 
 
@@ -22,6 +23,7 @@ export interface WorkspaceDto {
     runtimeStatus?: WorkspaceRuntimeStatus;
     runtimeError?: string;
     clean?: boolean;
+    agentActivity?: AgentActivityState;
     preamble?: string;
     result?: string;
     resolvedAt?: string;

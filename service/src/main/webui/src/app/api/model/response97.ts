@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { FeatureDto } from './featureDto';
+import { Entry16 } from './entry16';
 
 
 export interface Response97 { 
-    feature?: FeatureDto;
+    entries?: Array<Entry16>;
 }
 

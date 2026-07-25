@@ -88,6 +88,9 @@ export class WorkspaceLiveService {
       commands: [['commands'], ['workspace-agent-sessions', repoId, workspaceId]],
       // The bootstrap chain's state changed (chain started/ended, a command's outcome recorded).
       bootstrap: [['workspace-bootstrap', repoId, workspaceId]],
+      // A coding agent's live activity rollup flipped (cooking/idle/waiting) — re-fetch the workspace
+      // list so the Agents-tab chip + the tab's busy dot refresh from WorkspaceDto.agentActivity.
+      'agent-activity': [['workspaces', repoId]],
       // The working tree changed on disk: refresh the tree, detection, and any open file's content
       // together. `workspace-files` is a prefix (also refetches every opened lazy directory
       // `['workspace-files', repoId, workspaceId, dir]`); `workspace-detection` is shared by the file

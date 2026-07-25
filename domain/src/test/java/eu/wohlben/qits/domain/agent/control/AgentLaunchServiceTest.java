@@ -283,7 +283,9 @@ public class AgentLaunchServiceTest {
     String repoId = "aaaaaaaa-0000-0000-0000-000000000002";
     seedRepository(projectId, repoId);
     AgentLaunchService.PinnedSession pinned = freshPin();
-    String reportPath = "/api/commands/" + pinned.commandId() + "/agent-session";
+    // The hook now targets the workspace-daemon's in-container loopback webhook (13337), with the
+    // command id as a query param — not the retired direct-to-host /agent-session endpoint.
+    String reportPath = "/hooks/claude-code?commandId=" + pinned.commandId();
 
     LaunchSpec chat =
         agentLaunchService.renderChat(

@@ -49,6 +49,13 @@ components:
           type: string
         dataBase64:
           type: string
+    AgentActivityState:
+      type: string
+      enum:
+      - IDLE
+      - BUSY
+      - WAITING
+      - ENDED
     AgentLaunchMode:
       type: string
       enum:
@@ -972,17 +979,6 @@ components:
         transcript:
           type: string
           pattern: \S
-    ReportAgentSessionRequest:
-      type: object
-      properties:
-        hook_event_name:
-          type: string
-        source:
-          type: string
-        session_id:
-          type: string
-        transcript_path:
-          type: string
     RepositoryArchetype:
       type: string
       enum:
@@ -1030,32 +1026,30 @@ components:
     Response10:
       type: object
       properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry1"
+        command:
+          $ref: "#/components/schemas/CommandDto"
     Response100:
-      type: object
-      properties:
-        success:
-          type: boolean
-    Response101:
       type: object
       properties:
         task:
           $ref: "#/components/schemas/TaskDto"
-    Response102:
+    Response101:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry17"
-    Response103:
+    Response102:
       type: object
       properties:
         epic:
           $ref: "#/components/schemas/EpicDto"
+    Response103:
+      type: object
+      properties:
+        task:
+          $ref: "#/components/schemas/TaskDto"
     Response104:
       type: object
       properties:
@@ -1064,14 +1058,9 @@ components:
     Response105:
       type: object
       properties:
-        task:
-          $ref: "#/components/schemas/TaskDto"
-    Response106:
-      type: object
-      properties:
         success:
           type: boolean
-    Response107:
+    Response106:
       type: object
       properties:
         variant:
@@ -1086,47 +1075,47 @@ components:
     Response12:
       type: object
       properties:
-        command:
-          $ref: "#/components/schemas/CommandDto"
-    Response13:
-      type: object
-      properties:
         actionConfiguration:
           $ref: "#/components/schemas/ActionConfigurationDto"
-    Response14:
+    Response13:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry2"
-    Response15:
+    Response14:
       type: object
       properties:
         actionConfiguration:
           $ref: "#/components/schemas/ActionConfigurationDto"
-    Response16:
+    Response15:
       type: object
       properties:
         success:
           type: boolean
-    Response17:
+    Response16:
       type: object
       properties:
         actionConfiguration:
           $ref: "#/components/schemas/ActionConfigurationDto"
-    Response18:
+    Response17:
       type: object
       properties:
         featureFlowConfiguration:
           $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Response19:
+    Response18:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry3"
+    Response19:
+      type: object
+      properties:
+        featureFlowConfiguration:
+          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
     Response2:
       type: object
       properties:
@@ -1139,57 +1128,57 @@ components:
     Response20:
       type: object
       properties:
-        featureFlowConfiguration:
-          $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Response21:
-      type: object
-      properties:
         success:
           type: boolean
-    Response22:
+    Response21:
       type: object
       properties:
         featureFlowPhaseAction:
           $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
-    Response23:
+    Response22:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry4"
-    Response24:
+    Response23:
       type: object
       properties:
         featureFlowPhaseAction:
           $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
-    Response25:
+    Response24:
       type: object
       properties:
         success:
           type: boolean
-    Response26:
+    Response25:
       type: object
       properties:
         featureFlowPhaseAction:
           $ref: "#/components/schemas/FeatureFlowPhaseActionDto"
-    Response27:
+    Response26:
       type: object
       properties:
         featureFlowPhase:
           $ref: "#/components/schemas/FeatureFlowPhaseDto"
-    Response28:
+    Response27:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry5"
-    Response29:
+    Response28:
       type: object
       properties:
         featureFlowPhase:
           $ref: "#/components/schemas/FeatureFlowPhaseDto"
+    Response29:
+      type: object
+      properties:
+        success:
+          type: boolean
     Response3:
       type: object
       properties:
@@ -1198,41 +1187,36 @@ components:
     Response30:
       type: object
       properties:
-        success:
-          type: boolean
-    Response31:
-      type: object
-      properties:
         featureFlowPhase:
           $ref: "#/components/schemas/FeatureFlowPhaseDto"
-    Response32:
+    Response31:
       type: object
       properties:
         featureFlowPhaseStep:
           $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
-    Response33:
+    Response32:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry6"
-    Response34:
+    Response33:
       type: object
       properties:
         featureFlowPhaseStep:
           $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
-    Response35:
+    Response34:
       type: object
       properties:
         success:
           type: boolean
-    Response36:
+    Response35:
       type: object
       properties:
         featureFlowPhaseStep:
           $ref: "#/components/schemas/FeatureFlowPhaseStepDto"
-    Response37:
+    Response36:
       type: object
       properties:
         exitCode:
@@ -1242,18 +1226,25 @@ components:
           type: string
         stderr:
           type: string
-    Response38:
+    Response37:
       type: object
       properties:
         actions:
           type: array
           items:
             $ref: "#/components/schemas/WorkspaceActionDto"
-    Response39:
+    Response38:
       type: object
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
+    Response39:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry7"
     Response4:
       type: object
       properties:
@@ -1265,58 +1256,56 @@ components:
         entries:
           type: array
           items:
-            $ref: "#/components/schemas/Entry7"
+            $ref: "#/components/schemas/Entry8"
     Response41:
       type: object
       properties:
         entries:
           type: array
           items:
-            $ref: "#/components/schemas/Entry8"
-    Response42:
-      type: object
-      properties:
-        entries:
-          type: array
-          items:
             $ref: "#/components/schemas/Entry9"
-    Response43:
+    Response42:
       type: object
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
-    Response44:
+    Response43:
       type: object
       properties:
         success:
           type: boolean
-    Response45:
+    Response44:
       type: object
       properties:
         repository:
           $ref: "#/components/schemas/RepositoryDto"
         projectId:
           type: string
-    Response46:
+    Response45:
       type: object
       properties:
         featureFlowConfiguration:
           $ref: "#/components/schemas/FeatureFlowConfigurationDto"
-    Response47:
+    Response46:
       type: object
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
-    Response48:
+    Response47:
       type: object
       properties:
         technicalProcessId:
           type: string
-    Response49:
+    Response48:
       type: object
       properties:
         repository:
           $ref: "#/components/schemas/RepositoryDto"
+    Response49:
+      type: object
+      properties:
+        technicalProcessId:
+          type: string
     Response5:
       type: object
       properties:
@@ -1330,11 +1319,6 @@ components:
     Response51:
       type: object
       properties:
-        technicalProcessId:
-          type: string
-    Response52:
-      type: object
-      properties:
         commitHash:
           type: string
         hasConflicts:
@@ -1343,11 +1327,16 @@ components:
           type: string
         cleanedUp:
           type: boolean
-    Response53:
+    Response52:
       type: object
       properties:
         repository:
           $ref: "#/components/schemas/RepositoryDto"
+    Response53:
+      type: object
+      properties:
+        success:
+          type: boolean
     Response54:
       type: object
       properties:
@@ -1361,21 +1350,16 @@ components:
     Response56:
       type: object
       properties:
-        success:
-          type: boolean
-    Response57:
-      type: object
-      properties:
         branches:
           type: array
           items:
             $ref: "#/components/schemas/BranchDto"
-    Response58:
+    Response57:
       type: object
       properties:
         technicalProcessId:
           type: string
-    Response59:
+    Response58:
       type: object
       properties:
         entries:
@@ -1386,6 +1370,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Available"
+    Response59:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry10"
     Response6:
       type: object
       properties:
@@ -1398,16 +1389,9 @@ components:
     Response60:
       type: object
       properties:
-        entries:
-          type: array
-          items:
-            $ref: "#/components/schemas/Entry10"
-    Response61:
-      type: object
-      properties:
         output:
           type: string
-    Response62:
+    Response61:
       type: object
       properties:
         workspaceId:
@@ -1416,14 +1400,14 @@ components:
           type: string
         commandId:
           type: string
-    Response63:
+    Response62:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceDto"
         technicalProcessId:
           type: string
-    Response64:
+    Response63:
       type: object
       properties:
         commitHash:
@@ -1432,7 +1416,7 @@ components:
           type: boolean
         output:
           type: string
-    Response65:
+    Response64:
       type: object
       properties:
         paths:
@@ -1445,30 +1429,35 @@ components:
             $ref: "#/components/schemas/LazyDirDto"
         generation:
           type: string
-    Response66:
+    Response65:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry11"
-    Response67:
+    Response66:
       type: object
       properties:
         output:
           type: string
-    Response68:
+    Response67:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceDto"
         technicalProcessId:
           type: string
-    Response69:
+    Response68:
       type: object
       properties:
         success:
           type: boolean
+    Response69:
+      type: object
+      properties:
+        workspace:
+          $ref: "#/components/schemas/WorkspaceDto"
     Response7:
       type: object
       properties:
@@ -1477,54 +1466,54 @@ components:
     Response70:
       type: object
       properties:
-        workspace:
-          $ref: "#/components/schemas/WorkspaceDto"
-    Response71:
-      type: object
-      properties:
         files:
           type: array
           items:
             type: string
-    Response72:
+    Response71:
       type: object
       properties:
         technicalProcessId:
           type: string
-    Response73:
+    Response72:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
-    Response74:
+    Response73:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry12"
-    Response75:
+    Response74:
       type: object
       properties:
         workspace:
           $ref: "#/components/schemas/WorkspaceHistoryDetailDto"
-    Response76:
+    Response75:
       type: object
       properties:
         updatedAt:
           $ref: "#/components/schemas/Instant"
-    Response77:
+    Response76:
       type: object
       properties:
         id:
           type: string
-    Response78:
+    Response77:
       type: object
       properties:
         events:
           type: array
           items:
             $ref: "#/components/schemas/ServiceEventDto"
+    Response78:
+      type: object
+      properties:
+        instance:
+          $ref: "#/components/schemas/ServiceInstanceDto"
     Response79:
       type: object
       properties:
@@ -1533,133 +1522,135 @@ components:
     Response8:
       type: object
       properties:
-        command:
-          $ref: "#/components/schemas/CommandDto"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommandLogLineDto"
     Response80:
-      type: object
-      properties:
-        instance:
-          $ref: "#/components/schemas/ServiceInstanceDto"
-    Response81:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry13"
-    Response82:
+    Response81:
       type: object
       properties:
         setting:
           $ref: "#/components/schemas/SettingDto"
-    Response83:
+    Response82:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry14"
-    Response84:
+    Response83:
       type: object
       properties:
         setting:
           $ref: "#/components/schemas/SettingDto"
-    Response85:
+    Response84:
       type: object
       properties:
         text:
           type: string
-    Response86:
+    Response85:
       type: object
       properties:
         trace:
           $ref: "#/components/schemas/TelemetryTraceDto"
-    Response87:
+    Response86:
       type: object
       properties:
         spans:
           type: array
           items:
             $ref: "#/components/schemas/TelemetrySpanDto"
-    Response88:
+    Response87:
       type: object
       properties:
         metrics:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryMetricDto"
-    Response89:
+    Response88:
       type: object
       properties:
         logs:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryLogDto"
-    Response9:
-      type: object
-      properties:
-        lines:
-          type: array
-          items:
-            $ref: "#/components/schemas/CommandLogLineDto"
-    Response90:
+    Response89:
       type: object
       properties:
         groups:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryErrorGroupDto"
-    Response91:
+    Response9:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry1"
+    Response90:
       type: object
       properties:
         epic:
           $ref: "#/components/schemas/EpicDto"
-    Response92:
+    Response91:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry15"
-    Response93:
+    Response92:
       type: object
       properties:
         epic:
           $ref: "#/components/schemas/EpicDto"
-    Response94:
+    Response93:
       type: object
       properties:
         success:
           type: boolean
-    Response95:
+    Response94:
       type: object
       properties:
         feature:
           $ref: "#/components/schemas/FeatureDto"
-    Response96:
+    Response95:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/AuditEntryDto"
-    Response97:
+    Response96:
       type: object
       properties:
         feature:
           $ref: "#/components/schemas/FeatureDto"
-    Response98:
+    Response97:
       type: object
       properties:
         entries:
           type: array
           items:
             $ref: "#/components/schemas/Entry16"
-    Response99:
+    Response98:
       type: object
       properties:
         feature:
           $ref: "#/components/schemas/FeatureDto"
+    Response99:
+      type: object
+      properties:
+        success:
+          type: boolean
     RestartPolicy:
       type: string
       enum:
@@ -2141,6 +2132,8 @@ components:
           type: string
         clean:
           type: boolean
+        agentActivity:
+          $ref: "#/components/schemas/AgentActivityState"
         preamble:
           type: string
         result:
@@ -2289,7 +2282,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response14"
+                $ref: "#/components/schemas/Response13"
       summary: List
       tags:
       - Action Configuration Controller
@@ -2306,7 +2299,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response17"
+                $ref: "#/components/schemas/Response16"
         "400":
           description: Bad Request
       summary: Create
@@ -2332,7 +2325,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response13"
+                $ref: "#/components/schemas/Response12"
         "400":
           description: Bad Request
       summary: Update
@@ -2351,7 +2344,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response15"
+                $ref: "#/components/schemas/Response14"
       summary: Get
       tags:
       - Action Configuration Controller
@@ -2368,7 +2361,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response16"
+                $ref: "#/components/schemas/Response15"
       summary: Delete
       tags:
       - Action Configuration Controller
@@ -2392,7 +2385,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response107"
+                $ref: "#/components/schemas/Response106"
       summary: Me
       tags:
       - Auth Controller
@@ -2417,7 +2410,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response10"
+                $ref: "#/components/schemas/Response9"
       summary: List
       tags:
       - Command Controller
@@ -2434,7 +2427,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response11"
+                $ref: "#/components/schemas/Response10"
         "400":
           description: Bad Request
       summary: Launch
@@ -2454,34 +2447,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response12"
+                $ref: "#/components/schemas/Response11"
       summary: Get
-      tags:
-      - Command Controller
-  /api/commands/{commandId}/agent-session:
-    post:
-      parameters:
-      - name: commandId
-        in: path
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReportAgentSessionRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Response8"
-        "400":
-          description: Bad Request
-      summary: Report Agent Session
       tags:
       - Command Controller
   /api/commands/{commandId}/log:
@@ -2506,7 +2473,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response9"
+                $ref: "#/components/schemas/Response8"
       summary: Log
       tags:
       - Command Controller
@@ -2614,7 +2581,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response92"
+                $ref: "#/components/schemas/Response91"
       summary: List Features
       tags:
       - Epic Controller
@@ -2637,7 +2604,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response95"
+                $ref: "#/components/schemas/Response94"
         "400":
           description: Bad Request
       summary: Create Feature
@@ -2663,7 +2630,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response91"
+                $ref: "#/components/schemas/Response90"
         "400":
           description: Bad Request
       summary: Update
@@ -2682,7 +2649,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response93"
+                $ref: "#/components/schemas/Response92"
       summary: Get
       tags:
       - Epic Controller
@@ -2699,7 +2666,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response94"
+                $ref: "#/components/schemas/Response93"
       summary: Delete
       tags:
       - Epic Controller
@@ -2717,7 +2684,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response96"
+                $ref: "#/components/schemas/Response95"
       summary: Audit
       tags:
       - Epic Controller
@@ -2729,7 +2696,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response19"
+                $ref: "#/components/schemas/Response18"
       summary: List
       tags:
       - Feature Flow Configuration Controller
@@ -2753,7 +2720,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response18"
+                $ref: "#/components/schemas/Response17"
         "400":
           description: Bad Request
       summary: Update
@@ -2772,7 +2739,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response20"
+                $ref: "#/components/schemas/Response19"
       summary: Get
       tags:
       - Feature Flow Configuration Controller
@@ -2789,7 +2756,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response21"
+                $ref: "#/components/schemas/Response20"
       summary: Delete
       tags:
       - Feature Flow Configuration Controller
@@ -2806,7 +2773,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response23"
+                $ref: "#/components/schemas/Response22"
       summary: List
       tags:
       - Feature Flow Phase Action Controller
@@ -2823,7 +2790,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response26"
+                $ref: "#/components/schemas/Response25"
         "400":
           description: Bad Request
       summary: Create
@@ -2849,7 +2816,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response22"
+                $ref: "#/components/schemas/Response21"
         "400":
           description: Bad Request
       summary: Update
@@ -2868,7 +2835,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response24"
+                $ref: "#/components/schemas/Response23"
       summary: Get
       tags:
       - Feature Flow Phase Action Controller
@@ -2885,7 +2852,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response25"
+                $ref: "#/components/schemas/Response24"
       summary: Delete
       tags:
       - Feature Flow Phase Action Controller
@@ -2902,7 +2869,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response33"
+                $ref: "#/components/schemas/Response32"
       summary: List
       tags:
       - Feature Flow Phase Step Controller
@@ -2919,7 +2886,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response36"
+                $ref: "#/components/schemas/Response35"
         "400":
           description: Bad Request
       summary: Create
@@ -2945,7 +2912,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response32"
+                $ref: "#/components/schemas/Response31"
         "400":
           description: Bad Request
       summary: Update
@@ -2964,7 +2931,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response34"
+                $ref: "#/components/schemas/Response33"
       summary: Get
       tags:
       - Feature Flow Phase Step Controller
@@ -2981,7 +2948,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response35"
+                $ref: "#/components/schemas/Response34"
       summary: Delete
       tags:
       - Feature Flow Phase Step Controller
@@ -2998,7 +2965,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response28"
+                $ref: "#/components/schemas/Response27"
       summary: List
       tags:
       - Feature Flow Phase Controller
@@ -3015,7 +2982,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response31"
+                $ref: "#/components/schemas/Response30"
         "400":
           description: Bad Request
       summary: Create
@@ -3041,7 +3008,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response27"
+                $ref: "#/components/schemas/Response26"
         "400":
           description: Bad Request
       summary: Update
@@ -3060,7 +3027,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response29"
+                $ref: "#/components/schemas/Response28"
       summary: Get
       tags:
       - Feature Flow Phase Controller
@@ -3077,7 +3044,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response30"
+                $ref: "#/components/schemas/Response29"
       summary: Delete
       tags:
       - Feature Flow Phase Controller
@@ -3095,7 +3062,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response98"
+                $ref: "#/components/schemas/Response97"
       summary: List Tasks
       tags:
       - Feature Controller
@@ -3118,7 +3085,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response101"
+                $ref: "#/components/schemas/Response100"
         "400":
           description: Bad Request
       summary: Create Task
@@ -3144,7 +3111,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response97"
+                $ref: "#/components/schemas/Response96"
         "400":
           description: Bad Request
       summary: Update
@@ -3163,7 +3130,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response99"
+                $ref: "#/components/schemas/Response98"
       summary: Get
       tags:
       - Feature Controller
@@ -3180,7 +3147,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response100"
+                $ref: "#/components/schemas/Response99"
       summary: Delete
       tags:
       - Feature Controller
@@ -3192,7 +3159,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response42"
+                $ref: "#/components/schemas/Response41"
       summary: List
       tags:
       - Project Controller
@@ -3209,7 +3176,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response47"
+                $ref: "#/components/schemas/Response46"
         "400":
           description: Bad Request
       summary: Create
@@ -3235,7 +3202,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response39"
+                $ref: "#/components/schemas/Response38"
         "400":
           description: Bad Request
       summary: Update
@@ -3254,7 +3221,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response43"
+                $ref: "#/components/schemas/Response42"
       summary: Get
       tags:
       - Project Controller
@@ -3271,7 +3238,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response44"
+                $ref: "#/components/schemas/Response43"
       summary: Delete
       tags:
       - Project Controller
@@ -3289,7 +3256,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response102"
+                $ref: "#/components/schemas/Response101"
       summary: List
       tags:
       - Project Epics Controller
@@ -3312,7 +3279,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response103"
+                $ref: "#/components/schemas/Response102"
         "400":
           description: Bad Request
       summary: Create
@@ -3332,7 +3299,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response41"
+                $ref: "#/components/schemas/Response40"
       summary: List Feature Flow Configurations
       tags:
       - Project Controller
@@ -3355,7 +3322,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response46"
+                $ref: "#/components/schemas/Response45"
         "400":
           description: Bad Request
       summary: Create Feature Flow Configuration
@@ -3375,7 +3342,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response40"
+                $ref: "#/components/schemas/Response39"
       summary: List Repositories
       tags:
       - Project Controller
@@ -3398,7 +3365,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response45"
+                $ref: "#/components/schemas/Response44"
         "400":
           description: Bad Request
       summary: Create Repository
@@ -3418,7 +3385,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response53"
+                $ref: "#/components/schemas/Response52"
       summary: Get
       tags:
       - Repository Controller
@@ -3435,7 +3402,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response55"
+                $ref: "#/components/schemas/Response54"
       summary: Delete
       tags:
       - Repository Controller
@@ -3453,7 +3420,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response58"
+                $ref: "#/components/schemas/Response57"
       summary: Active Process
       tags:
       - Repository Controller
@@ -3477,7 +3444,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response54"
+                $ref: "#/components/schemas/Response53"
       summary: Delete Branch
       tags:
       - Repository Controller
@@ -3494,7 +3461,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response57"
+                $ref: "#/components/schemas/Response56"
       summary: Branches
       tags:
       - Repository Controller
@@ -3518,7 +3485,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response56"
+                $ref: "#/components/schemas/Response55"
         "400":
           description: Bad Request
       summary: Cleanup Branch
@@ -3544,7 +3511,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response52"
+                $ref: "#/components/schemas/Response51"
         "400":
           description: Bad Request
       summary: Merge Branch
@@ -3648,7 +3615,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response74"
+                $ref: "#/components/schemas/Response73"
       summary: List
       tags:
       - Workspace History Controller
@@ -3678,7 +3645,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response73"
+                $ref: "#/components/schemas/Response72"
       summary: Update
       tags:
       - Workspace History Controller
@@ -3701,7 +3668,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response75"
+                $ref: "#/components/schemas/Response74"
       summary: Get
       tags:
       - Workspace History Controller
@@ -3725,7 +3692,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response49"
+                $ref: "#/components/schemas/Response48"
         "400":
           description: Bad Request
       summary: Set Main Branch
@@ -3745,7 +3712,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response51"
+                $ref: "#/components/schemas/Response50"
       summary: Pull
       tags:
       - Repository Controller
@@ -3763,7 +3730,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response50"
+                $ref: "#/components/schemas/Response49"
       summary: Push
       tags:
       - Repository Controller
@@ -3781,7 +3748,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response48"
+                $ref: "#/components/schemas/Response47"
       summary: Sync
       tags:
       - Repository Controller
@@ -3817,7 +3784,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response66"
+                $ref: "#/components/schemas/Response65"
       summary: List
       tags:
       - Workspace Controller
@@ -3840,7 +3807,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response70"
+                $ref: "#/components/schemas/Response69"
         "400":
           description: Bad Request
       summary: Create
@@ -3865,7 +3832,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response38"
+                $ref: "#/components/schemas/Response37"
       summary: List
       tags:
       - Workspace Actions Controller
@@ -3893,7 +3860,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response37"
+                $ref: "#/components/schemas/Response36"
       summary: Run
       tags:
       - Workspace Actions Controller
@@ -3916,7 +3883,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response72"
+                $ref: "#/components/schemas/Response71"
       summary: Active Process
       tags:
       - Workspace Controller
@@ -4141,7 +4108,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response71"
+                $ref: "#/components/schemas/Response70"
       summary: Conflicts
       tags:
       - Workspace Controller
@@ -4216,7 +4183,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response69"
+                $ref: "#/components/schemas/Response68"
         "400":
           description: Bad Request
       summary: Discard
@@ -4241,7 +4208,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response68"
+                $ref: "#/components/schemas/Response67"
       summary: Ensure Container
       tags:
       - Workspace Controller
@@ -4264,7 +4231,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response67"
+                $ref: "#/components/schemas/Response66"
       summary: Fast Forward
       tags:
       - Workspace Controller
@@ -4291,7 +4258,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response65"
+                $ref: "#/components/schemas/Response64"
       summary: List Files
       tags:
       - Workspace Controller
@@ -4370,7 +4337,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response64"
+                $ref: "#/components/schemas/Response63"
         "400":
           description: Bad Request
       summary: Merge
@@ -4401,7 +4368,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response76"
+                $ref: "#/components/schemas/Response75"
         "400":
           description: Bad Request
       summary: Put
@@ -4496,7 +4463,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response77"
+                $ref: "#/components/schemas/Response76"
         "400":
           description: Bad Request
       summary: Add Attachment
@@ -4576,7 +4543,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response63"
+                $ref: "#/components/schemas/Response62"
       summary: Recreate Container
       tags:
       - Workspace Controller
@@ -4599,7 +4566,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response62"
+                $ref: "#/components/schemas/Response61"
       summary: Resolve Conflict
       tags:
       - Workspace Controller
@@ -4622,7 +4589,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response81"
+                $ref: "#/components/schemas/Response80"
       summary: List
       tags:
       - Workspace Service Controller
@@ -4650,7 +4617,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response80"
+                $ref: "#/components/schemas/Response79"
       summary: Start
       tags:
       - Workspace Service Controller
@@ -4678,7 +4645,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response79"
+                $ref: "#/components/schemas/Response78"
       summary: Stop
       tags:
       - Workspace Service Controller
@@ -4729,7 +4696,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response90"
+                $ref: "#/components/schemas/Response89"
       summary: Errors
       tags:
       - Workspace Telemetry Controller
@@ -4765,7 +4732,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response89"
+                $ref: "#/components/schemas/Response88"
       summary: Logs
       tags:
       - Workspace Telemetry Controller
@@ -4792,7 +4759,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response88"
+                $ref: "#/components/schemas/Response87"
       summary: Metrics
       tags:
       - Workspace Telemetry Controller
@@ -4831,7 +4798,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response87"
+                $ref: "#/components/schemas/Response86"
       summary: Slow Spans
       tags:
       - Workspace Telemetry Controller
@@ -4859,7 +4826,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response86"
+                $ref: "#/components/schemas/Response85"
       summary: Trace
       tags:
       - Workspace Telemetry Controller
@@ -4882,7 +4849,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response61"
+                $ref: "#/components/schemas/Response60"
       summary: Update From Parent
       tags:
       - Workspace Controller
@@ -4900,7 +4867,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response59"
+                $ref: "#/components/schemas/Response58"
       summary: List
       tags:
       - Repository Submodule Controller
@@ -4918,7 +4885,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response60"
+                $ref: "#/components/schemas/Response59"
       summary: Import Submodules
       tags:
       - Repository Submodule Controller
@@ -4966,7 +4933,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response78"
+                $ref: "#/components/schemas/Response77"
       summary: List
       tags:
       - Service Event Controller
@@ -4978,7 +4945,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response83"
+                $ref: "#/components/schemas/Response82"
       summary: List
       tags:
       - Setting Controller
@@ -5002,7 +4969,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response82"
+                $ref: "#/components/schemas/Response81"
         "400":
           description: Bad Request
       summary: Update
@@ -5021,7 +4988,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response84"
+                $ref: "#/components/schemas/Response83"
       summary: Get
       tags:
       - Setting Controller
@@ -5039,7 +5006,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response85"
+                $ref: "#/components/schemas/Response84"
         "400":
           description: Bad Request
       summary: Transcribe
@@ -5065,7 +5032,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response104"
+                $ref: "#/components/schemas/Response103"
         "400":
           description: Bad Request
       summary: Update
@@ -5084,7 +5051,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response105"
+                $ref: "#/components/schemas/Response104"
       summary: Get
       tags:
       - Task Controller
@@ -5101,7 +5068,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Response106"
+                $ref: "#/components/schemas/Response105"
       summary: Delete
       tags:
       - Task Controller

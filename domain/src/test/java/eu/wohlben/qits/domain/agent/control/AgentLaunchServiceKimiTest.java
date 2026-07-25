@@ -114,7 +114,7 @@ public class AgentLaunchServiceKimiTest {
     // A fresh Kimi launch has no session ref; the launch-local config.toml carries the report hook.
     assertTrue(spec.script().contains("[[hooks]]"), spec.script());
     assertTrue(
-        spec.script().contains("/api/commands/" + pinned.commandId() + "/agent-session"),
+        spec.script().contains("/hooks/claude-code?commandId=" + pinned.commandId()),
         spec.script());
     // Kimi handles KIMI_CODE_HOME itself; no HOME overlay from the launcher.
     assertFalse(spec.environment().containsKey("HOME"), spec.environment().toString());
@@ -137,7 +137,7 @@ public class AgentLaunchServiceKimiTest {
     assertTrue(spec.script().contains("--output-format stream-json"), spec.script());
     assertTrue(spec.script().contains("[[hooks]]"), spec.script());
     assertTrue(
-        spec.script().contains("/api/commands/" + pinned.commandId() + "/agent-session"),
+        spec.script().contains("/hooks/claude-code?commandId=" + pinned.commandId()),
         spec.script());
   }
 

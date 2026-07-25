@@ -7,9 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Available } from './available';
+import { Entry10 } from './entry10';
 
 
 export interface Response58 { 
-    technicalProcessId?: string;
+    entries?: Array<Entry10>;
+    available?: Array<Available>;
 }
 

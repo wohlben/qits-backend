@@ -163,22 +163,33 @@ public class KimiCodeAgent extends CodingAgent {
   }
 
   /**
-   * Appends the launch-local {@code config.toml} carrying this launch's session-report hook. Kimi's
-   * only hook channel is a {@code [[hooks]]} entry in {@code config.toml} — there is no per-launch
-   * flag like Claude's {@code --settings} — and the report URL is per-command, so a static
-   * volume-level hook can't carry it. Instead the launch copies the volume's {@code config.toml}
-   * into the throwaway home and appends its own {@code SessionStart} hook, which POSTs the hook's
-   * stdin JSON ({@code {hook_event_name, session_id, cwd}}) to the qits session-report endpoint.
-   * Must run after {@link #appendKimiHomePrelude} (it writes into the throwaway home) and before
-   * the {@code kimi} invocation.
+   * The agent-activity lifecycle hooks Kimi reports. {@code SessionStart} is always emitted (it
+   * drives session-lineage); the turn-boundary events are added only when {@link #activityTracking}
+   * is on. Names match Claude's hook events — verify against the pinned Kimi CLI's {@code
+   * [[hooks]]} vocabulary; an event Kimi doesn't recognize simply never fires (harmless).
+   */
+  private static final List<String> ACTIVITY_EVENTS =
+      List.of("UserPromptSubmit", "Stop", "Notification", "SessionEnd");
+
+  /**
+   * Appends the launch-local {@code config.toml} carrying this launch's activity hooks. Kimi's only
+   * hook channel is a {@code [[hooks]]} entry in {@code config.toml} — there is no per-launch flag
+   * like Claude's {@code --settings} — and the report URL is per-command, so a static volume-level
+   * hook can't carry it. Instead the launch copies the volume's {@code config.toml} into the
+   * throwaway home and appends one {@code [[hooks]]} block per event, each POSTing the hook's stdin
+   * JSON ({@code {hook_event_name, session_id, …}}) to the qits hook endpoint (the
+   * workspace-daemon's loopback webhook). {@code SessionStart} is always appended (lineage); the
+   * turn-boundary events follow when {@link #activityTracking} is on. Must run after {@link
+   * #appendKimiHomePrelude} (it writes into the throwaway home) and before the {@code kimi}
+   * invocation.
    */
   private void appendSessionReportHook(StringBuilder script) {
     if (sessionReportingUrl == null) {
       return;
     }
     if (sessionReportingUrl.contains("'")) {
-      // Defense in depth: the URL is composed of a resolver host, a port, and a UUID command id,
-      // none of which can contain a quote — but it ends up inside a TOML literal string.
+      // Defense in depth: the URL is composed of a fixed loopback host, a port, and a UUID command
+      // id, none of which can contain a quote — but it ends up inside a TOML literal string.
       throw new IllegalArgumentException(
           "Session-reporting URL must not contain quotes: " + sessionReportingUrl);
     }
@@ -188,12 +199,26 @@ public class KimiCodeAgent extends CodingAgent {
     script.append(
         "\n{ [ ! -e \"$QITS_KIMI_HOME/config.toml\" ] || cat \"$QITS_KIMI_HOME/config.toml\"; }"
             + " > \"$KIMI_CODE_HOME/config.toml\"\n");
+    script.append("cat >> \"$KIMI_CODE_HOME/config.toml\" <<'EOF'\n");
+    appendHookBlock(script, "SessionStart", post); // always — session-lineage
+    if (activityTracking) {
+      for (String event : ACTIVITY_EVENTS) {
+        appendHookBlock(script, event, post);
+      }
+    }
+    script.append("EOF");
+  }
+
+  /** One {@code [[hooks]]} TOML block wiring {@code event} to the report {@code command}. */
+  private static void appendHookBlock(StringBuilder script, String event, String command) {
     script
-        .append("cat >> \"$KIMI_CODE_HOME/config.toml\" <<'EOF'\n\n[[hooks]]\n")
-        .append("event = \"SessionStart\"\n")
+        .append("\n[[hooks]]\n")
+        .append("event = \"")
+        .append(event)
+        .append("\"\n")
         .append("command = '")
-        .append(post)
-        .append("'\nEOF");
+        .append(command)
+        .append("'\n");
   }
 
   /**

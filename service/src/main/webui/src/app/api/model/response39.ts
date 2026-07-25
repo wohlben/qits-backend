@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ProjectDto } from './projectDto';
+import { Entry7 } from './entry7';
 
 
 export interface Response39 { 
-    project?: ProjectDto;
+    entries?: Array<Entry7>;
 }
 

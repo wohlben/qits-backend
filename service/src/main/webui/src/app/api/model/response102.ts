@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { Entry17 } from './entry17';
+import { EpicDto } from './epicDto';
 
 
 export interface Response102 { 
-    entries?: Array<Entry17>;
+    epic?: EpicDto;
 }
 
