@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Tag;
  * cascade-cleans the repository if this chain is interrupted.
  */
 @Tag("extended")
-class CreateRepositoryIT {
+public class CreateRepositoryIT {
 
   static final String REPO_ID_KEY = "repository.id";
 
@@ -59,9 +59,10 @@ class CreateRepositoryIT {
     flow.waitFor("input#repository-url");
     flow.fill("input#repository-url", CLONE_URL);
     flow.click("button[type=submit]");
-    // Save returns to the project detail; the project had no repositories, so this is the only card
+    // Save returns to the project detail; the project had no repositories, so this is the only
+    // repository card (the epics section above may carry cards of its own — scope the click)
     flow.waitFor("app-repository-card");
-    flow.click("a:has-text('View')");
+    flow.click("app-repository-card a:has-text('View')");
     flow.waitFor("app-repository-detail-page");
     flow.screenshot("app-repository-detail-page", "created repository").as("created");
 
