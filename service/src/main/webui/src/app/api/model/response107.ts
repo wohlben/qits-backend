@@ -10,7 +10,6 @@
 
 
 export interface Response107 { 
-    variant?: string;
-    username?: string;
+    success?: boolean;
 }
 

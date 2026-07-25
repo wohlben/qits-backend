@@ -10,6 +10,6 @@
 
 
 export interface Response72 { 
-    technicalProcessId?: string;
+    files?: Array<string>;
 }
 

@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ServiceInstanceDto } from './serviceInstanceDto';
+import { ServiceEventDto } from './serviceEventDto';
 
 
 export interface Response79 { 
-    instance?: ServiceInstanceDto;
+    events?: Array<ServiceEventDto>;
 }
 

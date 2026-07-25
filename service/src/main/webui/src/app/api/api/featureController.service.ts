@@ -23,7 +23,7 @@ import { Response100 } from '../model/response100';
 // @ts-ignore
 import { Response101 } from '../model/response101';
 // @ts-ignore
-import { Response97 } from '../model/response97';
+import { Response102 } from '../model/response102';
 // @ts-ignore
 import { Response98 } from '../model/response98';
 // @ts-ignore
@@ -55,9 +55,9 @@ export class FeatureControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeaturesFeatureIdTasksGet(featureId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response98>;
-    public apiFeaturesFeatureIdTasksGet(featureId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response98>>;
-    public apiFeaturesFeatureIdTasksGet(featureId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response98>>;
+    public apiFeaturesFeatureIdTasksGet(featureId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response99>;
+    public apiFeaturesFeatureIdTasksGet(featureId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response99>>;
+    public apiFeaturesFeatureIdTasksGet(featureId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response99>>;
     public apiFeaturesFeatureIdTasksGet(featureId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (featureId === null || featureId === undefined) {
             throw new Error('Required parameter featureId was null or undefined when calling apiFeaturesFeatureIdTasksGet.');
@@ -90,7 +90,7 @@ export class FeatureControllerService extends BaseService {
 
         let localVarPath = `/api/features/${this.configuration.encodeParam({name: "featureId", value: featureId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/tasks`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response98>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response99>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -112,9 +112,9 @@ export class FeatureControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response101>;
-    public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response101>>;
-    public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response101>>;
+    public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response102>;
+    public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response102>>;
+    public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response102>>;
     public apiFeaturesFeatureIdTasksPost(featureId: string, createTaskRequest: CreateTaskRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (featureId === null || featureId === undefined) {
             throw new Error('Required parameter featureId was null or undefined when calling apiFeaturesFeatureIdTasksPost.');
@@ -159,7 +159,7 @@ export class FeatureControllerService extends BaseService {
 
         let localVarPath = `/api/features/${this.configuration.encodeParam({name: "featureId", value: featureId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/tasks`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response101>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response102>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createTaskRequest,
@@ -181,9 +181,9 @@ export class FeatureControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeaturesIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response100>;
-    public apiFeaturesIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response100>>;
-    public apiFeaturesIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response100>>;
+    public apiFeaturesIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response101>;
+    public apiFeaturesIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response101>>;
+    public apiFeaturesIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response101>>;
     public apiFeaturesIdDelete(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiFeaturesIdDelete.');
@@ -216,7 +216,7 @@ export class FeatureControllerService extends BaseService {
 
         let localVarPath = `/api/features/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response100>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response101>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -237,9 +237,9 @@ export class FeatureControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeaturesIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response99>;
-    public apiFeaturesIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response99>>;
-    public apiFeaturesIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response99>>;
+    public apiFeaturesIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response100>;
+    public apiFeaturesIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response100>>;
+    public apiFeaturesIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response100>>;
     public apiFeaturesIdGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiFeaturesIdGet.');
@@ -272,7 +272,7 @@ export class FeatureControllerService extends BaseService {
 
         let localVarPath = `/api/features/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response99>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response100>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -294,9 +294,9 @@ export class FeatureControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response97>;
-    public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response97>>;
-    public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response97>>;
+    public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response98>;
+    public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response98>>;
+    public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response98>>;
     public apiFeaturesIdPut(id: string, updateFeatureRequest: UpdateFeatureRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiFeaturesIdPut.');
@@ -341,7 +341,7 @@ export class FeatureControllerService extends BaseService {
 
         let localVarPath = `/api/features/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response97>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response98>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateFeatureRequest,

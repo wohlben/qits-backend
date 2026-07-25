@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceDto } from './workspaceDto';
 
 
-export interface Response64 { 
-    workspace?: WorkspaceDto;
-    technicalProcessId?: string;
+export interface Response108 { 
+    variant?: string;
+    username?: string;
 }
 

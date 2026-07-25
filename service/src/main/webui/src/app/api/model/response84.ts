@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { SettingDto } from './settingDto';
+import { Entry14 } from './entry14';
 
 
 export interface Response84 { 
-    setting?: SettingDto;
+    entries?: Array<Entry14>;
 }
 

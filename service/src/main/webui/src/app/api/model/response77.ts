@@ -10,6 +10,6 @@
 
 
 export interface Response77 { 
-    id?: string;
+    updatedAt?: string;
 }
 
