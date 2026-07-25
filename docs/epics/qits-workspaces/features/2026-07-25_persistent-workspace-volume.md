@@ -1,5 +1,31 @@
 # Persistent `/workspace` volume — survive container recreation on a named, label-tracked volume
 
+> **Status: implemented (2026-07-25).** Shipped largely as designed below, with these settled
+> choices:
+> - **Name = `qits_workspace_<workspaceId>`** (the stable `workspace.workspace_id` column — the same
+>   key the container name and `qits.workspace` label use), with project/repo/branch/parent in labels
+>   (§2's recommended id-based scheme).
+> - **`qits.project` ships in v1** on both the volume *and* the container. It is resolved inside
+>   `WorkspaceContainerFactory` via the already-injected `RepositoryNameResolver` (which maps
+>   `repoId → projectId`), so **no `projectId` threading through `run`/`forWorkspace` was needed** —
+>   the signature-churn concern in §2/Open-questions is moot.
+> - **`ensureWorkspaceVolume` is called from `DockerExecutor.run`** (§3), just before the container
+>   mounts the volume, gated on `qits.workspace.persist-workspace`. Interface signatures as shipped:
+>   `ensureWorkspaceVolume(repoId, workspaceId, branch, parent)`, `removeWorkspaceVolume(workspaceId)`,
+>   `listWorkspaceVolumes() → List<VolumeInfo(name, projectId, repoId, workspaceId, branch)>`,
+>   `workspaceVolumeName(workspaceId)`. The label set lives in `WorkspaceContainerFactory.workspaceVolumeLabels(...)`.
+> - **Removal wiring** landed exactly at the §4 matrix's remove rows: `deleteContainer`, `doDiscard`,
+>   the branch-gone abandon in `ensureContainer`, and `RepositoryService.delete` (which also sweeps
+>   containerless volumes for the repo). The dangling-volume GC (§5) runs in `RepositoryDiscoveryService.discover()`.
+> - **Test doubles:** `FakeContainerRuntime` (all 3 copies) emulates the volume as a persisted host
+>   dir that survives an incidental `rm`; `FakeWorkspaceDaemonProvisioner` gained the daemon's
+>   skip-clone-when-`/workspace/.git`-exists idempotency so recreation is lossless. Coverage in
+>   `WorkspaceContainerLifecycleServiceTest` (recreate-preserves, delete-removes, discard-removes, GC
+>   reap/spare) and the extended real-docker `WorkspaceContainerIT`.
+> - **Manual acceptance** walk (real docker, packaged app): `docs/manual-acceptance-tests/workspace/persistent-workspace-volume/plan.md`.
+> - **Follow-ups parked** in `docs/backlog-ideas/2026-07-25_persistent-workspace-volume-followups.md`
+>   (daemon bootstrap-skip on an already-provisioned tree; idle-eviction of long-STOPPED volumes).
+
 ## Introduction
 
 Today a workspace's checkout lives in the **container's ephemeral writable layer**: `/workspace` is

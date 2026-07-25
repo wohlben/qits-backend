@@ -11,10 +11,19 @@ workspace row.
 
 This feature adds a **container-only delete**: on a stopped/failed workspace in the repository detail
 route's branch list, holding **Shift** turns the **Start** button into a **Delete** button that
-removes just the container (`docker rm`), keeping the branch ref and the ACTIVE workspace row — the
-next **Start** re-clones a fresh container from the branch. Because it is destructive of any
-uncommitted working-tree state left in the stopped container, it is guarded by a confirmation dialog
-that requires the user to **retype the branch name** before the delete fires.
+removes just the container (`docker rm`) **and its persistent `/workspace` volume**, keeping the
+branch ref and the ACTIVE workspace row — the next **Start** re-creates an empty volume and re-clones
+a fresh container from the branch. Because it is destructive of any uncommitted working-tree state
+(and unpushed commits) left in the stopped container, it is guarded by a confirmation dialog that
+requires the user to **retype the branch name** before the delete fires.
+
+> **Contract update (persistent `/workspace` volume).** Since
+> [persistent-workspace-volume](2026-07-25_persistent-workspace-volume.md) made `/workspace` a
+> per-workspace named volume, an incidental **recreate** (image update, crash, prune, host restart)
+> now *preserves* the checkout. That makes **delete-container the one deliberate reset**: it is the
+> only lifecycle verb that removes the volume, so it is now the sole way to force a fresh checkout
+> and reclaim a workspace's disk. Its "loses uncommitted changes" promise therefore holds *because*
+> it drops the volume.
 
 Related / dependent plans:
 
@@ -39,17 +48,21 @@ Related / dependent plans:
 - **Confirmation.** Clicking Delete opens a "Delete container?" dialog explaining that the stopped
   container (and any uncommitted changes in it) is removed while the branch and workspace are kept.
   The confirm button stays disabled until the user types the exact branch name.
-- **Effect.** Removes the container (`docker rm`), leaves the workspace ACTIVE / `STOPPED` with no
-  runtime error; Start recreates it from the branch (losing only uncommitted working-tree state,
-  exactly like a recreate). The branch is **never** deleted — that remains Abandon's job.
+- **Effect.** Removes the container (`docker rm`) **and its persistent `/workspace` volume**
+  (`docker volume rm`, after the container so docker doesn't refuse an in-use volume), leaves the
+  workspace ACTIVE / `STOPPED` with no runtime error; Start re-creates an empty volume and re-clones
+  from the branch (losing uncommitted working-tree state and unpushed commits). Unlike an incidental
+  recreate — which now *keeps* the volume and reattaches the checkout — this is the deliberate reset.
+  The branch is **never** deleted — that remains Abandon's job.
 
 ## Implementation
 
 - **Backend.**
   - `WorkspaceService.deleteContainer(repoId, workspaceId)` — settles live daemons
-    (`containerEvents.fireStopping(..., false)`), `containers.rm(containerName)`, and marks the
-    workspace `STOPPED` with a cleared `runtimeError`. Mirrors `stopContainer` but uses `rm` instead
-    of `stop` and does not touch the branch or the row.
+    (`containerEvents.fireStopping(..., false)`), `containers.rm(containerName)`,
+    `containers.removeWorkspaceVolume(workspaceId)` (the persistent-volume drop; after `rm`), and
+    marks the workspace `STOPPED` with a cleared `runtimeError`. Mirrors `stopContainer` but uses
+    `rm` + volume-remove instead of `stop`, and does not touch the branch or the row.
   - `WorkspaceController` — `POST /api/repositories/{repoId}/workspaces/{workspaceId}/delete-container`,
     a thin passthrough returning the refreshed `WorkspaceDto` (the counterpart to `stop-container`).
 - **Frontend.**
