@@ -341,9 +341,6 @@ land that (or its `ReadFile`/`WriteFile` verbs) first.
 
 ## Cross-cutting risks / reminders
 
-- **Suite OOM (memory `quarkus-suite-oom-batching`)** — the full `domain`/`service` suites OOM
-  (exit 137) under the 4 GiB cgroup. Run in package batches with capped forks; don't run the whole
-  suite at once.
 - **OpenAPI two copies (memory `openapi-two-copies`)** — `docs/openapi.yml` and
   `service/src/main/webui/openapi.yml` are separate committed copies; sync both (Part 5/6) before
   `pnpm generate:api`. Regenerate via `./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest`.

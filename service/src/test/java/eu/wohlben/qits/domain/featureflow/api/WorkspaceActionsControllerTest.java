@@ -13,11 +13,7 @@ import eu.wohlben.qits.domain.repository.control.WorkspaceConfigView;
 import eu.wohlben.qits.workspacedaemonhost.WorkspaceDaemonRegistry;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,20 +30,7 @@ import org.junit.jupiter.api.Test;
  * by {@code DaemonControlSocketTest}.
  */
 @QuarkusTest
-@TestProfile(WorkspaceActionsControllerTest.TestProfile.class)
 public class WorkspaceActionsControllerTest {
-
-  public static class TestProfile implements QuarkusTestProfile {
-    @Override
-    public Map<String, String> getConfigOverrides() {
-      try {
-        Path tempDir = Files.createTempDirectory("qits-ws-actions-controller-test-repos");
-        return Map.of("qits.repositories.data-dir", tempDir.toString());
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
 
   private static final String WORKSPACE_ID = "work";
 
