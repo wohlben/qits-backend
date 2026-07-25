@@ -18,30 +18,39 @@ Like [qits-artifacts](../qits-artifacts/epic.md) and the observability split, th
 **own Maven module** (`epics/`) with its **own persistence unit**, depending on **neither `domain`
 nor `auth/*`** — because it is meant to be **extracted into a standalone service later**. It
 references the project/repository aggregates by **`String` id, not a JPA association**, so the Java
-stays decoupled. But — **unlike artifacts** (which isolates into a separate physical DB and so can't
-use FKs) — epics **shares qits' one physical database** with namespaced tables: the eventual split is
-code/deployment-only, the DB stays shared, so cross-boundary references carry **real DB-level FK
-constraints** (`ON DELETE CASCADE`) for integrity and easy admin joins.
+stays decoupled.
+
+> **Storage decision (revised at Part-1 implementation).** The original plan had epics *share qits'
+> one physical DB* so cross-boundary references could carry real FK constraints. That was
+> **rejected**: both shared-DB wirings hit a Flyway problem (shared version space, or nondeterministic
+> two-Flyway startup ordering for the cross-boundary FK). Part 1 instead adopts **full
+> artifacts-style isolation** — a **separate physical H2 file**, own datasource + PU + Flyway lineage.
+> So `projectId`/`repositoryId` are plain `String` columns with **no cross-boundary FK**; existence is
+> validated in `service`'s controllers (which see `domain`), and orphan cleanup on
+> project/repository delete is a [backlog follow-up](../../backlog-ideas/epics-orphan-cleanup-on-aggregate-delete.md).
+> Intra-module relationships (`epic → feature → task`, the `depends_on` self-refs) remain real FKs.
+> See [Part 1's write-up](features/2026-07-25_domain-and-persistence.md).
 
 Related/dependent plans:
 
 - **Module-split precedent** — [qits-artifacts](../qits-artifacts/epic.md): the "own module + own
-  persistence unit + no code dependency on qits aggregates" pattern this epic copies. It **diverges**
-  on storage: artifacts isolates into a separate physical DB (files-move split, no FKs); epics shares
-  the one physical DB (code-only split, FKs allowed).
+  persistence unit + own separate physical DB + no code dependency on qits aggregates" pattern this
+  epic copies **in full** (see the revised storage decision above — the earlier "shared DB with FKs"
+  divergence was dropped at implementation).
 - **Aggregate root it hangs off** — [qits-projects](../qits-projects/epic.md): epics reference their
   owning project by `projectId`; tasks reference their target repository by `repositoryId`. Both are
-  plain `String` columns in the Java (no `@ManyToOne`) but carry **DB-level FK constraints** (shared
-  DB).
+  plain `String` columns in the Java (no `@ManyToOne`) and, being in a separate physical DB, carry
+  **no cross-boundary FK** — existence is validated in the `service` controller.
 - **What it replaces** — the `docs/` project-documentation workflow in `AGENTS.md`
   (epics → feature-ideas/features → tasks-as-prose). That workflow stays for now; this epic is the
   managed-domain successor for planning that spans repositories and wants an audit trail without git.
 
 ## Parts, in implementation order
 
-1. **[domain-and-persistence](feature-ideas/domain-and-persistence.md)** *(idea)* — the new `epics/`
-   module: `Epic`/`Feature`/`Task` entities, own datasource + Flyway lineage, the audit log, and the
-   REST boundary hosted (for now) by `service`. No dependencies inside or outside this epic.
+1. **[domain-and-persistence](features/2026-07-25_domain-and-persistence.md)** *(done)* — the new
+   `epics/` module: `Epic`/`Feature`/`Task` entities, own **separate-DB** datasource + Flyway lineage,
+   the explicit audit-table log, and the REST boundary hosted (for now) by `service`. No dependencies
+   inside or outside this epic.
 2. **[project-detail-ui](feature-ideas/project-detail-ui.md)** *(idea)* — the Angular UI: an
    **Epics** section on the project-detail route (above Repositories), and the segmented drill-down
    routes epic → features → feature → tasks → task. Depends on part 1.
@@ -59,5 +68,5 @@ service is a later code/deployment move over the same shared DB.
 
 | Part | Status |
 |---|---|
-| [domain-and-persistence](feature-ideas/domain-and-persistence.md) | idea |
+| [domain-and-persistence](features/2026-07-25_domain-and-persistence.md) | done |
 | [project-detail-ui](feature-ideas/project-detail-ui.md) | idea |
