@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ProjectDto } from './projectDto';
 
 
 export interface Response47 { 
-    project?: ProjectDto;
+    technicalProcessId?: string;
 }
 

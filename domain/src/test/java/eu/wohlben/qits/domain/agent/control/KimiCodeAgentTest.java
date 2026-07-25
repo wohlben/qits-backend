@@ -254,6 +254,28 @@ public class KimiCodeAgentTest {
         script);
     // The hook must be in place before kimi starts.
     assertTrue(script.indexOf("[[hooks]]") < script.indexOf("\nkimi"), script);
+    // Without activity tracking, only the SessionStart lineage hook is wired.
+    assertFalse(script.contains("event = \"UserPromptSubmit\""), script);
+    assertFalse(script.contains("event = \"Stop\""), script);
+  }
+
+  @Test
+  public void activityTrackingRendersAllLifecycleHooks() {
+    String url =
+        "http://127.0.0.1:13337/hooks/claude-code?commandId=11111111-1111-1111-1111-111111111111";
+    String script =
+        CodingAgentFactory.ofType(AgentType.KIMI)
+            .sessionReporting(url)
+            .activityTracking(true)
+            .start()
+            .script();
+
+    // SessionStart (lineage) plus the four turn-boundary events, each its own [[hooks]] block.
+    assertTrue(script.contains("event = \"SessionStart\""), script);
+    assertTrue(script.contains("event = \"UserPromptSubmit\""), script);
+    assertTrue(script.contains("event = \"Stop\""), script);
+    assertTrue(script.contains("event = \"Notification\""), script);
+    assertTrue(script.contains("event = \"SessionEnd\""), script);
   }
 
   @Test

@@ -18,6 +18,7 @@ import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.entity.Repository;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.service.control.ServiceEventSpool;
+import eu.wohlben.qits.domain.setting.control.SettingsService;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -120,8 +121,18 @@ public class AgentLaunchService {
 
   @Inject AgentTypeResolver agentTypeResolver;
 
+  @Inject SettingsService settings;
+
   @ConfigProperty(name = "qits.workspace.qits-port", defaultValue = "8080")
   int qitsPort;
+
+  /**
+   * The loopback port the workspace-daemon's hook webhook binds inside the container. Must match
+   * the daemon's {@code qits.workspace-daemon.hooks-port} (both default 13337) — the hook {@code
+   * curl} targets {@code 127.0.0.1:<hooksPort>} in the same container the daemon runs in.
+   */
+  @ConfigProperty(name = "qits.workspace-daemon.hooks-port", defaultValue = "13337")
+  int hooksPort;
 
   /**
    * Explicit override for the {@code actions} MCP base URL. Empty by default so the URL is
@@ -542,21 +553,22 @@ public class AgentLaunchService {
                 "SWITCHED/REPORTED are hook-reported, never a launch source");
       }
     }
-    return agent.sessionReporting(sessionReportUrl(pinned.commandId()));
+    return agent
+        .activityTracking(
+            Boolean.parseBoolean(
+                settings.getOrDefault(SettingsService.AGENT_ACTIVITY_TRACKING_ENABLED, "true")))
+        .sessionReporting(sessionReportUrl(pinned.commandId()));
   }
 
   /**
-   * The container-reachable session-report endpoint for {@code commandId} — the SessionStart hook
-   * POSTs its stdin JSON here (composed exactly like {@link #derivedMcpUrl}).
+   * The container-loopback hook endpoint for {@code commandId} — the agent's lifecycle hooks POST
+   * their stdin JSON here, to the workspace-daemon's in-container webhook (which relays it home
+   * over the control socket). Host-agnostic on purpose: it targets {@code 127.0.0.1}, so no
+   * resolver host/port is baked into the hook command. The {@code commandId} rides as a query param
+   * so the daemon stays a dumb forwarder.
    */
   private String sessionReportUrl(String commandId) {
-    return "http://"
-        + qitsHostResolver.qitsHost()
-        + ":"
-        + qitsPort
-        + "/api/commands/"
-        + commandId
-        + "/agent-session";
+    return "http://127.0.0.1:" + hooksPort + "/hooks/claude-code?commandId=" + commandId;
   }
 
   /** The post-exit transcript import, composed onto the registry exit listener at spawn. */

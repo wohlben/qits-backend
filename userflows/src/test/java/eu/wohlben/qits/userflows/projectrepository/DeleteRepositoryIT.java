@@ -7,7 +7,9 @@ import eu.wohlben.qits.userflows.UserStory;
 import eu.wohlben.qits.userflows.UserStoryDescription;
 import eu.wohlben.qits.userflows.UserflowContext;
 import eu.wohlben.qits.userflows.UserflowPrecondition;
+import eu.wohlben.qits.userflows.UserflowRunsAfter;
 import eu.wohlben.qits.userflows.UserflowTarget;
+import eu.wohlben.qits.userflows.epic.DeleteEpicIT;
 import eu.wohlben.qits.userflows.project.CreateProjectIT;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -30,6 +32,8 @@ public class DeleteRepositoryIT {
   @UserStoryDescription(
       "An operator deletes the repository the precondition added, from its detail page.")
   @UserflowPrecondition(CreateRepositoryIT.class)
+  // the epic chain's task binds this repository — keep it alive until that chain is done
+  @UserflowRunsAfter(DeleteEpicIT.class)
   void deleteRepository(Flow flow, UserflowContext context) {
     String repoId = context.require(CreateRepositoryIT.REPO_ID_KEY, String.class);
     String projectId = context.require(CreateProjectIT.PROJECT_ID_KEY, String.class);

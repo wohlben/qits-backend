@@ -17,6 +17,10 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
+import { PrepareSubmoduleBackendRequest } from '../model/prepareSubmoduleBackendRequest';
+// @ts-ignore
+import { Response58 } from '../model/response58';
+// @ts-ignore
 import { Response59 } from '../model/response59';
 // @ts-ignore
 import { Response60 } from '../model/response60';
@@ -139,6 +143,76 @@ export class RepositorySubmoduleControllerService extends BaseService {
         return this.httpClient.request<Response60>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Prepare
+     * @endpoint post /api/repositories/{repositoryId}/submodules/prepare
+     * @param repositoryId 
+     * @param prepareSubmoduleBackendRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiRepositoriesRepositoryIdSubmodulesPreparePost(repositoryId: string, prepareSubmoduleBackendRequest: PrepareSubmoduleBackendRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response58>;
+    public apiRepositoriesRepositoryIdSubmodulesPreparePost(repositoryId: string, prepareSubmoduleBackendRequest: PrepareSubmoduleBackendRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response58>>;
+    public apiRepositoriesRepositoryIdSubmodulesPreparePost(repositoryId: string, prepareSubmoduleBackendRequest: PrepareSubmoduleBackendRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response58>>;
+    public apiRepositoriesRepositoryIdSubmodulesPreparePost(repositoryId: string, prepareSubmoduleBackendRequest: PrepareSubmoduleBackendRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (repositoryId === null || repositoryId === undefined) {
+            throw new Error('Required parameter repositoryId was null or undefined when calling apiRepositoriesRepositoryIdSubmodulesPreparePost.');
+        }
+        if (prepareSubmoduleBackendRequest === null || prepareSubmoduleBackendRequest === undefined) {
+            throw new Error('Required parameter prepareSubmoduleBackendRequest was null or undefined when calling apiRepositoriesRepositoryIdSubmodulesPreparePost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repositoryId", value: repositoryId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/submodules/prepare`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Response58>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: prepareSubmoduleBackendRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

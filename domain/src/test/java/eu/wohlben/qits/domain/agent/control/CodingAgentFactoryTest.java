@@ -205,6 +205,28 @@ public class CodingAgentFactoryTest {
             "curl -fsS -m 5 -X POST -H \\\"Content-Type: application/json\\\" --data-binary @- "
                 + REPORT_URL),
         cmd);
+    // Without activity tracking, only SessionStart is wired (lineage) — no turn-boundary events.
+    assertFalse(cmd.contains("\"UserPromptSubmit\""), cmd);
+    assertFalse(cmd.contains("\"Stop\""), cmd);
+    assertFalse(cmd.contains("\"Notification\""), cmd);
+    assertFalse(cmd.contains("\"SessionEnd\""), cmd);
+  }
+
+  @Test
+  public void activityTrackingAddsTheTurnBoundaryHooks() {
+    String cmd =
+        CodingAgentFactory.ofType(AgentType.CLAUDE)
+            .sessionReporting(REPORT_URL)
+            .activityTracking(true)
+            .chat()
+            .script();
+
+    // SessionStart stays (lineage) and the four activity events are added.
+    assertTrue(cmd.contains("\"SessionStart\""), cmd);
+    assertTrue(cmd.contains("\"UserPromptSubmit\""), cmd);
+    assertTrue(cmd.contains("\"Stop\""), cmd);
+    assertTrue(cmd.contains("\"Notification\""), cmd);
+    assertTrue(cmd.contains("\"SessionEnd\""), cmd);
   }
 
   @Test

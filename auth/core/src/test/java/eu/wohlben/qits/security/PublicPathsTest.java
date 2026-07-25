@@ -60,20 +60,15 @@ class PublicPathsTest {
   }
 
   @Test
-  void agentSessionReportHookIsPublicOnlyForTheExactShape() {
-    assertTrue(PublicPaths.isPublic("/api/commands/abc-123/agent-session"));
-    assertFalse(PublicPaths.isPublic("/api/commands/abc-123/agent-session/extra"));
-    assertFalse(PublicPaths.isPublic("/api/commands/abc/nested/agent-session"));
-    assertFalse(PublicPaths.isPublic("/api/commands/abc-123"));
-  }
-
-  @Test
   void uiSurfaceIsProtected() {
     assertFalse(PublicPaths.isPublic("/"));
     assertFalse(PublicPaths.isPublic("/index.html"));
     assertFalse(PublicPaths.isPublic("/api/projects"));
     assertFalse(PublicPaths.isPublic("/api/repositories/r1/workspaces/w1/events"));
     assertFalse(PublicPaths.isPublic("/api/terminal/commands/c1"));
+    // The retired agent-session hook endpoint is no longer public (agent-activity tracking moved it
+    // to the workspace-daemon's in-container loopback webhook).
+    assertFalse(PublicPaths.isPublic("/api/commands/abc-123/agent-session"));
     assertFalse(PublicPaths.isPublic("/daemon/w1/d1/"));
     assertFalse(PublicPaths.isPublic("/git")); // only the subtree is public, not the bare path
   }

@@ -9,10 +9,7 @@
  */
 
 
-export interface ReportAgentSessionRequest { 
-    hook_event_name?: string;
-    source?: string;
-    session_id?: string;
-    transcript_path?: string;
+export interface PrepareSubmoduleBackendRequest { 
+    backendUrl: string;
 }
 
