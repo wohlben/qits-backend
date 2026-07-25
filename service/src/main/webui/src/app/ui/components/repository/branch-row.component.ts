@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideBot, lucideFolderOpen, lucideTriangleAlert } from '@ng-icons/lucide';
 
@@ -19,6 +19,14 @@ import { ZardButtonComponent } from '@/shared/components/button';
 @Component({
   selector: 'app-branch-row',
   imports: [ZardButtonComponent, ZardBadgeComponent, NgIcon, DatePipe],
+  // Track the Shift modifier globally so a stopped/failed workspace's Start button can offer Delete
+  // while Shift is held — even before any pointer interaction. Reset on blur so a missed keyup (e.g.
+  // the window losing focus mid-press) can't strand the button in its destructive state.
+  host: {
+    '(window:keydown)': 'onModifierKey($event)',
+    '(window:keyup)': 'onModifierKey($event)',
+    '(window:blur)': 'clearModifier()',
+  },
   template: `
     <div class="flex w-full flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
       <div class="flex min-w-0 flex-col gap-1">
@@ -118,11 +126,24 @@ import { ZardButtonComponent } from '@/shared/components/button';
                 Recreate workspace
               </button>
             }
+          } @else if (shiftHeld()) {
+            <!-- Shift-modifier on a stopped/failed workspace: the Start button becomes a guarded
+                 Delete that removes just the (stopped) container — the branch and workspace row are
+                 kept (deleting those is Abandon). The parent confirms via a type-the-branch-name
+                 dialog before it fires. -->
+            <button
+              z-button
+              zType="destructive"
+              title="Delete this workspace's container (keeps the branch — you'll confirm by typing the branch name)"
+              (click)="deleteContainer.emit()"
+            >
+              Delete
+            </button>
           } @else {
             <button
               z-button
               zType="secondary"
-              title="Start this workspace's container (recreated from its branch)"
+              title="Start this workspace's container (recreated from its branch) — hold Shift to delete the container instead"
               (click)="ensureContainer.emit()"
             >
               {{ wt.runtimeStatus === 'FAILED' ? 'Recreate' : 'Start' }}
@@ -211,6 +232,13 @@ export class BranchRowComponent {
   /** Gracefully stop this workspace's container (pushes its branch first, then removes it). */
   readonly stopContainer = output<void>();
   /**
+   * Delete this workspace's stopped container (a `docker rm`), keeping its branch and workspace row —
+   * the next Start recreates it from the branch. Offered only while {@link shiftHeld}; the smart
+   * parent guards it behind a type-the-branch-name confirmation dialog. Deleting the branch itself is
+   * {@link abandon}.
+   */
+  readonly deleteContainer = output<void>();
+  /**
    * Recreate this workspace's container on the current image to pick up a newer workspace-daemon
    * build (offered only when {@link WorkspaceDto.daemonOutdated}). Tears the container down and
    * re-provisions from the branch; enabled only on a clean tree (the backend re-verifies).
@@ -228,6 +256,23 @@ export class BranchRowComponent {
   readonly abandon = output<void>();
   readonly delete = output<void>();
   readonly cleanup = output<void>();
+
+  /**
+   * Whether the Shift modifier is currently held. While held, a stopped/failed workspace's Start
+   * button turns into a (parent-confirmed) Delete for its container. Driven by window key events so
+   * it reflects the modifier without needing a click first.
+   */
+  protected readonly shiftHeld = signal(false);
+
+  /** Sync {@link shiftHeld} from any key event's modifier flag (true on Shift-down, false on -up). */
+  protected onModifierKey(event: KeyboardEvent): void {
+    this.shiftHeld.set(event.shiftKey);
+  }
+
+  /** Release the modifier when the window loses focus, so a missed keyup can't strand it held. */
+  protected clearModifier(): void {
+    this.shiftHeld.set(false);
+  }
 
   /** Badge colour for a container runtime state: neutral when running/stopped, red on failure. */
   runtimeBadgeType(status: WorkspaceRuntimeStatus | undefined): ZardBadgeTypeVariants {

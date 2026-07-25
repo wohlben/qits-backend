@@ -79,6 +79,7 @@ interface CreateWorkspaceForm {
             (viewCommits)="viewCommits($event)"
             (ensureContainer)="onEnsureContainer($event)"
             (stopContainer)="onStopContainer($event)"
+            (deleteContainer)="openDeleteContainer($event)"
             (recreateContainer)="onRecreateContainer($event)"
             (openWorkspace)="openWorkspace($event)"
             (run)="openRun($event)"
@@ -243,6 +244,46 @@ interface CreateWorkspaceForm {
       }
     </ng-template>
 
+    <!-- Delete container (keep branch): guarded by typing the branch name. Removes just the stopped
+         container; the branch and workspace row survive and Start recreates the container. -->
+    <ng-template #deleteContainerTpl>
+      <p class="text-sm text-muted-foreground">
+        Delete the container for
+        <span class="font-medium">{{ ui().selected?.workspaceId }}</span
+        >? This removes the stopped container and any uncommitted changes still in it. The branch
+        <span class="font-medium">{{ ui().branch }}</span> and the workspace are kept — Start
+        recreates the container from the branch. To delete the branch too, use Abandon.
+      </p>
+      <label class="mb-3 mt-3 flex flex-col gap-1 text-sm">
+        <span class="font-medium">
+          Type the branch name <span class="font-mono">{{ ui().branch }}</span> to confirm
+        </span>
+        <input
+          type="text"
+          autocomplete="off"
+          class="rounded-md border bg-background p-2 text-sm"
+          [value]="deleteContainerConfirm()"
+          (input)="deleteContainerConfirm.set(confirmInput.value)"
+          #confirmInput
+        />
+      </label>
+      <div class="flex items-center gap-2">
+        <button
+          z-button
+          zType="destructive"
+          [zLoading]="deleteContainerMutation.isPending()"
+          [zDisabled]="!deleteContainerConfirmed()"
+          (click)="onDeleteContainer()"
+        >
+          Delete container
+        </button>
+        <button z-button zType="secondary" type="button" (click)="closeDialog()">Cancel</button>
+      </div>
+      @if (deleteContainerMutation.isError()) {
+        <span class="text-sm text-destructive">Failed to delete the container</span>
+      }
+    </ng-template>
+
     <!-- Delete branch -->
     <ng-template #deleteTpl>
       <p class="text-sm text-muted-foreground">
@@ -391,6 +432,8 @@ export class BranchListComponent {
   private readonly createTpl = viewChild.required<TemplateRef<unknown>>('createTpl');
   private readonly integrateTpl = viewChild.required<TemplateRef<unknown>>('integrateTpl');
   private readonly abandonTpl = viewChild.required<TemplateRef<unknown>>('abandonTpl');
+  private readonly deleteContainerTpl =
+    viewChild.required<TemplateRef<unknown>>('deleteContainerTpl');
   private readonly deleteTpl = viewChild.required<TemplateRef<unknown>>('deleteTpl');
   private readonly dirtyWarningTpl = viewChild.required<TemplateRef<unknown>>('dirtyWarningTpl');
   private readonly resolveTpl = viewChild.required<TemplateRef<unknown>>('resolveTpl');
@@ -621,6 +664,14 @@ export class BranchListComponent {
   readonly integrateResult = signal('');
   readonly abandonResult = signal('');
 
+  // The branch name the user retypes to confirm deleting a container — an extra guard on the
+  // destructive action. The Delete button stays disabled until it matches the target branch exactly.
+  readonly deleteContainerConfirm = signal('');
+  readonly deleteContainerConfirmed = computed(() => {
+    const branch = this.ui.branch();
+    return !!branch && this.deleteContainerConfirm().trim() === branch;
+  });
+
   readonly createMutation = injectMutation(() => ({
     mutationFn: (data: {
       id: string;
@@ -726,6 +777,20 @@ export class BranchListComponent {
         ),
       ),
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
+  }));
+
+  // Delete just the (stopped) container — keeps the branch and workspace row, so the next Start
+  // recreates it from the branch. Guarded in the UI by the type-the-branch-name confirm dialog;
+  // deleting the branch too is the separate discard/Abandon flow.
+  readonly deleteContainerMutation = injectMutation(() => ({
+    mutationFn: (workspaceId: string) =>
+      lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdDeleteContainerPost(
+          this.repoId(),
+          workspaceId,
+        ),
+      ),
+    onSuccess: () => this.onMutationSuccess(),
   }));
 
   // Recreate tears the container down and re-provisions on the current image (the newer daemon).
@@ -930,6 +995,24 @@ export class BranchListComponent {
   openDelete(branch: string) {
     patchState(this.ui, { branch });
     this.openDialog('Delete branch?', this.deleteTpl());
+  }
+
+  /**
+   * Open the type-the-branch-name confirm dialog for deleting a workspace's container while keeping
+   * its branch (the Shift-modified Start action). The typed branch name gates the Delete button.
+   */
+  openDeleteContainer(workspace: WorkspaceDto) {
+    this.deleteContainerConfirm.set('');
+    patchState(this.ui, { selected: workspace, branch: workspace.branch ?? null });
+    this.openDialog('Delete container?', this.deleteContainerTpl());
+  }
+
+  /** Fire the container delete once the branch name is confirmed (button is disabled until then). */
+  onDeleteContainer() {
+    const workspaceId = this.ui.selected()?.workspaceId;
+    if (workspaceId && this.deleteContainerConfirmed()) {
+      this.deleteContainerMutation.mutate(workspaceId);
+    }
   }
 
   /** A merge was blocked because the workspace is dirty: warn instead of running it. */

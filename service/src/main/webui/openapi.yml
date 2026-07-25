@@ -3611,6 +3611,29 @@ paths:
       summary: Conflicts
       tags:
       - Workspace Controller
+  /api/repositories/{repoId}/workspaces/{workspaceId}/delete-container:
+    post:
+      parameters:
+      - name: repoId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: workspaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceDto"
+      summary: Delete Container
+      tags:
+      - Workspace Controller
   /api/repositories/{repoId}/workspaces/{workspaceId}/detection:
     get:
       parameters:
