@@ -248,3 +248,12 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
   topic on flag flips); `WorkingTreeMarker` stays in `domain` for `DetectionService`/`ComponentMapService`.
   Supersedes the trigger of
   [detection live freshness](../qits-workspaces/features/2026-07-12_detection-live-freshness-sse.md).
+- **[gate-operations-on-dirty-workspace](features/2026-07-25_gate-operations-on-dirty-workspace.md) —
+  implemented (2026-07-25).** Consumes the daemon-reported `WorkspaceDto.clean` to **gate unsafe
+  operations on a dirty tree**: the merges (integrate / fast-forward / merge-parent-in) reroute to a
+  small "Uncommitted changes" warning dialog instead of running, and the Cleanup/Abandon buttons are
+  hidden (`branch-row`/`branch-tree`/`branch-list`). A matching server-side guard
+  (`WorkspaceService.requireCleanWorkingTree`, reusing `isWorkspaceClean`) refuses
+  `fastForwardWorkspace`/`updateWorkspaceFromParent`/`mergeBranch`/`discardWorkspace` on a dirty
+  workspace (cleanup was already guarded). Gates on `clean === false` only; `null`/unknown is
+  unchanged. No API/DTO change.

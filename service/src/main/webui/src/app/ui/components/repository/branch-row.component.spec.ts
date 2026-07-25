@@ -249,4 +249,51 @@ describe('BranchRowComponent', () => {
     buttons.find((b) => b.textContent?.includes('Cleanup'))!.click();
     expect(cleaned).toBe(true);
   });
+
+  it('hides Cleanup and Abandon while the working tree is dirty', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/wip');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'wip',
+      branch: 'feature/wip',
+      parent: 'master',
+      runtimeStatus: 'RUNNING',
+      clean: false,
+    });
+    // Even a would-be-cleanupable workspace must hide the destructive actions when dirty.
+    fixture.componentRef.setInput('canCleanup', true);
+    fixture.detectChanges();
+
+    const buttons = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    );
+    expect(buttons.some((b) => b.textContent?.includes('Cleanup'))).toBe(false);
+    expect(buttons.some((b) => b.textContent?.includes('Abandon'))).toBe(false);
+  });
+
+  it('keeps Abandon when the working tree is clean or unknown', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      clean: true,
+    });
+    fixture.detectChanges();
+    let buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    expect(buttons.some((b) => b.textContent?.includes('Abandon'))).toBe(true);
+
+    // Unknown (null / not reported) preserves today's behaviour — Abandon stays available.
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'STOPPED',
+    });
+    fixture.detectChanges();
+    buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    expect(buttons.some((b) => b.textContent?.includes('Abandon'))).toBe(true);
+  });
 });

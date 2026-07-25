@@ -145,9 +145,46 @@ describe('BranchTreeComponent', () => {
     component.togglePopover('feature/x');
     expect(component.openBranch()).toBe('feature/x');
 
-    component.runIntegrate('feature/x');
+    // A plain branch (or a clean workspace) integrates normally.
+    component.runIntegrate('feature/x', null);
     expect(integrated).toBe('feature/x');
     expect(component.openBranch()).toBeNull();
+  });
+
+  it('reroutes a merge to blockedByDirty (and does not run it) when the workspace is dirty', () => {
+    const fixture = TestBed.createComponent(BranchTreeComponent);
+    const component = fixture.componentInstance;
+
+    let integrated: string | undefined;
+    let fastForwarded: { workspaceId?: string } | undefined;
+    let updated: { workspaceId?: string } | undefined;
+    const blocked: Array<{ workspaceId?: string }> = [];
+    component.integrate.subscribe((b) => (integrated = b));
+    component.fastForward.subscribe((w) => (fastForwarded = w));
+    component.update.subscribe((w) => (updated = w));
+    component.blockedByDirty.subscribe((w) => blocked.push(w));
+
+    const dirty = {
+      workspaceId: 'x',
+      branch: 'feature/x',
+      parent: 'master',
+      behind: 2,
+      ahead: 0,
+      clean: false,
+    };
+
+    // Behind tab (fast-forward): blocked, not run.
+    component.runAction(dirty);
+    expect(blocked.at(-1)?.workspaceId).toBe('x');
+    expect(fastForwarded).toBeUndefined();
+    expect(updated).toBeUndefined();
+    expect(component.openBranch()).toBeNull();
+
+    // Forward tab (integrate) on the same dirty workspace: blocked, not run.
+    component.runIntegrate('feature/x', dirty);
+    expect(blocked.length).toBe(2);
+    expect(blocked.at(-1)?.workspaceId).toBe('x');
+    expect(integrated).toBeUndefined();
   });
 
   it('summarizes a plain (non-workspace) branch against main, integrate-only', () => {

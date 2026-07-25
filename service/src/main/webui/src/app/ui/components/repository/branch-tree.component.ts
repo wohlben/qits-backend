@@ -188,7 +188,7 @@ interface NodeSummary {
                           zType="secondary"
                           zSize="sm"
                           class="w-full"
-                          (click)="runIntegrate(s.branch)"
+                          (click)="runIntegrate(s.branch, s.workspace)"
                         >
                           Integrate
                         </button>
@@ -299,6 +299,9 @@ export class BranchTreeComponent {
   readonly fastForward = output<WorkspaceDto>();
   /** Merge the parent into a diverged-but-cleanly-mergeable workspace to catch it up. */
   readonly update = output<WorkspaceDto>();
+  /** A merge (integrate/fast-forward/update) was blocked because the workspace has uncommitted
+   * changes — the parent opens a warning dialog instead of running the merge. */
+  readonly blockedByDirty = output<WorkspaceDto>();
   /** The incoming/outgoing commits for the currently-open branch (loaded lazily by the parent). */
   readonly commitsPreview = input<CommitsPreview | null>(null);
   /** Emitted when a branch's popover opens, so the parent can fetch that branch's commits. */
@@ -385,10 +388,13 @@ export class BranchTreeComponent {
     return this.canFastForward(wt) ? `Fast-forward to ${parent}` : `Merge ${parent} in`;
   }
 
-  /** Run the Behind-tab action: fast-forward when possible, otherwise merge the parent in. */
+  /** Run the Behind-tab action: fast-forward when possible, otherwise merge the parent in. A dirty
+   * working tree blocks the merge — the parent shows a warning dialog instead. */
   runAction(wt: WorkspaceDto | null): void {
     if (!wt) return;
-    if (this.canFastForward(wt)) {
+    if (this.isDirty(wt)) {
+      this.blockedByDirty.emit(wt);
+    } else if (this.canFastForward(wt)) {
       this.fastForward.emit(wt);
     } else {
       this.update.emit(wt);
@@ -396,10 +402,21 @@ export class BranchTreeComponent {
     this.closePopover();
   }
 
-  /** Integrate this branch into a target (the Forward tab's action); the parent opens the dialog. */
-  runIntegrate(branch: string): void {
-    this.integrate.emit(branch);
+  /** Integrate this branch into a target (the Forward tab's action); the parent opens the dialog. A
+   * dirty workspace blocks it (a plain branch has no working tree, so `wt` is null and never blocks). */
+  runIntegrate(branch: string, wt: WorkspaceDto | null): void {
+    if (this.isDirty(wt)) {
+      this.blockedByDirty.emit(wt!);
+    } else {
+      this.integrate.emit(branch);
+    }
     this.closePopover();
+  }
+
+  /** The workspace has uncommitted changes (daemon-reported `clean === false`); `null`/unknown is
+   * treated as not-dirty so behaviour is unchanged when the state isn't reported. */
+  isDirty(wt: WorkspaceDto | null): boolean {
+    return wt?.clean === false;
   }
 
   /** Behind the parent with no commits of its own — a clean fast-forward is possible. */

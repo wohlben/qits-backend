@@ -91,6 +91,7 @@ interface CreateWorkspaceForm {
             (delete)="openDelete($event)"
             (fastForward)="onFastForward($event)"
             (update)="onUpdate($event)"
+            (blockedByDirty)="openDirtyWarning($event)"
             [commitsPreview]="commitsPreview()"
             (peek)="onPeek($event)"
           />
@@ -258,6 +259,21 @@ interface CreateWorkspaceForm {
       }
     </ng-template>
 
+    <!-- Uncommitted changes: a merge (integrate/fast-forward/merge-parent-in) was blocked because
+         the workspace has a dirty working tree. Warn and point at the workspace to sort it out. -->
+    <ng-template #dirtyWarningTpl>
+      <p class="text-sm text-muted-foreground">
+        <span class="font-medium">{{ ui().branch }}</span> has uncommitted changes in its working
+        tree. Commit or discard them in the workspace before merging.
+      </p>
+      <div class="mt-3 flex items-center gap-2">
+        @if (ui().selected?.workspaceId) {
+          <button z-button (click)="openWorkspaceFromDialog()">Work on it</button>
+        }
+        <button z-button zType="secondary" type="button" (click)="closeDialog()">Close</button>
+      </div>
+    </ng-template>
+
     <!-- Resolve merge conflict (fork a workspace + have Claude merge the parent in and fix it) -->
     <ng-template #resolveTpl>
       <p class="text-sm text-muted-foreground">
@@ -370,6 +386,7 @@ export class BranchListComponent {
   private readonly integrateTpl = viewChild.required<TemplateRef<unknown>>('integrateTpl');
   private readonly abandonTpl = viewChild.required<TemplateRef<unknown>>('abandonTpl');
   private readonly deleteTpl = viewChild.required<TemplateRef<unknown>>('deleteTpl');
+  private readonly dirtyWarningTpl = viewChild.required<TemplateRef<unknown>>('dirtyWarningTpl');
   private readonly resolveTpl = viewChild.required<TemplateRef<unknown>>('resolveTpl');
   private readonly runTpl = viewChild.required<TemplateRef<unknown>>('runTpl');
   private readonly processTpl = viewChild.required<TemplateRef<unknown>>('processTpl');
@@ -886,6 +903,21 @@ export class BranchListComponent {
   openDelete(branch: string) {
     patchState(this.ui, { branch });
     this.openDialog('Delete branch?', this.deleteTpl());
+  }
+
+  /** A merge was blocked because the workspace is dirty: warn instead of running it. */
+  openDirtyWarning(workspace: WorkspaceDto) {
+    patchState(this.ui, { selected: workspace, branch: workspace.branch ?? null });
+    this.openDialog('Uncommitted changes', this.dirtyWarningTpl());
+  }
+
+  /** Close the warning dialog and open the workspace's detail page to commit/discard the changes. */
+  openWorkspaceFromDialog() {
+    const workspace = this.ui.selected();
+    this.closeDialog();
+    if (workspace) {
+      this.openWorkspace(workspace);
+    }
   }
 
   /** Open a dialog body via the official service; hides the built-in footer (templates own buttons). */

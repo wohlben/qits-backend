@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideBot, lucideFolderOpen } from '@ng-icons/lucide';
 
@@ -106,15 +106,19 @@ import { ZardButtonComponent } from '@/shared/components/button';
           </button>
         }
         <button z-button zType="secondary" (click)="branchOff.emit()">Branch off workspace</button>
-        @if (canCleanup()) {
+        @if (canCleanup() && !dirty()) {
           <!-- Fully integrated with nothing unmerged and no dependents: offer a safe, no-confirm
-               cleanup instead of Integrate/Abandon (the backend re-verifies before deleting). -->
+               cleanup instead of Integrate/Abandon (the backend re-verifies before deleting).
+               Hidden on a dirty tree — cleanup/abandon would discard uncommitted work. -->
           <button z-button zType="secondary" (click)="cleanup.emit()">Cleanup</button>
         } @else {
           <!-- Integrate moved into the commit popover (Forward tab); here we keep only the
-               destructive remove action. -->
+               destructive remove action. Abandon is hidden while the working tree is dirty so
+               uncommitted work can't be discarded by accident. -->
           @if (workspace()) {
-            <button z-button zType="destructive" (click)="abandon.emit()">Abandon</button>
+            @if (!dirty()) {
+              <button z-button zType="destructive" (click)="abandon.emit()">Abandon</button>
+            }
           } @else if (!hasChildren()) {
             <button z-button zType="destructive" (click)="delete.emit()">Delete</button>
           }
@@ -138,6 +142,14 @@ export class BranchRowComponent {
    * branch offers a no-confirm Cleanup in place of Integrate/Abandon.
    */
   readonly canCleanup = input(false);
+
+  /**
+   * The workspace has uncommitted changes (daemon-reported `clean === false`). While dirty, the
+   * destructive Cleanup/Abandon actions are hidden so uncommitted work can't be silently discarded.
+   * `null`/`undefined` (unknown, e.g. not RUNNING) is treated as not-dirty — behaviour is unchanged.
+   */
+  readonly dirty = computed(() => this.workspace()?.clean === false);
+
   readonly viewCommits = output<void>();
   /** Start or recreate this workspace's container (re-materialized from its branch on demand). */
   readonly ensureContainer = output<void>();
