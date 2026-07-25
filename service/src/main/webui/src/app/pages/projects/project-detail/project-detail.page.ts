@@ -10,6 +10,7 @@ import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { RepositoryDto } from '@/api/model/repositoryDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { ProjectDetailHeaderComponent } from '@/ui/components/project/project-detail-header.component';
+import { ProjectEpicListComponent } from '@/pattern/project/project-epic-list.component';
 import { ProjectRepositoryListComponent } from '@/pattern/project/project-repository-list.component';
 import { ZardButtonComponent } from '@/shared/components/button';
 
@@ -18,6 +19,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
   imports: [
     PageLayoutComponent,
     ProjectDetailHeaderComponent,
+    ProjectEpicListComponent,
     ProjectRepositoryListComponent,
     RouterLink,
     ZardButtonComponent,
@@ -68,7 +70,10 @@ import { ZardButtonComponent } from '@/shared/components/button';
         </button>
       </div>
 
-      <app-project-repository-list [projectId]="projectId" />
+      <div class="flex flex-col gap-8">
+        <app-project-epic-list [projectId]="projectId" />
+        <app-project-repository-list [projectId]="projectId" />
+      </div>
     </app-page-layout>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
