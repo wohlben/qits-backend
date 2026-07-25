@@ -10,6 +10,9 @@
 
 
 export interface Response58 { 
-    technicalProcessId?: string;
+    repositoryId?: string;
+    name?: string;
+    relativeUrl?: string;
+    backendUrl?: string;
 }
 

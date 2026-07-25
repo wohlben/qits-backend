@@ -116,12 +116,14 @@ public class ControlSocket {
   long maxBackoffMs;
 
   // Trailing-debounce quiet period: the tree must fall silent this long before one marker check +
-  // at-most-one GitStatus report. Deliberately generous (20s) so a git commit/push — a short burst
-  // of writes under .git/index/refs — settles fully before `git status` reads it, rather than
-  // racing
-  // the committer for index.lock. Each inotify event re-arms the timer (mirrors the old host
-  // qits.workspace.watch.coalesce-ms, but as a resetting debounce rather than a fixed window).
-  @ConfigProperty(name = "qits.workspace-daemon.git-status.coalesce-ms", defaultValue = "20000")
+  // at-most-one GitStatus report. Short (1.5s) so the dirty→clean badge flips promptly after a
+  // commit. It can be short because the monitor runs `git status`/`git diff` with
+  // --no-optional-locks (GitStatusMonitor.settleFromGit), so the recompute never takes
+  // .git/index.lock and can't race a commit for it — the 20s window that once had to swallow the
+  // whole commit burst is no longer needed (see resolved 2026-07-25 index.lock-contention issue).
+  // Each inotify event re-arms the timer, so the window now just coalesces a commit's write burst
+  // into one non-flickering settle.
+  @ConfigProperty(name = "qits.workspace-daemon.git-status.coalesce-ms", defaultValue = "1500")
   long gitStatusCoalesceMs;
 
   // Upper bound on the debounce above: under sustained churn the resetting timer would never fire,
@@ -131,6 +133,12 @@ public class ControlSocket {
   // the ceiling (pure trailing debounce).
   @ConfigProperty(name = "qits.workspace-daemon.git-status.max-wait-ms", defaultValue = "120000")
   long gitStatusMaxWaitMs;
+
+  // Loopback port the in-container coding-agent lifecycle hooks POST to (the daemon's only inbound
+  // listener; see HookWebhook). Must match the port AgentLaunchService renders into the hook curl —
+  // both default to 13337 (docs/epics/qits-coding-agents/ agent-activity tracking).
+  @ConfigProperty(name = "qits.workspace-daemon.hooks-port", defaultValue = "13337")
+  int hooksPort;
 
   // Auto-push kill switch (host's qits.workspace.auto-push.enabled, injected as
   // QITS_WORKSPACE_DAEMON_AUTO_PUSH_ENABLED). When false the daemon never pushes committed work on
@@ -220,6 +228,15 @@ public class ControlSocket {
   private volatile GitStatusMonitor gitStatus;
 
   /**
+   * The loopback HTTP listener the in-container coding agent's lifecycle hooks POST to; relays
+   * {@link eu.wohlben.qits.workspacedaemon.protocol.AgentActivity} home. Started unconditionally in
+   * {@link #start()} (not gated on provisioning — a hook can fire in a reconnect-adopted container,
+   * and SessionStart drives session-lineage which must always be captured); re-reports on
+   * reconnect.
+   */
+  private volatile HookWebhook hooks;
+
+  /**
    * Keeps the checkout and its origin ref in sync both ways: auto-pushes committed work as the
    * {@link GitStatusMonitor} observes it, and applies host-triggered incoming {@link PullBranch}
    * pulls (docs/epics/qits-workspace-daemon/features/2026-07-25_daemon-bidirectional-auto-sync.md).
@@ -304,6 +321,12 @@ public class ControlSocket {
     // sends nothing; it only awaits the Provisioned/ProvisionFailed we emit
     // (docs/epics/qits-workspace-daemon/ Part 1).
     startProvisioning();
+    // The hook webhook is independent of provisioning: a lifecycle hook can fire in a
+    // reconnect-adopted (already-provisioned) container, and SessionStart drives session-lineage
+    // which must be captured regardless. Its frames buffer in pendingOutbound until the socket is
+    // up.
+    hooks = new HookWebhook(vertx, hooksPort, this::send);
+    hooks.start();
     client = vertx.createWebSocketClient();
     if (heartbeatIntervalMs > 0) {
       vertx.setPeriodic(heartbeatIntervalMs, id -> heartbeat());
@@ -502,6 +525,12 @@ public class ControlSocket {
     if (g != null) {
       workers.execute(g::reportCurrent);
     }
+    // Likewise re-report the last known agent activity per tracked command, so a qits restart
+    // rebuilds the live "cooking / idle / waiting" projection from the daemon's retained state.
+    HookWebhook h = hooks;
+    if (h != null) {
+      workers.execute(h::reportCurrent);
+    }
     LOG.infof("workspace-daemon control socket established for workspace %s", workspaceId);
   }
 
@@ -642,6 +671,10 @@ public class ControlSocket {
     GitStatusMonitor g = gitStatus;
     if (g != null) {
       g.close();
+    }
+    HookWebhook h = hooks;
+    if (h != null) {
+      h.close();
     }
     OriginSync o = originSync;
     if (o != null) {

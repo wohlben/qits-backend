@@ -19,6 +19,8 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { CreateFeatureRequest } from '../model/createFeatureRequest';
 // @ts-ignore
+import { Response91 } from '../model/response91';
+// @ts-ignore
 import { Response92 } from '../model/response92';
 // @ts-ignore
 import { Response93 } from '../model/response93';
@@ -28,8 +30,6 @@ import { Response94 } from '../model/response94';
 import { Response95 } from '../model/response95';
 // @ts-ignore
 import { Response96 } from '../model/response96';
-// @ts-ignore
-import { Response97 } from '../model/response97';
 // @ts-ignore
 import { UpdateEpicRequest } from '../model/updateEpicRequest';
 
@@ -57,9 +57,9 @@ export class EpicControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiEpicsEpicIdFeaturesGet(epicId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response93>;
-    public apiEpicsEpicIdFeaturesGet(epicId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response93>>;
-    public apiEpicsEpicIdFeaturesGet(epicId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response93>>;
+    public apiEpicsEpicIdFeaturesGet(epicId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response92>;
+    public apiEpicsEpicIdFeaturesGet(epicId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response92>>;
+    public apiEpicsEpicIdFeaturesGet(epicId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response92>>;
     public apiEpicsEpicIdFeaturesGet(epicId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (epicId === null || epicId === undefined) {
             throw new Error('Required parameter epicId was null or undefined when calling apiEpicsEpicIdFeaturesGet.');
@@ -92,7 +92,7 @@ export class EpicControllerService extends BaseService {
 
         let localVarPath = `/api/epics/${this.configuration.encodeParam({name: "epicId", value: epicId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/features`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response93>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response92>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -114,9 +114,9 @@ export class EpicControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response96>;
-    public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response96>>;
-    public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response96>>;
+    public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response95>;
+    public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response95>>;
+    public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response95>>;
     public apiEpicsEpicIdFeaturesPost(epicId: string, createFeatureRequest: CreateFeatureRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (epicId === null || epicId === undefined) {
             throw new Error('Required parameter epicId was null or undefined when calling apiEpicsEpicIdFeaturesPost.');
@@ -161,7 +161,7 @@ export class EpicControllerService extends BaseService {
 
         let localVarPath = `/api/epics/${this.configuration.encodeParam({name: "epicId", value: epicId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/features`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response96>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response95>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createFeatureRequest,
@@ -183,9 +183,9 @@ export class EpicControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiEpicsIdAuditGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response97>;
-    public apiEpicsIdAuditGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response97>>;
-    public apiEpicsIdAuditGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response97>>;
+    public apiEpicsIdAuditGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response96>;
+    public apiEpicsIdAuditGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response96>>;
+    public apiEpicsIdAuditGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response96>>;
     public apiEpicsIdAuditGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiEpicsIdAuditGet.');
@@ -218,7 +218,7 @@ export class EpicControllerService extends BaseService {
 
         let localVarPath = `/api/epics/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/audit`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response97>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response96>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -239,9 +239,9 @@ export class EpicControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiEpicsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response95>;
-    public apiEpicsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response95>>;
-    public apiEpicsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response95>>;
+    public apiEpicsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response94>;
+    public apiEpicsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response94>>;
+    public apiEpicsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response94>>;
     public apiEpicsIdDelete(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiEpicsIdDelete.');
@@ -274,7 +274,7 @@ export class EpicControllerService extends BaseService {
 
         let localVarPath = `/api/epics/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response95>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response94>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -295,9 +295,9 @@ export class EpicControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiEpicsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response94>;
-    public apiEpicsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response94>>;
-    public apiEpicsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response94>>;
+    public apiEpicsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response93>;
+    public apiEpicsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response93>>;
+    public apiEpicsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response93>>;
     public apiEpicsIdGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiEpicsIdGet.');
@@ -330,7 +330,7 @@ export class EpicControllerService extends BaseService {
 
         let localVarPath = `/api/epics/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response94>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response93>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -352,9 +352,9 @@ export class EpicControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response92>;
-    public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response92>>;
-    public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response92>>;
+    public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response91>;
+    public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response91>>;
+    public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response91>>;
     public apiEpicsIdPut(id: string, updateEpicRequest: UpdateEpicRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiEpicsIdPut.');
@@ -399,7 +399,7 @@ export class EpicControllerService extends BaseService {
 
         let localVarPath = `/api/epics/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response92>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response91>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateEpicRequest,

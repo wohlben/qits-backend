@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryLogDto } from './telemetryLogDto';
+import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
 
 
 export interface Response90 { 
-    logs?: Array<TelemetryLogDto>;
+    groups?: Array<TelemetryErrorGroupDto>;
 }
 

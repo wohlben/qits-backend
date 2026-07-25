@@ -37,6 +37,7 @@ import {
 import { WorkspaceServicesComponent } from '@/pattern/service/workspace-services.component';
 import { WorkspaceTelemetryComponent } from '@/pattern/telemetry/workspace-telemetry.component';
 import { WorkspaceActionsComponent } from '@/pattern/workspace/workspace-actions.component';
+import { WorkspaceAgentActivityComponent } from '@/pattern/workspace/workspace-agent-activity.component';
 import { WorkspaceAgentSessionComponent } from '@/pattern/workspace/workspace-agent-session.component';
 import { WorkspaceChatComponent } from '@/pattern/workspace/workspace-chat.component';
 import { WorkspaceFileBrowserComponent } from '@/pattern/workspace/workspace-file-browser.component';
@@ -100,6 +101,7 @@ const PROCESS_TAB_LABEL = 'Starting';
     PageLayoutComponent,
     WorkspaceActionsComponent,
     WorkspaceBootstrapComponent,
+    WorkspaceAgentActivityComponent,
     WorkspaceAgentSessionComponent,
     WorkspaceChatComponent,
     WorkspaceServiceEventsComponent,
@@ -214,6 +216,7 @@ const PROCESS_TAB_LABEL = 'Starting';
               [activated]="agentsActivated()"
               (jumpToChat)="jumpToChat()"
             />
+            <app-workspace-agent-activity [repoId]="repoId" [workspaceId]="workspaceId" />
             <app-workspace-session-tree
               [repoId]="repoId"
               [workspaceId]="workspaceId"
@@ -417,10 +420,19 @@ export class WorkspaceDetailPage {
       : null,
   );
 
-  /** The running-session dot on the Agents tab — the embedded interactive agent's owner dot. */
-  readonly agentsIndicator = computed<ZardTabIndicator | null>(() =>
-    newestRunningInteractiveAgent(this.commandsQuery.data(), this.workspaceId) ? 'primary' : null,
-  );
+  /**
+   * The Agents-tab dot: primary (attention) when a tracked agent is actively cooking, success when
+   * an interactive agent is running but idle/waiting, else no dot. Upgrades the old binary
+   * running/not-running dot into a real busy signal off {@code WorkspaceDto.agentActivity}.
+   */
+  readonly agentsIndicator = computed<ZardTabIndicator | null>(() => {
+    if (this.workspace()?.agentActivity === 'BUSY') {
+      return 'primary';
+    }
+    return newestRunningInteractiveAgent(this.commandsQuery.data(), this.workspaceId)
+      ? 'success'
+      : null;
+  });
 
   /** The embedded run's current session (its list's last entry) — highlights its tree row. */
   readonly currentAgentSessionId = computed(() => {

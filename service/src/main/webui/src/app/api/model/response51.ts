@@ -10,6 +10,9 @@
 
 
 export interface Response51 { 
-    technicalProcessId?: string;
+    commitHash?: string;
+    hasConflicts?: boolean;
+    output?: string;
+    cleanedUp?: boolean;
 }
 

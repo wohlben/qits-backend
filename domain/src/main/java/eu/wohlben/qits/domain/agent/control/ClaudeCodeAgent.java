@@ -86,7 +86,7 @@ public class ClaudeCodeAgent extends CodingAgent {
       command.append(" --allowedTools ").append(shellQuote(String.join(",", allowedTools)));
     }
     if (sessionReportingUrl != null) {
-      command.append(" --settings ").append(shellQuote(writeJson(sessionReportSettings())));
+      command.append(" --settings ").append(shellQuote(writeJson(activityHookSettings())));
     }
     if (skipPermissions) {
       command.append(" --dangerously-skip-permissions");
@@ -94,26 +94,34 @@ public class ClaudeCodeAgent extends CodingAgent {
   }
 
   /**
-   * A settings layer whose {@code SessionStart} hook POSTs the hook's stdin JSON ({@code {source,
-   * session_id, transcript_path, …}}) to the qits session-report endpoint. SessionStart fires on
-   * {@code startup}/{@code resume}/{@code clear}/{@code compact}, so qits learns the live session
-   * whenever it changes underneath a running process — not just at launch.
+   * A settings layer wiring the agent-activity lifecycle hooks, each POSTing the hook's stdin JSON
+   * ({@code {hook_event_name, session_id, transcript_path, source, …}}) to the qits hook endpoint
+   * (the workspace-daemon's loopback webhook). {@code SessionStart} is <b>always</b> emitted — it
+   * fires on {@code startup}/{@code resume}/{@code clear}/{@code compact} and drives
+   * session-lineage, which is non-optional. When {@link #activityTracking} is on, the turn-boundary
+   * events ({@code UserPromptSubmit}/{@code Stop}/{@code Notification}/{@code SessionEnd}) are
+   * added too, so qits can show the live "cooking / idle / waiting" state.
    */
-  private Map<String, Object> sessionReportSettings() {
+  private Map<String, Object> activityHookSettings() {
     if (sessionReportingUrl.contains("'")) {
-      // Defense in depth: the URL is composed of a resolver host, a port, and a UUID command id,
-      // none of which can contain a quote — but it ends up inside a single-quoted argv.
+      // Defense in depth: the URL is composed of a fixed loopback host, a port, and a UUID command
+      // id, none of which can contain a quote — but it ends up inside a single-quoted argv.
       throw new IllegalArgumentException(
           "Session-reporting URL must not contain quotes: " + sessionReportingUrl);
     }
     String post =
         "curl -fsS -m 5 -X POST -H \"Content-Type: application/json\" --data-binary @- "
             + sessionReportingUrl;
-    return Map.of(
-        "hooks",
-        Map.of(
-            "SessionStart",
-            List.of(Map.of("hooks", List.of(Map.of("type", "command", "command", post))))));
+    Object group = List.of(Map.of("hooks", List.of(Map.of("type", "command", "command", post))));
+    Map<String, Object> hooks = new java.util.LinkedHashMap<>();
+    hooks.put("SessionStart", group); // always — session-lineage
+    if (activityTracking) {
+      hooks.put("UserPromptSubmit", group);
+      hooks.put("Stop", group);
+      hooks.put("Notification", group);
+      hooks.put("SessionEnd", group);
+    }
+    return Map.of("hooks", hooks);
   }
 
   /**

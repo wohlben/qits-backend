@@ -25,6 +25,14 @@ public class SettingsService {
   /** The default coding-agent harness for the instance (the first setting). */
   public static final String AGENT_DEFAULT_TYPE = "agent.default-type";
 
+  /**
+   * Whether qits injects the turn-boundary agent-activity hooks (the live "cooking / idle /
+   * waiting" state). Stored canonically as {@code "true"}/{@code "false"}; SessionStart lineage
+   * reporting is always injected regardless (docs/epics/qits-coding-agents/ agent-activity
+   * tracking).
+   */
+  public static final String AGENT_ACTIVITY_TRACKING_ENABLED = "agent.activity-tracking.enabled";
+
   @Inject SettingRepository settingRepository;
 
   /** The raw value for a key, if set. Runs in its own transaction (safe off request threads). */
@@ -72,6 +80,16 @@ public class SettingsService {
       return AgentType.parse(value)
           .map(AgentType::name)
           .orElseThrow(() -> new BadRequestException("Unknown agent.default-type: " + value));
+    }
+    if (AGENT_ACTIVITY_TRACKING_ENABLED.equals(key)) {
+      if ("true".equalsIgnoreCase(value)) {
+        return "true";
+      }
+      if ("false".equalsIgnoreCase(value)) {
+        return "false";
+      }
+      throw new BadRequestException(
+          "agent.activity-tracking.enabled must be true or false: " + value);
     }
     return value;
   }

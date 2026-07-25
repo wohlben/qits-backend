@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { CommandDto } from './commandDto';
+import { CommandLogLineDto } from './commandLogLineDto';
 
 
 export interface Response8 { 
-    command?: CommandDto;
+    lines?: Array<CommandLogLineDto>;
 }
 

@@ -63,6 +63,20 @@ public class SettingsServiceTest {
   }
 
   @Test
+  public void activityTrackingIsCanonicalizedToABoolean() {
+    settingsService.set(SettingsService.AGENT_ACTIVITY_TRACKING_ENABLED, "TRUE");
+    assertEquals(
+        "true", settingsService.get(SettingsService.AGENT_ACTIVITY_TRACKING_ENABLED).orElseThrow());
+    settingsService.set(SettingsService.AGENT_ACTIVITY_TRACKING_ENABLED, "False");
+    assertEquals(
+        "false",
+        settingsService.get(SettingsService.AGENT_ACTIVITY_TRACKING_ENABLED).orElseThrow());
+    assertThrows(
+        BadRequestException.class,
+        () -> settingsService.set(SettingsService.AGENT_ACTIVITY_TRACKING_ENABLED, "maybe"));
+  }
+
+  @Test
   public void blankKeyIsRejected() {
     assertThrows(BadRequestException.class, () -> settingsService.set("  ", "x"));
     assertFalse(settingsService.get("  ").isPresent());

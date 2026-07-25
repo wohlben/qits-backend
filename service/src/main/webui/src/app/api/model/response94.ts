@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { EpicDto } from './epicDto';
 
 
 export interface Response94 { 
-    epic?: EpicDto;
+    success?: boolean;
 }
 

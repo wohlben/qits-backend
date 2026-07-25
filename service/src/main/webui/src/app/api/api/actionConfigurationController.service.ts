@@ -19,6 +19,8 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { CreateActionConfigurationRequest } from '../model/createActionConfigurationRequest';
 // @ts-ignore
+import { Response12 } from '../model/response12';
+// @ts-ignore
 import { Response13 } from '../model/response13';
 // @ts-ignore
 import { Response14 } from '../model/response14';
@@ -26,8 +28,6 @@ import { Response14 } from '../model/response14';
 import { Response15 } from '../model/response15';
 // @ts-ignore
 import { Response16 } from '../model/response16';
-// @ts-ignore
-import { Response17 } from '../model/response17';
 // @ts-ignore
 import { UpdateActionConfigurationRequest } from '../model/updateActionConfigurationRequest';
 
@@ -54,9 +54,9 @@ export class ActionConfigurationControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiActionConfigurationsGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response14>;
-    public apiActionConfigurationsGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response14>>;
-    public apiActionConfigurationsGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response14>>;
+    public apiActionConfigurationsGet(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response13>;
+    public apiActionConfigurationsGet(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response13>>;
+    public apiActionConfigurationsGet(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response13>>;
     public apiActionConfigurationsGet(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
@@ -86,7 +86,7 @@ export class ActionConfigurationControllerService extends BaseService {
 
         let localVarPath = `/api/action-configurations`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response14>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response13>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -107,9 +107,9 @@ export class ActionConfigurationControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiActionConfigurationsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response16>;
-    public apiActionConfigurationsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response16>>;
-    public apiActionConfigurationsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response16>>;
+    public apiActionConfigurationsIdDelete(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response15>;
+    public apiActionConfigurationsIdDelete(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response15>>;
+    public apiActionConfigurationsIdDelete(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response15>>;
     public apiActionConfigurationsIdDelete(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiActionConfigurationsIdDelete.');
@@ -142,7 +142,7 @@ export class ActionConfigurationControllerService extends BaseService {
 
         let localVarPath = `/api/action-configurations/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response16>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response15>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -163,9 +163,9 @@ export class ActionConfigurationControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiActionConfigurationsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response15>;
-    public apiActionConfigurationsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response15>>;
-    public apiActionConfigurationsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response15>>;
+    public apiActionConfigurationsIdGet(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response14>;
+    public apiActionConfigurationsIdGet(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response14>>;
+    public apiActionConfigurationsIdGet(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response14>>;
     public apiActionConfigurationsIdGet(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiActionConfigurationsIdGet.');
@@ -198,7 +198,7 @@ export class ActionConfigurationControllerService extends BaseService {
 
         let localVarPath = `/api/action-configurations/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response15>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response14>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -220,9 +220,9 @@ export class ActionConfigurationControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response13>;
-    public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response13>>;
-    public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response13>>;
+    public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response12>;
+    public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response12>>;
+    public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response12>>;
     public apiActionConfigurationsIdPut(id: string, updateActionConfigurationRequest: UpdateActionConfigurationRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiActionConfigurationsIdPut.');
@@ -267,7 +267,7 @@ export class ActionConfigurationControllerService extends BaseService {
 
         let localVarPath = `/api/action-configurations/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response13>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response12>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: updateActionConfigurationRequest,
@@ -289,9 +289,9 @@ export class ActionConfigurationControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response17>;
-    public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response17>>;
-    public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response17>>;
+    public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response16>;
+    public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response16>>;
+    public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response16>>;
     public apiActionConfigurationsPost(createActionConfigurationRequest: CreateActionConfigurationRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (createActionConfigurationRequest === null || createActionConfigurationRequest === undefined) {
             throw new Error('Required parameter createActionConfigurationRequest was null or undefined when calling apiActionConfigurationsPost.');
@@ -333,7 +333,7 @@ export class ActionConfigurationControllerService extends BaseService {
 
         let localVarPath = `/api/action-configurations`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response17>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response16>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createActionConfigurationRequest,

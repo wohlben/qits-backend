@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { TelemetryErrorGroupDto } from './telemetryErrorGroupDto';
+import { EpicDto } from './epicDto';
 
 
 export interface Response91 { 
-    groups?: Array<TelemetryErrorGroupDto>;
+    epic?: EpicDto;
 }
 

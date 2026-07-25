@@ -5,14 +5,14 @@
 Active bug in the workspace dirty/clean status pipeline. Related plans:
 
 - **Concerns the watcher built in
-  [daemon-driven working-tree status](../epics/qits-workspace-daemon/features/2026-07-24_daemon-git-status-monitoring.md)**
+  [daemon-driven working-tree status](../../epics/qits-workspace-daemon/features/2026-07-24_daemon-git-status-monitoring.md)**
   — the `GitStatusMonitor` `inotifywait` + `git status --porcelain=v2` loop.
 - **Direct consequence of
-  [`git status` monitor races a commit/push for `.git/index.lock`](resolved/2026-07-25_git-status-monitor-index-lock-contention.md)**
+  [`git status` monitor races a commit/push for `.git/index.lock`](2026-07-25_git-status-monitor-index-lock-contention.md)**
   — the 20 s trailing debounce introduced there to end `index.lock` contention is the root cause of
   this lag. Any fix here must not reintroduce that contention.
 - Interacts with
-  [daemon bidirectional auto-sync](../epics/qits-workspace-daemon/features/2026-07-25_daemon-bidirectional-auto-sync.md)
+  [daemon bidirectional auto-sync](../../epics/qits-workspace-daemon/features/2026-07-25_daemon-bidirectional-auto-sync.md)
   — but the daemon's own auto-`push` runs strictly *after* the settle that emits the clean flip, so
   it cannot defer the badge update; only a user-initiated push can (see Cause, point 3).
 
@@ -105,3 +105,51 @@ subsequent activity) flips the badge within a bound well under the current 20 s.
 not re-arm the badge debounce" is assertable only under candidate 1's watch exclusion; under
 candidate 2 a push's `.git/refs/remotes` write still re-arms the (now short) window — harmless, so
 bound the post-push flip latency instead of asserting no re-arm.
+
+## Fix
+
+**Candidates 2 + 1, combined** — the principled lock-free recompute plus the cheap watch exclusion:
+
+1. **`git status`/`git diff` now run with `--no-optional-locks`**
+   (`GitStatusMonitor.settleFromGit`). The flag makes git skip the opportunistic index refresh, so
+   neither read takes `.git/index.lock` — the recompute can no longer race a concurrent commit/push
+   for it. Verified byte-identical porcelain/diff output against the unflagged commands. This removes
+   the root cause that forced the 20 s window.
+2. **The debounce quiet period drops from 20 s to 1.5 s**
+   (`qits.workspace-daemon.git-status.coalesce-ms` default in `ControlSocket`). With the lock race
+   gone the window is now only a short coalescing gate (collapse a commit's write burst into one
+   non-flickering settle), not a lock-avoidance one. The badge flips ~1.5 s after the commit instead
+   of ~20 s. The `max-wait-ms` cap stays 120 s.
+3. **Remote-tracking and fetch bookkeeping are excluded from the watch**
+   (`GitStatusMonitor.watchArgv`): `.git/refs/remotes`, `.git/FETCH_HEAD`, `.git/ORIG_HEAD` join the
+   existing `.git/objects`/`.git/logs` exclusions — matched under the top-level `.git/` *and* under a
+   submodule's own gitdir (`.git/modules/<name>/…`, via a `(modules/[^/]+/)*` hop). A push /
+   auto-push / fetch's ordinary loose-ref writes no longer re-arm the badge debounce, so the deferral
+   where a push appeared to *trigger* the flip is gone. (A periodic `packed-refs` rewrite can still
+   re-arm, but that is harmless now the recompute is lock-free and the window short.) Local
+   `refs/heads`, `index`, and `HEAD` stay watched, so a commit — and a pull/merge that advances the
+   branch and rewrites work-tree files — is still observed.
+
+A companion hardening lands with the shorter window: `settle` now **skips a blank `git status`
+read** rather than reporting it. A clean tree's `--porcelain=v2 --branch` output always carries the
+`# branch.*` headers, so blank output means the read itself failed (non-zero exit → `capture`
+returns `""`), which `WorkspaceDescriber.parse` would otherwise read as *not-dirty* and flip the
+badge falsely clean. The 20 s window practically guaranteed the read ran on a quiescent tree; the
+1.5 s window can land it mid-operation, making that false-clean path reachable — so it is now guarded.
+
+## Tests
+
+`GitStatusMonitorTest` gains three cases (the existing marker/dedup + debounce-timing tests are
+unaffected — they inject a settle counter and pass explicit timings, not the shipped defaults):
+
+- `commitBurstFlipsWithinAShortBound` — a commit's event burst that then goes quiet collapses to
+  exactly one settle, landing a short multiple of the quiet window later (well under the old 20 s).
+- `aBurstAfterTheFirstSettleStillFlipsWithinTheShortWindow` — a later write (e.g. a push landing in
+  the window) settles within the short window too, not +20 s: the push-deferral is gone.
+- `watchArgvExcludesRemoteAndFetchBookkeeping` — compiles the `--exclude` alternation and asserts it
+  matches the top-level `refs/remotes`/`FETCH_HEAD`/`ORIG_HEAD` paths while leaving `refs/heads`,
+  `index`, and work-tree files watched.
+- `watchArgvExcludesSubmoduleGitdirBookkeeping` — the same exclusion reaches a submodule's own gitdir
+  (`.git/modules/<name>/…`, including nested), so a submodule sync doesn't re-arm the debounce.
+- `blankStatusFromAFailedReadDoesNotFlipTheBadgeClean` — a blank (failed) `git status` read emits
+  nothing and leaves the prior dirty report standing, instead of reporting a false clean.

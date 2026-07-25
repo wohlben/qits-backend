@@ -34,6 +34,8 @@ allure-results/
 
 # Logs
 *.log
+# Rotated log files (e.g. quarkus.log.1) that *.log doesn't catch
+*.log.*
 
 # Local DB files
 *.db
