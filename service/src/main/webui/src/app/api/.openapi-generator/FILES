@@ -42,6 +42,7 @@ model/actionConfigurationDto.ts
 model/actionOrigin.ts
 model/actionType.ts
 model/addAttachmentRequest.ts
+model/agentActivityState.ts
 model/agentLaunchMode.ts
 model/agentMcpScope.ts
 model/agentSessionNodeDto.ts
@@ -126,10 +127,10 @@ model/logSeverity.ts
 model/mergeBranchRequest.ts
 model/mergeWorkspaceRequest.ts
 model/models.ts
+model/prepareSubmoduleBackendRequest.ts
 model/projectDto.ts
 model/promptAttachmentSource.ts
 model/refinePromptRequest.ts
-model/reportAgentSessionRequest.ts
 model/repositoryArchetype.ts
 model/repositoryDto.ts
 model/repositorySubmoduleDto.ts

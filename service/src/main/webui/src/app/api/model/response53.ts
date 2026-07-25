@@ -7,10 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { RepositoryDto } from './repositoryDto';
 
 
 export interface Response53 { 
-    repository?: RepositoryDto;
+    success?: boolean;
 }
 

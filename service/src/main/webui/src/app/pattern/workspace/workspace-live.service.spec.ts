@@ -96,6 +96,11 @@ describe('WorkspaceLiveService', () => {
       JSON.stringify(['commands']),
       JSON.stringify(['workspace-agent-sessions', 'repo-1', 'wt-1']),
     ]);
+
+    invalidate.mockClear();
+    source.emitTopic('agent-activity');
+    // Refreshes the workspace list so the Agents-tab activity chip + busy dot re-read the DTO.
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces', 'repo-1'])]);
   });
 
   it('a files hint refreshes the tree, detection, and open file content together', () => {
@@ -142,9 +147,9 @@ describe('WorkspaceLiveService', () => {
 
     source.emitOpen();
 
-    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + bootstrap(1) + files(3)
-    // + process(1) + prompt-draft(1) + prompt-attachments(1) = 15
-    expect(invalidate).toHaveBeenCalledTimes(15);
+    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + bootstrap(1) + agent-activity(1)
+    // + files(3) + process(1) + prompt-draft(1) + prompt-attachments(1) = 16
+    expect(invalidate).toHaveBeenCalledTimes(16);
     const keys = invalidatedKeys();
     expect(keys).toContain(JSON.stringify(['workspace-prompt-draft', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-prompt-attachments', 'repo-1', 'wt-1']));
@@ -158,6 +163,7 @@ describe('WorkspaceLiveService', () => {
     expect(keys).toContain(JSON.stringify(['workspace-detection', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-file', 'repo-1', 'wt-1']));
     expect(keys).toContain(JSON.stringify(['workspace-active-process', 'repo-1', 'wt-1']));
+    expect(keys).toContain(JSON.stringify(['workspaces', 'repo-1']));
   });
 
   it('closes the EventSource when the providing component is destroyed', () => {

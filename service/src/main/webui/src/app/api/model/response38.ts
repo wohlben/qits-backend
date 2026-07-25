@@ -7,10 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { WorkspaceActionDto } from './workspaceActionDto';
+import { ProjectDto } from './projectDto';
 
 
 export interface Response38 { 
-    actions?: Array<WorkspaceActionDto>;
+    project?: ProjectDto;
 }
 

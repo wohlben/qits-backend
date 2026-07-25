@@ -1,16 +1,19 @@
 package eu.wohlben.qits.domain.command.api;
 
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import eu.wohlben.qits.domain.command.control.CommandService;
+import eu.wohlben.qits.domain.command.dto.CommandDto;
 import eu.wohlben.qits.domain.command.entity.AgentSessionRef;
 import eu.wohlben.qits.domain.command.entity.AgentSessionSource;
 import eu.wohlben.qits.domain.command.entity.Command;
 import eu.wohlben.qits.domain.command.entity.CommandKind;
 import eu.wohlben.qits.domain.command.entity.CommandStatus;
 import eu.wohlben.qits.domain.command.persistence.CommandRepository;
+import eu.wohlben.qits.domain.error.BadRequestException;
+import eu.wohlben.qits.domain.error.NotFoundException;
 import eu.wohlben.qits.domain.project.entity.Project;
 import eu.wohlben.qits.domain.project.persistence.ProjectRepository;
 import eu.wohlben.qits.domain.repository.entity.Repository;
@@ -18,24 +21,28 @@ import eu.wohlben.qits.domain.repository.entity.Workspace;
 import eu.wohlben.qits.domain.repository.persistence.RepositoryRepository;
 import eu.wohlben.qits.domain.repository.persistence.WorkspaceRepository;
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.core.Response;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * The SessionStart hook's report endpoint: first report confirms the pinned session (recording the
- * transcript path), a differing id appends a SWITCHED entry, and the guards hold — the endpoint is
- * container-reachable without auth, so unknown/finished commands and malformed ids are rejected.
+ * The agent session-lineage sink ({@code CommandService.reportAgentSession}): first report confirms
+ * the pinned session (recording the transcript path), a differing id appends a SWITCHED entry, and
+ * the guards hold (unknown/finished commands and malformed ids are rejected).
+ *
+ * <p>Historically this was driven by the {@code POST /api/commands/{id}/agent-session} endpoint;
+ * that endpoint was retired with agent-activity tracking (the SessionStart hook now routes through
+ * the workspace-daemon, and {@code WorkspaceDaemonRegistry} feeds this same sink). This test now
+ * exercises the sink directly — the end-to-end route-through-the-daemon is covered by {@code
+ * DaemonControlSocketTest}.
  */
 @QuarkusTest
 public class AgentSessionReportTest {
+
+  @Inject CommandService commandService;
 
   @Inject ProjectRepository projectRepository;
 
@@ -90,34 +97,18 @@ public class AgentSessionReportTest {
     return command.id;
   }
 
-  /** The hook's stdin JSON verbatim: snake_case fields plus extras the endpoint must tolerate. */
-  private static Map<String, Object> report(String sessionId, String transcriptPath) {
-    Map<String, Object> body = new HashMap<>();
-    body.put("hook_event_name", "SessionStart");
-    body.put("source", "startup");
-    body.put("session_id", sessionId);
-    body.put("transcript_path", transcriptPath);
-    body.put("cwd", "/workspace");
-    return body;
-  }
-
   @Test
   public void firstReportConfirmsThePinnedSessionAndRecordsThePath() {
     String sessionId = UUID.randomUUID().toString();
     String commandId = seedAgentCommand(sessionId, CommandStatus.RUNNING);
     String path = "/claude-home/.claude/projects/-workspace/" + sessionId + ".jsonl";
 
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(sessionId, path))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.OK.getStatusCode())
-        .body("command.agentSessions", hasSize(1))
-        .body("command.agentSessions[0].sessionId", equalTo(sessionId))
-        .body("command.agentSessions[0].source", equalTo("PINNED"))
-        .body("command.agentSessions[0].transcriptPath", equalTo(path));
+    CommandDto command = commandService.reportAgentSession(commandId, sessionId, path);
+
+    assertEquals(1, command.agentSessions().size());
+    assertEquals(sessionId, command.agentSessions().get(0).sessionId());
+    assertEquals(AgentSessionSource.PINNED, command.agentSessions().get(0).source());
+    assertEquals(path, command.agentSessions().get(0).transcriptPath());
   }
 
   @Test
@@ -127,68 +118,50 @@ public class AgentSessionReportTest {
     String commandId = seedAgentCommand(pinned, CommandStatus.RUNNING);
 
     // The user ran /resume inside the TUI: the hook reports the newly-driven session.
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(other, "/claude-home/.claude/projects/-workspace/" + other + ".jsonl"))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.OK.getStatusCode())
-        .body("command.agentSessions", hasSize(2))
-        .body("command.agentSessions[1].sessionId", equalTo(other))
-        .body("command.agentSessions[1].source", equalTo("SWITCHED"))
-        .body("command.agentSessions[1].transcriptPath", notNullValue());
+    CommandDto afterSwitch =
+        commandService.reportAgentSession(
+            commandId, other, "/claude-home/.claude/projects/-workspace/" + other + ".jsonl");
+    assertEquals(2, afterSwitch.agentSessions().size());
+    assertEquals(other, afterSwitch.agentSessions().get(1).sessionId());
+    assertEquals(AgentSessionSource.SWITCHED, afterSwitch.agentSessions().get(1).source());
+    assertNotNull(afterSwitch.agentSessions().get(1).transcriptPath());
 
     // Switching back appends again — the list is the faithful order of sessions driven,
     // duplicates included.
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(pinned, "/claude-home/.claude/projects/-workspace/" + pinned + ".jsonl"))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.OK.getStatusCode())
-        .body("command.agentSessions", hasSize(3))
-        .body("command.agentSessions[2].sessionId", equalTo(pinned))
-        .body("command.agentSessions[2].source", equalTo("SWITCHED"));
+    CommandDto afterBack =
+        commandService.reportAgentSession(
+            commandId, pinned, "/claude-home/.claude/projects/-workspace/" + pinned + ".jsonl");
+    assertEquals(3, afterBack.agentSessions().size());
+    assertEquals(pinned, afterBack.agentSessions().get(2).sessionId());
+    assertEquals(AgentSessionSource.SWITCHED, afterBack.agentSessions().get(2).source());
   }
 
   @Test
-  public void anUnknownCommandIs404() {
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(UUID.randomUUID().toString(), null))
-        .when()
-        .post("/api/commands/" + UUID.randomUUID() + "/agent-session")
-        .then()
-        .statusCode(Response.Status.NOT_FOUND.getStatusCode());
+  public void anUnknownCommandIsNotFound() {
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            commandService.reportAgentSession(
+                UUID.randomUUID().toString(), UUID.randomUUID().toString(), null));
   }
 
   @Test
-  public void aFinishedCommandIs400() {
+  public void aFinishedCommandIsRejected() {
     String sessionId = UUID.randomUUID().toString();
     String commandId = seedAgentCommand(sessionId, CommandStatus.EXITED);
 
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(sessionId, null))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
+    assertThrows(
+        BadRequestException.class,
+        () -> commandService.reportAgentSession(commandId, sessionId, null));
   }
 
   @Test
-  public void aNonUuidSessionIdIs400() {
+  public void aNonUuidSessionIdIsRejected() {
     String commandId = seedAgentCommand(UUID.randomUUID().toString(), CommandStatus.RUNNING);
 
-    given()
-        .contentType(ContentType.JSON)
-        .body(report("../../../etc/passwd", null))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.BAD_REQUEST.getStatusCode());
+    assertThrows(
+        BadRequestException.class,
+        () -> commandService.reportAgentSession(commandId, "../../../etc/passwd", null));
   }
 
   @Test
@@ -200,16 +173,11 @@ public class AgentSessionReportTest {
             + kimiSession
             + "/agents/main/wire.jsonl";
 
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(kimiSession, path))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.OK.getStatusCode())
-        .body("command.agentSessions", hasSize(2))
-        .body("command.agentSessions[1].sessionId", equalTo(kimiSession))
-        .body("command.agentSessions[1].source", equalTo("SWITCHED"));
+    CommandDto command = commandService.reportAgentSession(commandId, kimiSession, path);
+
+    assertEquals(2, command.agentSessions().size());
+    assertEquals(kimiSession, command.agentSessions().get(1).sessionId());
+    assertEquals(AgentSessionSource.SWITCHED, command.agentSessions().get(1).source());
   }
 
   @Test
@@ -223,16 +191,11 @@ public class AgentSessionReportTest {
             + kimiSession
             + "/agents/main/wire.jsonl";
 
-    given()
-        .contentType(ContentType.JSON)
-        .body(report(kimiSession, path))
-        .when()
-        .post("/api/commands/" + commandId + "/agent-session")
-        .then()
-        .statusCode(Response.Status.OK.getStatusCode())
-        .body("command.agentSessions", hasSize(1))
-        .body("command.agentSessions[0].sessionId", equalTo(kimiSession))
-        .body("command.agentSessions[0].source", equalTo("REPORTED"))
-        .body("command.agentSessions[0].transcriptPath", equalTo(path));
+    CommandDto command = commandService.reportAgentSession(commandId, kimiSession, path);
+
+    assertEquals(1, command.agentSessions().size());
+    assertEquals(kimiSession, command.agentSessions().get(0).sessionId());
+    assertEquals(AgentSessionSource.REPORTED, command.agentSessions().get(0).source());
+    assertEquals(path, command.agentSessions().get(0).transcriptPath());
   }
 }

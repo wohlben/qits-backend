@@ -35,6 +35,11 @@ pull/sync process that walks the graph ([qits-technical-processes](../qits-techn
   foundation: recursive import of submodules as sibling repositories (diamond-deduped,
   cycle-safe), materialized offline in workspace containers, imported user-driven layer by
   layer.
+- **[submodule-backend-onboarding](features/2026-07-25_submodule-backend-onboarding.md)** — the
+  authoring half: add a brand-new submodule so its sibling points at the real backend, not the qits
+  git host. A `prepare` action pre-serves the backend as a sibling (breaking the `git submodule add`
+  chicken-and-egg), the relative-url convention folds imports onto the real backend, and a guard
+  rejects qits-host self-references.
 
 ## Parts (planned)
 
@@ -59,4 +64,5 @@ epic's creation has landed here.
 | Part | Status |
 |---|---|
 | [workspace-submodule-support](features/2026-07-14_workspace-submodule-support.md) | implemented |
+| [submodule-backend-onboarding](features/2026-07-25_submodule-backend-onboarding.md) | implemented |
 | [project-scoped-name-addressed-git-serving](feature-ideas/project-scoped-name-addressed-git-serving.md) | planned (2026-07-23) |

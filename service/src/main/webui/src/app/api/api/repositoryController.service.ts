@@ -27,6 +27,8 @@ import { CommitLogDto } from '../model/commitLogDto';
 // @ts-ignore
 import { MergeBranchRequest } from '../model/mergeBranchRequest';
 // @ts-ignore
+import { Response47 } from '../model/response47';
+// @ts-ignore
 import { Response48 } from '../model/response48';
 // @ts-ignore
 import { Response49 } from '../model/response49';
@@ -46,8 +48,6 @@ import { Response55 } from '../model/response55';
 import { Response56 } from '../model/response56';
 // @ts-ignore
 import { Response57 } from '../model/response57';
-// @ts-ignore
-import { Response58 } from '../model/response58';
 // @ts-ignore
 import { SetMainBranchRequest } from '../model/setMainBranchRequest';
 // @ts-ignore
@@ -77,9 +77,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response58>;
-    public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response58>>;
-    public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response58>>;
+    public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response57>;
+    public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response57>>;
+    public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response57>>;
     public apiRepositoriesRepoIdActiveProcessGet(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdActiveProcessGet.');
@@ -112,7 +112,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/active-process`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response58>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response57>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -134,9 +134,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response56>;
-    public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response56>>;
-    public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response56>>;
+    public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response55>;
+    public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response55>>;
+    public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response55>>;
     public apiRepositoriesRepoIdBranchesCleanupPost(repoId: string, cleanupBranchRequest: CleanupBranchRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdBranchesCleanupPost.');
@@ -181,7 +181,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/branches/cleanup`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response56>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response55>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: cleanupBranchRequest,
@@ -204,9 +204,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response54>;
-    public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response54>>;
-    public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response54>>;
+    public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response53>;
+    public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response53>>;
+    public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response53>>;
     public apiRepositoriesRepoIdBranchesDelete(repoId: string, branch: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdBranchesDelete.');
@@ -253,7 +253,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/branches`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response54>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response53>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),
@@ -275,9 +275,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdBranchesGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response57>;
-    public apiRepositoriesRepoIdBranchesGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response57>>;
-    public apiRepositoriesRepoIdBranchesGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response57>>;
+    public apiRepositoriesRepoIdBranchesGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response56>;
+    public apiRepositoriesRepoIdBranchesGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response56>>;
+    public apiRepositoriesRepoIdBranchesGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response56>>;
     public apiRepositoriesRepoIdBranchesGet(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdBranchesGet.');
@@ -310,7 +310,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/branches`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response57>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response56>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -332,9 +332,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response52>;
-    public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response52>>;
-    public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response52>>;
+    public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response51>;
+    public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response51>>;
+    public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response51>>;
     public apiRepositoriesRepoIdBranchesMergePost(repoId: string, mergeBranchRequest: MergeBranchRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdBranchesMergePost.');
@@ -379,7 +379,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/branches/merge`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response52>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response51>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: mergeBranchRequest,
@@ -632,9 +632,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdDelete(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response55>;
-    public apiRepositoriesRepoIdDelete(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response55>>;
-    public apiRepositoriesRepoIdDelete(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response55>>;
+    public apiRepositoriesRepoIdDelete(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response54>;
+    public apiRepositoriesRepoIdDelete(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response54>>;
+    public apiRepositoriesRepoIdDelete(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response54>>;
     public apiRepositoriesRepoIdDelete(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdDelete.');
@@ -667,7 +667,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response55>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response54>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -688,9 +688,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response53>;
-    public apiRepositoriesRepoIdGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response53>>;
-    public apiRepositoriesRepoIdGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response53>>;
+    public apiRepositoriesRepoIdGet(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response52>;
+    public apiRepositoriesRepoIdGet(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response52>>;
+    public apiRepositoriesRepoIdGet(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response52>>;
     public apiRepositoriesRepoIdGet(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdGet.');
@@ -723,7 +723,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response53>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response52>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -745,9 +745,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response49>;
-    public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response49>>;
-    public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response49>>;
+    public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response48>;
+    public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response48>>;
+    public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response48>>;
     public apiRepositoriesRepoIdMainBranchPut(repoId: string, setMainBranchRequest: SetMainBranchRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdMainBranchPut.');
@@ -792,7 +792,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/main-branch`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response49>('put', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response48>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: setMainBranchRequest,
@@ -814,9 +814,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdPullPost(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response51>;
-    public apiRepositoriesRepoIdPullPost(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response51>>;
-    public apiRepositoriesRepoIdPullPost(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response51>>;
+    public apiRepositoriesRepoIdPullPost(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response50>;
+    public apiRepositoriesRepoIdPullPost(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response50>>;
+    public apiRepositoriesRepoIdPullPost(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response50>>;
     public apiRepositoriesRepoIdPullPost(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdPullPost.');
@@ -849,7 +849,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/pull`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response51>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response50>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -870,9 +870,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdPushPost(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response50>;
-    public apiRepositoriesRepoIdPushPost(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response50>>;
-    public apiRepositoriesRepoIdPushPost(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response50>>;
+    public apiRepositoriesRepoIdPushPost(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response49>;
+    public apiRepositoriesRepoIdPushPost(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response49>>;
+    public apiRepositoriesRepoIdPushPost(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response49>>;
     public apiRepositoriesRepoIdPushPost(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdPushPost.');
@@ -905,7 +905,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/push`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response50>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response49>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -926,9 +926,9 @@ export class RepositoryControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiRepositoriesRepoIdSyncPost(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response48>;
-    public apiRepositoriesRepoIdSyncPost(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response48>>;
-    public apiRepositoriesRepoIdSyncPost(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response48>>;
+    public apiRepositoriesRepoIdSyncPost(repoId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response47>;
+    public apiRepositoriesRepoIdSyncPost(repoId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response47>>;
+    public apiRepositoriesRepoIdSyncPost(repoId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response47>>;
     public apiRepositoriesRepoIdSyncPost(repoId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (repoId === null || repoId === undefined) {
             throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdSyncPost.');
@@ -961,7 +961,7 @@ export class RepositoryControllerService extends BaseService {
 
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/sync`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response48>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response47>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
