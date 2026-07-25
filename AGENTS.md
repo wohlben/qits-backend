@@ -70,7 +70,11 @@ All Maven commands use the wrapper.
 # The export is variant-independent (AuthController lives in auth-core; the OpenAPI title is pinned).
 ./mvnw -pl service -am test -Dtest=OpenApiSchemaExportTest
 
-# Native build + integration tests (failsafe; ITs are skipped by default via skipITs=true)
+# Native build + integration tests (failsafe; ITs are skipped by default via skipITs=true).
+# Works INSIDE a workspace container / the devcontainer: the workspace image ships Mandrel
+# (GraalVM native-image for JDK 25) at GRAALVM_HOME=/usr/lib/jvm/mandrel-25, with `native-image`
+# on PATH — so Quarkus compiles locally and never needs the container-based native build (docker
+# is unavailable in a workspace anyway). Rebuild the image after pulling this change.
 ./mvnw -pl service package -Dnative -Dqits.variant=forwardauth
 
 # Extended suite: heavier, environment-dependent integration tests (JUnit `*IT`, @Tag("extended")),

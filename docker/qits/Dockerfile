@@ -3,7 +3,9 @@
 # source on the machine that runs them):
 #
 #   - stage `workspace` — the fat toolchain image every workspace container runs (and the
-#     devcontainer's base). Tag it as the name the `qits.workspace.image` config points at:
+#     devcontainer's base): `workspace-base` plus the GraalVM native toolchain (Mandrel), which is
+#     the one thing only workspaces need. Tag it as the name the `qits.workspace.image` config
+#     points at:
 #
 #         docker build -t qits/workspace:latest --target workspace -f docker/qits/Dockerfile .
 #
@@ -12,7 +14,7 @@
 #     /var/run/docker.sock) to create sibling workspace containers, and it must sit on the shared
 #     `qits-net` so those containers reach it back by DNS name (git clone/push over /git, OTLP over
 #     /api/otel, MCP over /mcp). So the final image is the devcontainer minus the IDE/dev-user bits:
-#     the `workspace` toolchain stage + the docker CLI, running the PACKAGED fast-jar instead of
+#     the shared `workspace-base` toolchain stage + the docker CLI, running the PACKAGED fast-jar instead of
 #     `quarkus:dev`. The fast-jar is built INSIDE the image build (stage `build`), not on the host
 #     and COPYied in — that is what lets the manual installer (install.sh) run entirely inside a
 #     throwaway container with only the docker socket mounted: the source never has to land on a
@@ -32,14 +34,16 @@
 
 # --- stage `workspace-daemon-build`: native-compile the in-container client daemon -------------------------
 # The workspace container's process is a GraalVM-native `qits-workspace-daemon` (docs/epics/qits-workspace-daemon/),
-# compiled here (Maven output-name `qits-workspace-daemon`) and COPYied into the `workspace` stage below. It
+# compiled here (Maven output-name `qits-workspace-daemon`) and COPYied into the `workspace-base` stage below. It
 # depends on neither `service` nor
 # `domain` (only workspace-daemon-protocol + quarkus-arc/vertx), so `-am` stays cheap and no node/pnpm is
 # needed — the Mandrel builder's JDK suffices. The builder JDK MUST be 25: native-image cannot read
 # bytecode newer than its own JDK, and the reactor targets release 25. (If the floating `jdk-25` tag
 # is ever absent, the Oracle GraalVM image container-registry.oracle.com/graalvm/native-image:25 is
 # the fallback native-25 toolchain.) BuildKit pulls this stage into both image builds via the
-# `COPY --from` edge in `workspace`.
+# `COPY --from` edge in `workspace-base`. It stays a SEPARATE stage even though `workspace` now has a
+# native toolchain of its own: the daemon must be compiled before/independently of the image that
+# ships it, and cross-building it here keeps the app image's dependency chain unchanged.
 FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25 AS workspace-daemon-build
 USER root
 WORKDIR /src
@@ -56,7 +60,11 @@ RUN ./mvnw -B -ntp -pl workspace-daemon -am package -Dnative \
       -Dmaven.build.cache.enabled=false \
       -Dquarkus.native.native-image-xmx=4g
 
-# --- stage `workspace`: the toolchain image every workspace container runs ------------------------
+# --- stage `workspace-base`: the toolchain shared by the workspace image AND the app image --------
+# Split from the `workspace` stage below purely so the app image can stop here: `workspace` = this
+# plus the GraalVM native toolchain, which is ~1 GB that only workspace containers have a use for.
+# Everything common lives here; nothing that is workspace-only does.
+#
 # Carries the common toolchain a repository's actions/dev servers/agent need — nothing repo-specific
 # (per-repo images and devcontainer.json support are deferred). The container's process is the
 # native `qits-workspace-daemon` binary COPYied in below (docs/epics/qits-workspace-daemon/): it is the
@@ -65,7 +73,7 @@ RUN ./mvnw -B -ntp -pl workspace-daemon -am package -Dnative \
 # tini's child (`--init` stays PID 1). The ENTRYPOINT is set after the binary is COPYied in below;
 # the `build`/final app stages that FROM this
 # one override or ignore it, so they are unaffected.
-FROM debian:bookworm-slim AS workspace
+FROM debian:bookworm-slim AS workspace-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -308,11 +316,62 @@ RUN chmod 0755 /usr/local/bin/qits-workspace-daemon
 # is unaffected.
 ENTRYPOINT ["/usr/local/bin/qits-workspace-daemon"]
 
+# --- stage `workspace`: the toolchain image every workspace container runs ------------------------
+# `workspace-base` plus the one thing only workspaces need: a GraalVM native toolchain. This is the
+# stage the runtime image is built from (`--target workspace`), and the devcontainer's base.
+FROM workspace-base AS workspace
+
+# GraalVM `native-image`, via Mandrel — so `./mvnw package -Dnative` WORKS IN A WORKSPACE CONTAINER,
+# not only inside the dedicated `workspace-daemon-build` stage above. qits' own natively-compiled
+# components (workspace-daemon, and the separately deployed qits-gateway repo) are built by actions
+# and the coding agent from inside a workspace, where docker is unavailable — so Quarkus' default
+# container-based native build (quarkus.native.container-build, which shells out to the Mandrel
+# BUILDER IMAGE) can never run there. Without a local native-image the only feedback is a build
+# failure at the end of a long build, which is exactly what "compiles to native" must not be.
+#
+# Mandrel is the Quarkus-blessed, JVM-only GraalVM distribution (no polyglot/JS/Truffle), and the
+# same toolchain the builder image wraps — so a workspace-side native build and the
+# `workspace-daemon-build` stage use the same compiler. `java25` matters for the same reason it does
+# there: native-image cannot read bytecode newer than its own JDK, and everything in reach targets
+# release 25.
+#
+# Kept ALONGSIDE Temurin rather than replacing it: Temurin stays JAVA_HOME (the runtime everything
+# compiles and runs on, and what jdtls discovers), while GRAALVM_HOME points Quarkus at Mandrel for
+# the native step only — the discovery order Quarkus uses is quarkus.native.graalvm-home, then
+# GRAALVM_HOME, then JAVA_HOME. The extra PATH symlink makes a bare `native-image` invocation (a
+# hand-written script, a non-Quarkus project) work too.
+#
+# ~200 MB download, ~1 GB in the layer — which is exactly why it sits HERE and not in
+# `workspace-base`: the app image stages below build on `workspace-base` and never carry it. Bump
+# MANDREL_VERSION to upgrade; the checksum is verified from the release's own .sha256 asset, and
+# `native-image --version` fails the build loudly if the toolchain is unusable (it links against the
+# build-essential/zlib layer from the base stage).
+ARG MANDREL_VERSION=25.0.3.0-Final
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) mandrel_arch=amd64 ;; \
+      arm64) mandrel_arch=aarch64 ;; \
+      *) echo "unsupported architecture for Mandrel: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac; \
+    tarball="mandrel-java25-linux-${mandrel_arch}-${MANDREL_VERSION}.tar.gz"; \
+    base="https://github.com/graalvm/mandrel/releases/download/mandrel-${MANDREL_VERSION}"; \
+    cd /tmp; \
+    curl -fsSL -O "${base}/${tarball}"; \
+    curl -fsSL -O "${base}/${tarball}.sha256"; \
+    sha256sum -c "${tarball}.sha256"; \
+    mkdir -p /usr/lib/jvm/mandrel-25; \
+    tar -xzf "${tarball}" -C /usr/lib/jvm/mandrel-25 --strip-components=1; \
+    rm -f "/tmp/${tarball}" "/tmp/${tarball}.sha256"; \
+    ln -s /usr/lib/jvm/mandrel-25/bin/native-image /usr/local/bin/native-image; \
+    native-image --version
+ENV GRAALVM_HOME=/usr/lib/jvm/mandrel-25
+
 # --- stage `build`: package the fast-jar -----------------------------------------------------------
 # The workspace toolchain stage already has everything the reactor build needs (JDK 25, the mvnw
 # wrapper's deps resolve over the network, node + pnpm for the Quinoa Angular build), so build on it
-# rather than pulling a separate maven image.
-FROM workspace AS build
+# rather than pulling a separate maven image. On `workspace-base`, not `workspace`: the app image has
+# no use for the ~1 GB GraalVM toolchain the workspace stage adds.
+FROM workspace-base AS build
 USER root
 WORKDIR /src
 
@@ -346,7 +405,9 @@ RUN ./mvnw -B -ntp -pl service -am package \
       -Dqits.variant=${QITS_VARIANT}
 
 # --- final stage: the runtime image ----------------------------------------------------------------
-FROM workspace
+# `workspace-base`, not `workspace`: qits itself never native-compiles anything at runtime, so the
+# app image stays free of the GraalVM toolchain.
+FROM workspace-base
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
