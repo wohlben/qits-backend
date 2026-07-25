@@ -257,3 +257,17 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
   `fastForwardWorkspace`/`updateWorkspaceFromParent`/`mergeBranch`/`discardWorkspace` on a dirty
   workspace (cleanup was already guarded). Gates on `clean === false` only; `null`/unknown is
   unchanged. No API/DTO change.
+- **[daemon-bidirectional-auto-sync](features/2026-07-25_daemon-bidirectional-auto-sync.md) —
+  implemented (2026-07-25).** Keeps the container checkout and its origin ref in sync **both ways**.
+  A new in-container `OriginSync` (behind a `GitRunner` fork seam, one single-thread scheduler)
+  **auto-pushes** committed work as the `GitStatusMonitor` observes each commit — with push-conflict
+  handling against the host's concurrent same-branch pushes (transient → capped backoff retry;
+  non-fast-forward → `--ff-only` reconcile then one retry, never a force). The host, after a clean
+  integration/merge that advances a workspace's branch (`mergeBranch`/`mergeWorkspace` →
+  `notifyIncomingMerge`), sends a new `PullBranch` over a framework-free `WorkspaceGitSync` SPI
+  (`WorkspaceDaemonRegistry`) so the daemon **fast-forwards** its checkout right away. Adds the
+  `qits.workspace-daemon.auto-push*` knobs + the `QITS_WORKSPACE_DAEMON_AUTO_PUSH_ENABLED` kill
+  switch. The residual clean-gate → pull TOCTOU race is an **accepted, documented risk** (ff-only
+  refuses safely; the next host git op reconciles). Builds on
+  [daemon-git-status-monitoring](features/2026-07-24_daemon-git-status-monitoring.md) and the
+  clean-gate of [gate-operations-on-dirty-workspace](features/2026-07-25_gate-operations-on-dirty-workspace.md).
