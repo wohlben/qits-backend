@@ -51,8 +51,14 @@ fork git locally):
 
 - `start()` emits the initial (boot) report, then forks
   `inotifywait -m -r -q -e modify,create,delete,move,close_write --exclude <regex> /workspace`;
-  stdout is read on a daemon thread, each line opening one coalescing window
-  (`qits.workspace-daemon.git-status.coalesce-ms`, default 250ms).
+  stdout is read on a daemon thread, each line feeding a **trailing debounce**: every event re-arms
+  the timer, so the marker is recomputed only once the tree has been **quiet** for
+  `qits.workspace-daemon.git-status.coalesce-ms` (default **20s**), bounded above by
+  `qits.workspace-daemon.git-status.max-wait-ms` (default 120s) so sustained churn still refreshes at
+  a ceiling. This quiescence gate is why a `git commit`/`push` — a short burst of writes under
+  `.git/index`/`refs` — no longer races the committer for `index.lock`: the recompute lands *after*
+  the burst settles, not during it (see
+  [resolved: git-status monitor index.lock contention](../../../issues/resolved/2026-07-25_git-status-monitor-index-lock-contention.md)).
 - **Dedup on the full working-tree marker** — `sha256(git status --porcelain=v2 --branch -uall + " "
   + git diff)`, its own copy of the domain `WorkingTreeMarker` algorithm. A report fires only when the
   marker moves; the `clean`/`head` fields come from reusing `WorkspaceDescriber.parse`. Deduping on
