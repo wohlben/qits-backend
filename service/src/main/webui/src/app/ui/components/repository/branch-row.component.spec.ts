@@ -192,6 +192,47 @@ describe('BranchRowComponent', () => {
     expect(badges.some((b) => b.textContent?.includes('Clean'))).toBe(false);
   });
 
+  it('shows registry badges (connected-since + daemon version) when the daemon reports them', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      clean: true,
+      daemonConnectedAt: '2026-07-25T09:14:03Z',
+      daemonVersion: '1.0.0-SNAPSHOT',
+      daemonBuildTime: '2026-07-25T07:28:30Z',
+    });
+    fixture.detectChanges();
+
+    const badges = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('z-badge'),
+    );
+    expect(badges.some((b) => b.textContent?.includes('up since'))).toBe(true);
+    const versionBadge = badges.find((b) => b.textContent?.includes('daemon 1.0.0-SNAPSHOT'));
+    expect(versionBadge).toBeTruthy();
+    // The build timestamp rides the version badge's title (single badge per fact).
+    expect(versionBadge?.getAttribute('title')).toContain('built');
+  });
+
+  it('shows no registry badges when the daemon has not reported build identity', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'STOPPED',
+    });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('up since');
+    expect(el.textContent).not.toContain('daemon ');
+  });
+
   it('shows a Clean badge when the daemon reports the working tree clean', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/login');

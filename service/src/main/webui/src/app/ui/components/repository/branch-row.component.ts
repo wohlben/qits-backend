@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideBot, lucideFolderOpen } from '@ng-icons/lucide';
@@ -17,7 +18,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
  */
 @Component({
   selector: 'app-branch-row',
-  imports: [ZardButtonComponent, ZardBadgeComponent, NgIcon],
+  imports: [ZardButtonComponent, ZardBadgeComponent, NgIcon, DatePipe],
   template: `
     <div class="flex w-full flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
       <div class="flex min-w-0 flex-col gap-1">
@@ -46,6 +47,34 @@ import { ZardButtonComponent } from '@/shared/components/button';
                 [attr.title]="wt.clean ? 'No uncommitted changes' : 'Uncommitted changes in the working tree'"
               >
                 {{ wt.clean ? 'Clean' : 'Dirty' }}
+              </z-badge>
+            }
+            <!-- Workspace registry (docs/epics/qits-workspace-registry/): when the in-container
+                 daemon's control socket registered ("connected since"), and the daemon binary's
+                 build identity. Both are known only while RUNNING and reported (null ⇒ no badge). -->
+            @if (wt.daemonConnectedAt) {
+              <z-badge
+                zType="outline"
+                [attr.title]="
+                  'workspace-daemon connected (registered) ' + (wt.daemonConnectedAt | date: 'medium')
+                "
+              >
+                up since {{ wt.daemonConnectedAt | date: 'short' }}
+              </z-badge>
+            }
+            @if (wt.daemonVersion) {
+              <z-badge
+                zType="outline"
+                [attr.title]="
+                  wt.daemonBuildTime
+                    ? 'workspace-daemon ' +
+                      wt.daemonVersion +
+                      ' · built ' +
+                      (wt.daemonBuildTime | date: 'medium')
+                    : 'workspace-daemon ' + wt.daemonVersion
+                "
+              >
+                daemon {{ wt.daemonVersion }}
               </z-badge>
             }
           </span>

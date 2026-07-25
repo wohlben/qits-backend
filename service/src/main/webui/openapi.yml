@@ -1873,6 +1873,12 @@ components:
           type: string
         resolvedAt:
           $ref: "#/components/schemas/Instant"
+        daemonConnectedAt:
+          $ref: "#/components/schemas/Instant"
+        daemonVersion:
+          type: string
+        daemonBuildTime:
+          $ref: "#/components/schemas/Instant"
     WorkspaceEventDto:
       type: object
       properties:
