@@ -18,31 +18,35 @@ frameworks:
     root: service/src/main/webui
 
 services:
-  # The qits dev server: `quarkus:dev` serving the REST API on :8080 and the Angular SPA (Quinoa),
-  # live-reloaded and web-viewable through the parent qits' proxy. The web view frames QUARKUS
-  # (:8080, entry /projects) — qits' UI is SSE/websocket-heavy on /api, which Quarkus serves
-  # natively while Quinoa dev-proxies the SPA. See docs/guides/qits-in-qits-registration.md.
-  - name: qits dev server
+  # The qits server: the PACKAGED app (prod fast-jar) serving the REST API on :8080 and the prebuilt
+  # Angular SPA (Quinoa serves it statically — NO `ng serve`), web-viewable through the parent qits'
+  # proxy. Deliberately NOT `quarkus:dev`: a workspace exists to build/test the app, so live-reload
+  # is wasted resources (~1.1 GiB of `ng serve`/esbuild + a heavier dev JVM — see
+  # docs/issues/2026-07-25_wedged-workspace-service-not-recovered.md). The bootstrap `install` step
+  # builds this jar (with the `local` auth variant) before the service starts. The web view frames
+  # QUARKUS (:8080, entry /projects). See docs/guides/qits-in-qits-registration.md.
+  - name: qits server
     description: >-
-      Runs `./mvnw -pl service -am quarkus:dev` — the qits REST API and the Angular SPA (Quinoa),
-      live-reloaded and web-viewable through the parent qits proxy.
-    # One command (folded). -Dqits.variant=forwardauth: every service build must name an auth variant
-    # (enforcer); %dev's fallback identity `dev` keeps the framed child usable. root-path serves
-    # under the web-view prefix; the OTEL flags light qits' own (dark-by-default) telemetry and
-    # bridge the injected endpoint into the Quarkus key (dev mode ignores the plain env var). The
-    # speech warmup is skipped so a demo child doesn't pull the ~700 MB model.
+      Runs the packaged qits fast-jar (`service/target/quarkus-app/quarkus-run.jar`) — the REST API
+      and the prebuilt Angular SPA — web-viewable through the parent qits proxy. Rebuild + restart to
+      pick up code changes (no live-reload, by design).
+    # `-D` flags precede `-jar` (JVM system properties, not program args). The `local` auth variant
+    # (built into the jar by bootstrap `install`) authenticates every request as a fixed local user,
+    # so the framed child is usable with no proxy and no login — a packaged NORMAL-mode build has no
+    # dev fallback (docs/epics/qits-authentication/). root-path serves under the web-view prefix; the
+    # OTEL flags light qits' own telemetry; the speech warmup is skipped so a demo child doesn't pull
+    # the ~700 MB model.
     start: >-
-      ./mvnw -q -pl service -am quarkus:dev
-      -Dquarkus.bootstrap.workspace-discovery=true
-      -Dqits.variant=forwardauth
+      java
       -Dquarkus.http.host=0.0.0.0
       -Dquarkus.http.port=8080
       -Dquarkus.http.root-path="${QITS_PUBLIC_BASE:-/}"
       -Dquarkus.otel.sdk.disabled=false
       -Dquarkus.otel.exporter.otlp.endpoint="${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}"
       -Dqits.speech.warmup-on-start=false
-    # With the Quinoa check-path fix, Quarkus prints this only after the Angular dev server answered
-    # its readiness probe — so READY implies the SPA is servable.
+      -jar service/target/quarkus-app/quarkus-run.jar
+    # Prod Quarkus prints this once the HTTP server is up; the SPA is baked into the jar, so READY
+    # implies the whole app (API + SPA) is servable.
     ready-pattern: "(?i)Listening on: http"
     stop-signal: TERM
     restart-policy: ON_FAILURE
@@ -58,12 +62,8 @@ services:
         kind: COMMAND
         command: |-
           curl -fsS -m 2 "http://127.0.0.1:8080${QITS_PUBLIC_BASE%/}/q/health"
-      # Any HTTP answer on :4200 means ng serve is up (it may 302/404 bare paths under a serve path).
-      - name: Angular
-        kind: HTTP
-        port: 4200
-        path: /
-        expect-status: 2xx,3xx,4xx
+      # No Angular health-check: the packaged run serves the prebuilt SPA from :8080 (Quinoa static),
+      # there is no `ng serve` on :4200.
 
 # The bootstrap chain (docs/epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md): ordered one-shot
 # steps a freshly provisioned child-qits workspace runs before the dev-server daemon auto-starts.
@@ -72,8 +72,10 @@ services:
 # idempotent by design (skip-if-exists / reset), so re-provisions and manual re-runs are safe.
 bootstrap:
   - name: install
-    description: Build the reactor so the cli jar exists (skip tests; forwardauth variant).
-    execute: ./mvnw install -DskipTests -Dqits.variant=forwardauth
+    description: >-
+      Build the reactor incl. the packaged service jar the `qits server` service runs (skip tests;
+      `local` auth variant — the unauthenticated build for this trusted local child).
+    execute: ./mvnw install -DskipTests -Dqits.variant=local
   - name: seed-demo-data
     description: Seed the tiny testing-repo demo (idempotent, skip-if-exists).
     execute: ./mvnw -pl cli quarkus:run -Dcli.args=seed

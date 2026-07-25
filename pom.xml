@@ -25,6 +25,7 @@
         <module>auth/core</module>
         <module>auth/oidc</module>
         <module>auth/forwardauth</module>
+        <module>auth/local</module>
         <module>service</module>
         <module>cli</module>
         <!-- The in-container client daemon (docs/epics/qits-workspace-daemon/): a Quarkus
@@ -120,6 +121,11 @@
             <dependency>
                 <groupId>eu.wohlben</groupId>
                 <artifactId>auth-forwardauth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>auth-local</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -187,13 +187,16 @@
                             <rules>
                                 <requireProperty>
                                     <property>qits.variant</property>
-                                    <regex>oauth|forwardauth</regex>
+                                    <regex>oauth|forwardauth|local</regex>
                                     <message>Packaging qits requires an explicit auth variant for the service app:
   -Dqits.variant=forwardauth   trust forward-auth proxy headers (Remote-User/Remote-Groups) — the everyday dev/test variant
   -Dqits.variant=oauth         built-in OIDC login (Keycloak); requires QUARKUS_OIDC_* env at runtime
-(quarkus:dev and test default to forwardauth without the flag — a packaged build never defaults.)
+  -Dqits.variant=local         EXPLICITLY UNAUTHENTICATED — every request is a fixed local user. Trusted LOCAL starts only
+                               (a workspace's own packaged qits behind the parent on qits-net; a laptop run). NEVER internet-expose.
+(quarkus:dev and test default to forwardauth without the flag — a packaged build never defaults. The
+ auth-scheme variants forwardauth/oauth never run unauthenticated; only `local` does, and only when named explicitly.)
 See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</message>
-                                    <regexMessage>Unknown qits.variant — valid values are: forwardauth, oauth.
+                                    <regexMessage>Unknown qits.variant — valid values are: forwardauth, oauth, local.
 See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</regexMessage>
                                 </requireProperty>
                             </rules>
@@ -284,6 +287,25 @@ See docs/epics/qits-authentication/features/2026-07-16_build-variant-auth.md.</r
                 <dependency>
                     <groupId>eu.wohlben</groupId>
                     <artifactId>auth-forwardauth</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- The `local` variant: EXPLICITLY UNAUTHENTICATED (every request is a fixed local user),
+             for trusted local starts — a workspace's own packaged qits behind the parent proxy on
+             qits-net, or a laptop run. The auth-scheme variants above never degrade to this; only
+             this explicit flag pulls the open mechanism. Never internet-expose a local build. -->
+        <profile>
+            <id>variant-local</id>
+            <activation>
+                <property>
+                    <name>qits.variant</name>
+                    <value>local</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>eu.wohlben</groupId>
+                    <artifactId>auth-local</artifactId>
                 </dependency>
             </dependencies>
         </profile>

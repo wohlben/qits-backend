@@ -1,11 +1,20 @@
-# Build-variant auth: `forwardauth` / `oauth`
+# Build-variant auth: `forwardauth` / `oauth` / `local`
 
 Authentication is a **build-time variant**, not a runtime feature: every qits build names exactly one
-auth variant (`-Dqits.variant=forwardauth|oauth`), the auth code lives in dedicated Maven modules
-outside `service`, and there is **no unauthenticated build and no runtime toggle**. A `forwardauth`
-image trusts the identity headers a forward-auth proxy injects; an `oauth` image terminates the OIDC
-authorization-code flow itself (Keycloak) and refuses to start without its OIDC config — an
-OIDC-configured qits can never run unauthenticated.
+auth variant (`-Dqits.variant=forwardauth|oauth|local`), the auth code lives in dedicated Maven
+modules outside `service`, and there is **no runtime toggle**. A `forwardauth` image trusts the
+identity headers a forward-auth proxy injects; an `oauth` image terminates the OIDC
+authorization-code flow itself (Keycloak) and refuses to start without its OIDC config.
+
+**The invariant that matters: an auth-scheme variant never runs unauthenticated.** Once a build
+names `forwardauth` or `oauth`, that scheme is enforced unconditionally and cannot degrade to open —
+a forwardauth build 401s until the proxy injects the header (its dev/test fallback is
+LaunchMode-guarded off in a packaged build), an OIDC-configured qits refuses to start without its
+config. The **only** build that runs unauthenticated is the dedicated **`local`** variant, chosen
+explicitly with `-Dqits.variant=local`: it authenticates every request as one fixed local user, with
+no proxy and no login, for **trusted local starts only** (a workspace's own packaged qits behind the
+parent proxy on qits-net; a laptop run). A `local` build is open — never internet-expose it. So
+"unauthenticated" is not a hole in a scheme; it is a distinct, explicitly-named build.
 
 This supersedes the short-lived *optional OIDC auth* design (a `qits.auth.enabled` runtime knob with
 quarkus-oidc always packaged but dormant): the mechanism work carried over, the "optional feature"
@@ -45,6 +54,7 @@ Three plain library-jar modules under `auth/` (reactor members like `domain`), e
 | `auth/core` (`auth-core`) | Shared by both variants: the global `QitsAuthPolicy` (always enforcing — no enable knob), the `PublicPaths` token-free allowlist, `AuthController` (`GET /api/auth/me` → `{variant, username}`), the optional `qits.auth.required-role` check. |
 | `auth/oidc` (variant id **`oauth`**) | `quarkus-oidc` + the shipped OIDC defaults. No Java of its own — quarkus-oidc's hybrid mechanism does the work. |
 | `auth/forwardauth` (variant id **`forwardauth`**) | `ForwardAuthMechanism` (proxy header → `TrustedAuthenticationRequest`) + `ForwardAuthIdentityProvider` (groups header → roles), header-name config, the LaunchMode-guarded dev/test fallback identity. |
+| `auth/local` (variant id **`local`**) | `LocalAuthMechanism` (unconditional fixed identity → `TrustedAuthenticationRequest`, **not** LaunchMode-guarded) + `LocalIdentityProvider` (config `qits.auth.local.groups` → roles). The explicitly-open variant: every request is `qits.auth.local.user` (default `local`), in any launch mode. Trusted local starts only. |
 
 **The variant contract** (also in `auth-core`'s `package-info`): a variant module defines
 `qits.auth.variant=<id>` in its `META-INF/microprofile-config.properties`, provides exactly one
@@ -55,20 +65,21 @@ from the app module itself.
 
 ## Selection: one flag, defaulted pre-packaging, mandatory for artifacts
 
-`service/pom.xml` has two property-activated profiles (`variant-oauth` / `variant-forwardauth`);
-`-Dqits.variant=…` activates the matching one, which adds the single variant-module dependency
-(`auth-core` arrives transitively). `service` itself contains **zero auth code** — its only
-auth-adjacent line is config (the trip-wire below).
+`service/pom.xml` has three property-activated profiles (`variant-oauth` / `variant-forwardauth` /
+`variant-local`); `-Dqits.variant=…` activates the matching one, which adds the single
+variant-module dependency (`auth-core` arrives transitively). `service` itself contains **zero auth
+code** — its only auth-adjacent line is config (the trip-wire below).
 
 - **Flagless pre-packaging default**: a third profile (`variant-default-forwardauth`, activated on
   `!qits.variant` — a separate profile because Maven allows one activation property each) pulls
   `auth-forwardauth` when no flag is given, so `quarkus:dev` and `test` run flagless with the
   everyday variant (whose `%dev`/`%test` fallback identity `dev` means effectively no auth). Any
   explicit `-Dqits.variant` deactivates it.
-- **maven-enforcer** (`requireProperty qits.variant`, bound to **`prepare-package`** in `service`)
-  fails any flagless build that produces an artifact — `package`/`install`/`verify` — with a message
-  listing the valid values: a shipped qits never defaults its auth. Pre-packaging phases never reach
-  the rule, which is what lets dev/test run flagless.
+- **maven-enforcer** (`requireProperty qits.variant`, regex `oauth|forwardauth|local`, bound to
+  **`prepare-package`** in `service`) fails any flagless build that produces an artifact —
+  `package`/`install`/`verify` — with a message listing the valid values: a shipped qits never
+  defaults its auth, and choosing the open `local` variant is always an explicit, named act (never a
+  fallback). Pre-packaging phases never reach the rule, which is what lets dev/test run flagless.
 - **Augmentation trip-wire**: `quarkus.application.name=qits-${qits.auth.variant}` in service's
   `application.properties`. The expansion source only exists in a variant module's shipped config, so
   any build that ends up with no auth module on the classpath — e.g. a **typo'd** `-Dqits.variant`,
@@ -84,7 +95,7 @@ passes it through; `install.sh` requires `QITS_VARIANT` in the environment. The 
 unconditionally active (missing `QUARKUS_OIDC_*` env fails startup, deliberately), in a forwardauth
 build header trust is unconditionally active.
 
-## Enforcement: one global policy (auth-core, both variants)
+## Enforcement: one global policy (auth-core, all variants)
 
 `QitsAuthPolicy` is a **global `HttpSecurityPolicy`** — Quarkus mounts the auth handlers on the main
 Vert.x router ahead of every user route, so one bean covers the JAX-RS `/api` tree, the raw router
@@ -164,6 +175,32 @@ cookie reaches all three for free:
 
 CSRF posture: `q_session` is HttpOnly + SameSite=Lax; all state-changing endpoints are non-GET under
 `/api`, which Lax cookies don't accompany cross-site.
+
+## The `local` variant: explicitly unauthenticated, trusted local starts
+
+The open variant, chosen only by an explicit `-Dqits.variant=local`. `LocalAuthMechanism`
+authenticates **every** request as one fixed identity through the `IdentityProviderManager` (a
+`TrustedAuthenticationRequest`, so `SecurityIdentityAugmentor`s and the groups→roles provider keep
+working), so `QitsAuthPolicy` always sees a non-anonymous principal and lets the request through.
+
+- `qits.auth.local.user` (default `local`) → the principal reported by `/api/auth/me`
+  (`{"variant":"local","username":"local"}`).
+- `qits.auth.local.groups` (optional, comma-separated) → roles, so `qits.auth.required-role` can be
+  exercised locally exactly as under the other variants. Empty ⇒ roleless.
+
+Two deliberate differences from forwardauth's dev fallback make this a real variant rather than a
+leak:
+
+- **Unconditional** — there is no header to supply or omit; the identity is always present.
+- **Not LaunchMode-guarded** — unlike forwardauth's `dev-user` (blanked in `NORMAL`), the local
+  identity works in `NORMAL` (packaged/prod) launch mode. That is the whole purpose: a **packaged**
+  qits that serves with a working identity and **no proxy** — which is what lets a workspace run its
+  own child qits as a lean packaged app (no `quarkus:dev`, no live-reload) behind the parent's
+  web-view proxy on qits-net.
+
+**Security.** A `local` build is open: anyone who can reach it is the local user. It must never be
+internet-exposed. The auth-scheme variants never degrade to this; `local` is the *only* open build,
+and only ever by explicit name — see the invariant at the top of this doc.
 
 ## SPA integration (deliberately minimal — no keycloak-js, no token handling)
 
