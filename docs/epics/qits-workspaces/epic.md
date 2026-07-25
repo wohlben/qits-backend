@@ -123,3 +123,5 @@ not scope loss.
 | [backend-framework-detection](features/2026-07-12_backend-framework-detection.md) | implemented |
 | [workspace-sse-live-updates](features/2026-07-07_workspace-sse-live-updates.md) | implemented |
 | [detection-live-freshness-sse](features/2026-07-12_detection-live-freshness-sse.md) | implemented |
+| [delete-workspace-container](features/2026-07-25_delete-workspace-container.md) | implemented |
+| [persistent-workspace-volume](features/2026-07-25_persistent-workspace-volume.md) | implemented |

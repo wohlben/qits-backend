@@ -152,8 +152,13 @@ idle-stop/restart policies; migration of pre-existing host workspaces (resolve o
 ## Open questions carried forward
 
 Default image ownership/versioning; container user (docker `--user $(id -u)` today vs rootless
-podman — `DockerExecutor` stays runtime-agnostic); `/workspace` volume (anonymous today); per-repo
-networks vs the shared bridge; git-server exposure once qits binds beyond localhost.
+podman — `DockerExecutor` stays runtime-agnostic); per-repo networks vs the shared bridge;
+git-server exposure once qits binds beyond localhost.
+
+**Resolved:** ~~`/workspace` volume (anonymous today)~~ — `/workspace` is now a **per-workspace named
+volume** (`qits_workspace_<workspaceId>`, rich `qits.*` labels), so the checkout survives container
+recreation and unpushed commits no longer die with the writable layer; see
+[persistent-workspace-volume](2026-07-25_persistent-workspace-volume.md).
 
 ## Testing
 
