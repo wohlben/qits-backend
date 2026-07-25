@@ -79,6 +79,7 @@ interface CreateWorkspaceForm {
             (viewCommits)="viewCommits($event)"
             (ensureContainer)="onEnsureContainer($event)"
             (stopContainer)="onStopContainer($event)"
+            (recreateContainer)="onRecreateContainer($event)"
             (openWorkspace)="openWorkspace($event)"
             (run)="openRun($event)"
             (configureWithClaude)="configureWithClaude($event)"
@@ -111,6 +112,11 @@ interface CreateWorkspaceForm {
           }
           @if (stopContainerMutation.isError()) {
             <div class="text-sm text-destructive">Failed to stop the container</div>
+          }
+          @if (recreateContainerMutation.isError()) {
+            <div class="text-sm text-destructive">
+              Failed to recreate the container: {{ errorMessage(recreateContainerMutation.error()) }}
+            </div>
           }
         }
       }
@@ -722,6 +728,27 @@ export class BranchListComponent {
     onSuccess: () => invalidateRepository(this.queryClient, this.repoId()),
   }));
 
+  // Recreate tears the container down and re-provisions on the current image (the newer daemon).
+  // Like ensure, it runs asynchronously — the response carries a technical-process id and the work
+  // streams into the "Recreating workspace" dialog; the backend rejects a dirty/unknown tree with a
+  // 400 that lands in the inline error above.
+  readonly recreateContainerMutation = injectMutation(() => ({
+    mutationFn: (workspaceId: string) =>
+      lastValueFrom(
+        this.workspaceService.apiRepositoriesRepoIdWorkspacesWorkspaceIdRecreateContainerPost(
+          this.repoId(),
+          workspaceId,
+        ),
+      ),
+    onSuccess: (res) => {
+      invalidateRepository(this.queryClient, this.repoId());
+      if (res.technicalProcessId) {
+        patchState(this.ui, { processId: res.technicalProcessId });
+        this.openDialog('Recreating workspace', this.processTpl());
+      }
+    },
+  }));
+
   readonly resolveMutation = injectMutation(() => ({
     mutationFn: (workspaceId: string) =>
       lastValueFrom(
@@ -1009,6 +1036,13 @@ export class BranchListComponent {
   onStopContainer(workspace: WorkspaceDto) {
     if (workspace.workspaceId) {
       this.stopContainerMutation.mutate(workspace.workspaceId);
+    }
+  }
+
+  /** Recreate a workspace's container onto the latest daemon build (backend re-verifies CLEAN). */
+  onRecreateContainer(workspace: WorkspaceDto) {
+    if (workspace.workspaceId) {
+      this.recreateContainerMutation.mutate(workspace.workspaceId);
     }
   }
 

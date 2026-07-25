@@ -250,6 +250,7 @@ interface NodeSummary {
             (viewCommits)="viewCommits.emit(node.label)"
             (ensureContainer)="ensureContainer.emit(node.data!)"
             (stopContainer)="stopContainer.emit(node.data!)"
+            (recreateContainer)="recreateContainer.emit(node.data!)"
             (openWorkspace)="openWorkspace.emit(node.data!)"
             (run)="run.emit(node.label)"
             (configureWithClaude)="configureWithClaude.emit(node.label)"
@@ -281,6 +282,8 @@ export class BranchTreeComponent {
   readonly ensureContainer = output<WorkspaceDto>();
   /** Gracefully stop a workspace's container (carries the workspace). */
   readonly stopContainer = output<WorkspaceDto>();
+  /** Recreate a workspace's container on the latest daemon build (carries the workspace). */
+  readonly recreateContainer = output<WorkspaceDto>();
   /** Open a workspace's detail page (carries the workspace). */
   readonly openWorkspace = output<WorkspaceDto>();
   /** Open the "Run…" dialog for a workspace-backed branch (carries the branch name). */

@@ -9,7 +9,8 @@
  */
 
 
-export interface Response77 { 
-    id?: string;
+export interface Response91 { 
+    variant?: string;
+    username?: string;
 }
 

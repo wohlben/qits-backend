@@ -59,6 +59,18 @@ explicitly introduces persistence.
   them as three nullable `WorkspaceDto` fields, and renders them as two badges next to the
   clean/dirty badge in the branch tree.
 
+### Part 2 — outdated-daemon warning + recreate workspace (IMPLEMENTED)
+
+- **[outdated-daemon-warning-recreate](features/2026-07-25_outdated-daemon-warning-recreate.md)**
+  (**implemented 2026-07-25**) — the first part to make a registry fact *actionable*. Adds an
+  enumeration seam (`WorkspaceDaemonInfo.all()`) so the backend can derive, from the registry alone,
+  the newest daemon build currently connected; flags any workspace running a strictly-older build via
+  a new nullable `WorkspaceDto.daemonOutdated`; turns the Part 1 version badge into a warning; and
+  offers a **Recreate workspace** action (`POST .../recreate-container`) that tears the container down
+  and re-provisions it on the current image (the newer daemon). Recreate is gated CLEAN-only and
+  re-verified server-side — dirty **and** unknown are both rejected. Persists nothing, RUNNING-only,
+  matching the epic contract.
+
 ### Later parts (OUT OF SCOPE until proposed — each its own feature-idea)
 
 Candidate registry facts the same seam can carry (not yet specced): the daemon's capability version
@@ -69,3 +81,4 @@ head/branch drift, the running services roll-up. Each would be a new `Hello`/eve
 ## Status
 
 - Part 1 — **done** (2026-07-25).
+- Part 2 — **done** (2026-07-25).

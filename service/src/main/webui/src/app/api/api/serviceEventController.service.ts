@@ -17,7 +17,7 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
-import { Response77 } from '../model/response77';
+import { Response78 } from '../model/response78';
 // @ts-ignore
 import { ServiceEventSeverity } from '../model/serviceEventSeverity';
 
@@ -51,9 +51,9 @@ export class ServiceEventControllerService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response77>;
-    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response77>>;
-    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response77>>;
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response78>;
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response78>>;
+    public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response78>>;
     public apiServiceEventsGet(page?: number, pageSize?: number, repoId?: string, severity?: ServiceEventSeverity, since?: string, source?: string, workspaceId?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
@@ -148,7 +148,7 @@ export class ServiceEventControllerService extends BaseService {
 
         let localVarPath = `/api/service-events`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response77>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Response78>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),

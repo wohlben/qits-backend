@@ -267,6 +267,89 @@ describe('BranchRowComponent', () => {
     expect(el.textContent).not.toContain('Dirty');
   });
 
+  it('warns and offers a usable Recreate when the daemon is outdated and the tree is clean', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      clean: true,
+      daemonVersion: '1.0.0-SNAPSHOT',
+      daemonOutdated: true,
+    });
+    fixture.detectChanges();
+
+    let recreated = false;
+    fixture.componentInstance.recreateContainer.subscribe(() => (recreated = true));
+
+    const el = fixture.nativeElement as HTMLElement;
+    // The version badge turns into a warning inviting a recreate.
+    const versionBadge = Array.from(el.querySelectorAll('z-badge')).find((b) =>
+      b.textContent?.includes('daemon 1.0.0-SNAPSHOT'),
+    );
+    expect(versionBadge?.getAttribute('title')).toContain('newer');
+
+    const recreate = Array.from(el.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Recreate workspace'),
+    )!;
+    expect(recreate).toBeTruthy();
+    expect(recreate.hasAttribute('disabled')).toBe(false);
+    recreate.click();
+    expect(recreated).toBe(true);
+  });
+
+  it('disables Recreate when the daemon is outdated but the tree is not clean', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    const base = {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      daemonVersion: '1.0.0-SNAPSHOT',
+      daemonOutdated: true,
+    };
+    fixture.componentRef.setInput('branch', 'feature/login');
+
+    // Dirty → recreate would lose uncommitted work, so the button is present but disabled.
+    fixture.componentRef.setInput('workspace', { ...base, clean: false });
+    fixture.detectChanges();
+    let recreate = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((b) => b.textContent?.includes('Recreate workspace'))!;
+    expect(recreate).toBeTruthy();
+    expect(recreate.hasAttribute('disabled')).toBe(true);
+
+    // Unknown (cleanliness not reported) is treated just as strictly — still disabled.
+    fixture.componentRef.setInput('workspace', { ...base, clean: undefined });
+    fixture.detectChanges();
+    recreate = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Recreate workspace'),
+    )!;
+    expect(recreate.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('offers no Recreate button when the daemon is up to date', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      clean: true,
+      daemonVersion: '1.0.0-SNAPSHOT',
+      // daemonOutdated absent/false ⇒ no warning, no recreate
+    });
+    fixture.detectChanges();
+
+    const buttons = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    );
+    expect(buttons.some((b) => b.textContent?.includes('Recreate workspace'))).toBe(false);
+  });
+
   it('replaces integrate/abandon with cleanup when the workspace can be cleaned up', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/done');

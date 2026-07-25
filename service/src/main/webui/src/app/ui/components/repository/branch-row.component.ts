@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideBot, lucideFolderOpen } from '@ng-icons/lucide';
+import { lucideBot, lucideFolderOpen, lucideTriangleAlert } from '@ng-icons/lucide';
 
 import { WorkspaceDto } from '@/api/model/workspaceDto';
 import { WorkspaceRuntimeStatus } from '@/api/model/workspaceRuntimeStatus';
@@ -62,18 +62,25 @@ import { ZardButtonComponent } from '@/shared/components/button';
                 up since {{ wt.daemonConnectedAt | date: 'short' }}
               </z-badge>
             }
+            <!-- Daemon build identity. When the registry knows a newer build is connected elsewhere
+                 (daemonOutdated), the badge turns into a warning inviting a recreate. -->
             @if (wt.daemonVersion) {
               <z-badge
-                zType="outline"
+                [zType]="wt.daemonOutdated ? 'destructive' : 'outline'"
                 [attr.title]="
-                  wt.daemonBuildTime
-                    ? 'workspace-daemon ' +
-                      wt.daemonVersion +
-                      ' · built ' +
-                      (wt.daemonBuildTime | date: 'medium')
-                    : 'workspace-daemon ' + wt.daemonVersion
+                  wt.daemonOutdated
+                    ? 'A newer workspace-daemon build is available — recreate this workspace to update.'
+                    : wt.daemonBuildTime
+                      ? 'workspace-daemon ' +
+                        wt.daemonVersion +
+                        ' · built ' +
+                        (wt.daemonBuildTime | date: 'medium')
+                      : 'workspace-daemon ' + wt.daemonVersion
                 "
               >
+                @if (wt.daemonOutdated) {
+                  <ng-icon name="lucideTriangleAlert" class="size-3" />
+                }
                 daemon {{ wt.daemonVersion }}
               </z-badge>
             }
@@ -92,6 +99,25 @@ import { ZardButtonComponent } from '@/shared/components/button';
             <button z-button zType="ghost" title="Stop this container" (click)="stopContainer.emit()">
               Stop
             </button>
+            <!-- Only offered when the registry says this daemon is outdated, and only enabled on a
+                 clean tree — recreate destroys the container, so uncommitted work would be lost. The
+                 backend re-verifies CLEAN (rejecting dirty AND unknown), so this is a UX guard only. -->
+            @if (wt.daemonOutdated) {
+              <button
+                z-button
+                zType="secondary"
+                [zDisabled]="wt.clean !== true"
+                [title]="
+                  wt.clean === true
+                    ? 'Recreate this container on the latest workspace-daemon build'
+                    : 'Recreate needs a clean working tree — commit or discard changes first'
+                "
+                (click)="recreateContainer.emit()"
+              >
+                <ng-icon name="lucideTriangleAlert" class="size-4" />
+                Recreate workspace
+              </button>
+            }
           } @else {
             <button
               z-button
@@ -155,7 +181,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
       </div>
     </div>
   `,
-  viewProviders: [provideIcons({ lucideBot, lucideFolderOpen })],
+  viewProviders: [provideIcons({ lucideBot, lucideFolderOpen, lucideTriangleAlert })],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BranchRowComponent {
@@ -184,6 +210,12 @@ export class BranchRowComponent {
   readonly ensureContainer = output<void>();
   /** Gracefully stop this workspace's container (pushes its branch first, then removes it). */
   readonly stopContainer = output<void>();
+  /**
+   * Recreate this workspace's container on the current image to pick up a newer workspace-daemon
+   * build (offered only when {@link WorkspaceDto.daemonOutdated}). Tears the container down and
+   * re-provisions from the branch; enabled only on a clean tree (the backend re-verifies).
+   */
+  readonly recreateContainer = output<void>();
   /** Open this workspace's detail page (file browser + chat dialog). */
   readonly openWorkspace = output<void>();
   /** Open the "Run…" dialog to pick a preconfigured action to run in this workspace. */

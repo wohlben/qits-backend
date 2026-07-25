@@ -28,6 +28,7 @@ export interface WorkspaceDto {
     daemonConnectedAt?: string;
     daemonVersion?: string;
     daemonBuildTime?: string;
+    daemonOutdated?: boolean;
 }
 export namespace WorkspaceDto {
 }
