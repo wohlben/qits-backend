@@ -1865,6 +1865,8 @@ components:
           $ref: "#/components/schemas/WorkspaceRuntimeStatus"
         runtimeError:
           type: string
+        clean:
+          type: boolean
         preamble:
           type: string
         result:

@@ -238,3 +238,13 @@ qits speaks to it over the socket. That collapse is the epic's definition of don
     actions surface (`…/workspaces/{id}/actions[/run]`) runs config actions over the socket **reusing
     `RunCommand`** (no new protocol verb; runs not recorded as `Command` rows). Part 6 (write-back)
     still parked.
+- **[daemon-git-status-monitoring](features/2026-07-24_daemon-git-status-monitoring.md) —
+  implemented (2026-07-24).** The daemon becomes the **sole** working-tree change detector: a new
+  in-container `GitStatusMonitor` (own `inotifywait` + marker dedup) reports a new unsolicited
+  `GitStatus{clean, head}` on boot/reconnect/change; the registry caches it (in-memory, RUNNING-only,
+  new `WorkspaceGitStatus` SPI) behind a nullable `WorkspaceDto.clean` + a branch-tree Clean/Dirty
+  badge. **Removes the host `WorkspaceWatchService`/`WorkspaceWatchSession`** (+ `qits.workspace.watch.*`)
+  and **re-homes** its `FILES` SSE trigger onto the daemon report (which also fires a new `GIT_STATUS`
+  topic on flag flips); `WorkingTreeMarker` stays in `domain` for `DetectionService`/`ComponentMapService`.
+  Supersedes the trigger of
+  [detection live freshness](../qits-workspaces/features/2026-07-12_detection-live-freshness-sse.md).

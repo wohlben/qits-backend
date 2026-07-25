@@ -38,6 +38,16 @@ import { ZardButtonComponent } from '@/shared/components/button';
             >
               {{ wt.runtimeStatus ?? 'STOPPED' }}
             </z-badge>
+            <!-- Working-tree cleanliness, reported live by the in-container daemon. Only shown while
+                 RUNNING and reported (null ⇒ unknown ⇒ no badge). -->
+            @if (wt.clean != null) {
+              <z-badge
+                [zType]="wt.clean ? 'secondary' : 'outline'"
+                [attr.title]="wt.clean ? 'No uncommitted changes' : 'Uncommitted changes in the working tree'"
+              >
+                {{ wt.clean ? 'Clean' : 'Dirty' }}
+              </z-badge>
+            }
           </span>
         }
       </div>

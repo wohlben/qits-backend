@@ -173,6 +173,59 @@ describe('BranchRowComponent', () => {
     expect(buttons.some((b) => b.textContent?.includes('Recreate'))).toBe(true);
   });
 
+  it('shows a Dirty badge when the daemon reports the working tree unclean', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      clean: false,
+    });
+    fixture.detectChanges();
+
+    const badges = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('z-badge'),
+    );
+    expect(badges.some((b) => b.textContent?.includes('Dirty'))).toBe(true);
+    expect(badges.some((b) => b.textContent?.includes('Clean'))).toBe(false);
+  });
+
+  it('shows a Clean badge when the daemon reports the working tree clean', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'RUNNING',
+      clean: true,
+    });
+    fixture.detectChanges();
+
+    const badges = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('z-badge'),
+    );
+    expect(badges.some((b) => b.textContent?.includes('Clean'))).toBe(true);
+  });
+
+  it('shows no clean/dirty badge when cleanliness is unknown (null)', () => {
+    const fixture = TestBed.createComponent(BranchRowComponent);
+    fixture.componentRef.setInput('branch', 'feature/login');
+    fixture.componentRef.setInput('workspace', {
+      workspaceId: 'login-fix',
+      branch: 'feature/login',
+      parent: 'develop',
+      runtimeStatus: 'STOPPED',
+    });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Clean');
+    expect(el.textContent).not.toContain('Dirty');
+  });
+
   it('replaces integrate/abandon with cleanup when the workspace can be cleaned up', () => {
     const fixture = TestBed.createComponent(BranchRowComponent);
     fixture.componentRef.setInput('branch', 'feature/done');

@@ -21,6 +21,7 @@ export interface WorkspaceDto {
     status?: WorkspaceStatus;
     runtimeStatus?: WorkspaceRuntimeStatus;
     runtimeError?: string;
+    clean?: boolean;
     preamble?: string;
     result?: string;
     resolvedAt?: string;

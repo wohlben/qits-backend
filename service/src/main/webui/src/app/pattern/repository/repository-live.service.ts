@@ -71,6 +71,9 @@ export class RepositoryLiveService {
       // reattaches to a running process (or re-enables its buttons once it finishes). Payload never
       // rides this channel; the log rides the process's own SSE stream.
       process: [['repository-active-process', repoId]],
+      // A workspace's in-container daemon reported its working tree flipped clean↔dirty: re-fetch the
+      // branch-tree workspace list so the dirty badge refreshes.
+      'git-status': [['workspaces', repoId]],
     };
   }
 }

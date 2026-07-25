@@ -87,6 +87,15 @@ describe('RepositoryLiveService', () => {
     expect(invalidatedKeys()).toEqual([JSON.stringify(['repository-active-process', 'repo-1'])]);
   });
 
+  it('maps the git-status hint to the workspaces invalidation', () => {
+    const { source } = connect();
+    invalidate.mockClear();
+
+    source.emitTopic('git-status');
+
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces', 'repo-1'])]);
+  });
+
   it('ignores unknown topics such as the heartbeat', () => {
     const { source } = connect();
     invalidate.mockClear();
@@ -96,14 +105,17 @@ describe('RepositoryLiveService', () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
-  it('on (re)connect, invalidates the active-process key once', () => {
+  it('on (re)connect, invalidates every topic key once', () => {
     const { source } = connect();
     invalidate.mockClear();
 
     source.emitOpen();
 
-    expect(invalidate).toHaveBeenCalledTimes(1);
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['repository-active-process', 'repo-1'])]);
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidatedKeys()).toEqual([
+      JSON.stringify(['repository-active-process', 'repo-1']),
+      JSON.stringify(['workspaces', 'repo-1']),
+    ]);
   });
 
   it('closes the EventSource when the providing component is destroyed', () => {

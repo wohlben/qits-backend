@@ -1,5 +1,14 @@
 # Live working-tree freshness for `/files` and `/detection` — a per-workspace file watcher over SSE
 
+> **Superseded (2026-07-24, [daemon git-status monitoring](../../qits-workspace-daemon/features/2026-07-24_daemon-git-status-monitoring.md)):**
+> the host-side `WorkspaceWatchService`/`WorkspaceWatchSession` (a `docker exec inotifywait` per
+> workspace) has been **removed**. The `FILES` hint and its `files` SSE topic — and everything
+> downstream in this doc — are unchanged, but the **trigger** now comes from the in-container
+> `workspace-daemon`: it watches `/workspace` with its own `inotifywait`, dedups on the same
+> working-tree marker, and reports over its control socket; `WorkspaceDaemonRegistry` fires the
+> `FILES` hint on each report. Read this doc for the SSE/marker/generation-token design; read the
+> daemon feature for who fires `FILES` today.
+
 ## Introduction
 
 [Backend framework detection](2026-07-12_backend-framework-detection.md) moved
