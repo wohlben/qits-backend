@@ -78,6 +78,15 @@ Related epics / cross-cutting concerns:
   image path for the interactive PTY — spike-proven 2026-07-20). Depends on the workspace-detail
   [refresh-resilient-prompt-building](../qits-workspace-detail/feature-ideas/refresh-resilient-prompt-building.md)
   persistence, which it promotes to a necessity.
+- **[agent-activity-tracking](feature-ideas/agent-activity-tracking.md)** — turn Claude Code's
+  lifecycle hooks (`UserPromptSubmit`/`Stop`/`Notification`) into a live "cooking / idle / waiting"
+  activity state: qits injects hooks that POST to a new loopback webhook on the workspace-daemon, the
+  daemon relays it over its dial-home socket, the host caches it in the in-mem `WorkspaceDaemonRegistry`
+  (SPI + `AGENT_ACTIVITY` change hint), and a new Agents-tab item shows/configures it. Copies the
+  [daemon-git-status-monitoring](../qits-workspace-daemon/features/2026-07-24_daemon-git-status-monitoring.md)
+  transport pattern, and **retires the current direct-to-host `SessionStart` hook** — session-lineage
+  reporting (`CommandService.reportAgentSession`) keeps working but is re-fed over the same daemon route,
+  removing the second hook and the `POST /api/commands/{id}/agent-session` endpoint.
 
 ## Done when
 
@@ -98,3 +107,4 @@ epic's creation has landed here.
 | [kimi-code-harness](features/2026-07-20_kimi-code-harness.md) | implemented |
 | [kimi-code-acp-chat](features/2026-07-22_kimi-code-acp-chat.md) | implemented |
 | [mcp-task-prompt-delivery](feature-ideas/mcp-task-prompt-delivery.md) | idea |
+| [agent-activity-tracking](feature-ideas/agent-activity-tracking.md) | idea |
