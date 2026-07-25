@@ -143,16 +143,25 @@ Add a `WorkspaceAgentActivityComponent` under `pattern/workspace/` and stack it 
 Refine `agentsIndicator()` so the tab dot reflects `BUSY` (`primary`/pulsing) vs merely
 present-but-idle, upgrading today's binary running/not-running dot into a real busy signal.
 
+## As implemented (resolved decisions)
+
+- **Transport = TCP loopback** `127.0.0.1:13337` (`qits.workspace-daemon.hooks-port`), a raw Vert.x
+  `HttpServer` — not a unix-domain socket (which would need Netty native-transport + GraalVM
+  native-image config on the daemon binary; the port is loopback-only and reachable since the agent
+  and daemon share the container's network namespace).
+- **Command correlation = query param**: the hook `curl`s
+  `http://127.0.0.1:13337/hooks/claude-code?commandId=<id>`; the daemon reads the param and forwards
+  it opaquely, staying a dumb forwarder.
+- **Both harnesses fully tracked**: Claude (`--settings` hook layer) *and* Kimi (one `[[hooks]]`
+  TOML block per event) emit the complete event set when tracking is on. SessionStart is always
+  injected by both (lineage). Kimi's `[[hooks]]` event-name vocabulary should be re-verified against
+  the pinned Kimi CLI — an event Kimi doesn't recognize simply never fires (harmless).
+- **Config = instance-level** one key `agent.activity-tracking.enabled` (default `true`,
+  canonicalized to `true`/`false`), gating only the turn-boundary events; SessionStart lineage is
+  never gated. Per-workspace override is a later refinement if wanted.
+
 ## Open questions
 
-- **TCP loopback vs unix socket**: a unix-domain socket at a fixed in-container path
-  (`curl --unix-socket …`) needs no port allocation and is inherently loopback-only; a
-  `127.0.0.1:<port>` is simpler to `curl` and more portable. Lean unix socket.
-- **Command correlation transport**: render `commandId` as a query param on the hook `curl` vs. an
-  added JSON body field. Query param is simpler to inject and keeps the daemon a dumb forwarder; lean
-  query param.
-- **Instance-level vs per-workspace config**: start instance-level (one settings key) for parity with
-  `agent.default-type`; per-workspace override is a later refinement if wanted.
 - **Manual `claude` runs**: writing hooks into claude-home `settings.json` would cover sessions qits
   didn't launch, but muddies "qits-managed" vs "user" config on the shared volume. Deferred.
 

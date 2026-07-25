@@ -7,11 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { WorkspaceActionDto } from './workspaceActionDto';
 
 
 export interface Response37 { 
-    exitCode?: number;
-    stdout?: string;
-    stderr?: string;
+    actions?: Array<WorkspaceActionDto>;
 }
 

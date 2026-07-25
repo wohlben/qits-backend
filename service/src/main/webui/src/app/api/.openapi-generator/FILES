@@ -42,6 +42,7 @@ model/actionConfigurationDto.ts
 model/actionOrigin.ts
 model/actionType.ts
 model/addAttachmentRequest.ts
+model/agentActivityState.ts
 model/agentLaunchMode.ts
 model/agentMcpScope.ts
 model/agentSessionNodeDto.ts
@@ -129,7 +130,6 @@ model/models.ts
 model/projectDto.ts
 model/promptAttachmentSource.ts
 model/refinePromptRequest.ts
-model/reportAgentSessionRequest.ts
 model/repositoryArchetype.ts
 model/repositoryDto.ts
 model/repositorySubmoduleDto.ts
@@ -143,7 +143,6 @@ model/response103.ts
 model/response104.ts
 model/response105.ts
 model/response106.ts
-model/response107.ts
 model/response11.ts
 model/response12.ts
 model/response13.ts

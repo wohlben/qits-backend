@@ -7,9 +7,10 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ServiceEventDto } from './serviceEventDto';
 
 
 export interface Response77 { 
-    id?: string;
+    events?: Array<ServiceEventDto>;
 }
 

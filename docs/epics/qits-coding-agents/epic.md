@@ -68,6 +68,14 @@ Related epics / cross-cutting concerns:
 - **[agent-lsp-plugins](features/2026-07-07_agent-lsp-plugins.md)** (07-07) — install Claude
   Code LSP plugins (jdtls, typescript-lsp) per workspace to sharpen the agent's code navigation
   (surfaced via the workspace-detail Plugins/Agents tab).
+- **[agent-activity-tracking](features/2026-07-25_agent-activity-tracking.md)** (07-25) — a live
+  "cooking / idle / waiting" activity state for both harnesses: qits injects lifecycle hooks that
+  POST to a new loopback webhook on the workspace-daemon (TCP `127.0.0.1:13337`), the daemon relays
+  an `AgentActivity` frame over its dial-home socket, the host caches it in `WorkspaceDaemonRegistry`
+  (new `WorkspaceAgentActivity` SPI + `AGENT_ACTIVITY` change hint → `WorkspaceDto.agentActivity`),
+  and a new Agents-tab item shows/configures it. Copies the daemon git-status transport and
+  **retires the direct-to-host `SessionStart` hook** — session-lineage (`reportAgentSession`) is
+  re-fed over the same daemon route, removing the `POST /api/commands/{id}/agent-session` endpoint.
 
 ## Parts (ideas)
 
@@ -78,16 +86,6 @@ Related epics / cross-cutting concerns:
   image path for the interactive PTY — spike-proven 2026-07-20). Depends on the workspace-detail
   [refresh-resilient-prompt-building](../qits-workspace-detail/feature-ideas/refresh-resilient-prompt-building.md)
   persistence, which it promotes to a necessity.
-- **[agent-activity-tracking](feature-ideas/agent-activity-tracking.md)** — turn Claude Code's
-  lifecycle hooks (`UserPromptSubmit`/`Stop`/`Notification`) into a live "cooking / idle / waiting"
-  activity state: qits injects hooks that POST to a new loopback webhook on the workspace-daemon, the
-  daemon relays it over its dial-home socket, the host caches it in the in-mem `WorkspaceDaemonRegistry`
-  (SPI + `AGENT_ACTIVITY` change hint), and a new Agents-tab item shows/configures it. Copies the
-  [daemon-git-status-monitoring](../qits-workspace-daemon/features/2026-07-24_daemon-git-status-monitoring.md)
-  transport pattern, and **retires the current direct-to-host `SessionStart` hook** — session-lineage
-  reporting (`CommandService.reportAgentSession`) keeps working but is re-fed over the same daemon route,
-  removing the second hook and the `POST /api/commands/{id}/agent-session` endpoint.
-
 ## Done when
 
 Rolling: current when its `feature-ideas/` is empty and every coding-agent feature since this
@@ -106,5 +104,5 @@ epic's creation has landed here.
 | [agent-lsp-plugins](features/2026-07-07_agent-lsp-plugins.md) | implemented |
 | [kimi-code-harness](features/2026-07-20_kimi-code-harness.md) | implemented |
 | [kimi-code-acp-chat](features/2026-07-22_kimi-code-acp-chat.md) | implemented |
+| [agent-activity-tracking](features/2026-07-25_agent-activity-tracking.md) | implemented |
 | [mcp-task-prompt-delivery](feature-ideas/mcp-task-prompt-delivery.md) | idea |
-| [agent-activity-tracking](feature-ideas/agent-activity-tracking.md) | idea |

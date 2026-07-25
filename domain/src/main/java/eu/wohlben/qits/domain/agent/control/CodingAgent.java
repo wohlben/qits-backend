@@ -73,6 +73,14 @@ public abstract class CodingAgent {
   /** The qits endpoint the harness reports session-identity changes to, or null. */
   protected String sessionReportingUrl;
 
+  /**
+   * Whether to also emit the turn-boundary activity hooks (UserPromptSubmit / Stop / Notification /
+   * SessionEnd) alongside the always-on SessionStart hook. Gated by the {@code
+   * agent.activity-tracking.enabled} setting; SessionStart is emitted regardless (it drives
+   * session-lineage). Only meaningful when {@link #sessionReportingUrl} is set.
+   */
+  protected boolean activityTracking;
+
   /** Attaches an MCP server under {@code key} with a harness-agnostic {@link McpServers} config. */
   public CodingAgent mcpServer(String key, Object config) {
     this.mcpServers.put(key, config);
@@ -156,6 +164,16 @@ public abstract class CodingAgent {
    */
   public CodingAgent sessionReporting(String url) {
     this.sessionReportingUrl = url;
+    return this;
+  }
+
+  /**
+   * Enables the turn-boundary activity hooks (BUSY/IDLE/WAITING/ENDED) on top of the always-on
+   * SessionStart lineage hook. Off by default; the launch path sets it from the {@code
+   * agent.activity-tracking.enabled} instance setting.
+   */
+  public CodingAgent activityTracking(boolean on) {
+    this.activityTracking = on;
     return this;
   }
 
