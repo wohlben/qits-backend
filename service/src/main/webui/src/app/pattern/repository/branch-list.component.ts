@@ -825,8 +825,8 @@ export class BranchListComponent {
     onSuccess: (res) => {
       invalidateRepository(this.queryClient, this.repoId());
       this.closeDialog();
-      // The backend already spawned the autonomous Claude command on the resolution workspace; open
-      // its terminal so the human watches it work.
+      // The backend already spawned the autonomous agent chat on the resolution workspace; open
+      // its command page (the live chat frame) so the human watches it work.
       if (res.commandId) {
         this.router.navigate(['/commands', res.commandId]);
       }

@@ -121,24 +121,43 @@ public class AgentLaunchServiceKimiTest {
   }
 
   @Test
-  public void renderAutonomousUsesKimiWithStreamJson() {
+  public void renderAutonomousChatUsesKimiAcp() {
     String projectId = UUID.randomUUID().toString();
     String repoId = UUID.randomUUID().toString();
     seedRepository(projectId, repoId);
 
     AgentLaunchService.PinnedSession pinned = unpinned();
     LaunchSpec spec =
-        agentLaunchService.renderAutonomous(
+        agentLaunchService.renderAutonomousChat(
             repoId, "work", AgentMcpScope.REPOSITORY, pinned, AgentType.KIMI);
 
+    // Autonomous rides the chat pipeline, and Kimi chat is the ACP transport — a plain
+    // `exec kimi acp`, no per-launch farm and no mcp.json (the MCP scope, including the read-only
+    // marking, rides the ACP session/new instead — see acpSessionConfigReadOnlyMarksServerUrls).
+    assertEquals("exec kimi acp", spec.script());
+    assertFalse(spec.script().contains("mcp.json"), spec.script());
+    assertFalse(
+        spec.script().contains(AgentLaunchService.TASK_PROMPT_BOOTSTRAP),
+        "the bootstrap turn rides stdin, not the argv: " + spec.script());
+  }
+
+  @Test
+  public void acpSessionConfigReadOnlyMarksServerUrls() {
+    String projectId = UUID.randomUUID().toString();
+    String repoId = UUID.randomUUID().toString();
+    seedRepository(projectId, repoId);
+
+    // The autonomous launch builds the ACP config read-only, so ReadOnlyRepositoryToolFilter
+    // fences the mutating repository tools — the ACP counterpart of the URL marking Claude gets.
+    AcpSessionConfig config =
+        agentLaunchService.buildAcpSessionConfig(
+            repoId, "work", AgentMcpScope.REPOSITORY, unpinned(), true);
+
+    assertEquals(1, config.mcpServers().size());
+    AcpSessionConfig.AcpMcpServer repository = config.mcpServers().get(0);
+    assertTrue(repository.url().contains("agentReadOnly=true"), repository.url());
     assertTrue(
-        spec.script().contains("kimi -p '" + AgentLaunchService.TASK_PROMPT_BOOTSTRAP + "'"),
-        spec.script());
-    assertTrue(spec.script().contains("--output-format stream-json"), spec.script());
-    assertTrue(spec.script().contains("[[hooks]]"), spec.script());
-    assertTrue(
-        spec.script().contains("/hooks/claude-code?commandId=" + pinned.commandId()),
-        spec.script());
+        repository.enabledTools().contains("taskPrompt"), repository.enabledTools().toString());
   }
 
   @Test

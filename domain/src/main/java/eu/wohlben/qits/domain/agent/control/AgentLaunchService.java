@@ -269,31 +269,55 @@ public class AgentLaunchService {
   }
 
   /**
-   * Spawns an autonomous, one-shot Claude run ({@code claude -p '…'
-   * --dangerously-skip-permissions}) that <strong>fetches</strong> its task over MCP: the narrowed
-   * repository server is attached and the argv prompt is the {@link #TASK_PROMPT_BOOTSTRAP} turn,
-   * so the run reads the workspace's composed draft (which the caller must persist first) via
-   * {@code taskPrompt}. Used by composed flows such as conflict resolution. Returns the spawned
-   * command.
+   * Spawns an autonomous agent run as a <strong>chat</strong> command (kind {@code CHAT}) that
+   * <strong>fetches</strong> its task over MCP: the narrowed repository server is attached
+   * (read-only marked) and the seed turn is the {@link #TASK_PROMPT_BOOTSTRAP}, so the run reads
+   * the workspace's composed draft (which the caller must persist first) via {@code taskPrompt}.
+   * Riding the chat pipeline — instead of the old one-shot {@code claude -p}, which printed nothing
+   * until it exited — renders the run as a live conversation on its command page, and the human can
+   * follow up in the same session once the autonomous turn finishes. Used by composed flows such as
+   * conflict resolution. Returns the spawned command (the sign-in REPL when the agent isn't logged
+   * in yet, exactly like {@link #launchChat}).
    */
   public CommandDto launchAutonomous(String repoId, String workspaceId, String name) {
     // Composed flows carry no per-launch choice, so they resolve the qits-wide default.
     AgentType type = agentTypeResolver.resolve(null);
+
+    // Same container + auth gate as chat: the run needs a live container, and without the
+    // shared-volume login it would just die unauthenticated — redirect to the sign-in REPL instead.
+    workspaceService.ensureContainer(repoId, workspaceId);
+    if (!agentAuthStatus.isLoggedIn(repoId, workspaceId, type)) {
+      return launchLogin(repoId, workspaceId, type);
+    }
+
     PinnedSession pinned = pinSession(repoId, workspaceId, null, false, type);
-    LaunchSpec spec = renderAutonomous(repoId, workspaceId, AgentMcpScope.REPOSITORY, pinned, type);
+    LaunchSpec spec =
+        renderAutonomousChat(repoId, workspaceId, AgentMcpScope.REPOSITORY, pinned, type);
+    ChatProtocolFactory protocolFactory =
+        type == AgentType.KIMI
+            ? process ->
+                new AcpChatProtocol(
+                    process,
+                    buildAcpSessionConfig(
+                        repoId, workspaceId, AgentMcpScope.REPOSITORY, pinned, true))
+            : null;
     CommandDto command =
-        commandService.launchAgent(
+        commandService.launchChat(
             repoId,
             workspaceId,
             name,
             spec.script(),
-            true,
             spec.environment(),
             pinned.commandId(),
             pinned.ref(),
-            transcriptSweep(),
+            chatTranscriptSweep(),
+            protocolFactory,
             type);
-    // Autonomous always renders the bootstrap turn; recordRun is a no-op when the workspace has no
+    transcriptTailService.startTail(command.id(), type);
+    // The bootstrap rides stdin as the first user turn (a chat only speaks over stdin); the agent
+    // then pulls the real composed prompt back over MCP via taskPrompt.
+    commandRegistry.chatSend(command.id(), TASK_PROMPT_BOOTSTRAP);
+    // Autonomous always delivers the bootstrap turn; recordRun is a no-op when the workspace has no
     // draft row, so it needs no separate deliverability probe (the resolution caller persists one).
     recordDelivery(true, repoId, workspaceId, command.id());
     return command;
@@ -617,12 +641,26 @@ public class AgentLaunchService {
    */
   AcpSessionConfig buildAcpSessionConfig(
       String repoId, String workspaceId, AgentMcpScope scope, PinnedSession pinned) {
+    return buildAcpSessionConfig(repoId, workspaceId, scope, pinned, false);
+  }
+
+  /**
+   * {@link #buildAcpSessionConfig} with the autonomous read-only marking: {@code readOnly} appends
+   * the {@code agentReadOnly} marker to each server URL so the mutating repository tools are fenced
+   * — the ACP counterpart of {@link #renderAutonomousChat}'s URL marking.
+   */
+  AcpSessionConfig buildAcpSessionConfig(
+      String repoId,
+      String workspaceId,
+      AgentMcpScope scope,
+      PinnedSession pinned,
+      boolean readOnly) {
     List<AcpSessionConfig.AcpMcpServer> servers = new java.util.ArrayList<>();
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
       servers.add(
           new AcpSessionConfig.AcpMcpServer(
               server.key(),
-              server.url(),
+              readOnly ? readOnlyMarked(server.url()) : server.url(),
               KimiCodeAgent.stripServerPrefix(server.key(), server.allowedTools())));
     }
     AgentSessionRef ref = pinned.ref();
@@ -637,11 +675,12 @@ public class AgentLaunchService {
   }
 
   /**
-   * Renders the one-shot autonomous run: the {@code scope} MCP servers attached (so {@code
-   * taskPrompt} is reachable), the credential overlay, skip-permissions, and the bootstrap turn as
-   * the {@code -p} argv. Package-visible so the MCP attachment is assertable without a container.
+   * Renders the autonomous run as a stream-json chat: the {@code scope} MCP servers attached (so
+   * {@code taskPrompt} is reachable), the credential overlay and skip-permissions — like {@link
+   * #renderChat}, but with each server URL read-only marked. Package-visible so the MCP attachment
+   * is assertable without a container.
    */
-  LaunchSpec renderAutonomous(
+  LaunchSpec renderAutonomousChat(
       String repoId,
       String workspaceId,
       AgentMcpScope scope,
@@ -649,15 +688,13 @@ public class AgentLaunchService {
       AgentType agentType) {
     CodingAgent agent = CodingAgentFactory.ofType(agentType);
     for (ScopedMcp server : serversFor(repoId, workspaceId, scope)) {
-      // Unattended run under skip-permissions: mark the server read-only so
+      // Unattended first turn under skip-permissions: mark the server read-only so
       // ReadOnlyRepositoryToolFilter (service module) hides the mutating repository tools
       // (createWorkspace/integrateBranch/…). The run still gets taskPrompt + the read-only tools;
       // its own git work happens inside its container, not via host-side MCP mutations.
       agent.mcpServer(server.key(), McpServers.httpMcp(readOnlyMarked(server.url())));
     }
-    return withSession(withAgentHome(agent, agentType), pinned)
-        .skipPermissions()
-        .run(TASK_PROMPT_BOOTSTRAP);
+    return withSession(withAgentHome(agent, agentType), pinned).skipPermissions().chat();
   }
 
   /**
