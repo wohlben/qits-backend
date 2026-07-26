@@ -103,6 +103,8 @@ All Maven commands use the wrapper.
 # code-seeded global `Bash` action. The fixture's committed `.qits-config.yml` (a web-viewable
 # OTEL-enabled `quarkus:dev` service, the bootstrap chain, actions) is the workspace-scoped source
 # of truth — read in-container per workspace by the workspace-daemon, never ingested into DB rows.
+# (Qits config default location is `.config/qits/repository.yml`; the root-level `.qits-config.yml`
+# the fixture and qits-backend itself still use is the supported legacy fallback.)
 # Exercises the stack-specific feature surface (framework detection, web view, observability,
 # feature-flows, the coding agent) — the counterpart to `seed` (which owns git merge/divergence).
 # Idempotent by RESET — re-running deletes and recreates the project, so it always returns to the same

@@ -84,6 +84,8 @@ daemons come up.
 
 **qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this service
 (and the build/test/lint actions) — and that file is the only place the service exists**
+(qits-backend still uses the legacy root location; the default for new repos is
+`.config/qits/repository.yml`, with the root-level `.qits-config.yml` read as fallback)
 ([config-as-single-source-of-truth](../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)):
 config is **workspace-scoped, file-only, read in-container** by the workspace-daemon from its own
 checkout. There is no DB copy, no ingestion on clone, and no UI editor — the service shows up on a

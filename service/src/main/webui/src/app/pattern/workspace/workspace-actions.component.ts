@@ -43,7 +43,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
           @if (actions.length === 0) {
             <p class="text-sm text-muted-foreground">
               No actions configured — define global ones under Action Configurations or declare them
-              in the repository's .qits-config.yml.
+              in the repository's qits config (.config/qits/repository.yml).
             </p>
           } @else {
             <ul class="flex flex-col divide-y rounded-md border">

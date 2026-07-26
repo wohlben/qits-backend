@@ -13,6 +13,12 @@
 > runs config actions over the control socket **reusing the existing `RunCommand` verb** — no new
 > `DaemonMessage`. See [`docs/implementation-plan.md`](../../../implementation-plan.md) Part 5.
 
+> **Relocated 2026-07-26.** The default committed location is now **`.config/qits/repository.yml`**;
+> the original root-level `.qits-config.yml` stays supported as a **fallback**, read only when the
+> new path is absent (in-container by the daemon's `ConfigReader`, host-side by
+> `QitsConfigParser.readConfig` — which tries `CONFIG_PATH` then `LEGACY_CONFIG_PATH`). Mentions of
+> `.qits-config.yml` in this doc predate the move; everything else about the model is unchanged.
+
 ## Introduction
 
 Part 5 of the **provisioning-inversion** track of [qits-workspace-daemon](../epic.md) (see the
