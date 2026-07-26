@@ -43,7 +43,7 @@ Related epics / cross-cutting concerns:
 
 ## Parts, in implementation order
 
-1. **[ci-post-receive-pipeline](feature-ideas/ci-post-receive-pipeline.md)** *(idea)* — the MVP:
+1. **[ci-post-receive-pipeline](features/2026-07-26_ci-post-receive-pipeline.md)** *(implemented)* — the MVP:
    the self-contained `ci/` module (own datasource/Flyway, event intake, runner), the
    `ci-post-receive.yml` format (`steps` with `script` + `image`), the `ReceivePack` post-receive
    trigger, sequential containerized step execution, and a persisted run/step status per push. No
@@ -66,5 +66,5 @@ subsequent CI feature lands here.
 
 | Part | Status |
 |---|---|
-| [ci-post-receive-pipeline](feature-ideas/ci-post-receive-pipeline.md) | idea |
+| [ci-post-receive-pipeline](features/2026-07-26_ci-post-receive-pipeline.md) | implemented |
 | standalone-ci-service | future (not yet drafted) |

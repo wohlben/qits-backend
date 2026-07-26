@@ -47,6 +47,21 @@ class PublicPathsTest {
   }
 
   @Test
+  void onlyTheCiEventIntakeIsPublic() {
+    // The intake is token-free at the session-policy layer (the git host's post-receive hook holds
+    // no session, and after extraction is another process) and guarded by the static-token filter
+    // in `service`.
+    assertTrue(PublicPaths.isPublic("/api/ci/events/post-receive"));
+    // Run READS are not public: step output is the build log of a possibly private repository, and
+    // repo ids are handed to containers/clone urls, so anonymous reads would leak them.
+    assertFalse(PublicPaths.isPublic("/api/ci/repositories/r1/runs"));
+    assertFalse(PublicPaths.isPublic("/api/ci/runs/run-1"));
+    assertFalse(PublicPaths.isPublic("/api/ci"));
+    assertFalse(PublicPaths.isPublic("/api/ci/events")); // only the subtree, not the bare path
+    assertFalse(PublicPaths.isPublic("/api/cinema")); // prefix must not bleed
+  }
+
+  @Test
   void configRelayIsPublicExactlyNotAsPrefix() {
     assertTrue(PublicPaths.isPublic("/api/config.json"));
     assertFalse(PublicPaths.isPublic("/api/config.json/extra"));

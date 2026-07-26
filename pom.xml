@@ -18,6 +18,10 @@
              plain library jar with its OWN named datasource (a separate H2, artifacts-style),
              consumed by `service` which hosts its REST boundary. -->
         <module>epics</module>
+        <!-- The CI pipeline domain (docs/epics/qits-ci/): the in-repo ci-<event>.yml pipelines as a
+             quality gate — a plain library jar with its OWN named datasource (a separate H2,
+             artifacts-style), consumed by `service` which hosts its REST boundary. -->
+        <module>ci</module>
         <!-- The in-container workspace-daemon control plane (docs/epics/qits-workspace-daemon/): a tiny
              framework-free wire-contract jar shared by `service` (the control-socket route) and
              `workspace-daemon` (the native binary), so neither side owns the protocol. Depends on nothing. -->
@@ -119,6 +123,11 @@
             <dependency>
                 <groupId>eu.wohlben</groupId>
                 <artifactId>epics</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.wohlben</groupId>
+                <artifactId>ci</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

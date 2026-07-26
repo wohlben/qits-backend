@@ -84,6 +84,12 @@ services:
       # docs/guides/deployment.md): the network is external and shared, so two stacks answering the
       # same alias round-robin each other's container->qits traffic (git 404s, cross-stack OTLP/MCP).
       QITS_WORKSPACE_GIT_HOST: ${QITS_WORKSPACE_GIT_HOST:-qits}
+      # CI step containers clone from the git host by the same alias (qits.ci.container-git-url) and
+      # MUST join the same network the alias exists on — both track the per-stack values above, or a
+      # second stack's steps would join a stray `qits-net` where `qits-b` does not resolve and every
+      # run would go red. The port follows QUARKUS_HTTP_PORT for the same reason.
+      QITS_CI_CONTAINER_GIT_URL: http://${QITS_WORKSPACE_GIT_HOST:-qits}:${QUARKUS_HTTP_PORT:-8080}
+      QITS_CI_NETWORK: ${QITS_WORKSPACE_NETWORK:-qits-net}
       # The docker network qits creates workspace containers on (qits.workspace.network). Same value
       # compose resolves for the external network below — one .env setting drives both. Per-stack
       # unique on multi-stack servers, for the same reason as the alias.

@@ -29,6 +29,11 @@ public final class PublicPaths {
         || path.startsWith(
             "/api/artifacts/") // blob store: CI uploaders (writes token-guarded) + <img> serves
         || path.equals("/api/artifacts")
+        // ci pipelines: ONLY the git host's event intake is token-free (its caller holds no
+        // session, and after extraction is another process); it is guarded by the static
+        // qits.ci.token. Run reads are NOT public — step output is build logs of a possibly
+        // private repository, so /api/ci/repositories/… and /api/ci/runs/… stay behind the policy.
+        || path.startsWith("/api/ci/events/")
         || path.equals("/api/config.json") // the SPA identity relay, fetched pre-bootstrap
         || path.startsWith("/api/auth/"); // /api/auth/me + the oauth variant's logout path
   }

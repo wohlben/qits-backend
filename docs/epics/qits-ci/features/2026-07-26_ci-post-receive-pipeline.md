@@ -146,3 +146,73 @@ core.
 - Extended (`-Pextended`, real docker): one IT pushing a commit whose config runs a trivial step in
   a real image, asserting `SUCCESS` and captured output; one asserting a failing script yields
   `FAILED` with the exit code.
+
+## As implemented (2026-07-26)
+
+Landed on the sketch above, with one deliberate departure: the sketch's "reads are open" became
+"only the event intake is public" once it was clear step output is a build log. The decisions the
+sketch left open, as shipped:
+
+- **Module**: `ci/` (`eu.wohlben.qits.ci`, entity/persistence/control/mapper/dto + framework-free
+  `error/`). Named datasource/PU/Flyway (`quarkus.{datasource,hibernate-orm,flyway}.ci.*`) ship in
+  the jar's `META-INF/microprofile-config.properties`; H2 under `~/.qits/data/ci/h2/ci`,
+  migrations at `db/ci/migration`, git caches for config reads under `~/.qits/data/ci/repos/`.
+  `service` indexes it (`quarkus.index-dependency.ci.*`) and hosts `eu.wohlben.qits.ci.api`
+  (`CiEventController`, `CiRunController`, `CiTokenFilter`, `CiExceptionMapper`), all
+  `@Operation(hidden = true)`. **Only `/api/ci/events/` is on `PublicPaths`** (its caller, the git
+  host hook, holds no session): run reads carry build logs of possibly private repositories, so they
+  stay behind `QitsAuthPolicy` rather than being open like artifacts blobs.
+- **Trigger**: `GitHostRoutes` resolves an `OpenedRepo` (id + JGit repo) per request and sets
+  `setPostReceiveHook` on the push-path `ReceivePack` only; `CiPostReceiveNotifier` posts one
+  event per OK non-delete `refs/heads/*` `ReceiveCommand` to `qits.ci.intake-url`
+  (`OtelForwarder`-style async fire-and-forget, `X-CI-Token` attached when configured). The git
+  host's want policy stays JGit's default `ADVERTISED` — relaxing it to `REACHABLE_COMMIT` would
+  put a reachability walk behind every non-tip want on an unauthenticated route, so ci instead
+  fetches the **branch ref** and verifies reachability itself (below).
+- **Hostile-input handling**: the intake is reachable without a session and its token is blank by
+  default, so `CiIdentifiers` validates `repoId`/`branch`/`sha` before any of them reaches a
+  filesystem path or a `git`/`bash` argv, and the runner passes the clone url and sha to `bash` as
+  **positional arguments** (`$1`/`$2`) instead of interpolating them. Step containers run
+  `--cap-drop=ALL --security-opt=no-new-privileges` with `qits.ci.{memory-limit,pids-limit,cpus}`
+  caps and never see the docker socket. The residual exposure — a push is *itself* unauthenticated,
+  and running repo-committed scripts is the feature — is tracked in
+  `docs/issues/2026-07-26_ci-executes-repo-controlled-code-from-unauthenticated-pushes.md`.
+- **Execution**: `CiRunService` runs serially on a single-threaded daemon worker (intake returns
+  202; runs across all repos queue — parallelism stays a follow-up), each DB transition in its own
+  `QuarkusTransaction.requiringNew()`. `CiDockerRunner` shells `qits.ci.container-runtime` with a
+  strict clone/checkout prelude before the script (`set -e` … `set +e`) — so **step images must
+  contain `git` and `bash`**; an image without them fails its step with the honest prelude error
+  in the output. One conservative timeout (`qits.ci.step-timeout-seconds`, default 900); a
+  timed-out step is `docker rm -f`'d and recorded FAILED with a `[step timed out]` marker. Step
+  output is bounded **while reading** (`CiProcess` keeps a rolling tail of
+  `qits.ci.output-max-chars`, default 64k) — a step's output is attacker-controlled and unbounded, so
+  buffering it whole would let one chatty step OOM the shared qits JVM. Step containers clone from
+  `qits.ci.container-git-url` and join `qits.ci.network`; **both must name the same per-stack
+  network/alias** (the prod compose file derives them from `QITS_WORKSPACE_{GIT_HOST,NETWORK}`, or a
+  second stack's steps would join a network where the alias does not resolve). Host-side config
+  fetches use `qits.ci.git-host-url`.
+- **Recording semantics** — a run is recorded only when it says something true about a commit:
+  - absent config ⇒ nothing (opt-in);
+  - git host unreachable ⇒ nothing, warn-logged (a read failure must not invent a gate — the
+    `QitsConfigParser` stance);
+  - **commit no longer reachable** (amended/force-pushed away) ⇒ nothing. The config read fetches
+    `refs/heads/<branch>` and checks the pushed sha is still an ancestor of the tip, so an ordinary
+    racing push (branch advanced, commit still reachable) still runs, while a replaced commit is
+    `GONE`. This matters because a red run would blame a commit whose build was never broken, and the
+    epic's planned blocking gate would then reject the branch.
+  - a step whose **clone/checkout prelude** failed means the script never ran, so the exit code
+    belongs to `git`, not the pipeline. The runner reports that separately from the exit code (an
+    `ERR` trap emits a sentinel *at the point of failure*, so it survives the output tail-truncation
+    a success marker printed before a chatty script would not). The service then asks git which cause
+    it was: commit `GONE` ⇒ the run is discarded (it describes a push that no longer exists), commit
+    still reachable ⇒ the step stays recorded FAILED with its prelude error, which is how a step
+    image **missing `git`/`bash`** surfaces. Discarding both would hide a genuinely broken pipeline.
+  - present but broken/absurdly large config ⇒ `CONFIG_ERROR`, so the broken gate is visible;
+  - present with **no steps** ⇒ a trivially green zero-step `SUCCESS` run — opted in and visible,
+    unlike an absent file.
+- **Interrupted runs**: a run left `RUNNING` by a crash cannot resume (the worker queue dies with the
+  JVM), so `CiRunService` sweeps them to `FAILED` at startup, and any mid-run failure moves that
+  run's `RUNNING`/`PENDING` steps to terminal states — no finished run ever contains a step that
+  claims to still be executing. Both the sweep and `CiDockerRunner`'s network-ensure skip `TEST`
+  launch mode, since `@Mock` replaces a bean only at injection points and its `StartupEvent`
+  observer would otherwise still fire (and shell docker) in every test app.

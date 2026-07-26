@@ -47,6 +47,8 @@ services:
       # OTLP, MCP) is plain DNS, no eth0/host.docker.internal. Matches the `qits` alias below.
       # Quarkus maps this env var to the `qits.workspace.git-host` config property.
       QITS_WORKSPACE_GIT_HOST: qits
+      # Same alias for CI step containers cloning from the git host (qits.ci.container-git-url).
+      QITS_CI_CONTAINER_GIT_URL: http://qits:8080
       # Bind Quarkus on ALL interfaces. `quarkus:dev` binds the HTTP port to `localhost` by default,
       # which is fine when qits runs on the host but fatal here: qits now runs *inside* a container on
       # qits-net, so a loopback bind makes qits:8080 unreachable from the sibling workspace containers

@@ -40,6 +40,13 @@
             <artifactId>epics</artifactId>
         </dependency>
         <dependency>
+            <!-- The CI pipeline domain (docs/epics/qits-ci/): a plain library jar this module hosts
+                 the REST boundary for (eu.wohlben.qits.ci.api). Indexed for Arc + its own
+                 persistence unit via quarkus.index-dependency.ci.* in application.properties. -->
+            <groupId>eu.wohlben</groupId>
+            <artifactId>ci</artifactId>
+        </dependency>
+        <dependency>
             <!-- The workspace-daemon control-plane wire contract (docs/epics/qits-workspace-daemon/): shared
                  with the native `workspace-daemon` binary, so the backend's control-socket route
                  (eu.wohlben.qits.workspacedaemonhost) and the in-container client agree on one definition. -->
