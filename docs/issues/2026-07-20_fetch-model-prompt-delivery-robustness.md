@@ -27,11 +27,14 @@ silently:
    persisted a blank `serializedPrompt` — `seed` falls back to the null `initialContext`: a chat
    sends no first turn, an interactive TUI opens with no argv prompt. The operator sees a live
    session with no task.
-2. **Autonomous — MCP/git-host unreachable at launch.** `renderAutonomous` now runs
-   `claude -p …TASK_PROMPT_BOOTSTRAP` (the one-sentence "fetch the task prompt and implement it")
-   rather than embedding the composed prompt in argv (old `.run(prompt)`). If `qits-net`/the
-   in-process git-host/MCP endpoint is momentarily unreachable, `taskPrompt` returns nothing and the
-   unattended conflict-resolution agent produces no merge, with no error surfaced to the operator.
+2. **Autonomous — MCP/git-host unreachable at launch.** The autonomous launch delivers only the
+   one-sentence `TASK_PROMPT_BOOTSTRAP` ("fetch the task prompt and implement it") rather than
+   embedding the composed prompt (old `.run(prompt)`) — originally as the argv of a one-shot
+   `claude -p` (`renderAutonomous`), since 2026-07-26 as the first stdin turn of a stream-json chat
+   (`renderAutonomousChat`; the chat rendering at least shows the failure live on the command page
+   instead of an empty page). If `qits-net`/the in-process git-host/MCP endpoint is momentarily
+   unreachable, `taskPrompt` returns nothing and the unattended conflict-resolution agent produces
+   no merge.
 
 Both are inherent to a *fetch* delivery model (any out-of-band fetch can fail where an in-argv push
 could not); both are rare (a race window / a transient infra failure), which is why they are
