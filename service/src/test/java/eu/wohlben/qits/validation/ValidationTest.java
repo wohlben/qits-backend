@@ -25,7 +25,8 @@ public class ValidationTest {
     given()
         .contentType(ContentType.JSON)
         .body(
-            new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest("", null))
+            new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
+                "", null, null, null))
         .when()
         .post("/api/projects")
         .then()
@@ -40,7 +41,7 @@ public class ValidationTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Val Project", null))
+                    "Val Project", null, null, null))
             .when()
             .post("/api/projects")
             .then()
@@ -84,7 +85,7 @@ public class ValidationTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Original", null))
+                    "Original", null, null, null))
             .when()
             .post("/api/projects")
             .then()
@@ -112,7 +113,7 @@ public class ValidationTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Original", null))
+                    "Original", null, null, null))
             .when()
             .post("/api/projects")
             .then()
@@ -171,7 +172,7 @@ public class ValidationTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Original", "desc"))
+                    "Original", null, "desc", null))
             .when()
             .post("/api/projects")
             .then()

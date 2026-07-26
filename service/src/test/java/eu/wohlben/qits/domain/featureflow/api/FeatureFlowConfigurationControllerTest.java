@@ -39,7 +39,7 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Ctrl Project", null))
+                    "Ctrl Project", null, null, null))
             .when()
             .post("/api/projects")
             .then()
@@ -121,7 +121,7 @@ public class FeatureFlowConfigurationControllerTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Val Project", null))
+                    "Val Project", null, null, null))
             .when()
             .post("/api/projects")
             .then()

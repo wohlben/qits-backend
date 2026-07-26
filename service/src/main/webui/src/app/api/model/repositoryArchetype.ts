@@ -10,7 +10,11 @@
 
 
 export const RepositoryArchetype = {
+    Project: 'PROJECT',
     Service: 'SERVICE',
+    Library: 'LIBRARY',
+    Integration: 'INTEGRATION',
+    Application: 'APPLICATION',
     ServiceTemplate: 'SERVICE_TEMPLATE',
     Fork: 'FORK'
 } as const;

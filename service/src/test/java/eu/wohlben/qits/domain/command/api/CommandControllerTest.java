@@ -27,7 +27,7 @@ public class CommandControllerTest {
     String projectId =
         given()
             .contentType(ContentType.JSON)
-            .body(new CreateProjectRequest("Command Project", null))
+            .body(new CreateProjectRequest("Command Project", null, null, null))
             .when()
             .post("/api/projects")
             .then()
