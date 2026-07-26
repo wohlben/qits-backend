@@ -71,6 +71,9 @@
                 <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/src/main/webui/node_modules</exclude>
                 <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/src/main/webui/dist</exclude>
                 <exclude>src/test/resources/fixtures/testing-repo-quarkus-angular/src/main/webui/.angular</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-lit/target</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-lit/src/main/webui/node_modules</exclude>
+                <exclude>src/test/resources/fixtures/testing-repo-quarkus-lit/src/main/webui/dist</exclude>
 
                 <!-- webui/: regenerable build/tooling artifacts, none of which affect the Angular
                      production build's output. (.pi, public/, src/ ARE tracked inputs — kept.) -->

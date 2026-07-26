@@ -10,6 +10,11 @@
 > `.qits-config.yml` is now **authoritative, workspace-scoped, and read in-container** from each
 > workspace's own checkout — never ingested. The doc below is kept as the historical record of the
 > superseded model.
+>
+> **Relocated 2026-07-26:** the default committed location moved to `.config/qits/repository.yml`
+> (resolving this doc's `.qits/`-directory open question in favor of the XDG-style `.config/`
+> convention); the original root-level `.qits-config.yml` remains supported as a fallback, read
+> only when the new path is absent.
 
 ## Introduction
 

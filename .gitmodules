@@ -10,3 +10,6 @@
 [submodule "qits-gateway"]
 	path = qits-gateway
 	url = ../qits-gateway.git
+[submodule "domain/src/test/resources/fixtures/testing-repo-quarkus-lit"]
+	path = domain/src/test/resources/fixtures/testing-repo-quarkus-lit
+	url = ../qits-fixture-quarkus-lit.git

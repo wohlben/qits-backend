@@ -72,6 +72,9 @@ Related / dependent plans:
   submodule extends; see **Nested submodules in workspaces**.
 - `docs/guides/quarkus-angular-integration.md` — durable guide; the "where the SPA lives" note and any
   fresh-clone instructions get updated in the same change.
+- `docs/epics/qits-lit-webcomponents/features/2026-07-26_servable-quarkus-lit-fixture.md` — the fourth
+  fixture submodule (`testing-repo-quarkus-lit`) reuses this packaging model verbatim (in-tree webui,
+  no nested submodule) but is owned by the lit epic, not this one.
 
 ## Decisions locked in
 

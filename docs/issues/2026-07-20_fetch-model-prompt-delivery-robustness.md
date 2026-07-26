@@ -27,11 +27,14 @@ silently:
    persisted a blank `serializedPrompt` — `seed` falls back to the null `initialContext`: a chat
    sends no first turn, an interactive TUI opens with no argv prompt. The operator sees a live
    session with no task.
-2. **Autonomous — MCP/git-host unreachable at launch.** `renderAutonomous` now runs
-   `claude -p …TASK_PROMPT_BOOTSTRAP` (the one-sentence "fetch the task prompt and implement it")
-   rather than embedding the composed prompt in argv (old `.run(prompt)`). If `qits-net`/the
-   in-process git-host/MCP endpoint is momentarily unreachable, `taskPrompt` returns nothing and the
-   unattended conflict-resolution agent produces no merge, with no error surfaced to the operator.
+2. **Autonomous — MCP/git-host unreachable at launch.** The autonomous launch delivers only the
+   one-sentence `TASK_PROMPT_BOOTSTRAP` ("fetch the task prompt and implement it") rather than
+   embedding the composed prompt (old `.run(prompt)`) — originally as the argv of a one-shot
+   `claude -p` (`renderAutonomous`), since 2026-07-26 as the first stdin turn of a stream-json chat
+   (`renderAutonomousChat`; the chat rendering at least shows the failure live on the command page
+   instead of an empty page). If `qits-net`/the in-process git-host/MCP endpoint is momentarily
+   unreachable, `taskPrompt` returns nothing and the unattended conflict-resolution agent produces
+   no merge.
 
 Both are inherent to a *fetch* delivery model (any out-of-band fetch can fail where an in-argv push
 could not); both are rare (a race window / a transient infra failure), which is why they are
@@ -56,3 +59,11 @@ logs instead of a mystery. No behavior change.
 
 Trigger to pick up: a real report of an agent session starting with no task, or the autonomous
 conflict-resolution flow leaving a workspace untouched with no error.
+
+**2026-07-26 — trigger fired (deterministic variant).** Mode 2 happens on every domain test run:
+`ResolveConflictServiceTest` spawns real autonomous agents whose MCP endpoint can never be reached
+(a `domain` `@QuarkusTest` runs no HTTP server), so each starts task-less by construction. That
+test-side spawn is its own bug with its own fix direction — see
+[2026-07-26_resolve-conflict-tests-spawn-real-orphaned-agents](2026-07-26_resolve-conflict-tests-spawn-real-orphaned-agents.md)
+— but it also stands as a live confirmation of this doc's mode 2: the agent gets the bootstrap
+turn, finds no `taskPrompt` tool, and produces no merge, with no error surfaced anywhere.

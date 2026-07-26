@@ -68,8 +68,9 @@ public class ContextServerRegistry {
             "actions",
             "CRUD over the global action library: the preconfigured, code-based processes"
                 + " workspaces can run (an interactive shell/Claude Code, or a one-off command like"
-                + " 'mvn test'). Config-declared workspace actions live in .qits-config.yml and are"
-                + " managed by editing that file, not via MCP.",
+                + " 'mvn test'). Config-declared workspace actions live in the repository's qits"
+                + " config (.config/qits/repository.yml, legacy .qits-config.yml) and are managed"
+                + " by editing that file, not via MCP.",
             actionsPath,
             actionsPath + "/sse",
             null,

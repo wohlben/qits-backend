@@ -38,7 +38,7 @@ import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-statu
         @let instances = servicesQuery.data() ?? [];
         @if (instances.length === 0) {
           <p class="text-sm text-muted-foreground">
-            No services declared in this repository's .qits-config.yml.
+            No services declared in this repository's qits config (.config/qits/repository.yml).
           </p>
         } @else {
           <ul class="flex flex-col divide-y rounded-md border">

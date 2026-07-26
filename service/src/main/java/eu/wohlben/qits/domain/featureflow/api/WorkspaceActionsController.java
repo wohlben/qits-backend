@@ -120,7 +120,8 @@ public class WorkspaceActionsController {
             .findFirst()
             .orElseThrow(
                 () ->
-                    new NotFoundException("Action not declared in .qits-config.yml: " + actionId));
+                    new NotFoundException(
+                        "Action not declared in the workspace qits config: " + actionId));
     if (decl.interactive()) {
       throw new BadRequestException(
           "Interactive actions run in a workspace terminal, not over the control socket: "

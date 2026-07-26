@@ -11,6 +11,8 @@
 
 export interface CreateProjectRequest { 
     name: string;
+    slug?: string;
     description?: string;
+    url?: string;
 }
 

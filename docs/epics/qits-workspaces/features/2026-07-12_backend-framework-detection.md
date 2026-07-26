@@ -42,7 +42,11 @@ Related / dependent plans:
 
 `domain/.../repository/control/FrameworkDetectionService.java`: a faithful, **container-free** Java
 port of `detect-frameworks.ts`, pure over a `List<String>` of paths. It owns the framework registry
-(three `Descriptor`s: `java-quarkus`, `ts-angular`, `docs`) and the ported helpers — `markerRoots`,
+(four `Descriptor`s: `java-quarkus`, `ts-angular`, `ts-lit` — added by
+`docs/epics/qits-lit-webcomponents/features/2026-07-26_servable-quarkus-lit-fixture.md`, a
+Vite-config marker minus Angular roots with `.test.ts` ↔ `.ts` linking, its lit-dependency
+content peek layered in `DetectionService.filterLitCandidates` — and `docs`) and the ported
+helpers — `markerRoots`,
 `docsRoots`, `owningProject` (deepest root wins), the CamelCase-prefix owner resolution
 (`camelWords`/`camelPrefixes`/`ownerSource`, including the `[A-Z]*` single-match fuzzy fold), the
 gitignore glob → regex translator (ported char-for-char, **not** `PathMatcher`), and the public API

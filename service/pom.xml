@@ -157,7 +157,7 @@
                 <directory>src/test/resources</directory>
             </testResource>
             <!-- Share the git test fixtures that live in the domain module — only the committed
-                 bare submodule-*.git repos. The three submodule working trees are derived into bare
+                 bare submodule-*.git repos. The submodule working trees are derived into bare
                  repos on the classpath by the derive-fixture-bares antrun step below. -->
             <testResource>
                 <directory>${project.basedir}/../domain/src/test/resources/fixtures</directory>
@@ -166,6 +166,7 @@
                     <exclude>testing-repo/**</exclude>
                     <exclude>testing-repo-angular/**</exclude>
                     <exclude>testing-repo-quarkus-angular/**</exclude>
+                    <exclude>testing-repo-quarkus-lit/**</exclude>
                 </excludes>
             </testResource>
         </testResources>
