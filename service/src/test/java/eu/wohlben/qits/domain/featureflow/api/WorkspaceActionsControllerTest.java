@@ -46,7 +46,8 @@ public class WorkspaceActionsControllerTest {
     String projectId =
         given()
             .contentType(ContentType.JSON)
-            .body(new ProjectController.CreateProjectRequest("WS Actions Project", null))
+            .body(
+                new ProjectController.CreateProjectRequest("WS Actions Project", null, null, null))
             .post("/api/projects")
             .then()
             .statusCode(200)

@@ -33,21 +33,19 @@ qits-live-deployment.
 - **[project-domain](features/2026-05-01_project-domain.md)** — the Project BCE package
   (entity, control service, persistence, mapper, DTO, controller); the aggregate root and the
   reference implementation of the project-oriented BCE layout the whole codebase follows.
+- **[project-wrapper-repository](features/2026-07-26_project-wrapper-repository.md)** *(step 1)* —
+  project creation always ends with one repository: a `PROJECT`-archetype **wrapper repository**
+  named `<slug>-<slug>` after the project's new immutable `slug`, seeded with a **project template
+  skeleton** (`services/`/`libs/`/`integrations/`/`apps/`, one directory per repository archetype)
+  when its main branch is empty. Changes the [project model](../../guides/project-model.md) from "a
+  project *is* a polyrepo" to "a project starts as one repository and grows into one". The
+  already-seeded `qits` project is retro-fitted through the boot reconcile
+  (`github.com/wohlben/qits-qits`); no other pre-existing project is touched.
 
 ## Parts (ideas)
 
-Two ordered steps — the wrapper first, then the wrapper as registry.
+Step 1 (the wrapper itself) has landed; step 2 makes it the project's repository registry.
 
-- **[project-wrapper-repository](feature-ideas/project-wrapper-repository.md)** *(step 1)* — project creation
-  always ends with one repository: a `PROJECT`-archetype **wrapper repository** named
-  `<project>-<project>` (enforced by backend validation on the project name), seeded with a
-  **project template skeleton** (`services/`/`libs/`/`integrations/`/`apps/`, one directory per
-  repository archetype — which extends the archetype set) when its main branch is empty, and starting
-  as an inline monorepo the project sheds into siblings-as-submodules one directory at a time. Changes the
-  [project model](../../guides/project-model.md) from "a project *is* a polyrepo" to "a project
-  starts as one repository and grows into one". The already-seeded `qits` project is retro-fitted
-  through the [startup self-seed](../qits-live-deployment/features/2026-07-19_startup-qits-self-seed.md)'s
-  boot reconcile (`github.com/wohlben/qits-qits`); no other pre-existing project is touched.
 - **[wrapper-declared-repositories](feature-ideas/wrapper-declared-repositories.md)** *(step 2)* —
   the wrapper becomes the project's **repository registry**: creating a repository also registers it in
   the wrapper as a submodule at `<archetype-dir>/<name>` (`ignore = all`, `update = merge`,
@@ -66,5 +64,5 @@ starts as a draft in this epic's `feature-ideas/`.
 | Part | Status |
 |---|---|
 | [project-domain](features/2026-05-01_project-domain.md) | implemented |
-| [project-wrapper-repository](feature-ideas/project-wrapper-repository.md) | idea (step 1) |
+| [project-wrapper-repository](features/2026-07-26_project-wrapper-repository.md) | implemented (step 1) |
 | [wrapper-declared-repositories](feature-ideas/wrapper-declared-repositories.md) | idea (step 2) |

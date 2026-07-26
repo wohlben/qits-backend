@@ -3,7 +3,7 @@
 ## Introduction
 
 **Step 2 of the wrapper feature.** Once every project owns a
-[wrapper repository](project-wrapper-repository.md) with an archetype-shaped skeleton, the wrapper
+[wrapper repository](../features/2026-07-26_project-wrapper-repository.md) with an archetype-shaped skeleton, the wrapper
 becomes the **declarative registry of the project's repositories**: creating a repository under a
 project also registers it in the wrapper as a submodule at `<archetype-dir>/<name>`, so the wrapper's
 committed `.gitmodules` and the project's `Repository` rows are kept in sync in both directions. This
@@ -12,7 +12,7 @@ convention only exists once there are submodules to have a convention about.
 
 Related / dependent plans:
 
-- **[project-wrapper-repository](project-wrapper-repository.md)** — step 1: the wrapper, the
+- **[project-wrapper-repository](../features/2026-07-26_project-wrapper-repository.md)** — step 1: the wrapper, the
   `<project>-<project>` name rule, the archetype↔directory taxonomy (`services/` `libs/`
   `integrations/` `apps/`), the skeleton, and the `qits` retro-fit. This step depends on all of it.
 - **[qits-project-repository-submodules](../../qits-project-repository-submodules/epic.md)** — the

@@ -14,7 +14,7 @@ the archetype its extraction produces.
 
 This is **step 1 of two**: it establishes the wrapper, its name rule, the archetype↔directory
 taxonomy, and the skeleton.
-**[wrapper-declared-repositories](wrapper-declared-repositories.md)** is step 2 — it makes the wrapper
+**[wrapper-declared-repositories](../feature-ideas/wrapper-declared-repositories.md)** is step 2 — it makes the wrapper
 the *registry* of the project's repositories (every repository registered as a submodule in its
 archetype directory) and authors the `AGENTS.md` contract this step leaves empty.
 
@@ -221,7 +221,7 @@ the same `AGENTS.md` + `CLAUDE.md`-symlink pair this repository itself uses. In 
 `AGENTS.md` is an **empty placeholder**: the layout convention is self-evident from the directory
 READMEs, and the contract that actually needs writing down is the submodule discipline, which only
 exists once repositories are registered into the wrapper — so it is authored by
-[wrapper-declared-repositories](wrapper-declared-repositories.md) (step 2), which owns both the
+[wrapper-declared-repositories](../feature-ideas/wrapper-declared-repositories.md) (step 2), which owns both the
 convention and the code that upholds it.
 
 - **Empty, not absent.** Creating the file (and its symlink) here means step 2 fills content into a
@@ -345,7 +345,7 @@ is visible):
    be born` and leave a stale `.git/modules/<name>` behind.
 3. `git rm -r --cached <path>` + register it as a submodule at `<archetype-dir>/<name>`, commit on the
    workspace branch, integrate. The registration itself is
-   [wrapper-declared-repositories](wrapper-declared-repositories.md)' job (step 2) — extraction just
+   [wrapper-declared-repositories](../feature-ideas/wrapper-declared-repositories.md)' job (step 2) — extraction just
    calls it, so there is one place that knows how a repository is written into the wrapper.
 
 Afterwards the wrapper is the superproject at the root of the imported-edge closure a workspace
@@ -391,6 +391,79 @@ or materialization needs to change; the wrapper simply *is* the top of that grap
   places that describe the self-seed manifest — `docs/guides/qits-in-qits-registration.md` and
   [startup-qits-self-seed](../../qits-live-deployment/features/2026-07-19_startup-qits-self-seed.md)
   (its manifest and Config sections list the entries and url overrides).
+
+## Status — implemented 2026-07-26
+
+Built across `domain`, `service`, `cli` and the Angular UI; the `domain`, `service` and `cli` suites
+are green. Four things were decided differently from the plan above, each for a reason worth keeping:
+
+- **A project gained a separate, immutable `slug`** rather than validating the display `name`. The
+  plan applied `@ProjectSlug` to `Project.name`, which would have forced 86 test project names plus
+  the cli seeds' `"Demo Project"` / `"Quarkus + Angular Demo"` to be renamed, and left the *rename
+  re-derivation* question (item 4 of the naming section) genuinely open. Detaching the two settles it
+  structurally instead: `name` stays a free-form, editable label; `slug` is git-safe, set once at
+  creation, and `@Column(updatable = false)`. **There is no rename path, so a wrapper's alias can
+  never go stale** — option (a) and option (b) both become moot. The wrapper is `<slug>-<slug>`.
+- **Wrapper uniqueness is a query plus a service guard** (`RepositoryRepository.findWrapperByProject`
+  + `ProjectService.adoptWrapperRepository`), not a `project.wrapper_repository_id` FK. `V44`
+  therefore carries only the archetype check-constraint rebuild and the new `Project.slug` column,
+  and `ProjectService.delete` needs no null-the-FK-first ordering step.
+- **The slug regex needed a fix before it could be used.** As specified,
+  `^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])$` requires **at least two characters**, so a one-character
+  slug — which `slugify("X")` legitimately produces — would be rejected by the very rule meant to
+  accept it. Shipped as `^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$` (1–40 characters), pinned by a
+  regression test.
+- **`adoptWrapperRepository` handles four states, not three.** The plan listed create / promote /
+  no-op. Because `SelfSeedService.ensureProject()` now creates the `qits` project — and therefore a
+  *greenfield* wrapper — before the manifest entry adopts `github.com/wohlben/qits-qits`, a fourth
+  state is reached on the very first boot: **an existing url-less wrapper gains the backup remote**
+  (`RepositoryService.attachBackupRemote`). Without it the retro-fit would fail on every deployment.
+
+### Implementation notes
+
+- **The skeleton is committed with plumbing, seven git processes, no worktree**: one `hash-object -w`
+  for every blob, one `update-index --add --cacheinfo <mode>,<sha>,<path>` for every entry (the
+  explicit mode is what lands `CLAUDE.md` as a real `120000` symlink), then `write-tree` —
+  which builds the nested subtrees, unlike `mktree` — `commit-tree` with **no `-p`** (a root commit)
+  and `update-ref`. Scratch lives at `<data-dir>/<repoId>/skeleton/`, a sibling of `origin`, so
+  `deleteDataDir` reaps it and repository discovery (which keys on `origin`) never sees it.
+- **The template is read with `ClassPathUtils.consumeAsPaths`**, not
+  `Path.of(getResource(...).toURI())` — the latter works in tests against exploded `target/classes`
+  and throws `FileSystemNotFoundException` from the packaged fast-jar's `jar:` URI.
+- **`V44`'s slug backfill uses H2's THREE-argument `regexp_replace`, which is already global.** The
+  four-argument `'g'` form is rejected outright by H2 2.4.240 (`Invalid value "g" for parameter {1}`).
+  Verified against the real engine before merging, since a wrong backfill would give the deployed
+  `qits` project a garbage slug and the retro-fit would then fail inside the self-seed's per-item
+  try/catch — a log line nobody reads.
+- **Process segment names now come from the repository's alias** (`pull:testing-repo`) rather than
+  its url basename (`pull:testing-repo.git`). A url-less wrapper has no basename, and the alias is
+  the identity every other surface already uses; this also removed a latent NPE on the pull, sync and
+  push process entry points for *every* repository.
+- **Template dotfiles are stored `dot-`-prefixed** (`dot-gitignore`, `dot-qits-config.yml`) and
+  un-prefixed when committed. This is not cosmetic: plexus' archiver default-excludes, which
+  maven-jar-plugin applies, silently drop `**/.gitignore` and `**/.gitattributes` from **every jar**.
+  A resource named `.gitignore` therefore reaches `target/classes` — so the tests and dev mode saw it
+  — and vanished from the packaged artifact, so a wrapper created by the *packaged* app was missing a
+  file with no error anywhere. Caught by running the real `cli seed-webapp` against the fast-jar and
+  diffing the committed tree; a test now asserts no template resource is stored with a leading dot,
+  which catches the whole class rather than the one instance.
+- **The `.qits-config.yml` in the skeleton carries `version: 1`** (without it the parser raises a
+  config warning on every wrapper ever created) and deliberately **does not** declare
+  `repository.archetype` — the parser change in this same feature rejects `PROJECT` there.
+- **Two build-derived fixtures** were added to `scripts/derive-fixture-bares.sh`: `qits-qits.git`
+  (ref-less — the empty-upstream adopt case, and the self-seed override) and `demo-demo.git` (real
+  history — adoption must leave it untouched). The strict name rule means no existing fixture could
+  stand in for either.
+
+### Known limitation
+
+`RepositoryService.deleteInternal` leans on the schema's `on delete cascade` for a repository's
+workspaces, events, aliases and commands. That is correct for every real caller, since each owns its
+own transaction — but a caller that *created* a repository earlier in the **same** transaction still
+holds those children managed, and Hibernate then flushes a child pointing at a removed parent. Two
+`ProjectServiceTest` methods did exactly that and were rewritten to use per-verb transactions, which
+is also what production does. Pre-existing, and made reachable rather than caused by this feature.
+
 
 ## Decided
 
