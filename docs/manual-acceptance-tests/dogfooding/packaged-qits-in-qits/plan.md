@@ -4,7 +4,7 @@
 
 The complete dogfooding experience on one machine, against the **packaged** app image (not
 `quarkus:dev`): build and run qits as a container with no auth proxy in front, register qits'
-own repository in it, launch the qits dev-server daemon in a workspace container, use the framed
+own repository in it, launch the qits dev-server service in a workspace container, use the framed
 qits UI through the web view, and verify telemetry from the child arrived in the parent.
 
 This is the acceptance walk for
@@ -135,9 +135,9 @@ lot). Status reaches `READY`; both health dots (Quarkus COMMAND, Angular HTTP) g
 
 Open the workspace's **Web view**.
 
-*Expect:* the child qits UI renders inside the frame under `/daemon/{ws}/{daemonId}/` (child
+*Expect:* the child qits UI renders inside the frame under `/service/{ws}/{serviceId}/` (child
 forwardauth dev mode answers as user `dev`). Navigate: Projects loads (empty child), open pages,
-confirm no console errors and that all frame requests stay under the `/daemon/...` prefix.
+confirm no console errors and that all frame requests stay under the `/service/...` prefix.
 
 ### 9. Verify telemetry reached the parent
 
@@ -159,7 +159,7 @@ curl -s -H 'Remote-User: tester' \
   for the SPA half;
 - spans from the child **backend** — Quarkus server spans under service name **`qits-forwardauth`**
   (from its artifact): `HTTP GET`, `GET /auth/me`, `GET /projects`, …;
-- **no** spans for `/otel/v1/*`, `/daemon/*`, `/git/*`, `/mcp/*` (the suppress list);
+- **no** spans for `/otel/v1/*`, `/service/*`, `/git/*`, `/mcp/*` (the suppress list);
 - the *Logs* view shows the child's log records (severity-classified).
 
 ### 10. Capture round-trip (optional but recommended)
@@ -172,7 +172,7 @@ carries the DOM snapshot + "Selected component" / "Rendered DOM" sections.
 
 The `promptContext` **state** entry only rides along if the child's `PromptContextStore` was
 instantiated during the session — a `providedIn: 'root'` signal store is created lazily on first
-injection, and only the file-browser / command-chat / speak-to-prompt / daemon-webview routes inject
+injection, and only the file-browser / command-chat / speak-to-prompt / service-webview routes inject
 it. Captured from the fresh **Projects** route it is **absent** (no "## App state at capture"
 section); reach one of those routes first to see it. Tracked in
 [`docs/issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md`](../../../issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md).
@@ -186,7 +186,7 @@ section); reach one of those routes first to see it. Tracked in
 - [ ] `.qits-config.yml` is the only config source: the `qits dev server` service and the six
       config actions appear on the `main` workspace's Services/Actions tabs, read in-container —
       no DB rows, no ingestion, no config warning.
-- [ ] Daemon reaches `READY`; both health dots green.
+- [ ] Service reaches `READY`; both health dots green.
 - [ ] Framed child UI usable through the web view, all requests under the proxy prefix.
 - [ ] Parent telemetry shows child browser **and** backend spans + logs; suppressed paths absent.
 - [ ] (Optional) Capture from the frame creates a parent workspace with the DOM/component snapshot
@@ -208,7 +208,7 @@ docker ps --filter name=qits-ws- -q | xargs -r docker rm -f   # siblings — rem
 - **Workspace container can't reach the parent (git clone 404 / OTLP dark)** → alias collision:
   another stack on `qits-net` also answers your `QITS_WORKSPACE_GIT_HOST` alias. Pick a unique
   one in `.env` and recreate.
-- **Daemon READY but the frame shows the splash forever** → the web-view port was added after the
+- **Service READY but the frame shows the splash forever** → the web-view port was added after the
   container existed; recreate (stop-container → ensure-container → start).
 - **`pnpm install` fails in the child** → no GitHub reachability from workspace containers (the
   `@qits/angular` git dependency needs it).

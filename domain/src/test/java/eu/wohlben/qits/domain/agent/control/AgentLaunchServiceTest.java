@@ -116,7 +116,7 @@ public class AgentLaunchServiceTest {
     // Mutating tools are left out so the agent still prompts before changing anything.
     assertFalse(actions.allowedTools().contains("mcp__actions__createGlobalAction"));
 
-    // The repository server rides along, narrowed to this repository — daemons and the other
+    // The repository server rides along, narrowed to this repository — services and the other
     // repository-owned configuration are managed there.
     AgentLaunchService.ScopedMcp repository = servers.get(1);
     assertEquals("repository", repository.key());
@@ -218,23 +218,24 @@ public class AgentLaunchServiceTest {
   }
 
   @Test
-  public void autonomousLaunchFetchesViaBootstrapWithTheRepositoryServerAndCredentialVolume() {
-    // Autonomous is now a fetch-model run: the -p arg is the one-sentence bootstrap turn (the real
-    // prompt lives in the workspace draft), and the narrowed repository server is attached —
-    // without
-    // it taskPrompt would be unreachable. HOME still points at the shared credential volume.
+  public void autonomousLaunchRendersAChatWithTheRepositoryServerAndCredentialVolume() {
+    // Autonomous rides the chat pipeline (the bootstrap turn is sent over stdin, not argv, so the
+    // command page renders the live conversation), and the narrowed repository server is attached —
+    // without it taskPrompt would be unreachable. HOME still points at the shared credential
+    // volume.
     String projectId = "aaaaaaaa-0000-0000-0000-0000000000c1";
     String repoId = "aaaaaaaa-0000-0000-0000-0000000000c2";
     seedRepository(projectId, repoId);
 
     LaunchSpec spec =
-        agentLaunchService.renderAutonomous(
+        agentLaunchService.renderAutonomousChat(
             repoId, "work", AgentMcpScope.REPOSITORY, freshPin(), AgentType.CLAUDE);
 
     assertEquals("/claude-home", spec.environment().get("HOME"));
-    assertTrue(
-        spec.script().startsWith("claude -p '" + AgentLaunchService.TASK_PROMPT_BOOTSTRAP + "'"),
-        spec.script());
+    assertTrue(spec.script().contains("--input-format stream-json"), spec.script());
+    assertFalse(
+        spec.script().contains(AgentLaunchService.TASK_PROMPT_BOOTSTRAP),
+        "the bootstrap turn rides stdin, not the argv: " + spec.script());
     assertTrue(
         spec.script()
             .contains(
@@ -245,8 +246,8 @@ public class AgentLaunchServiceTest {
                     + "&workspaceId=work"),
         spec.script());
     assertTrue(spec.script().contains("--dangerously-skip-permissions"), spec.script());
-    // Unattended run: the repository server is marked read-only so ReadOnlyRepositoryToolFilter
-    // fences the mutating repository tools.
+    // Unattended first turn: the repository server is marked read-only so
+    // ReadOnlyRepositoryToolFilter fences the mutating repository tools.
     assertTrue(spec.script().contains("agentReadOnly=true"), spec.script());
   }
 
@@ -260,7 +261,7 @@ public class AgentLaunchServiceTest {
     // set.
     assertTrue(
         agentLaunchService
-            .renderAutonomous(
+            .renderAutonomousChat(
                 repoId, "work", AgentMcpScope.REPOSITORY, freshPin(), AgentType.CLAUDE)
             .script()
             .contains("agentReadOnly=true"));
@@ -294,7 +295,7 @@ public class AgentLaunchServiceTest {
     assertTrue(chat.script().contains(reportPath), chat.script());
 
     LaunchSpec autonomous =
-        agentLaunchService.renderAutonomous(
+        agentLaunchService.renderAutonomousChat(
             repoId, "work", AgentMcpScope.REPOSITORY, pinned, AgentType.CLAUDE);
     assertTrue(
         autonomous.script().contains("--session-id " + pinned.ref().sessionId),

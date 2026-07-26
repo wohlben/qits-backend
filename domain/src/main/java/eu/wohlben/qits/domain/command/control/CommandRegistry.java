@@ -274,7 +274,7 @@ public class CommandRegistry {
 
   /**
    * Send a named signal (e.g. TERM) to a running PTY command's process group — the graceful half of
-   * a daemon stop. False if the command is not a running PTY session or delivery failed.
+   * a service stop. False if the command is not a running PTY session or delivery failed.
    */
   public boolean signal(String commandId, String signal) {
     CommandSession session = sessions.get(commandId);

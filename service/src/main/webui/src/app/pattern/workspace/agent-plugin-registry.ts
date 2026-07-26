@@ -39,8 +39,8 @@ export const AGENT_PLUGIN_REGISTRY: readonly AgentPluginEntry[] = [
     marketplace: AGENT_PLUGIN_MARKETPLACE,
     label: 'TypeScript LSP',
     description:
-      'typescript-language-server — code intelligence for TypeScript/Angular (.ts, .tsx, .js).',
-    frameworkIds: ['ts-angular'],
+      'typescript-language-server — code intelligence for TypeScript/Angular/Lit (.ts, .tsx, .js).',
+    frameworkIds: ['ts-angular', 'ts-lit'],
   },
 ];
 

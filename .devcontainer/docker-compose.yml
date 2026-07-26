@@ -52,7 +52,7 @@ services:
       # Bind Quarkus on ALL interfaces. `quarkus:dev` binds the HTTP port to `localhost` by default,
       # which is fine when qits runs on the host but fatal here: qits now runs *inside* a container on
       # qits-net, so a loopback bind makes qits:8080 unreachable from the sibling workspace containers
-      # — container->qits OTLP (the daemon's dev server forwarding browser + backend spans), git, and
+      # — container->qits OTLP (the service's dev server forwarding browser + backend spans), git, and
       # MCP all fail (browser sees 502 from the app's /api/otel proxy). It also lets the published
       # 127.0.0.1:8080 below actually reach the process. (Prod/`package` runs already bind 0.0.0.0.)
       QUARKUS_HTTP_HOST: 0.0.0.0
@@ -83,7 +83,7 @@ services:
       TZ: ${TZ:-Etc/UTC}
     ports:
       # App ingress for the developer's browser (the ONLY host publish — this is qits' own UI, not a
-      # workspace container). Quinoa dev server on 4200 proxies /api + /daemon to Quarkus on 8080.
+      # workspace container). Quinoa dev server on 4200 proxies /api + /service to Quarkus on 8080.
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:4200:4200"
     networks:

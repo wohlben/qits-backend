@@ -362,7 +362,7 @@ interface CreateWorkspaceForm {
     </ng-template>
 
     <!-- Starting workspace: the live, segmented log of the container start (docker run, clone,
-         daemon auto-start), streamed from its technical process. Closing the dialog does not stop
+         service auto-start), streamed from its technical process. Closing the dialog does not stop
          the work — reopening (or the workspace detail's transient tab) replays and resumes. -->
     <ng-template #processTpl>
       @if (ui().processId; as processId) {
@@ -825,8 +825,8 @@ export class BranchListComponent {
     onSuccess: (res) => {
       invalidateRepository(this.queryClient, this.repoId());
       this.closeDialog();
-      // The backend already spawned the autonomous Claude command on the resolution workspace; open
-      // its terminal so the human watches it work.
+      // The backend already spawned the autonomous agent chat on the resolution workspace; open
+      // its command page (the live chat frame) so the human watches it work.
       if (res.commandId) {
         this.router.navigate(['/commands', res.commandId]);
       }

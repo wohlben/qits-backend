@@ -34,7 +34,7 @@ describe('CommandChatComponent', () => {
     const snippet = store.add({
       html: '<button class="cta">Go</button>',
       selector: '#root > button',
-      url: 'http://localhost/daemon/wt/d/',
+      url: 'http://localhost/service/wt/d/',
       tag: 'button',
       textPreview: 'Go',
     });
@@ -54,7 +54,7 @@ describe('CommandChatComponent', () => {
     const snippet = store.add({
       html: '<div>x</div>',
       selector: 'div',
-      url: 'http://localhost/daemon/wt/d/',
+      url: 'http://localhost/service/wt/d/',
       tag: 'div',
       textPreview: 'x',
     });

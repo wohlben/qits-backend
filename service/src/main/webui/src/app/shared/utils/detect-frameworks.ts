@@ -16,10 +16,11 @@ export interface LinkedFile {
 /**
  * The framework icon painted on a detected project's root folder node, or `null` for the repo root
  * / an unknown framework. Java shows the Quarkus mark or the plain Java cup depending on the
- * server-refined label (`Java / Quarkus` vs `Java / Maven`); Angular the shield.
+ * server-refined label (`Java / Quarkus` vs `Java / Maven`); Angular the shield; Lit the flame.
  */
 export function frameworkRootIcon(frameworkId: string, label: string): string | null {
   if (frameworkId === 'ts-angular') return '/angular.svg';
+  if (frameworkId === 'ts-lit') return '/lit.svg';
   if (frameworkId === 'java-quarkus') return label.includes('Quarkus') ? '/quarkus.svg' : '/java.svg';
   return null;
 }
@@ -27,7 +28,7 @@ export function frameworkRootIcon(frameworkId: string, label: string): string | 
 /**
  * The directory a quick-access toggle opens the tree down to (its ancestors are opened too), so
  * activating a framework lands the user inside its source tree instead of at the collapsed root —
- * java → `<root>/src/main`, angular → `<root>/src`, docs → the docs dir itself. `null` = don't
+ * java → `<root>/src/main`, angular/lit → `<root>/src`, docs → the docs dir itself. `null` = don't
  * auto-open (unknown framework).
  */
 export function autoExpandDir(frameworkId: string, root: string): string | null {
@@ -35,6 +36,7 @@ export function autoExpandDir(frameworkId: string, root: string): string | null 
     case 'java-quarkus':
       return root === '' ? 'src/main' : `${root}/src/main`;
     case 'ts-angular':
+    case 'ts-lit':
       return root === '' ? 'src' : `${root}/src`;
     case 'docs':
       return root || null;

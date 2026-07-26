@@ -8,8 +8,8 @@ import { ServiceInstanceDto } from '@/api/model/serviceInstanceDto';
 import { ServiceStatus } from '@/api/model/serviceStatus';
 import { ServiceTerminalComponent } from '@/pattern/service/service-terminal.component';
 import { ZardButtonComponent } from '@/shared/components/button';
-import { ServiceHealthChecksComponent } from '@/ui/components/daemon/service-health-checks.component';
-import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-status-chip.component';
+import { ServiceHealthChecksComponent } from '@/ui/components/service/service-health-checks.component';
+import { ServiceStatusChipComponent } from '@/ui/components/service/service-status-chip.component';
 
 /**
  * The workspace's services panel: every effective service (running or not — the everything-visible
@@ -38,17 +38,17 @@ import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-statu
         @let instances = servicesQuery.data() ?? [];
         @if (instances.length === 0) {
           <p class="text-sm text-muted-foreground">
-            No services declared in this repository's .qits-config.yml.
+            No services declared in this repository's qits config (.config/qits/repository.yml).
           </p>
         } @else {
           <ul class="flex flex-col divide-y rounded-md border">
-            @for (instance of instances; track instance.daemon?.id) {
+            @for (instance of instances; track instance.definition?.id) {
               <li class="flex flex-wrap items-center gap-3 px-3 py-2">
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="truncate font-medium">{{ instance.daemon?.name }}</span>
-                  @if (instance.daemon?.description) {
+                  <span class="truncate font-medium">{{ instance.definition?.name }}</span>
+                  @if (instance.definition?.description) {
                     <span class="truncate text-xs text-muted-foreground">
-                      {{ instance.daemon?.description }}
+                      {{ instance.definition?.description }}
                     </span>
                   }
                 </div>
@@ -73,8 +73,8 @@ import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-statu
                   <app-service-terminal
                     [repoId]="repoId()"
                     [workspaceId]="workspaceId()"
-                    [daemonId]="instance.daemon!.id!"
-                    [name]="instance.daemon!.name!"
+                    [serviceId]="instance.definition!.id!"
+                    [name]="instance.definition!.name!"
                   />
                   <button
                     z-button
@@ -82,7 +82,7 @@ import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-statu
                     zSize="sm"
                     type="button"
                     [zLoading]="stopMutation.isPending()"
-                    (click)="stopMutation.mutate(instance.daemon!.id!)"
+                    (click)="stopMutation.mutate(instance.definition!.id!)"
                   >
                     Stop
                   </button>
@@ -92,7 +92,7 @@ import { ServiceStatusChipComponent } from '@/ui/components/daemon/service-statu
                     zSize="sm"
                     type="button"
                     [zLoading]="startMutation.isPending()"
-                    (click)="startMutation.mutate(instance.daemon!.id!)"
+                    (click)="startMutation.mutate(instance.definition!.id!)"
                   >
                     Start
                   </button>
@@ -130,13 +130,13 @@ export class WorkspaceServicesComponent {
   }));
 
   readonly startMutation = injectMutation(() => ({
-    mutationFn: (daemonId: string) =>
+    mutationFn: (serviceId: string) =>
       lastValueFrom(
-        // NB: the generated client orders path params alphabetically (daemonId, repoId, workspaceId),
+        // NB: the generated client orders path params alphabetically (repoId, serviceId, workspaceId),
         // not in path order — pass them in that order or the URL segments get scrambled (404).
-        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost(
-          daemonId,
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost(
           this.repoId(),
+          serviceId,
           this.workspaceId(),
         ),
       ),
@@ -144,11 +144,11 @@ export class WorkspaceServicesComponent {
   }));
 
   readonly stopMutation = injectMutation(() => ({
-    mutationFn: (daemonId: string) =>
+    mutationFn: (serviceId: string) =>
       lastValueFrom(
-        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost(
-          daemonId,
+        this.serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost(
           this.repoId(),
+          serviceId,
           this.workspaceId(),
         ),
       ),

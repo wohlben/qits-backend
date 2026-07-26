@@ -84,7 +84,7 @@ class PublicPathsTest {
     // The retired agent-session hook endpoint is no longer public (agent-activity tracking moved it
     // to the workspace-daemon's in-container loopback webhook).
     assertFalse(PublicPaths.isPublic("/api/commands/abc-123/agent-session"));
-    assertFalse(PublicPaths.isPublic("/daemon/w1/d1/"));
+    assertFalse(PublicPaths.isPublic("/service/w1/d1/"));
     assertFalse(PublicPaths.isPublic("/git")); // only the subtree is public, not the bare path
   }
 }

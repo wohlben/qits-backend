@@ -121,7 +121,7 @@ describe('WorkspaceTelemetryComponent', () => {
         },
       },
     });
-    // Seed the caches the way the daemons spec does — the component reads, we assert rendering.
+    // Seed the caches the way the services spec does — the component reads, we assert rendering.
     queryClient.setQueryData(['telemetry-errors', 'repo-1', 'wt-1'], [errorGroup()]);
     queryClient.setQueryData(['telemetry-logs', 'repo-1', 'wt-1', null], [LOG]);
     queryClient.setQueryData(['telemetry-trace', 'repo-1', 'wt-1', TRACE_ID], {

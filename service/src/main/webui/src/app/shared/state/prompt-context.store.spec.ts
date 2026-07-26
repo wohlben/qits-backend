@@ -6,7 +6,7 @@ import { formatReferencesForPrompt, formatSnippetsForPrompt } from './snippet-fo
 const pick = (overrides: Partial<Parameters<typeof formatSnippetsForPrompt>[0][number]> = {}) => ({
   html: '<button class="cta">Go</button>',
   selector: '#root > button:nth-of-type(1)',
-  url: 'http://localhost:8080/daemon/wt/d/',
+  url: 'http://localhost:8080/service/wt/d/',
   tag: 'button',
   textPreview: 'Go',
   ...overrides,
@@ -41,7 +41,7 @@ describe('PromptContextStore', () => {
     expect(rePick.id).toBe(first.id);
 
     // Same selector on a different document is a different element.
-    s.add(pick({ url: 'http://localhost:8080/daemon/wt/d/other' }));
+    s.add(pick({ url: 'http://localhost:8080/service/wt/d/other' }));
     expect(s.count()).toBe(2);
   });
 
@@ -562,7 +562,7 @@ describe('formatSnippetsForPrompt', () => {
 
     expect(text).toContain('Picked element <button>');
     expect(text).toContain('selector: #root > button:nth-of-type(1)');
-    expect(text).toContain('http://localhost:8080/daemon/wt/d/');
+    expect(text).toContain('http://localhost:8080/service/wt/d/');
     expect(text).toContain('```html\n<button class="cta">Go</button>\n```');
     expect(text).toContain('<div>x</div>');
   });
@@ -628,7 +628,7 @@ describe('formatSnippetsForPrompt', () => {
     expect(text).not.toContain('Rendered by');
     expect(text).not.toContain('Enclosing components:');
     expect(text).toBe(
-      'Picked element <button> (selector: #root > button:nth-of-type(1)) on http://localhost:8080/daemon/wt/d/:\n' +
+      'Picked element <button> (selector: #root > button:nth-of-type(1)) on http://localhost:8080/service/wt/d/:\n' +
         '```html\n<button class="cta">Go</button>\n```',
     );
   });

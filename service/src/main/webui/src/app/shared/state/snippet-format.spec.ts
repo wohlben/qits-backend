@@ -10,7 +10,7 @@ describe('buildSerializedPrompt', () => {
     id: 's1',
     html: '<button class="cta">Go</button>',
     selector: '#root > button',
-    url: 'http://localhost/daemon/wt/d/',
+    url: 'http://localhost/service/wt/d/',
     tag: 'button',
     textPreview: 'Go',
     capturedAt: 0,

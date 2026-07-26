@@ -1,6 +1,6 @@
 /**
  * Mapping between the framed app's own routes ("app-side paths", e.g. `/greeting?tab=2`) and the
- * daemon web-view proxy URLs that serve them (`/daemon/{workspaceId}/{daemonId}/greeting?tab=2`).
+ * service web-view proxy URLs that serve them (`/service/{workspaceId}/{serviceId}/greeting?tab=2`).
  * The URL bar displays and accepts the app-side form — the user edits the app's URL, not the
  * proxy's — and navigation must stay inside the proxy prefix or the same-origin picker (and the
  * URL bar itself) breaks on a foreign document.
@@ -9,12 +9,12 @@
 /** A parsed URL-bar input: either the normalized app-side path, or why it can't be applied. */
 export type AppPathParse = { appPath: string } | { error: string };
 
-const OUTSIDE_PROXY_ERROR = "outside this daemon's web view";
+const OUTSIDE_PROXY_ERROR = "outside this service's web view";
 
 /**
  * Normalizes URL-bar input to an app-side path. Accepted forms: an app-side path (leading slash
- * optional), this daemon's proxy path, or a full URL that resolves inside this daemon's proxy
- * prefix on this origin. A URL or `/daemon/…` path pointing anywhere else is rejected — it would
+ * optional), this service's proxy path, or a full URL that resolves inside this service's proxy
+ * prefix on this origin. A URL or `/service/…` path pointing anywhere else is rejected — it would
  * either leave the same-origin proxy or be silently reinterpreted as an app route.
  */
 export function parseAppPath(input: string, proxyPath: string, origin: string): AppPathParse {
@@ -36,7 +36,7 @@ export function parseAppPath(input: string, proxyPath: string, origin: string): 
     const appPath = stripProxyPrefix(origin + trimmed, proxyPath);
     return appPath == null ? { error: OUTSIDE_PROXY_ERROR } : { appPath };
   }
-  if (trimmed.startsWith('/daemon/')) {
+  if (trimmed.startsWith('/service/')) {
     return { error: OUTSIDE_PROXY_ERROR };
   }
   return { appPath: trimmed.startsWith('/') ? trimmed : '/' + trimmed };
@@ -49,7 +49,7 @@ export function toProxyUrl(appPath: string, proxyPath: string): string {
 
 /**
  * The app-side path (route + query + hash) of a framed document's URL, or null when the URL does
- * not live under this daemon's proxy prefix.
+ * not live under this service's proxy prefix.
  */
 export function stripProxyPrefix(href: string, proxyPath: string): string | null {
   let url: URL;

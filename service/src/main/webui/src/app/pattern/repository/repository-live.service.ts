@@ -74,6 +74,10 @@ export class RepositoryLiveService {
       // A workspace's in-container daemon reported its working tree flipped clean↔dirty: re-fetch the
       // branch-tree workspace list so the dirty badge refreshes.
       'git-status': [['workspaces', repoId]],
+      // A coding agent's activity rollup flipped in some workspace of this repo (the backend mirrors
+      // the workspace-channel hint here): re-fetch the workspace list so the agent-activity bar on
+      // the repository detail route re-sorts live.
+      'agent-activity': [['workspaces', repoId]],
     };
   }
 }

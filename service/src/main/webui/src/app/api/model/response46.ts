@@ -8,9 +8,11 @@
  * Do not edit the class manually.
  */
 import { ProjectDto } from './projectDto';
+import { RepositoryDto } from './repositoryDto';
 
 
 export interface Response46 { 
     project?: ProjectDto;
+    wrapper?: RepositoryDto;
 }
 

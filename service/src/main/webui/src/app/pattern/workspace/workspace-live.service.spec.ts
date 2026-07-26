@@ -82,11 +82,11 @@ describe('WorkspaceLiveService', () => {
     const { source } = connect();
     invalidate.mockClear();
 
-    source.emitTopic('daemons');
+    source.emitTopic('services');
     expect(invalidatedKeys()).toEqual([JSON.stringify(['workspace-services', 'repo-1', 'wt-1'])]);
 
     invalidate.mockClear();
-    source.emitTopic('daemon-events');
+    source.emitTopic('service-events');
     expect(invalidatedKeys()).toEqual([JSON.stringify(['workspace-service-events', 'repo-1', 'wt-1'])]);
 
     invalidate.mockClear();
@@ -147,7 +147,7 @@ describe('WorkspaceLiveService', () => {
 
     source.emitOpen();
 
-    // daemons(1) + daemon-events(1) + telemetry(4) + commands(2) + bootstrap(1) + agent-activity(1)
+    // services(1) + service-events(1) + telemetry(4) + commands(2) + bootstrap(1) + agent-activity(1)
     // + files(3) + process(1) + prompt-draft(1) + prompt-attachments(1) = 16
     expect(invalidate).toHaveBeenCalledTimes(16);
     const keys = invalidatedKeys();

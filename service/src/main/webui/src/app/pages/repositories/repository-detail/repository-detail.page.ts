@@ -9,6 +9,7 @@ import { WorkspaceControllerService } from '@/api/api/workspaceController.servic
 import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { RepositoryDetailHeaderComponent } from '@/ui/components/repository/repository-detail-header.component';
+import { WorkspaceActivityBarComponent } from '@/pattern/workspace/workspace-activity-bar.component';
 import { BranchListComponent } from '@/pattern/repository/branch-list.component';
 import { RepositorySubmodulesComponent } from '@/pattern/repository/repository-submodules.component';
 import { RepositorySyncComponent } from '@/pattern/repository/repository-sync.component';
@@ -19,6 +20,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
   imports: [
     PageLayoutComponent,
     RepositoryDetailHeaderComponent,
+    WorkspaceActivityBarComponent,
     BranchListComponent,
     RepositorySubmodulesComponent,
     RepositorySyncComponent,
@@ -38,8 +40,9 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div pageActions class="flex items-center gap-2">
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
         <!-- Launches Claude Code in the main workspace with the actions MCP scoped to this repo, so
-             global actions can be managed from inside Claude. The committed .qits-config.yml (the
-             single config source) is edited directly in the repo. -->
+             global actions can be managed from inside Claude. The committed qits config
+             (.config/qits/repository.yml, legacy .qits-config.yml — the single config source) is
+             edited directly in the repo. -->
         <button
           z-button
           zType="secondary"
@@ -57,6 +60,14 @@ import { ZardButtonComponent } from '@/shared/components/button';
           Delete
         </button>
       </div>
+
+      <!-- Sticky row of buttons for every workspace in this repo with a live agent session, newest
+           activity first — same element as on the workspace detail route, minus the "current"
+           highlight. Hides itself entirely while no agent is active. -->
+      <app-workspace-activity-bar
+        class="sticky top-0 z-20 -mx-6 mb-2 block border-b border-border bg-background/95 px-6 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        [repoId]="repoId"
+      />
 
       <!-- Surface a failed agent launch instead of the old silent no-op: the usual cause is a lost
            container the backend now re-provisions, but a genuinely dead branch or unreachable

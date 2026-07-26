@@ -112,7 +112,7 @@ public class Command extends PanacheEntityBase {
 
   /**
    * The ordered list of coding-agent sessions this command drove — the last entry is the current
-   * session. Empty for plain actions/terminals/daemons; exactly one entry for most agent launches;
+   * session. Empty for plain actions/terminals/services; exactly one entry for most agent launches;
    * several when the user switched sessions inside the interactive TUI (hook-reported).
    */
   @ElementCollection(fetch = FetchType.EAGER)

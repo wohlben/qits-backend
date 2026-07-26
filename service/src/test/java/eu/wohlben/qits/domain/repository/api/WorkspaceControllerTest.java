@@ -29,7 +29,7 @@ public class WorkspaceControllerTest {
             .contentType(ContentType.JSON)
             .body(
                 new eu.wohlben.qits.domain.project.api.ProjectController.CreateProjectRequest(
-                    "Workspace Project", null))
+                    "Workspace Project", null, null, null))
             .when()
             .post("/api/projects")
             .then()
@@ -493,7 +493,7 @@ public class WorkspaceControllerTest {
 
   /**
    * Polls until the workspace's technical process completed — i.e. the async provision (and any
-   * daemon auto-start) is fully done. Deliberately NOT a runtime-status poll: the workspace list
+   * service auto-start) is fully done. Deliberately NOT a runtime-status poll: the workspace list
    * computes RUNNING live from the container set, which reports the container as soon as {@code
    * docker run} happened — while the clone is still writing the working tree (and its final index
    * write would clobber a concurrent {@code git add} from the test).
@@ -1137,6 +1137,56 @@ public class WorkspaceControllerTest {
             "links.find { it.path == 'web/src/foo.ts' }.tests[0].path",
             equalTo("web/src/foo.spec.ts"))
         .body("links.find { it.path == 'web/src/foo.ts' }.tests[0].kinds", contains("vitest"));
+  }
+
+  /**
+   * The Lit stack: a Vite root whose package.json depends on {@code lit} is a {@code ts-lit}
+   * project (the DetectionService content peek confirming the structural marker), its {@code
+   * *.test.ts} suffix pairing links sources to tests with the config-detected Vitest runner — and a
+   * Vite root <em>without</em> the lit dependency is no project at all (never mislabeled).
+   */
+  @Test
+  public void testDetectionRecognisesALitProjectViaContentPeekAndLinksDotTests() throws Exception {
+    String repoId = createProjectAndRepository();
+    Path ws = ensuredWorkspacePath(repoId, "master");
+    Files.createDirectories(ws.resolve("lit/src"));
+    Files.createDirectories(ws.resolve("other/src"));
+    // a Lit project: vite config + a package.json with a lit dependency + a vitest config
+    Files.writeString(ws.resolve("lit/vite.config.ts"), "export default {};\n");
+    Files.writeString(ws.resolve("lit/vitest.config.ts"), "export default {};\n");
+    Files.writeString(
+        ws.resolve("lit/package.json"), "{ \"dependencies\": { \"lit\": \"^3.0.0\" } }\n");
+    Files.writeString(ws.resolve("lit/src/foo.ts"), "export const foo = 1;\n");
+    Files.writeString(ws.resolve("lit/src/foo.test.ts"), "test('foo', () => {});\n");
+    // a Vite project with no lit dependency (a React/Vue shape) — must NOT be classified
+    Files.writeString(ws.resolve("other/vite.config.ts"), "export default {};\n");
+    Files.writeString(
+        ws.resolve("other/package.json"), "{ \"dependencies\": { \"react\": \"^19.0.0\" } }\n");
+    Files.writeString(ws.resolve("other/src/app.ts"), "export const app = 1;\n");
+
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .get(detectionUrl(repoId))
+        .then()
+        .statusCode(Response.Status.OK.getStatusCode())
+        .body("projects.find { it.root == 'lit' }.frameworkId", equalTo("ts-lit"))
+        .body("projects.find { it.root == 'lit' }.label", equalTo("TypeScript / Lit"))
+        .body("projects.find { it.root == 'other' }", nullValue())
+        .body(
+            "frameworks.find { it.frameworkId == 'ts-lit' }.memberPaths",
+            hasItems(
+                "lit/vite.config.ts",
+                "lit/vitest.config.ts",
+                "lit/package.json",
+                "lit/src/foo.ts",
+                "lit/src/foo.test.ts"))
+        // links: Lit source → its .test.ts, runner config-detected as Vitest
+        .body(
+            "links.find { it.path == 'lit/src/foo.ts' }.tests[0].path",
+            equalTo("lit/src/foo.test.ts"))
+        .body("links.find { it.path == 'lit/src/foo.ts' }.tests[0].kinds", contains("vitest"))
+        .body("links.find { it.path == 'lit/src/foo.ts' }.projectRoot", equalTo("lit"));
   }
 
   /**

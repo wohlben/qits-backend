@@ -1,6 +1,6 @@
-package eu.wohlben.qits.domain.daemon.entity;
+package eu.wohlben.qits.domain.service.entity;
 
-/** How a {@link HealthCheck} probes the daemon, ordered by dependency weight. */
+/** How a {@link HealthCheck} probes the service, ordered by dependency weight. */
 public enum HealthCheckKind {
   /** {@code curl} against the container's loopback; the HTTP status is matched. */
   HTTP,

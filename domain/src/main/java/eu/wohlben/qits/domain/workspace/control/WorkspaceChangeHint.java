@@ -2,7 +2,7 @@ package eu.wohlben.qits.domain.workspace.control;
 
 /**
  * A payload-free "something changed, re-read it" signal for one workspace's live channel. Fired at
- * the existing mutation choke-points (daemon status, daemon events, telemetry ingest, command
+ * the existing mutation choke-points (service status, service events, telemetry ingest, command
  * lifecycle) and delivered — via CDI async events — to the SSE boundary in the {@code service}
  * module, which pushes the {@link Topic} name to subscribed browsers. The hint carries no data: the
  * frontend reacts by re-fetching through the unchanged REST endpoints, so a dropped or missed hint
@@ -12,10 +12,10 @@ public record WorkspaceChangeHint(String repoId, String workspaceId, Topic topic
 
   /** The kind of change; maps 1:1 to a frontend query-invalidation. */
   public enum Topic {
-    /** A daemon instance's status flipped (start, ready, exit, crash, restart, degrade). */
-    DAEMONS,
-    /** A daemon event row was persisted. */
-    DAEMON_EVENTS,
+    /** A service instance's status flipped (start, ready, exit, crash, restart, degrade). */
+    SERVICES,
+    /** A service event row was persisted. */
+    SERVICE_EVENTS,
     /** The workspace's telemetry buffers got new data (debounced — highest churn). */
     TELEMETRY,
     /** A command's lifecycle changed (started, exited, terminated). */
@@ -45,8 +45,10 @@ public record WorkspaceChangeHint(String repoId, String workspaceId, Topic topic
      * A coding agent's live activity state changed for this workspace — its rollup flipped between
      * cooking (BUSY), idle, waiting-on-you, or none. Reported by the in-container {@code
      * workspace-daemon} (which hears the agent's lifecycle hooks) and cached by {@code
-     * WorkspaceDaemonRegistry}; fired on the workspace channel so the frontend re-fetches the
-     * workspace and refreshes the Agents-tab activity chip + the tab's busy dot.
+     * WorkspaceDaemonRegistry}; fired on the workspace channel (the frontend re-fetches the
+     * workspace and refreshes the Agents-tab activity chip + the tab's busy dot), and mirrored onto
+     * the repository channel {@code (repoId, null)} and the global channel {@code (null, null)} so
+     * the agent-activity bars on the repository and project detail routes refresh live too.
      */
     AGENT_ACTIVITY,
     /**

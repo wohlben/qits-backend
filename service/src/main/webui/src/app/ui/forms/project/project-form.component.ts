@@ -7,6 +7,8 @@ import { FormFieldLayoutComponent } from '@/ui/layout/form-field-layout/form-fie
 
 export interface ProjectFormData {
   name: string;
+  /** Only collected on create — the slug is immutable once the project exists. Blank = derive it. */
+  slug: string;
   description: string;
 }
 
@@ -16,6 +18,21 @@ export interface ProjectFormData {
   template: `
     <form (submit)="onSubmit($event)" class="flex flex-col gap-4 max-w-xl">
       <app-form-field-layout [field]="form.name" id="project-name" label="Name" autocomplete="off" />
+
+      <!--
+        The slug is the project's git-safe identity: its wrapper repository is named
+        <slug>-<slug>, so it cannot be changed once the project exists. Offered only on create,
+        and optional — left blank it is derived from the name.
+      -->
+      @if (!editing()) {
+        <app-form-field-layout
+          [field]="form.slug"
+          id="project-slug"
+          label="Slug (optional — derived from the name, and permanent)"
+          autocomplete="off"
+          placeholder="lowercase-with-dashes"
+        />
+      }
 
       <app-project-description-input [field]="form.description" />
 
@@ -30,9 +47,11 @@ export interface ProjectFormData {
 export class ProjectFormComponent {
   readonly initialData = input<ProjectFormData>();
   readonly loading = input(false);
+  /** Hides the slug field: an existing project's slug is immutable. */
+  readonly editing = input(false);
   readonly submitted = output<ProjectFormData>();
 
-  readonly model = signal<ProjectFormData>({ name: '', description: '' });
+  readonly model = signal<ProjectFormData>({ name: '', slug: '', description: '' });
   readonly form = form(this.model, (schemaPath) => {
     required(schemaPath.name, { message: 'Name is required' });
   });

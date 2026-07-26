@@ -108,9 +108,9 @@ public class CommandService {
   /**
    * What a launch needs regardless of where it came from: an action or a coding agent. {@code
    * actionId} is null for agent launches (they aren't backed by an action). {@code otel} injects
-   * the OTLP exporter environment (daemons with the toggle set; see {@link OtelEnvironment}).
-   * {@code publicBase} is the proxied base path a web-viewable daemon must serve under, injected as
-   * {@code QITS_PUBLIC_BASE}; null for everything else. {@code commandId} is a caller-chosen id
+   * the OTLP exporter environment (services with the toggle set; see {@link OtelEnvironment}).
+   * {@code publicBase} is the proxied base path a web-viewable service must serve under, injected
+   * as {@code QITS_PUBLIC_BASE}; null for everything else. {@code commandId} is a caller-chosen id
    * (agent launches render it into the session-report hook URL before the row exists; null
    * generates one) and {@code agentSession} the first entry of an agent launch's session list —
    * both null for everything that isn't an agent session. {@code agentType} is the coding-agent
@@ -276,7 +276,7 @@ public class CommandService {
   }
 
   /**
-   * The lifecycle status write first (like {@link #launchDaemon}'s composite), then the extra
+   * The lifecycle status write first (like {@link #launchService}'s composite), then the extra
    * listener — so e.g. the transcript sweep sees the finished row.
    */
   private CommandExitListener compose(CommandExitListener extra) {
@@ -290,16 +290,16 @@ public class CommandService {
   }
 
   /**
-   * Launch a supervised daemon run as a registry command (kind {@code DAEMON}) — a PTY process like
-   * an interactive action, so the existing terminal socket gives log tailing and re-attach. The
-   * caller (the daemon supervisor) owns the lifecycle around it: {@code exitListener} is invoked
-   * <em>after</em> the persisted status update, and {@code observerSinks} are attached before the
-   * first output byte so ready/error observers never miss early lines. An optional {@code
-   * logWriterTap} is teed onto the session's log writer, receiving every captured line with the
-   * same sequence the audit log persists — the seam that lets observer findings anchor to {@code
-   * command_log_line} rows.
+   * Launch a supervised service run as a registry command (kind {@code SERVICE}) — a PTY process
+   * like an interactive action, so the existing terminal socket gives log tailing and re-attach.
+   * The caller (the service supervisor) owns the lifecycle around it: {@code exitListener} is
+   * invoked <em>after</em> the persisted status update, and {@code observerSinks} are attached
+   * before the first output byte so ready/error observers never miss early lines. An optional
+   * {@code logWriterTap} is teed onto the session's log writer, receiving every captured line with
+   * the same sequence the audit log persists — the seam that lets observer findings anchor to
+   * {@code command_log_line} rows.
    */
-  public CommandDto launchDaemon(
+  public CommandDto launchService(
       String repoId,
       String workspaceId,
       String name,
@@ -320,7 +320,7 @@ public class CommandService {
                 script,
                 true,
                 environment,
-                CommandKind.DAEMON,
+                CommandKind.SERVICE,
                 otel,
                 publicBase,
                 null,
@@ -339,7 +339,7 @@ public class CommandService {
               try {
                 logWriterTap.append(commandId, sequence, channel, content, timestamp);
               } catch (RuntimeException e) {
-                LOG.debugf(e, "Daemon log tap failed for command %s", commandId);
+                LOG.debugf(e, "Service log tap failed for command %s", commandId);
               }
             };
     registry.spawn(
@@ -347,18 +347,18 @@ public class CommandService {
     return p.dto();
   }
 
-  /** A prepared daemon run: the persisted RUNNING command row, its container, and resolved env. */
-  public record DaemonRun(CommandDto command, String container, Map<String, String> environment) {}
+  /** A prepared service run: the persisted RUNNING command row, its container, and resolved env. */
+  public record ServiceRun(CommandDto command, String container, Map<String, String> environment) {}
 
   /**
-   * Prepare a daemon run without spawning: validate the workspace, snapshot branch/commit, persist
-   * a RUNNING {@code DAEMON} row, and resolve the env overlay (OTEL, {@code QITS_PUBLIC_BASE}, and
-   * the caller's env). The {@link ServiceSupervisor} starts the detached daemon session with the
+   * Prepare a service run without spawning: validate the workspace, snapshot branch/commit, persist
+   * a RUNNING {@code SERVICE} row, and resolve the env overlay (OTEL, {@code QITS_PUBLIC_BASE}, and
+   * the caller's env). The {@link ServiceSupervisor} starts the detached service session with the
    * returned {@code environment}, then attaches a log follower to the returned command id via
-   * {@link #followDaemon}. The row's {@code script} is the daemon's own startScript (meaningful
+   * {@link #followService}. The row's {@code script} is the service's own startScript (meaningful
    * history), even though the process qits streams is the follower tail.
    */
-  public DaemonRun beginDaemonRun(
+  public ServiceRun beginServiceRun(
       String repoId,
       String workspaceId,
       String name,
@@ -376,24 +376,24 @@ public class CommandService {
                 script,
                 true,
                 environment,
-                CommandKind.DAEMON,
+                CommandKind.SERVICE,
                 otel,
                 publicBase,
                 null,
                 null,
                 null));
-    return new DaemonRun(p.dto(), p.container(), p.env());
+    return new ServiceRun(p.dto(), p.container(), p.env());
   }
 
   /**
-   * Attach a follower process (the daemon's {@code tail -F} of its mirror log) to an
+   * Attach a follower process (the service's {@code tail -F} of its mirror log) to an
    * already-created command id, streaming its output through the same persistence + replay pipeline
    * as any command — so the ready-pattern, per-line persistence, and terminal re-attach all keep
-   * working while the daemon itself runs detached in its session. The follower carries no daemon
-   * env (that rode into the session); its own exit does not drive daemon lifecycle — the
+   * working while the service itself runs detached in its session. The follower carries no service
+   * env (that rode into the session); its own exit does not drive service lifecycle — the
    * supervisor's liveness poll owns that.
    */
-  public void followDaemon(
+  public void followService(
       String commandId,
       String container,
       String followScript,
@@ -507,7 +507,7 @@ public class CommandService {
     }
 
     // Branch comes from the stored column. Read it in its own transaction: launches also come from
-    // non-request threads (the daemon supervisor's scheduler on relaunch), where the Panache
+    // non-request threads (the service supervisor's scheduler on relaunch), where the Panache
     // session would otherwise have no active context.
     String branch =
         QuarkusTransaction.requiringNew()
@@ -560,13 +560,13 @@ public class CommandService {
       env.putAll(otelEnvironment.forLaunch(repoId, workspaceId, dto.id(), descriptor.name()));
     }
     if (descriptor.publicBase() != null) {
-      // Web-viewable daemons serve under the proxied base path (the startScript passes it to the
+      // Web-viewable services serve under the proxied base path (the startScript passes it to the
       // dev server, e.g. `vite --base "$QITS_PUBLIC_BASE"`). Before the definition overlay so an
       // explicit user var wins, like OTEL_* above.
       env.put("QITS_PUBLIC_BASE", descriptor.publicBase());
     }
-    if (descriptor.kind() == CommandKind.DAEMON) {
-      // Unconditional for daemons (like TERM, not behind the otel toggle): the backend relays it
+    if (descriptor.kind() == CommandKind.SERVICE) {
+      // Unconditional for services (like TERM, not behind the otel toggle): the backend relays it
       // to its SPA via config.json's capture section, and the app-side gate (env unset => capture
       // null => no button) handles absence everywhere else. Before the overlay so a user var wins.
       env.put("QITS_CAPTURE_ENDPOINT", otelEnvironment.captureEndpoint());

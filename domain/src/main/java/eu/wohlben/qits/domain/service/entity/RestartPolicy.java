@@ -1,6 +1,6 @@
-package eu.wohlben.qits.domain.daemon.entity;
+package eu.wohlben.qits.domain.service.entity;
 
-/** What the supervisor does when a daemon's process exits on its own. */
+/** What the supervisor does when a service's process exits on its own. */
 public enum RestartPolicy {
   /** Never relaunch; a non-zero exit settles the instance in CRASHED. */
   NEVER,

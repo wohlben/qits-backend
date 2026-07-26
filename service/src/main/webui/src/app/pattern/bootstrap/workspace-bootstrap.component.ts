@@ -48,7 +48,7 @@ import { BootstrapOutcomeChipComponent } from '@/ui/components/bootstrap/bootstr
         <div class="text-sm text-destructive">Failed to load bootstrap steps</div>
       } @else if (entries().length === 0) {
         <p class="text-sm text-muted-foreground">
-          No bootstrap steps declared in this repository's .qits-config.yml.
+          No bootstrap steps declared in this repository's qits config (.config/qits/repository.yml).
         </p>
       } @else {
         <ul class="flex flex-col divide-y rounded-md border">

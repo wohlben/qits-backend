@@ -354,6 +354,103 @@ class FrameworkDetectionServiceTest {
             .matches());
   }
 
+  // ---- ts-lit (the Vite-marker candidate rule + the .test.ts suffix pairing) -----------------
+
+  @Test
+  void detectsALitCandidateAtTheViteConfigDirButNeverInsideAnAngularWorkspace() {
+    // The structural rule only: a vite.config.* marks a candidate root (the "does package.json
+    // depend on lit" confirmation is DetectionService's content peek, not this class's job).
+    List<String> paths =
+        List.of(
+            "pom.xml",
+            "src/main/webui/vite.config.ts",
+            "src/main/webui/package.json",
+            "src/main/webui/src/components/greeting-form/greeting-form.ts");
+    assertEquals(List.of("java-quarkus@", "ts-lit@src/main/webui"), shape(service.detect(paths)));
+
+    // The marker's other spellings count too.
+    assertEquals(
+        List.of("ts-lit@js", "ts-lit@mjs"),
+        shape(service.detect(List.of("js/vite.config.js", "mjs/vite.config.mjs"))));
+
+    // An Angular workspace that also carries a vite config (Angular's own builder setups do) stays
+    // Angular-only — the angular.json root is subtracted from the candidates.
+    assertEquals(
+        List.of("ts-angular@w"),
+        shape(service.detect(List.of("w/angular.json", "w/vite.config.ts", "w/package.json"))));
+  }
+
+  @Test
+  void resolvesLitMembershipScopedByRoot() {
+    String root = "src/main/webui";
+    List<String> paths =
+        List.of(
+            root + "/package.json",
+            root + "/vite.config.ts",
+            root + "/vitest.config.ts",
+            root + "/tsconfig.json",
+            root + "/index.html",
+            root + "/src/components/greeting-form/greeting-form.ts",
+            root + "/public/favicon.ico",
+            root + "/README.md", // not a member
+            "pom.xml"); // not a member (outside root)
+    DetectedProject lit =
+        service.detect(paths).stream()
+            .filter(p -> p.descriptor().id().equals("ts-lit"))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(
+        sorted(
+            root + "/index.html",
+            root + "/package.json",
+            root + "/public/favicon.ico",
+            root + "/src/components/greeting-form/greeting-form.ts",
+            root + "/tsconfig.json",
+            root + "/vite.config.ts",
+            root + "/vitest.config.ts"),
+        sorted(service.memberPaths(lit, paths)));
+  }
+
+  @Test
+  void linksLitSourcesToDotTestCounterpartsBothWays() {
+    String root = "src/main/webui";
+    String comp = root + "/src/components/greeting-form";
+    List<String> paths =
+        List.of(
+            root + "/vite.config.ts",
+            root + "/package.json",
+            comp + "/greeting-form.ts",
+            comp + "/greeting-form.test.ts",
+            comp + "/name-input.ts");
+    List<DetectedProject> projects = service.detect(paths);
+
+    assertEquals(
+        List.of(comp + "/greeting-form.test.ts"),
+        service.linkedTestsOf(comp + "/greeting-form.ts", projects, paths));
+    assertEquals(
+        List.of(comp + "/greeting-form.ts"),
+        service.linkedSourcesOf(comp + "/greeting-form.test.ts", projects, paths));
+    // a test is not a source of tests, and an untested sub-component links nothing
+    assertEquals(
+        List.of(), service.linkedTestsOf(comp + "/greeting-form.test.ts", projects, paths));
+    assertEquals(List.of(), service.linkedTestsOf(comp + "/name-input.ts", projects, paths));
+  }
+
+  @Test
+  void angularSpecSuffixIsInertInsideALitRootAndViceVersa() {
+    // Inside a lit root a stray .spec.ts is neither a test nor a claimable counterpart.
+    List<String> litPaths = List.of("lit/vite.config.ts", "lit/src/foo.ts", "lit/src/foo.spec.ts");
+    List<DetectedProject> litProjects = service.detect(litPaths);
+    assertEquals(List.of(), service.linkedTestsOf("lit/src/foo.ts", litProjects, litPaths));
+    assertEquals(List.of(), service.linkedSourcesOf("lit/src/foo.spec.ts", litProjects, litPaths));
+
+    // Inside an Angular root a .test.ts is a plain source, not a test.
+    List<String> ngPaths = List.of("ng/angular.json", "ng/src/foo.ts", "ng/src/foo.test.ts");
+    List<DetectedProject> ngProjects = service.detect(ngPaths);
+    assertEquals(List.of(), service.linkedSourcesOf("ng/src/foo.test.ts", ngProjects, ngPaths));
+    assertEquals(List.of(), service.linkedTestsOf("ng/src/foo.test.ts", ngProjects, ngPaths));
+  }
+
   private static List<String> sorted(String... values) {
     return sorted(List.of(values));
   }
@@ -368,6 +465,7 @@ class FrameworkDetectionServiceTest {
   void descriptorByIdResolvesShippedKindsAndNullOtherwise() {
     assertEquals("java-quarkus", FrameworkDetectionService.descriptorById("java-quarkus").id());
     assertEquals("ts-angular", FrameworkDetectionService.descriptorById("ts-angular").id());
+    assertEquals("ts-lit", FrameworkDetectionService.descriptorById("ts-lit").id());
     assertEquals("docs", FrameworkDetectionService.descriptorById("docs").id());
     assertNull(FrameworkDetectionService.descriptorById("rust-cargo"));
     assertNull(FrameworkDetectionService.descriptorById(null));

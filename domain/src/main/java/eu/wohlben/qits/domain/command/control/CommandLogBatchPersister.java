@@ -19,7 +19,7 @@ import java.util.Map;
  * Persists a batch of captured log lines in one transaction, off the request path. Isolated in its
  * own bean so {@code CommandLogService}'s background writer thread invokes it through the CDI proxy
  * (so {@link Transactional}/{@link ActivateRequestContext} actually apply — a self-invocation would
- * bypass them). The owning command is loaded once per batch and shared across its lines. DAEMON
+ * bypass them). The owning command is loaded once per batch and shared across its lines. SERVICE
  * commands' OUTPUT lines are additionally stamped with a classified {@link LogSeverity} — local,
  * cheap, and off the hot path, which is what makes {@code ?severity=} filters possible without
  * re-parsing.
@@ -55,7 +55,7 @@ public class CommandLogBatchPersister {
   }
 
   private LogSeverity classify(Command command, CommandLogService.PendingLine line) {
-    if (command.kind != CommandKind.DAEMON || line.channel() != LogChannel.OUTPUT) {
+    if (command.kind != CommandKind.SERVICE || line.channel() != LogChannel.OUTPUT) {
       return null;
     }
     return logLineClassifier.classify(line.content()).orElse(null);

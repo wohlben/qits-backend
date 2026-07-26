@@ -52,9 +52,9 @@ public class OtelEnvironment {
   }
 
   /**
-   * The capture ingest URL a daemon's backend relays to its SPA (the config.json {@code capture}
+   * The capture ingest URL a service's backend relays to its SPA (the config.json {@code capture}
    * section) — composed like the OTLP endpoint above, but independent of the {@code otel} toggle:
-   * injected for every daemon.
+   * injected for every service.
    */
   public String captureEndpoint() {
     return "http://" + qitsHostResolver.qitsHost() + ":" + qitsPort + "/api/capture";

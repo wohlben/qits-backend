@@ -51,7 +51,7 @@ public class ClaudeCodeAgent extends CodingAgent {
     // messages, tool calls, result) come back on stdout — driven programmatically over plain pipes,
     // not a PTY. --verbose emits every event, not just the final result. --include-hook-events
     // surfaces hook lifecycle events (e.g. Stop) in the stream, giving qits turn-boundary
-    // awareness for busy/idle detection and well-timed daemon-event injection. exec'd because the
+    // awareness for busy/idle detection and well-timed service-event injection. exec'd because the
     // process is long-lived and managed.
     StringBuilder command =
         new StringBuilder(

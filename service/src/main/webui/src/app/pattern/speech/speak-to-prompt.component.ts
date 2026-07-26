@@ -138,7 +138,7 @@ import { WavRecorder } from './wav-recorder';
         }
       </section>
 
-      <!-- Elements picked from a daemon web view; all listed snippets ride along with the launch
+      <!-- Elements picked from a service web view; all listed snippets ride along with the launch
            (remove the ones you don't want). The cache is root-scoped and survives navigation. -->
       @if (promptContext.count() > 0) {
         <section class="flex flex-col gap-2">

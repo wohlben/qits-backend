@@ -14,8 +14,8 @@ This is a *current-state contract* document: when a feature changes the contract
 guide in place.
 
 Related: [workspace submodule support](../epics/qits-project-repository-submodules/features/2026-07-14_workspace-submodule-support.md) ·
-[daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
-[daemon healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) ·
+[service web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
+[service healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) ·
 [spa-feature-capture](../epics/qits-integration-angular/features/2026-07-14_spa-feature-capture.md) ·
 [workspace bootstrap commands](../epics/qits-workspaces/features/2026-07-18_workspace-bootstrap-commands.md).
 
@@ -33,17 +33,23 @@ Related: [workspace submodule support](../epics/qits-project-repository-submodul
 **On a packaged deployment this step is automatic.** A `NORMAL`-launch-mode qits (jar / native /
 prod image) self-seeds at startup
 ([startup self-seed feature](../epics/qits-live-deployment/features/2026-07-19_startup-qits-self-seed.md)): it boots into a
-`"qits"` project with `wohlben/qits-backend` and `wohlben/qits-angular-integration` already
-registered, and the qits-backend submodules imported (including the one second-level import on the
+`"qits"` project (slug `qits`) holding its wrapper repository `qits-qits` plus
+`wohlben/qits-backend` and `wohlben/qits-angular-integration` already registered, and the
+qits-backend submodules imported (including the one second-level import on the
 `testing-repo-quarkus-angular` child). Each repo's committed `.qits-config.yml` is **not ingested**
 anywhere — it is the single, workspace-scoped source of truth, read in-container per workspace
 (see step 3). Nothing below is
 needed there — pick up at step 2 (the workspace / first-build walk). The seed is reconciled
 additively on every boot and can be turned off with `qits.startup-seed.enabled=false` or redirected
-with `qits.startup-seed.repo-url` (mirror/fork/air-gap).
+with `qits.startup-seed.repo-url` / `qits.startup-seed.angular-integration-url` /
+`qits.startup-seed.wrapper-url` (mirror/fork/air-gap).
 
 **On a dev instance (`quarkus:dev`), or to register it by hand,** do the manual walk — submodule
-import is REQUIRED. *Projects → New project* ("qits") *→ Add repository*:
+import is REQUIRED. *Projects → New project*: name it "qits" and **give it the slug `qits`**
+(the create form derives it from the name, which already yields `qits` here). Creating the project
+also creates its wrapper repository `qits-qits`, remote-less and seeded with the project template
+skeleton; attaching `https://github.com/wohlben/qits-qits.git` as its backup remote is optional and
+independent of the walk below. Then *→ Add repository*:
 
 - URL: `https://github.com/wohlben/qits-backend.git`
 - Archetype: `SERVICE`
@@ -75,15 +81,17 @@ auto-starts** (the chain is read from the workspace's own checkout — no host-s
 So opening the child's first workspace yields a child qits with the demo fixtures **already
 seeded** — there are no manual install/seed steps in this walk. The ordering is load-bearing: qits'
 own build guard fails any lifecycle build once something listens on `:8080`, so the install could
-never run after the daemon is up. Watch the chain as `bootstrap:*` segments of the workspace Start
+never run after the service is up. Watch the chain as `bootstrap:*` segments of the workspace Start
 process (or on the workspace's **Bootstrap** tab, which also offers re-runs); a failed chain skips
-daemon auto-start by design — fix, then "Run all" from the Bootstrap tab, and on success the
-daemons come up.
+service auto-start by design — fix, then "Run all" from the Bootstrap tab, and on success the
+services come up.
 
-## 3. The dev-server daemon
+## 3. The dev-server service
 
 **qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this service
 (and the build/test/lint actions) — and that file is the only place the service exists**
+(qits-backend still uses the legacy root location; the default for new repos is
+`.config/qits/repository.yml`, with the root-level `.qits-config.yml` read as fallback)
 ([config-as-single-source-of-truth](../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)):
 config is **workspace-scoped, file-only, read in-container** by the workspace-daemon from its own
 checkout. There is no DB copy, no ingestion on clone, and no UI editor — the service shows up on a
@@ -142,36 +150,38 @@ SSE/websocket-heavy on `/api`; Quarkus serves those natively and Quinoa dev-prox
 - `Angular` — HTTP on port `4200`, path `/` (any HTTP answer means ng serve is up; it may 302/404
   bare paths under the serve path — connection-refused-while-compiling is the red-then-green).
 
-(Log observers and log sources no longer exist — that subsystem was removed with the daemon-backed
+(Log observers and log sources no longer exist — that subsystem was removed with the service-backed
 service supervision, 2026-07-24; `readyPattern`, health checks and crash excerpts are the surviving
 surface.)
 
-Remember the two standing rules: daemon-definition changes apply on the next (re)launch, and
+Remember the two standing rules: service-definition changes apply on the next (re)launch, and
 `webView.port` changes need a container recreate (stop-container → ensure-container → start).
 
 ## 4. Acceptance walk
 
 0. **Packaged deployment only** — boot a packaged image (with outbound HTTPS to GitHub): with no UI
-   steps, a `"qits"` project appears holding `qits-backend` + `qits-angular-integration`, the
+   steps, a `"qits"` project appears holding its wrapper `qits-qits` (adopted from the — possibly
+   empty — `wohlben/qits-qits`, seeded with the project template skeleton on `main`) plus
+   `qits-backend` + `qits-angular-integration`, the
    qits-backend submodule siblings imported (incl. the second-level `webui` edge). The
    `qits dev server` service + build/test/lint actions + `bootstrap:` chain live only in the
    committed `.qits-config.yml`, read in-container per workspace — nothing is ingested at this
    point. No workspace is provisioned (lazy by design). A second boot is a fast
    all-present no-op. (On a dev instance you did steps 1–3 by hand instead.)
 1. First workspace Start: the `bootstrap:*` segments run (install → seeds) and settle green, then
-   the daemon phase begins; the Bootstrap tab shows `SUCCEEDED`/`SKIPPED` per command.
-2. Daemon → `READY`; both health dots green.
-3. Web view renders the qits UI under `/daemon/{ws}/{d}/` — navigate, open a project, watch the
+   the service phase begins; the Bootstrap tab shows `SUCCEEDED`/`SKIPPED` per command.
+2. Service → `READY`; both health dots green.
+3. Web view renders the qits UI under `/service/{ws}/{s}/` — navigate, open a project, watch the
    child's own SSE-driven pages work in the frame.
 4. Parent workspace Telemetry tab: full-stack traces from the child — browser CLIENT spans
    (`qits dev server-browser`, `app.route.*`, `code.function.name`) rooting the child's
-   Quarkus SERVER spans (service `qits-forwardauth`); no `/otel/v1/*`, `/daemon/*`, `/git/*` or
+   Quarkus SERVER spans (service `qits-forwardauth`); no `/otel/v1/*`, `/service/*`, `/git/*` or
    `/mcp/*` self-spans (suppressed).
 5. Capture: in the framed child UI, use the floaty capture button → a new workspace appears in
    the **parent** whose goal carries the child UI snapshot (DOM + selected component). The
    `promptContext` **state** entry rides along only if `PromptContextStore` was instantiated in the
    session (a lazy `providedIn: 'root'` store — only the file-browser / command-chat /
-   speak-to-prompt / daemon-webview routes inject it), so it is absent from a capture off the fresh
+   speak-to-prompt / service-webview routes inject it), so it is absent from a capture off the fresh
    Projects route — see
    [`../issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md`](../issues/2026-07-18_capture-promptcontext-absent-on-lazy-store.md).
 
@@ -179,8 +189,8 @@ Remember the two standing rules: daemon-definition changes apply on the next (re
 
 - **No docker in the child**: its own workspace-container features fail lazily on first use
   (browsing, API, telemetry, agent-free flows all work — anything needing a container does not).
-  Nested web views can't materialize either, so the child's own `/daemon` frames stay splash.
-- **Build-time root path**: only the `quarkus:dev` daemon form can serve under the prefix; a
+  Nested web views can't materialize either, so the child's own `/service` frames stay splash.
+- **Build-time root path**: only the `quarkus:dev` service form can serve under the prefix; a
   packaged child jar cannot be rebased at runtime.
 - **Captures land in the parent** (framed capture posts same-origin `/api/capture`); unframed the
   button hides by design (container-internal ingest URL fails the OPTIONS probe).

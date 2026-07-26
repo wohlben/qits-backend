@@ -186,7 +186,7 @@ final class CommandSession {
    * container. The script runs under {@code setsid} as a session/group leader with its pgid written
    * to a pid file, so {@code kill -- -pgid} reaches a compound script's children too. Killing the
    * host-side {@code docker exec} client instead would orphan the process alive — this is the
-   * graceful half of a daemon stop; {@link #terminate()} stays the kill fallback. Returns false if
+   * graceful half of a service stop; {@link #terminate()} stays the kill fallback. Returns false if
    * the signal could not be delivered.
    */
   boolean signal(String signal) {

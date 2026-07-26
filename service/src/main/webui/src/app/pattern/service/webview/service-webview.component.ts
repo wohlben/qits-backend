@@ -34,7 +34,7 @@ const LIVE_STATUSES: (ServiceStatus | undefined)[] = [
 
 /**
  * The workspace's Web view tab: frames the service's app through the same-origin
- * `/daemon/{workspaceId}/{daemonId}/` proxy. Always present — without a live web-viewable service
+ * `/service/{workspaceId}/{serviceId}/` proxy. Always present — without a live web-viewable service
  * it renders an empty state instead of a dead frame. The iframe mounts on the tab's first
  * activation (the page passes `activated`) and then stays mounted while a live service exists, so
  * the framed app doesn't reload on every tab switch. Pick mode turns on the {@link DomPicker};
@@ -111,12 +111,12 @@ const LIVE_STATUSES: (ServiceStatus | undefined)[] = [
                 (change)="selectedServiceId.set($any($event.target).value)"
                 aria-label="Framed service"
               >
-                @for (instance of webViewable(); track instance.daemon?.id) {
-                  <option [value]="instance.daemon?.id">{{ instance.daemon?.name }}</option>
+                @for (instance of webViewable(); track instance.definition?.id) {
+                  <option [value]="instance.definition?.id">{{ instance.definition?.name }}</option>
                 }
               </select>
             } @else {
-              <span class="text-sm font-medium">{{ selected()?.daemon?.name }}</span>
+              <span class="text-sm font-medium">{{ selected()?.definition?.name }}</span>
             }
 
             <button
@@ -213,21 +213,21 @@ export class ServiceWebviewComponent {
   readonly selectedServiceId = signal<string | null>(null);
   readonly selected = computed(() => {
     const candidates = this.webViewable();
-    return candidates.find((i) => i.daemon?.id === this.selectedServiceId()) ?? candidates[0] ?? null;
+    return candidates.find((i) => i.definition?.id === this.selectedServiceId()) ?? candidates[0] ?? null;
   });
   /**
    * The relative proxied path off the DTO plus the definition's entry path — no service origin, no
    * port. proxyPath is trailing-slashed and entryPath is stored slash-less (both validated
    * backend-side), so the join is a plain concatenation. Trusted as a resource URL: it is
    * backend-provided registry/definition state (never user input), and the whole point is framing
-   * our own origin's /daemon/ path.
+   * our own origin's /service/ path.
    */
   readonly frameSrc = computed(() => {
     const selected = this.selected();
     if (!selected?.proxyPath) {
       return this.sanitizer.bypassSecurityTrustResourceUrl('about:blank');
     }
-    const entryPath = selected.daemon?.webView?.entryPath?.replace(/^\/+/, '') ?? '';
+    const entryPath = selected.definition?.webView?.entryPath?.replace(/^\/+/, '') ?? '';
     return this.sanitizer.bypassSecurityTrustResourceUrl(selected.proxyPath + entryPath);
   });
 
@@ -332,7 +332,7 @@ export class ServiceWebviewComponent {
       this.urlBarOpen.set(false);
       return;
     }
-    const entryPath = this.selected()?.daemon?.webView?.entryPath?.replace(/^\/+/, '') ?? '';
+    const entryPath = this.selected()?.definition?.webView?.entryPath?.replace(/^\/+/, '') ?? '';
     const appPath = this.currentAppPath() ?? '/' + entryPath;
     this.urlOpenedWith.set(appPath);
     this.urlValue.set(appPath);

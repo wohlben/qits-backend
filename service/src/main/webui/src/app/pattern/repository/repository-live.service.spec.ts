@@ -96,6 +96,15 @@ describe('RepositoryLiveService', () => {
     expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces', 'repo-1'])]);
   });
 
+  it('maps the agent-activity hint to the workspaces invalidation (the activity bar)', () => {
+    const { source } = connect();
+    invalidate.mockClear();
+
+    source.emitTopic('agent-activity');
+
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces', 'repo-1'])]);
+  });
+
   it('ignores unknown topics such as the heartbeat', () => {
     const { source } = connect();
     invalidate.mockClear();
@@ -111,9 +120,10 @@ describe('RepositoryLiveService', () => {
 
     source.emitOpen();
 
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledTimes(3);
     expect(invalidatedKeys()).toEqual([
       JSON.stringify(['repository-active-process', 'repo-1']),
+      JSON.stringify(['workspaces', 'repo-1']),
       JSON.stringify(['workspaces', 'repo-1']),
     ]);
   });

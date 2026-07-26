@@ -43,7 +43,7 @@ export class WebTerminalComponent implements OnDestroy {
 
   /**
    * An explicit WebSocket path (relative to the app origin, no leading slash), overriding the
-   * default `api/terminal/commands/<commandId>`. Used by the daemon interactive terminal.
+   * default `api/terminal/commands/<commandId>`. Used by the service interactive terminal.
    */
   readonly socketPath = input<string>();
 

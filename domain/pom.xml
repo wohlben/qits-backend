@@ -71,9 +71,10 @@
         <testResources>
             <testResource>
                 <directory>src/test/resources</directory>
-                <!-- The fixtures dir holds the committed bare submodule-*.git repos AND three
+                <!-- The fixtures dir holds the committed bare submodule-*.git repos AND four
                      git-submodule working trees (testing-repo, testing-repo-angular,
-                     testing-repo-quarkus-angular). Copy only the plain bares; the submodule working
+                     testing-repo-quarkus-angular, testing-repo-quarkus-lit). Copy only the plain
+                     bares; the submodule working
                      trees are turned into bare *.git repos on the classpath by the
                      derive-fixture-bares antrun step below (a working tree is not a bare, and one
                      carries node_modules/target once built). -->
@@ -81,6 +82,7 @@
                     <exclude>fixtures/testing-repo/**</exclude>
                     <exclude>fixtures/testing-repo-angular/**</exclude>
                     <exclude>fixtures/testing-repo-quarkus-angular/**</exclude>
+                    <exclude>fixtures/testing-repo-quarkus-lit/**</exclude>
                 </excludes>
             </testResource>
         </testResources>

@@ -40,134 +40,6 @@ export class WorkspaceServiceControllerService extends BaseService {
     }
 
     /**
-     * Start
-     * @endpoint post /api/repositories/{repoId}/workspaces/{workspaceId}/services/{daemonId}/start
-     * @param daemonId 
-     * @param repoId 
-     * @param workspaceId 
-     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
-     * @param reportProgress flag to report request and response progress.
-     * @param options additional options
-     */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response80>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response80>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response80>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost(daemonId: string, repoId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (daemonId === null || daemonId === undefined) {
-            throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost.');
-        }
-        if (repoId === null || repoId === undefined) {
-            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost.');
-        }
-        if (workspaceId === null || workspaceId === undefined) {
-            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost.');
-        }
-
-        let localVarHeaders = this.defaultHeaders;
-
-        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
-            'application/json'
-        ]);
-        if (localVarHttpHeaderAcceptSelected !== undefined) {
-            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
-        }
-
-        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
-
-        const localVarTransferCache: boolean = options?.transferCache ?? true;
-
-
-        let responseType_: 'text' | 'json' | 'blob' = 'json';
-        if (localVarHttpHeaderAcceptSelected) {
-            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
-                responseType_ = 'text';
-            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
-                responseType_ = 'json';
-            } else {
-                responseType_ = 'blob';
-            }
-        }
-
-        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/services/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/start`;
-        const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response80>('post', `${basePath}${localVarPath}`,
-            {
-                context: localVarHttpContext,
-                responseType: <any>responseType_,
-                ...(withCredentials ? { withCredentials } : {}),
-                headers: localVarHeaders,
-                observe: observe,
-                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
-                reportProgress: reportProgress
-            }
-        );
-    }
-
-    /**
-     * Stop
-     * @endpoint post /api/repositories/{repoId}/workspaces/{workspaceId}/services/{daemonId}/stop
-     * @param daemonId 
-     * @param repoId 
-     * @param workspaceId 
-     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
-     * @param reportProgress flag to report request and response progress.
-     * @param options additional options
-     */
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response79>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response79>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response79>>;
-    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost(daemonId: string, repoId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (daemonId === null || daemonId === undefined) {
-            throw new Error('Required parameter daemonId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost.');
-        }
-        if (repoId === null || repoId === undefined) {
-            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost.');
-        }
-        if (workspaceId === null || workspaceId === undefined) {
-            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost.');
-        }
-
-        let localVarHeaders = this.defaultHeaders;
-
-        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
-            'application/json'
-        ]);
-        if (localVarHttpHeaderAcceptSelected !== undefined) {
-            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
-        }
-
-        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
-
-        const localVarTransferCache: boolean = options?.transferCache ?? true;
-
-
-        let responseType_: 'text' | 'json' | 'blob' = 'json';
-        if (localVarHttpHeaderAcceptSelected) {
-            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
-                responseType_ = 'text';
-            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
-                responseType_ = 'json';
-            } else {
-                responseType_ = 'blob';
-            }
-        }
-
-        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/services/${this.configuration.encodeParam({name: "daemonId", value: daemonId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/stop`;
-        const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<Response79>('post', `${basePath}${localVarPath}`,
-            {
-                context: localVarHttpContext,
-                responseType: <any>responseType_,
-                ...(withCredentials ? { withCredentials } : {}),
-                headers: localVarHeaders,
-                observe: observe,
-                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
-                reportProgress: reportProgress
-            }
-        );
-    }
-
-    /**
      * List
      * @endpoint get /api/repositories/{repoId}/workspaces/{workspaceId}/services
      * @param repoId 
@@ -215,6 +87,134 @@ export class WorkspaceServiceControllerService extends BaseService {
         let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/services`;
         const { basePath, withCredentials } = this.configuration;
         return this.httpClient.request<Response81>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Start
+     * @endpoint post /api/repositories/{repoId}/workspaces/{workspaceId}/services/{serviceId}/start
+     * @param repoId 
+     * @param serviceId 
+     * @param workspaceId 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost(repoId: string, serviceId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response80>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost(repoId: string, serviceId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response80>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost(repoId: string, serviceId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response80>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost(repoId: string, serviceId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (repoId === null || repoId === undefined) {
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost.');
+        }
+        if (serviceId === null || serviceId === undefined) {
+            throw new Error('Required parameter serviceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost.');
+        }
+        if (workspaceId === null || workspaceId === undefined) {
+            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/services/${this.configuration.encodeParam({name: "serviceId", value: serviceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/start`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Response80>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Stop
+     * @endpoint post /api/repositories/{repoId}/workspaces/{workspaceId}/services/{serviceId}/stop
+     * @param repoId 
+     * @param serviceId 
+     * @param workspaceId 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost(repoId: string, serviceId: string, workspaceId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Response79>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost(repoId: string, serviceId: string, workspaceId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Response79>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost(repoId: string, serviceId: string, workspaceId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Response79>>;
+    public apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost(repoId: string, serviceId: string, workspaceId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (repoId === null || repoId === undefined) {
+            throw new Error('Required parameter repoId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost.');
+        }
+        if (serviceId === null || serviceId === undefined) {
+            throw new Error('Required parameter serviceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost.');
+        }
+        if (workspaceId === null || workspaceId === undefined) {
+            throw new Error('Required parameter workspaceId was null or undefined when calling apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/repositories/${this.configuration.encodeParam({name: "repoId", value: repoId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/workspaces/${this.configuration.encodeParam({name: "workspaceId", value: workspaceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/services/${this.configuration.encodeParam({name: "serviceId", value: serviceId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/stop`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Response79>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,

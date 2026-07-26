@@ -1,14 +1,15 @@
 package eu.wohlben.qits.domain.repository.control;
 
-import eu.wohlben.qits.domain.daemon.entity.HealthCheckKind;
-import eu.wohlben.qits.domain.daemon.entity.RestartPolicy;
 import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
+import eu.wohlben.qits.domain.service.entity.HealthCheckKind;
+import eu.wohlben.qits.domain.service.entity.RestartPolicy;
 import java.util.List;
 import java.util.Map;
 
 /**
- * The parsed, framework-free representation of a workspace checkout's committed {@code
- * .qits-config.yml}. The file is <strong>authoritative</strong>: it is read in-container by the
+ * The parsed, framework-free representation of a workspace checkout's committed qits config file
+ * ({@code .config/qits/repository.yml}, or the legacy root-level {@code .qits-config.yml} as
+ * fallback). The file is <strong>authoritative</strong>: it is read in-container by the
  * workspace-daemon and surfaced to the host over the control socket as the Part-2 wire schema
  * ({@link WorkspaceConfigView} wraps it; {@code WorkspaceDaemonRegistry} Jackson-deserializes it).
  * There is no host-side DB config store and no reconciler — declared actions/services/bootstrap
@@ -73,7 +74,7 @@ public record QitsConfig(
     }
   }
 
-  /** One {@code services[]} entry — a config-declared workspace service (dev daemon). */
+  /** One {@code services[]} entry — a config-declared workspace service (dev server). */
   public record ServiceDecl(
       String id,
       String name,

@@ -51,7 +51,7 @@ public class CommandLifecycleService {
    * launches render it into the session-report hook URL — and pass it as {@code commandId}; null
    * generates a fresh one. {@code initialAgentSession} is the first entry of an agent launch's
    * session list, persisted in the same transaction as the row so the hook can never race it; null
-   * for everything that isn't an agent session (actions, daemons, the login REPL). {@code
+   * for everything that isn't an agent session (actions, services, the login REPL). {@code
    * agentType} is the resolved coding-agent harness (null for non-agent launches ⇒ legacy CLAUDE).
    */
   @Transactional

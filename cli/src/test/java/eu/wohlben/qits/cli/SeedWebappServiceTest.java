@@ -21,6 +21,7 @@ import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
+import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceRuntimeStatus;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceStatus;
 import io.quarkus.test.junit.QuarkusTest;
@@ -66,14 +67,15 @@ public class SeedWebappServiceTest {
   // transient-reference error that never occurs in the real CLI. This profile boots its own Quarkus
   // instance with a clean in-memory H2, so leaving committed rows behind is harmless.
   @Test
-  public void seedsStackDemoWithObservableDaemonAndFeatureFlow() {
+  public void seedsStackDemoWithObservableServiceAndFeatureFlow() {
     // Drives the command via the real services with no JAX-RS request context — a guard for the
     // command-mode wiring (@ActivateRequestContext on seed()).
     Repository first = seedWebappService.seed();
     assertNotNull(first, "first seed should create the repository");
 
     // Idempotent by reset: a second run tears the prior project down and recreates it, so there is
-    // still exactly one project and its workspaces/daemons/feature-flows are back to the known-good
+    // still exactly one project and its workspaces/services/feature-flows are back to the
+    // known-good
     // state (not duplicated, not "already exists" errors from re-creating the same workspace ids).
     Repository second = seedWebappService.seed();
     assertNotNull(second);
@@ -91,7 +93,13 @@ public class SeedWebappServiceTest {
             .orElse(null);
     assertNotNull(project, "demo project should exist");
 
-    Repository repo = projectService.getRepositories(project.id).get(0);
+    // Filter, don't index: the project also owns its PROJECT-archetype wrapper, and
+    // getRepositories has no `order by`, so get(0) is both wrong and non-deterministic.
+    Repository repo =
+        projectService.getRepositories(project.id).stream()
+            .filter(r -> r.archetype != RepositoryArchetype.PROJECT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("the seed registered no repository"));
     assertEquals("main", repo.mainBranch, "fixture's default branch is 'main'");
 
     // TODO(Part 5): the observable-daemon assertion went away with the DB definition store; the

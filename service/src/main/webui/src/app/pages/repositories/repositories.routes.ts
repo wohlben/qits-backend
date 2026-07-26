@@ -4,9 +4,12 @@ import { Routes, UrlMatchResult, UrlSegment } from '@angular/router';
  * `:repoId/workspaces/:workspaceId(/:tab)?` as ONE route config — the optional trailing segment
  * selects the detail page's active tab, and a single config means tab navigation never remounts
  * the page (the chat socket, web-view iframe, and scroll positions survive; two route entries
- * would fail Angular's default reuse check on every bare↔slugged transition). Any non-`wip`
- * 4th segment is accepted so unknown slugs still reach the page, which normalizes them away;
- * `wip` is reserved for the legacy speak-to-prompt page below.
+ * would fail Angular's default reuse check on every bare↔slugged transition). The flip side of the
+ * single config: switching to ANOTHER workspace would also reuse the page, which reads its identity
+ * params from the route snapshot once — so the route opts into `data.remountParams` (see
+ * {@code ParamRemountRouteReuseStrategy}) to remount on a repoId/workspaceId change while the tab
+ * slug keeps reusing. Any non-`wip` 4th segment is accepted so unknown slugs still reach the page,
+ * which normalizes them away; `wip` is reserved for the legacy speak-to-prompt page below.
  */
 export function workspaceDetailMatcher(segments: UrlSegment[]): UrlMatchResult | null {
   if (segments.length < 3 || segments.length > 4 || segments[1].path !== 'workspaces') {
@@ -45,6 +48,7 @@ export const repositoriesRoutes: Routes = [
   },
   {
     matcher: workspaceDetailMatcher,
+    data: { remountParams: ['repoId', 'workspaceId'] },
     loadComponent: () =>
       import('./workspace-detail/workspace-detail.page').then((m) => m.WorkspaceDetailPage),
   },

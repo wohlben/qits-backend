@@ -2,7 +2,7 @@
 
 This guide walks a **stock `code.quarkus.io` starter** (extensions `rest-jackson` +
 `quinoa`, Angular in `src/main/webui/`) to a fully qits-managed app: framework-aware file
-browsing, a web-viewable dev-server daemon with per-service healthchecks, log observation,
+browsing, a web-viewable dev-server service with per-service healthchecks, log observation,
 backend OTEL, and frontend OTEL through the backend gateway. It was written by performing exactly this walk on a fresh starter
 (2026-07-06/07) and cross-checking against the reference implementation, the
 [`testing-repo-quarkus-angular` fixture](../epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md)
@@ -25,22 +25,22 @@ fixture breaks, this guide is stale too).
   **JDK 25** (Temurin), **Node 22 + pnpm** (corepack), git, python3, tmux, the Claude Code CLI.
   The container runs as your host uid with the workspace cloned at **`/workspace`**; `HOME` is
   the workspace, so Maven/pnpm caches land in `/workspace/.m2`, `/workspace/.cache`, … and
-  survive daemon restarts (but not container recreation).
+  survive service restarts (but not container recreation).
 - Your app builds with a **committed `./mvnw`** and pnpm (commit `pnpm-lock.yaml` — it is also
   how Quinoa detects the package manager).
 
 Two rules learned the hard way, used throughout:
 
-1. **Daemon definition changes take effect on the next (re)launch, not on the running process.**
-   A live daemon keeps running the definition it started with; an updated
-   `webView`/observer/startScript applies when it next launches. Both a manual daemon stop + start
+1. **Service definition changes take effect on the next (re)launch, not on the running process.**
+   A live service keeps running the definition it started with; an updated
+   `webView`/observer/startScript applies when it next launches. Both a manual service stop + start
    and an automatic crash-triggered relaunch re-read the current definition (the relaunch used to
    reuse a stale launch-time copy — [now fixed](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)),
    so a container recreate — which the supervisor sees as a crash — already picks up the new
    definition.
 2. **Port publishing is container-create-time only.** Adding or changing `webView.port` on a
    live workspace needs a container recreate: `POST …/stop-container` then
-   `POST …/ensure-container`, then a daemon start. (After a docker/host restart, the same
+   `POST …/ensure-container`, then a service start. (After a docker/host restart, the same
    recreate sequence is currently also the fix for wedged containers — see
    [this issue](../issues/resolved/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md).)
 
@@ -115,7 +115,7 @@ clean: `.m2/`, `.cache/`, `.local/`, `.angular/`, `.redhat/`.
 **Why (do not skip this for a Java project):** the workspace runs a **Java language server** — the
 coding agent's bundled **jdtls**, and VS Code's **redhat.java** if you also open the repo in an
 IDE. Both import the project through **m2e**, whose Eclipse *output directory* defaults to the
-**same `target/classes`** that Maven and your **`quarkus:dev` dev-server daemon** (Tier 1) use.
+**same `target/classes`** that Maven and your **`quarkus:dev` dev-server service** (Tier 1) use.
 When the language server's model is briefly incomplete — right after a `mvn clean`, or mid
 re-index — its background compiler writes half-resolved `*.class` stubs into that shared
 `target/classes`. The running `quarkus:dev` then hot-reloads them and dies:
@@ -135,7 +135,7 @@ is inherited by every module:
        agent's jdtls both set the `m2e.version` user property on every Maven resolve (m2e-core's
        MavenExecutionContext), and no `./mvnw` CLI invocation sets it. Relocating the whole build
        DIRECTORY sends the language server's classes/test-classes/generated-sources to target-ide/,
-       so Maven and the quarkus:dev daemon keep exclusive ownership of target/. Relocate
+       so Maven and the quarkus:dev service keep exclusive ownership of target/. Relocate
        <directory> (a profile's <build> may set it); do NOT try <outputDirectory> — a profile
        can't set it, and the Quarkus dev mojo can't resolve a property-indirected outputDirectory
        for reactor hot-reload deps. -->
@@ -162,20 +162,20 @@ target-ide/
 qits itself, where this replaced an earlier, wrong "disable the build cache for the module" patch
 (see [maven-build-cache](../epics/qits-build-setup/features/2026-07-05_maven-build-cache.md)).
 
-**Verify:** with the `quarkus:dev` daemon running (Tier 1), edit a `.java` file and save. The
-daemon hot-reloads cleanly — no `Unresolved compilation problems`, no mass "Unsatisfied
+**Verify:** with the `quarkus:dev` service running (Tier 1), edit a `.java` file and save. The
+service hot-reloads cleanly — no `Unresolved compilation problems`, no mass "Unsatisfied
 dependency". A `target-ide/` appears (the language server's output); `target/classes` stays owned
 by Maven. If the IDE still shows stale red, reload the window so the language server re-imports.
 
 ---
 
-## Tier 1 — the dev-server daemon
+## Tier 1 — the dev-server service
 
-Daemons are defined **per repository** and run **per workspace** (see
-[daemons](../epics/qits-workspace-services/features/2026-07-04_daemons.md)). Create the dev-server daemon:
+Services are defined **per repository** and run **per workspace** (see
+[services](../epics/qits-workspace-services/features/2026-07-04_daemons.md)). Create the dev-server service:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/repositories/<repoId>/daemons \
+curl -s -X POST http://localhost:8080/api/repositories/<repoId>/services \
   -H 'Content-Type: application/json' -d '{
   "name": "Quarkus dev server",
   "description": "Runs ./mvnw quarkus:dev — REST API + Angular SPA via Quinoa.",
@@ -191,7 +191,7 @@ Every flag in the `startScript` is load-bearing:
 
 - `-Dquarkus.http.host=0.0.0.0` — Quarkus must be reachable beyond container loopback.
 - `-Dquarkus.http.root-path="${QITS_PUBLIC_BASE:-/}"` — serves the whole app (API included)
-  under the daemon's proxy prefix (Tier 2). The `:-/` default keeps a standalone run at `/`.
+  under the service's proxy prefix (Tier 2). The `:-/` default keeps a standalone run at `/`.
 - `-Dquarkus.otel.exporter.otlp.endpoint=…` — **dev mode does not honor the
   `OTEL_EXPORTER_OTLP_ENDPOINT` env var** (Quarkus reads only `quarkus.otel.*`); this bridge
   hands the injected value in (Tier 4;
@@ -205,8 +205,8 @@ Every flag in the `startScript` is load-bearing:
 Start it in a workspace and watch the state:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/repositories/<repoId>/workspaces/main/daemons/<daemonId>/start -d '{}' -H 'Content-Type: application/json'
-curl -s http://localhost:8080/api/repositories/<repoId>/workspaces/main/daemons   # entries[].instance.status
+curl -s -X POST http://localhost:8080/api/repositories/<repoId>/workspaces/main/services/<serviceId>/start -d '{}' -H 'Content-Type: application/json'
+curl -s http://localhost:8080/api/repositories/<repoId>/workspaces/main/services   # entries[].instance.status
 ```
 
 **First-launch cost:** the container starts with empty caches, so the first run downloads the
@@ -220,14 +220,14 @@ followed by `start` reaches `READY` again quickly.
 
 ## Tier 1b — healthchecks: per-service health dots
 
-`READY` is a single bit, and this daemon stands up **two** servers (Quarkus `:8080` + the Angular
+`READY` is a single bit, and this service stands up **two** servers (Quarkus `:8080` + the Angular
 dev server `:4200` — one process group, one `readyPattern`). If Angular dies or wedges while
-Quarkus stays up, the daemon still reads READY and the app is half-broken with no signal.
+Quarkus stays up, the service still reads READY and the app is half-broken with no signal.
 Healthchecks close that gap: named probes qits runs on an interval **inside the workspace
 container**, each with its own green/red/grey dot beside the status chip. See
-[daemon healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md).
+[service healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md).
 
-**qits-side only — no app changes.** Extend the daemon definition (full `PUT`, as always):
+**qits-side only — no app changes.** Extend the service definition (full `PUT`, as always):
 
 ```json
 "healthChecks": [
@@ -244,7 +244,7 @@ What each choice is doing:
 
 - **Probes run in the container's own network namespace** (`docker exec`), so `127.0.0.1:<port>`
   is the service's own loopback. **No port publishing, no container recreate** — unlike
-  `webView.port` (rule 2), you can add or change checks freely; they apply on the next daemon
+  `webView.port` (rule 2), you can add or change checks freely; they apply on the next service
   (re)launch (rule 1).
 - **Why the Quarkus check is a `COMMAND`, not `HTTP`:** after Tier 2 your backend serves under
   `$QITS_PUBLIC_BASE` (`quarkus.http.root-path`), so `/q/health` is *not* at the bare root — and
@@ -252,49 +252,49 @@ What each choice is doing:
   it cannot express `${QITS_PUBLIC_BASE%/}/q/health`. A `COMMAND` check is a bash script and can.
   **Before Tier 2** (no root-path yet) the plain form works fine:
   `{"name": "Quarkus", "kind": "HTTP", "port": 8080, "path": "/q/health"}`. All probes get
-  `QITS_PUBLIC_BASE` in their env (plus the daemon's own `environment` map).
+  `QITS_PUBLIC_BASE` in their env (plus the service's own `environment` map).
 - **The Angular check accepts `4xx`** — under `--serve-path`, bare `/` on `:4200` may 404 or
   redirect; any HTTP answer means the dev server is serving, while connection-refused (red) means
-  it's compiling or dead. That refused-while-compiling window is the demo: start the daemon and
+  it's compiling or dead. That refused-while-compiling window is the demo: start the service and
   watch Quarkus go green while Angular sits red, then flips.
 - There is also a dependency-free **`TCP`** kind (`{"kind": "TCP", "port": …}` — a bash
   `/dev/tcp` connect) for ports that don't speak HTTP.
 - **Defaults:** probe every 5 s (`intervalMs`), 2 s timeout (`timeoutMs`), green after 1 success
   (`healthyThreshold`), red only after 3 consecutive failures (`unhealthyThreshold` — debounces a
-  transient refusal), first probe after the daemon's ready grace (`initialDelayMs`). Check names
-  must be unique within the daemon.
+  transient refusal), first probe after the service's ready grace (`initialDelayMs`). Check names
+  must be unique within the service.
 
 Semantics to rely on (and not fight):
 
-- **Display-only.** Health never changes `DaemonStatus`, never restarts anything, never writes a
-  `daemon_event` row. The dots sit *beside* the chip; a READY daemon with a red dot is exactly
+- **Display-only.** Health never changes `ServiceStatus`, never restarts anything, never writes a
+  `service_event` row. The dots sit *beside* the chip; a READY service with a red dot is exactly
   the "half-down" state the feature exists to show.
 - **Live gauge, not history.** Only the latest result per check is kept, in memory: a qits
-  restart drops it (dots grey, then repopulate within one interval), a stopped daemon reads all
+  restart drops it (dots grey, then repopulate within one interval), a stopped service reads all
   grey — never a stale red. `UNHEALTHY` means the probe ran and got a bad answer (wrong status,
   nonzero exit, timeout); grey `UNKNOWN` means "no verdict" (not started, or the probe itself
   couldn't run — e.g. a missing tool).
 - The dots update over the workspace's existing SSE feed (on state flips), and the hover tooltip
   carries latency + the failing evidence (`exit 7: curl: (7) Failed to connect…`, `HTTP 503
   (expected 2xx,3xx)`). Agents read the same data from the workspace-daemons REST endpoint (`GET
-  /api/repositories/{repoId}/workspaces/{workspaceId}/daemons`, per-entry `instance.health`).
+  /api/repositories/{repoId}/workspaces/{workspaceId}/services`, per-entry `instance.health`).
 
-**Verify:** start the daemon → both dots green within one interval of READY (Angular red first
+**Verify:** start the service → both dots green within one interval of READY (Angular red first
 if you catch the compile window). Then kill the frontend inside the container:
 `docker exec <container> bash -c 'pkill -9 -f "ng serve"'` → the Angular dot flips red within
 ~15 s (3 failed probes) **while the chip stays READY**, with the connection-refused evidence in
-the tooltip; the Events feed gains nothing. Restart the daemon → all dots reset grey, then green.
+the tooltip; the Events feed gains nothing. Restart the service → all dots reset grey, then green.
 
 ---
 
 ## Tier 2 — the web view
 
-The trap tier. The daemon web view frames your app in an iframe served through qits' proxy at
-`/daemon/{workspaceId}/{daemonId}/` — the value qits injects as **`$QITS_PUBLIC_BASE`**. The
+The trap tier. The service web view frames your app in an iframe served through qits' proxy at
+`/service/{workspaceId}/{serviceId}/` — the value qits injects as **`$QITS_PUBLIC_BASE`**. The
 frame targets the **frontend dev server (`:4200`)** for HMR; the SPA's API calls travel
 base-relative through the ng dev-server proxy to Quarkus, which serves under the same prefix
 via `quarkus.http.root-path` (already in the Tier 1 startScript). Full design:
-[daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md).
+[service web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md).
 
 ### App-side changes (five pieces, all required)
 
@@ -326,7 +326,7 @@ server has `--serve-path` but **no `--base-href`**, so rebase at runtime, before
 <base href="/">
 <script>
   (function () {
-    var match = location.pathname.match(/^\/daemon\/[^/]+\/[^/]+\//);
+    var match = location.pathname.match(/^\/service\/[^/]+\/[^/]+\//);
     if (match) document.querySelector('base').setAttribute('href', match[0]);
   })();
 </script>
@@ -348,7 +348,7 @@ quarkus.quinoa.dev-server.port=4200
 ```
 
 The `${quarkus.http.root-path:/}` prefix is the subtle one: Quinoa matches ignored prefixes
-against the **full** request path, so a bare `/api` silently stops matching under the daemon
+against the **full** request path, so a bare `/api` silently stops matching under the service
 prefix — and then **every API GET loops forever** between Quinoa's dev proxy and ng's API proxy.
 POSTs are unaffected (Quinoa only handles GET/HEAD), so a POST-only app hides the
 misconfiguration until the first GET. See the
@@ -356,7 +356,7 @@ misconfiguration until the first GET. See the
 
 ### qits-side
 
-Add the web view to the daemon definition (`PUT` replaces the definition — send the full body,
+Add the web view to the service definition (`PUT` replaces the definition — send the full body,
 Tier 1's fields plus):
 
 ```json
@@ -378,9 +378,9 @@ background — watch the streamed segments at
 `runtimeStatus` until it reads `RUNNING`
 (see [the technical-process log stream](../epics/qits-technical-processes/features/2026-07-18_technical-process-log-stream.md)).
 
-The container kill looks like a crash to the supervisor, so an `ON_FAILURE`/`ALWAYS` daemon
+The container kill looks like a crash to the supervisor, so an `ON_FAILURE`/`ALWAYS` service
 auto-relaunches and — since [the relaunch now re-reads the definition](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md)
-— comes back on the new `webView`; a `NEVER` daemon (or one already stopped) needs a manual
+— comes back on the new `webView`; a `NEVER` service (or one already stopped) needs a manual
 start. The instance's `needsContainerRecreate` field / the amber badge in the UI tells you when
 the recreate is needed.
 
@@ -391,14 +391,14 @@ the recreate is needed.
 | Blank iframe, asset 404s in devtools | missing `--serve-path` / `<base>` rebase — assets resolve against `/` |
 | SPA renders, API calls 404 | fetches hardcode `/api` instead of base-relative `api/…` |
 | SPA renders, API **GET**s hang forever (POSTs fine) | `ignored-path-prefixes` not root-path-aware — the Quinoa↔ng loop |
-| Frame shows 502 "container does not publish the daemon's port" | `webView.port` added after the container existed — recreate it |
-| Frame shows 404 "No web-viewable daemon here." while the API lists a `proxyPath` | a `NEVER`-policy daemon didn't relaunch after the container recreate — start it (auto-relaunch of `ON_FAILURE`/`ALWAYS` now reads the fresh definition) |
+| Frame shows 502 "container does not publish the service's port" | `webView.port` added after the container existed — recreate it |
+| Frame shows 404 "No web-viewable service here." while the API lists a `proxyPath` | a `NEVER`-policy service didn't relaunch after the container recreate — start it (auto-relaunch of `ON_FAILURE`/`ALWAYS` now reads the fresh definition) |
 | `ERR_EMPTY_RESPONSE` in the frame | `ng serve` without `--host 0.0.0.0` |
 | Frame shows "This host … is not allowed" | not an app-config gap — qits' proxy rewrites the Host to `localhost` for you ([resolved](../issues/resolved/2026-07-07_web-view-host-not-allowed-after-devcontainer-move.md)); if you still see it, qits predates that fix |
 
 **Verify (the walk's strict acceptance):** open the workspace page → *Web view* floaty → the
 frame renders your SPA on the `entryPath` route; an API POST made by the SPA succeeds (check the
-rendered result, or `curl -X POST http://localhost:8080/daemon/main/<daemonId>/api/…`); an API
+rendered result, or `curl -X POST http://localhost:8080/service/main/<serviceId>/api/…`); an API
 GET through the prefix returns promptly (no loop); editing a frontend file in the workspace
 hot-reloads the frame; the *Pick element* DOM picker highlights and records a pick.
 
@@ -406,9 +406,9 @@ hot-reloads the frame; the *Pick element* DOM picker highlights and records a pi
 
 ## Tier 3 — logs to qits
 
-Daemon output is observed line-by-line; a rolling file gets you the full backend log even when
+Service output is observed line-by-line; a rolling file gets you the full backend log even when
 `-q` quiets Maven. See
-[daemon log observation](../epics/qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md).
+[service log observation](../epics/qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md).
 
 **App-side** — `application.properties`:
 
@@ -420,7 +420,7 @@ quarkus.log.file.path=quarkus.log
 (Workspace-relative path; also add `*.log` and `*.log.[0-9]*` to `.gitignore` for the rotation
 files.)
 
-**qits-side** — extend the daemon definition (full `PUT` + daemon stop/start, as always):
+**qits-side** — extend the service definition (full `PUT` + service stop/start, as always):
 
 ```json
 "observers": [
@@ -439,9 +439,9 @@ severity word. The `FILE` source tails `quarkus.log` with `tail -F` semantics.
 **Verify:** provoke an error (hot-reload a `throw` into an endpoint and call it — remember the
 container clone is live-editable) → within seconds the workspace **Events** tab shows
 `ERROR_DETECTED` entries from *both* sources (`output` and `quarkus.log:<line>`), also at
-`GET /api/daemon-events?repoId=…&workspaceId=…`; the daemon transitions to `DEGRADED`
-(status is sticky — restart the daemon to clear it); a running workspace chat receives a
-`[daemon:…]` note. Revert the throw.
+`GET /api/service-events?repoId=…&workspaceId=…`; the service transitions to `DEGRADED`
+(status is sticky — restart the service to clear it); a running workspace chat receives a
+`[service:…]` note. Revert the throw.
 
 ---
 
@@ -469,7 +469,7 @@ Endpoint, service name and resource attributes stay out of the file — qits inj
 launch (see the env table below), and the Tier 1 startScript already bridges the endpoint into
 dev mode. `%test` disables the SDK where no OTLP backend exists.
 
-**qits-side** — set `"otel": true` in the daemon definition (full `PUT` + stop/start).
+**qits-side** — set `"otel": true` in the service definition (full `PUT` + stop/start).
 
 Two behaviors to know (both observed on the walk, both fine):
 
@@ -680,26 +680,26 @@ backend's); the CLIENT span carries `app.route.path` and `code.function.name`; n
 
 ## Reference: what qits injects, and what the app must do with it
 
-Injected into every daemon/action/chat exec (`CommandService.prepare` →
-`OtelEnvironment`/`DaemonProxyPath`); explicit entries in the daemon's `environment` map win
+Injected into every service/action/chat exec (`CommandService.prepare` →
+`OtelEnvironment`/`ServiceProxyPath`); explicit entries in the service's `environment` map win
 over all of these.
 
 | Variable | When | Value shape | The app must… |
 |---|---|---|---|
 | `TERM` | always | `xterm-256color` | nothing (sane terminal output) |
-| `QITS_PUBLIC_BASE` | daemon has a `webView` | `/daemon/{workspaceId}/{daemonId}/` (stable across restarts) | serve under it: `quarkus.http.root-path`, `ng serve --serve-path`, `<base>` rebase, proxy key |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | daemon `otel: true` | `http://<qits-host>:<port>/api/otel` (container-reachable) | bridge into dev mode via `-Dquarkus.otel.exporter.otlp.endpoint` (not honored as env); relay to the browser via `config.json` gate |
+| `QITS_PUBLIC_BASE` | service has a `webView` | `/service/{workspaceId}/{serviceId}/` (stable across restarts) | serve under it: `quarkus.http.root-path`, `ng serve --serve-path`, `<base>` rebase, proxy key |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | service `otel: true` | `http://<qits-host>:<port>/api/otel` (container-reachable) | bridge into dev mode via `-Dquarkus.otel.exporter.otlp.endpoint` (not honored as env); relay to the browser via `config.json` gate |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `otel: true` | `http/protobuf` | match it (`quarkus.otel.exporter.otlp.protocol`) |
-| `OTEL_SERVICE_NAME` | `otel: true` | the daemon name | backend ignores it (artifactId wins — fine); relay to the browser, which appends `-browser` |
+| `OTEL_SERVICE_NAME` | `otel: true` | the service name | backend ignores it (artifactId wins — fine); relay to the browser, which appends `-browser` |
 | `OTEL_RESOURCE_ATTRIBUTES` | `otel: true` | `qits.workspace.id=…,qits.repository.id=…,qits.command.id=…` | leave alone (Quarkus honors it — it routes telemetry to your workspace); relay verbatim to the browser |
-| `QITS_CAPTURE_ENDPOINT` | every daemon (not gated on `otel`) | `http://<qits-host>:<port>/api/capture` (container-reachable; the library posts same-origin when framed) | relay to the browser via `config.json`'s `capture` section (`qits.capture.endpoint` in MicroProfile terms) — the gate that shows the capture button |
+| `QITS_CAPTURE_ENDPOINT` | every service (not gated on `otel`) | `http://<qits-host>:<port>/api/capture` (container-reachable; the library posts same-origin when framed) | relay to the browser via `config.json`'s `capture` section (`qits.capture.endpoint` in MicroProfile terms) — the gate that shows the capture button |
 
 ## Final acceptance
 
 Your workspace now supports the same manual E2E loop as the `seed-webapp` fixture (the
 executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webapp`):
 
-1. Daemon starts → `READY` (Tier 1); the Quarkus and Angular health dots go green, and killing
+1. Service starts → `READY` (Tier 1); the Quarkus and Angular health dots go green, and killing
    the frontend in-container flips its dot red while the chip stays READY (Tier 1b).
 2. Web view renders the SPA through the proxy prefix; an API round trip works; HMR live; DOM
    picker picks (Tier 2).
@@ -710,10 +710,10 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
 
 ## Related documents
 
-- Features: [daemons](../epics/qits-workspace-services/features/2026-07-04_daemons.md) ·
-  [daemon healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) ·
-  [daemon web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
-  [daemon log observation](../epics/qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md) ·
+- Features: [services](../epics/qits-workspace-services/features/2026-07-04_daemons.md) ·
+  [service healthchecks](../epics/qits-workspace-services/features/2026-07-10_daemon-healthchecks.md) ·
+  [service web-view configuration](../epics/qits-workspace-services/features/2026-07-06_daemon-webview-configuration.md) ·
+  [service log observation](../epics/qits-workspace-services/features/2026-07-04_daemon-log-observation-expansion.md) ·
   [observability](../epics/qits-observability/features/2026-07-04_observability.md) ·
   [spa-observability](../epics/qits-observability/features/2026-07-06_spa-observability.md) ·
   [spa-telemetry-meta-enrichment](../epics/qits-observability/features/2026-07-11_spa-telemetry-meta-enrichment.md) ·
@@ -724,6 +724,6 @@ executable form of this guide, `./mvnw -pl cli quarkus:run -Dcli.args=seed-webap
   [OTEL endpoint not bridged in dev mode](../issues/resolved/2026-07-05_quarkus-otel-endpoint-not-bridged.md) ·
   [Quinoa ignored-prefix root-path loop](../issues/resolved/2026-07-06_quinoa-ignored-prefix-root-path-loop.md)
 - Issues found while validating this guide:
-  [stale daemon definition on relaunch](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md) ·
+  [stale service definition on relaunch](../issues/resolved/2026-07-06_daemon-relaunch-uses-stale-definition-after-webview-update.md) ·
   [ensure-container no-ops on exited containers](../issues/resolved/2026-07-07_ensure-container-noops-on-exited-container-after-host-restart.md) ·
-  [daemons empty state references removed global library](../issues/resolved/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md)
+  [services empty state references removed global library](../issues/resolved/2026-07-06_workspace-daemons-empty-state-references-removed-global-library.md)

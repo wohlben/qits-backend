@@ -22,7 +22,7 @@ export interface PickedRef {
 }
 
 /**
- * The parent-side DOM picker for the daemon web view. Because the proxied frame is same-origin,
+ * The parent-side DOM picker for the service web view. Because the proxied frame is same-origin,
  * this is ordinary code operating directly on `iframe.contentDocument` — nothing is injected into
  * the framed app. Capture-phase listeners keep the app from reacting to pick clicks; a single
  * `pointer-events: none` overlay div tracks the hovered element. Already-picked elements (fed in

@@ -24,6 +24,10 @@ made them clean. It does **not** own:
 - **Workspace submodule support** as a product feature —
   [qits-project-repository-submodules](../qits-project-repository-submodules/epic.md) (the
   fixtures merely *exercise* it).
+- The **Lit web-components fixture** (`qits-fixture-quarkus-lit`) —
+  [qits-lit-webcomponents](../qits-lit-webcomponents/epic.md) owns it as that stack's
+  reference implementation; it reuses this epic's packaging machinery (submodule + derived
+  bare) but its feature history lands there.
 - The tiny committed `submodule-*.git` and `testing-repo` bares documented alongside the code in
   the root `CLAUDE.md`'s Test-fixtures section (this epic is the *feature history*; that is the
   current-state reference).

@@ -110,7 +110,7 @@ there: the draft record splits into
 |---|---|
 | Interactive PTY (Agents tab) | argv prompt at launch; `CommandRegistry.input` keystroke injection mid-session |
 | Chat (stream-json) | `ChatSession.sendUser` text turn |
-| Autonomous (`claude -p`) | argv prompt |
+| Autonomous (stream-json chat) | `ChatSession.sendUser` text turn (since 2026-07-26; was a one-shot `claude -p` with the bootstrap as argv) |
 
 Mid-session prompt refinement is an explicit user action ("hand to agent" / "update the agent"),
 not an autosave side effect: composing autosaves continuously, but only the button injects the
@@ -139,7 +139,11 @@ implementation pins down or deviates from the idea above:
 - **Autonomous was rewired too** (not deferred): `ResolveConflictService` now persists its composed
   (injection-fenced) prompt as the resolution workspace's draft and calls the prompt-less
   `launchAutonomous(repoId, workspaceId, name)`, which attaches the narrowed `repository` MCP server
-  (previously autonomous attached none) and runs the bootstrap via `claude -p`.
+  (previously autonomous attached none). Originally the bootstrap ran via a one-shot `claude -p`,
+  which printed nothing until it exited — the operator watched an empty command page for the whole
+  run. Since 2026-07-26 the autonomous launch rides the **chat pipeline** (kind `CHAT`,
+  `renderAutonomousChat`, bootstrap sent over stdin as the first turn), so the command page renders
+  the live conversation and the human can follow up in the same session after the autonomous turn.
 - **Run-tracking + versioning** (per product direction): `WorkspacePromptDraft` gained a monotonic
   `prompt_version` (bumped per content-changing upsert) and `last_run_at` / `last_run_prompt_version`
   / `last_run_command_id`, written by `recordRun` after a delivered launch (migration `V38`). The

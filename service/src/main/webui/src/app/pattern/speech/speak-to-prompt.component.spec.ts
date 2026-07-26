@@ -174,7 +174,7 @@ describe('SpeakToPromptComponent', () => {
     store.add({
       html: '<button class="cta">Go</button>',
       selector: '#root > button',
-      url: 'http://localhost/daemon/wt/d/',
+      url: 'http://localhost/service/wt/d/',
       tag: 'button',
       textPreview: 'Go',
     });
@@ -196,7 +196,7 @@ describe('SpeakToPromptComponent', () => {
     store.add({
       html: '<button class="cta">Go</button>',
       selector: '#root > button',
-      url: 'http://localhost/daemon/wt/d/greeting/world',
+      url: 'http://localhost/service/wt/d/greeting/world',
       appPath: '/greeting/world',
       tag: 'button',
       textPreview: 'Go',
@@ -222,7 +222,7 @@ describe('SpeakToPromptComponent', () => {
     store.add({
       html: '<button class="cta">Go</button>',
       selector: '#root > button',
-      url: 'http://localhost/daemon/wt/d/greeting/world',
+      url: 'http://localhost/service/wt/d/greeting/world',
       appPath: '/greeting/world',
       tag: 'button',
       textPreview: 'Go',
@@ -472,7 +472,7 @@ describe('SpeakToPromptComponent', () => {
             id: 's1',
             html: '<button>Go</button>',
             selector: '#root > button',
-            url: 'http://localhost/daemon/wt/d/',
+            url: 'http://localhost/service/wt/d/',
             tag: 'button',
             textPreview: 'Go',
             capturedAt: 0,
