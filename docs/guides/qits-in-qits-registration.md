@@ -33,17 +33,23 @@ Related: [workspace submodule support](../epics/qits-project-repository-submodul
 **On a packaged deployment this step is automatic.** A `NORMAL`-launch-mode qits (jar / native /
 prod image) self-seeds at startup
 ([startup self-seed feature](../epics/qits-live-deployment/features/2026-07-19_startup-qits-self-seed.md)): it boots into a
-`"qits"` project with `wohlben/qits-backend` and `wohlben/qits-angular-integration` already
-registered, and the qits-backend submodules imported (including the one second-level import on the
+`"qits"` project (slug `qits`) holding its wrapper repository `qits-qits` plus
+`wohlben/qits-backend` and `wohlben/qits-angular-integration` already registered, and the
+qits-backend submodules imported (including the one second-level import on the
 `testing-repo-quarkus-angular` child). Each repo's committed `.qits-config.yml` is **not ingested**
 anywhere — it is the single, workspace-scoped source of truth, read in-container per workspace
 (see step 3). Nothing below is
 needed there — pick up at step 2 (the workspace / first-build walk). The seed is reconciled
 additively on every boot and can be turned off with `qits.startup-seed.enabled=false` or redirected
-with `qits.startup-seed.repo-url` (mirror/fork/air-gap).
+with `qits.startup-seed.repo-url` / `qits.startup-seed.angular-integration-url` /
+`qits.startup-seed.wrapper-url` (mirror/fork/air-gap).
 
 **On a dev instance (`quarkus:dev`), or to register it by hand,** do the manual walk — submodule
-import is REQUIRED. *Projects → New project* ("qits") *→ Add repository*:
+import is REQUIRED. *Projects → New project*: name it "qits" and **give it the slug `qits`**
+(the create form derives it from the name, which already yields `qits` here). Creating the project
+also creates its wrapper repository `qits-qits`, remote-less and seeded with the project template
+skeleton; attaching `https://github.com/wohlben/qits-qits.git` as its backup remote is optional and
+independent of the walk below. Then *→ Add repository*:
 
 - URL: `https://github.com/wohlben/qits-backend.git`
 - Archetype: `SERVICE`
@@ -84,6 +90,8 @@ daemons come up.
 
 **qits-backend commits a root [`.qits-config.yml`](../../.qits-config.yml) that declares this service
 (and the build/test/lint actions) — and that file is the only place the service exists**
+(qits-backend still uses the legacy root location; the default for new repos is
+`.config/qits/repository.yml`, with the root-level `.qits-config.yml` read as fallback)
 ([config-as-single-source-of-truth](../epics/qits-workspace-daemon/features/2026-07-24_config-as-single-source-of-truth.md)):
 config is **workspace-scoped, file-only, read in-container** by the workspace-daemon from its own
 checkout. There is no DB copy, no ingestion on clone, and no UI editor — the service shows up on a
@@ -152,7 +160,9 @@ Remember the two standing rules: daemon-definition changes apply on the next (re
 ## 4. Acceptance walk
 
 0. **Packaged deployment only** — boot a packaged image (with outbound HTTPS to GitHub): with no UI
-   steps, a `"qits"` project appears holding `qits-backend` + `qits-angular-integration`, the
+   steps, a `"qits"` project appears holding its wrapper `qits-qits` (adopted from the — possibly
+   empty — `wohlben/qits-qits`, seeded with the project template skeleton on `main`) plus
+   `qits-backend` + `qits-angular-integration`, the
    qits-backend submodule siblings imported (incl. the second-level `webui` edge). The
    `qits dev server` service + build/test/lint actions + `bootstrap:` chain live only in the
    committed `.qits-config.yml`, read in-container per workspace — nothing is ingested at this

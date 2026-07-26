@@ -509,7 +509,11 @@ components:
         name:
           type: string
           pattern: \S
+        slug:
+          type: string
         description:
+          type: string
+        url:
           type: string
     CreateTaskRequest:
       type: object
@@ -972,6 +976,8 @@ components:
           type: string
         name:
           type: string
+        slug:
+          type: string
         description:
           type: string
     PromptAttachmentSource:
@@ -990,7 +996,11 @@ components:
     RepositoryArchetype:
       type: string
       enum:
+      - PROJECT
       - SERVICE
+      - LIBRARY
+      - INTEGRATION
+      - APPLICATION
       - SERVICE_TEMPLATE
       - FORK
     RepositoryDto:
@@ -1304,6 +1314,8 @@ components:
       properties:
         project:
           $ref: "#/components/schemas/ProjectDto"
+        wrapper:
+          $ref: "#/components/schemas/RepositoryDto"
     Response47:
       type: object
       properties:

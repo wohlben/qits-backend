@@ -16,6 +16,7 @@ import { ZardButtonComponent } from '@/shared/components/button';
   template: `
     <app-project-form
       [initialData]="initialData()"
+      [editing]="!!project()"
       [loading]="createMutation.isPending() || updateMutation.isPending()"
       (submitted)="onSubmitted($event)"
     >
@@ -34,7 +35,7 @@ export class ProjectCreateUpdateFormComponent {
 
   readonly initialData = computed(() => {
     const p = this.project();
-    return p ? { name: p.name ?? '', description: p.description ?? '' } : undefined;
+    return p ? { name: p.name ?? '', slug: p.slug ?? '', description: p.description ?? '' } : undefined;
   });
 
   readonly createMutation = injectMutation(() => ({
@@ -61,9 +62,16 @@ export class ProjectCreateUpdateFormComponent {
 
   onSubmitted(data: ProjectFormData) {
     if (this.project()) {
-      this.updateMutation.mutate(data);
+      // The slug is immutable, so an update never carries it.
+      this.updateMutation.mutate({ name: data.name, description: data.description });
     } else {
-      this.createMutation.mutate(data);
+      // A blank slug means "derive it from the name" — send undefined, not an empty string, which
+      // would fail the format check.
+      this.createMutation.mutate({
+        name: data.name,
+        slug: data.slug?.trim() ? data.slug.trim() : undefined,
+        description: data.description,
+      });
     }
   }
 

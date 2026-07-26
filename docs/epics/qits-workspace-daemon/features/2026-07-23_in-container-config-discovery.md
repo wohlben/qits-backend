@@ -7,6 +7,11 @@
 > a SnakeYAML parse (`ConfigParser` + `DaemonQitsConfig`), `domain`'s `QitsConfig`/`QitsConfigParser`
 > stay put until Part 5. This change **also retired the host provisioning fallback** (see *Workstream
 > B* at the end) — the daemon is now the sole provisioner. See `docs/implementation-plan.md` Part 2.
+>
+> **Relocated 2026-07-26:** the default committed location is now `.config/qits/repository.yml`;
+> the daemon's `ConfigReader` reads it first and falls back to the legacy root-level
+> `.qits-config.yml` when absent (the host's `QitsConfigParser.readConfig` applies the same
+> precedence against the bare origin). File mentions below predate the move.
 
 ## Introduction
 

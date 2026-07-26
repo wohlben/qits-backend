@@ -122,7 +122,9 @@ below is retained as the record; the settled decisions live in the moved feature
 
 ## Part 2 — [in-container-config-discovery](epics/qits-workspace-daemon/features/2026-07-23_in-container-config-discovery.md) ✅ implemented 2026-07-23
 
-The daemon reads/parses `.qits-config.yml` from the checkout (its own branch). Pivot to file-as-truth.
+The daemon reads/parses the qits config from the checkout (its own branch). Pivot to file-as-truth.
+(Since 2026-07-26 the default location is `.config/qits/repository.yml`, with the root-level
+`.qits-config.yml` as legacy fallback — path mentions below predate that.)
 **Also retired the host provisioning fallback** (Workstream B — the daemon is now the sole
 provisioner; per directive). See the moved feature doc for the settled design.
 
@@ -311,13 +313,14 @@ checklist below is retained as the record; the settled decisions live in the mov
 
 ## Part 6 — [config-write-back-from-ui](epics/qits-workspace-daemon/feature-ideas/config-write-back-from-ui.md)
 
-The config UI writes edits back into `/workspace/.qits-config.yml` as a working-tree change (never an
-auto-commit). **Depends on the Part-3 file transport**
+The config UI writes edits back into the workspace's config file (default
+`/workspace/.config/qits/repository.yml`; legacy `/workspace/.qits-config.yml` — write back to
+whichever the daemon read) as a working-tree change (never an auto-commit). **Depends on the Part-3 file transport**
 ([container-file-access-over-socket](epics/qits-workspace-daemon/feature-ideas/container-file-access-over-socket.md)) —
 land that (or its `ReadFile`/`WriteFile` verbs) first.
 
 **Daemon / backend**
-- [ ] Use the file-access verbs to read `/workspace/.qits-config.yml` for the form and write the
+- [ ] Use the file-access verbs to read the workspace's config file for the form and write the
       re-serialized file on save. No commit.
 
 **UI (`service/src/main/webui`)**

@@ -11,6 +11,8 @@ import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.GitExecutor;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
+import eu.wohlben.qits.domain.repository.entity.Repository;
+import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceRuntimeStatus;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -63,7 +65,9 @@ public class SeedServiceTest {
             .orElse(null);
     assertNotNull(project, "Demo Project should exist");
 
-    String repoId = projectService.getRepositories(project.id).get(0).id;
+    // Filter, don't index: every project also owns its PROJECT-archetype wrapper repository, and
+    // getRepositories has no `order by`, so get(0) is both wrong and non-deterministic.
+    String repoId = seededRepository(project.id).id;
     Map<String, WorkspaceDto> byId = new java.util.HashMap<>();
     for (WorkspaceDto wt : workspaceService.listWorkspaces(repoId)) {
       byId.put(wt.workspaceId(), wt);
@@ -111,5 +115,13 @@ public class SeedServiceTest {
         "Merge feeder into mainline|qits <qits@local>|qits <qits@local>",
         mergeTip,
         "the seeded merge commit carries the configured (default) qits identity");
+  }
+
+  /** The repository the seed cloned — i.e. the project's one non-wrapper repository. */
+  private Repository seededRepository(String projectId) {
+    return projectService.getRepositories(projectId).stream()
+        .filter(r -> r.archetype != RepositoryArchetype.PROJECT)
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("the seed registered no repository"));
   }
 }

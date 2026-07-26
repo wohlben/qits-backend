@@ -19,6 +19,7 @@ import eu.wohlben.qits.domain.repository.control.ContainerRuntime;
 import eu.wohlben.qits.domain.repository.control.WorkspaceService;
 import eu.wohlben.qits.domain.repository.dto.WorkspaceDto;
 import eu.wohlben.qits.domain.repository.entity.Repository;
+import eu.wohlben.qits.domain.repository.entity.RepositoryArchetype;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceRuntimeStatus;
 import eu.wohlben.qits.domain.repository.entity.WorkspaceStatus;
 import io.quarkus.test.junit.QuarkusTest;
@@ -87,7 +88,13 @@ public class SeedLitServiceTest {
             .orElse(null);
     assertNotNull(project, "demo project should exist");
 
-    Repository repo = projectService.getRepositories(project.id).get(0);
+    // Filter, don't index: the project also owns its PROJECT-archetype wrapper, and
+    // getRepositories has no `order by`, so get(0) is both wrong and non-deterministic.
+    Repository repo =
+        projectService.getRepositories(project.id).stream()
+            .filter(r -> r.archetype != RepositoryArchetype.PROJECT)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("the seed registered no repository"));
     assertEquals("main", repo.mainBranch, "fixture's default branch is 'main'");
 
     // The dev-server daemon and build/lint/test actions come from the fixture's committed

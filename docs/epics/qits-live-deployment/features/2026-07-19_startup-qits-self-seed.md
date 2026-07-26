@@ -62,7 +62,8 @@ Related/dependent plans:
    `https://github.com/wohlben/qits-backend.git` (SERVICE, import-submodules ON, one
    second-level import) and `https://github.com/wohlben/qits-angular-integration.git` (the
    `@qits/angular` library, `docs/epics/qits-integration-angular/features/2026-07-13_qits-angular-integration-library.md` —
-   SERVICE, no submodules, no deep imports).
+   SERVICE, no submodules, no deep imports). A third entry, the project's `PROJECT`-archetype
+   wrapper, was prepended on 2026-07-26 — see *Update 2026-07-26* below.
 3. **Idempotency is per item, not per seed** (driving the real services, like the cli seeds —
    no raw SQL):
    - Project **"qits"**: created if absent, matched by name otherwise (`ProjectService`).
@@ -173,9 +174,35 @@ Built and tested (`domain` + `service` suites green):
   only when the web app boots — the `cli` command-mode app never self-seeds. The gate predicate is a
   pure `static shouldSeed(LaunchMode, boolean)` for direct unit-testing.
 - **Config** — `qits.startup-seed.enabled` (default `true`), `qits.startup-seed.repo-url` (default
-  `https://github.com/wohlben/qits-backend.git`), and `qits.startup-seed.angular-integration-url`
+  `https://github.com/wohlben/qits-backend.git`), `qits.startup-seed.angular-integration-url`
   (default `https://github.com/wohlben/qits-angular-integration.git`, the second override added so
-  the domain test can seed both manifest repos offline).
+  the domain test can seed both manifest repos offline), and `qits.startup-seed.wrapper-url`
+  (default `https://github.com/wohlben/qits-qits.git`, added 2026-07-26 with the wrapper entry).
+  The wrapper override carries one extra caveat beyond "an override changes item identity": a url
+  whose basename is not `qits-qits` fails the wrapper name validation, so a fixture it points at must
+  be named accordingly.
+
+### Update 2026-07-26 — the wrapper entry
+
+The manifest gained a **third entry, placed first**: `https://github.com/wohlben/qits-qits.git` with
+archetype `PROJECT` — the seeded project's
+[wrapper repository](../../qits-projects/features/2026-07-26_project-wrapper-repository.md), and the
+one retro-fit that feature performs. It is first because it is the project root and, once extraction
+starts, the superproject of the others; ordering is otherwise free, given per-item idempotency.
+
+Three things differ from the ordinary entries:
+
+- **It routes through the adopt seam.** `reconcileRepository` branches on `archetype == PROJECT` and
+  calls `ProjectService.adoptWrapperRepository`; `createRepositoryUnderProject` rejects `PROJECT`
+  outright. Adoption is idempotent across all four states a reconcile can find (create / promote a
+  repository already registered at that url / attach the remote to the greenfield wrapper
+  `ensureProject` just made / no-op once adopted), so it is matched by *role*, not by clone url.
+- **`ensureProject` now passes the slug explicitly** (`create("qits", "qits", …)`) rather than
+  letting it be derived from the display name: the adopt check — basename of the manifest url must
+  equal `<slug>-<slug>` — hangs off that value, so it must not drift.
+- **The upstream may be completely empty.** `wohlben/qits-qits` can be a repository created on the
+  forge and never pushed to; adoption clones it, finds no refs, and seeds the project template
+  skeleton on `main`. Nothing has to be pushed by hand first.
 - **Tests** — `SelfSeedServiceTest` (domain, fixtures redirect the qits-backend slot to
   `submodule-super.git` — its `child-a → grandchild` depth stands in for the quarkus-angular
   `webui` edge — and the angular slot to plain `testing-repo.git`): project + both repos + siblings

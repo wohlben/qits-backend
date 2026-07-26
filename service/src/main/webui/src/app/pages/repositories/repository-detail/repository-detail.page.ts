@@ -38,8 +38,9 @@ import { ZardButtonComponent } from '@/shared/components/button';
       <div pageActions class="flex items-center gap-2">
         <a z-button zType="secondary" [routerLink]="['/repositories', repoId, 'history']">History</a>
         <!-- Launches Claude Code in the main workspace with the actions MCP scoped to this repo, so
-             global actions can be managed from inside Claude. The committed .qits-config.yml (the
-             single config source) is edited directly in the repo. -->
+             global actions can be managed from inside Claude. The committed qits config
+             (.config/qits/repository.yml, legacy .qits-config.yml — the single config source) is
+             edited directly in the repo. -->
         <button
           z-button
           zType="secondary"

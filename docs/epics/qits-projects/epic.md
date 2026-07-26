@@ -33,6 +33,25 @@ qits-live-deployment.
 - **[project-domain](features/2026-05-01_project-domain.md)** — the Project BCE package
   (entity, control service, persistence, mapper, DTO, controller); the aggregate root and the
   reference implementation of the project-oriented BCE layout the whole codebase follows.
+- **[project-wrapper-repository](features/2026-07-26_project-wrapper-repository.md)** *(step 1)* —
+  project creation always ends with one repository: a `PROJECT`-archetype **wrapper repository**
+  named `<slug>-<slug>` after the project's new immutable `slug`, seeded with a **project template
+  skeleton** (`services/`/`libs/`/`integrations/`/`apps/`, one directory per repository archetype)
+  when its main branch is empty. Changes the [project model](../../guides/project-model.md) from "a
+  project *is* a polyrepo" to "a project starts as one repository and grows into one". The
+  already-seeded `qits` project is retro-fitted through the boot reconcile
+  (`github.com/wohlben/qits-qits`); no other pre-existing project is touched.
+
+## Parts (ideas)
+
+Step 1 (the wrapper itself) has landed; step 2 makes it the project's repository registry.
+
+- **[wrapper-declared-repositories](feature-ideas/wrapper-declared-repositories.md)** *(step 2)* —
+  the wrapper becomes the project's **repository registry**: creating a repository also registers it in
+  the wrapper as a submodule at `<archetype-dir>/<name>` (`ignore = all`, `update = merge`,
+  `branch = main`), deleting one de-registers it, and the committed `.gitmodules` stays in sync with the
+  `Repository` rows. Authors the `AGENTS.md` contract step 1 leaves empty, and closes the
+  provisioning gap it flagged.
 
 ## Done when
 
@@ -45,3 +64,5 @@ starts as a draft in this epic's `feature-ideas/`.
 | Part | Status |
 |---|---|
 | [project-domain](features/2026-05-01_project-domain.md) | implemented |
+| [project-wrapper-repository](features/2026-07-26_project-wrapper-repository.md) | implemented (step 1) |
+| [wrapper-declared-repositories](feature-ideas/wrapper-declared-repositories.md) | idea (step 2) |

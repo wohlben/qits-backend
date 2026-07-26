@@ -58,3 +58,24 @@ derive testing-repo                 testing-repo.git                 master
 derive testing-repo-quarkus-angular testing-repo-quarkus-angular.git main
 derive testing-repo-angular         qits-fixture-angular.git         main
 derive testing-repo-quarkus-lit     testing-repo-quarkus-lit.git     main
+
+# Project-wrapper fixtures. A wrapper may only be adopted from a url whose basename is
+# `<slug>-<slug>` (docs/epics/qits-projects/features/2026-07-26_project-wrapper-repository.md), so
+# these carry names no other fixture can stand in for.
+
+# An EMPTY upstream: no refs at all, HEAD dangling at an unborn `main` — a forge repository created
+# and never pushed to. Adopting it must yield the project template skeleton on `main` rather than
+# demanding a first commit be pushed by hand. Nothing to derive from a working tree, so it is
+# initialized directly (which is also why it cannot be committed: a ref-less bare has no content).
+empty_bare() {
+  local bare="$DST/$1" default="$2"
+  rm -rf "$bare"
+  git init -q --bare "$bare"
+  git -C "$bare" symbolic-ref HEAD "refs/heads/$default"
+}
+
+empty_bare qits-qits.git main
+
+# A NON-empty upstream for the same adopt path (project slug `demo`): real history that adoption must
+# leave completely untouched.
+derive testing-repo demo-demo.git master

@@ -45,7 +45,7 @@ public class WorkspaceBootstrapControllerTest {
         return Map.of(
             "qits.repositories.data-dir",
             tempDir.toString(),
-            // No provision-time chain: the checkout's .qits-config.yml is staged only after
+            // No provision-time chain: the checkout's qits config is staged only after
             // provisioning (the self-clone needs an empty directory), and an async autorun chain
             // could otherwise read it mid-staging and pollute lastRun. Manual runs are unaffected.
             "qits.bootstrap.autorun-enabled",
@@ -80,7 +80,9 @@ public class WorkspaceBootstrapControllerTest {
     String projectId =
         given()
             .contentType(ContentType.JSON)
-            .body(new ProjectController.CreateProjectRequest("WS Bootstrap Project", null))
+            .body(
+                new ProjectController.CreateProjectRequest(
+                    "WS Bootstrap Project", null, null, null))
             .post("/api/projects")
             .then()
             .statusCode(200)
@@ -110,9 +112,11 @@ public class WorkspaceBootstrapControllerTest {
   }
 
   /**
-   * Stage the chain on both sides of a real run: the checkout's {@code .qits-config.yml} (the
-   * {@code FakeWorkspaceBootstrapDriver}'s source — written after provisioning, since the
-   * self-clone needs an empty directory) and the config reader (the surface's source).
+   * Stage the chain on both sides of a real run: the checkout's committed config (the {@code
+   * FakeWorkspaceBootstrapDriver}'s source — written after provisioning, since the self-clone needs
+   * an empty directory; staged at the default {@code .config/qits/repository.yml} location, while
+   * the domain-side runner tests stage the legacy {@code .qits-config.yml} — together covering both
+   * lookup branches) and the config reader (the surface's source).
    */
   private void stageChainInCheckout(String repoId, QitsConfig.BootstrapDecl... steps)
       throws Exception {
@@ -122,8 +126,11 @@ public class WorkspaceBootstrapControllerTest {
       yaml.append("  - name: ").append(step.name()).append('\n');
       yaml.append("    execute: ").append(step.execute()).append('\n');
     }
-    Files.writeString(
-        Path.of(dataDir, repoId, "workspaces", "work", ".qits-config.yml"), yaml.toString());
+    Path config =
+        Path.of(dataDir, repoId, "workspaces", "work")
+            .resolve(eu.wohlben.qits.domain.repository.control.QitsConfigParser.CONFIG_PATH);
+    Files.createDirectories(config.getParent());
+    Files.writeString(config, yaml.toString());
     stageChain(steps);
   }
 
