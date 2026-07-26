@@ -36,10 +36,15 @@ describe('WorkspaceActivityBarComponent', () => {
     queryClient.setQueryData(['workspaces', 'repo-1'], workspaces);
   }
 
-  function createComponent(currentWorkspaceId = 'wt-1') {
+  function createComponent(currentWorkspaceId: string | null = 'wt-1', label: string | null = null) {
     const fixture = TestBed.createComponent(WorkspaceActivityBarComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
-    fixture.componentRef.setInput('currentWorkspaceId', currentWorkspaceId);
+    if (currentWorkspaceId !== null) {
+      fixture.componentRef.setInput('currentWorkspaceId', currentWorkspaceId);
+    }
+    if (label !== null) {
+      fixture.componentRef.setInput('label', label);
+    }
     fixture.detectChanges();
     return fixture;
   }
@@ -85,6 +90,26 @@ describe('WorkspaceActivityBarComponent', () => {
     const el = createComponent().nativeElement as HTMLElement;
     expect(el.textContent).toContain('Waiting on you');
     expect(buttons(el)[0].getAttribute('title')).toContain('Waiting on you');
+  });
+
+  it('renders without a current workspace (repository/project routes) — nothing highlighted', () => {
+    seed([
+      { workspaceId: 'wt-1', branch: 'main', agentActivity: 'BUSY' },
+      { workspaceId: 'wt-2', branch: 'feature', agentActivity: 'WAITING' },
+    ]);
+    const el = createComponent(null).nativeElement as HTMLElement;
+    expect(buttons(el)).toHaveLength(2);
+    expect(buttons(el).filter((b) => b.getAttribute('aria-current') === 'page')).toHaveLength(0);
+  });
+
+  it('prefixes the row with the repo label and names the nav after it', () => {
+    seed([{ workspaceId: 'wt-1', branch: 'main', agentActivity: 'BUSY' }]);
+    const el = createComponent(null, 'my-repo').nativeElement as HTMLElement;
+    const nav = el.querySelector('nav')!;
+    expect(nav.textContent).toContain('my-repo');
+    expect(nav.getAttribute('aria-label')).toBe(
+      'Workspaces with recent agent activity in my-repo',
+    );
   });
 
   it('navigates to the chat tab of the clicked workspace', () => {

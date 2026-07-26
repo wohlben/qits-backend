@@ -44,14 +44,19 @@ interface ActivityButton {
 }
 
 /**
- * The sticky "recent agent activity" bar on the workspace detail route: a single row of buttons, one
- * per workspace in this repo that has a live coding-agent session (BUSY / WAITING / IDLE), ordered
- * newest-activity-first (far left = most recently changed). A session that just stopped bubbles to the
- * left because that's its most recent change, so the user can jump straight to whichever workspace
- * needs their next prompt — clicking a button opens that workspace's Chat tab.
+ * The sticky "recent agent activity" bar on the workspace, repository, and project detail routes: a
+ * single row of buttons, one per workspace in this repo that has a live coding-agent session (BUSY /
+ * WAITING / IDLE), ordered newest-activity-first (far left = most recently changed). A session that
+ * just stopped bubbles to the left because that's its most recent change, so the user can jump
+ * straight to whichever workspace needs their next prompt — clicking a button opens that workspace's
+ * Chat tab. `currentWorkspaceId` is set only on the workspace detail route (it highlights the open
+ * workspace); the project detail route mounts one bar per repository, telling them apart via the
+ * optional `label` prefix.
  *
  * State comes from {@code WorkspaceDto.agentActivity} on the shared {@code ['workspaces', repoId]}
- * query, which {@code WorkspaceLiveService} keeps fresh over the `agent-activity` SSE topic — so the
+ * query, which each mounting route's live service ({@code WorkspaceLiveService},
+ * {@code RepositoryLiveService}, or the project route's {@code GlobalLiveService}) keeps fresh over
+ * its channel's `agent-activity` SSE topic — so the
  * row re-sorts live with no polling. Ordering is remembered in the root-scoped
  * {@link WorkspaceActivityOrderStore} (survives the page remount on workspace switch). Buttons persist
  * while a session is stopped/waiting and drop off only when its activity clears (ENDED / container
@@ -68,8 +73,11 @@ interface ActivityButton {
     @if (buttons().length) {
       <nav
         class="flex items-center gap-2 overflow-x-auto py-1"
-        aria-label="Workspaces with recent agent activity"
+        [attr.aria-label]="navLabel()"
       >
+        @if (label(); as prefix) {
+          <span class="shrink-0 text-xs font-medium text-muted-foreground">{{ prefix }}</span>
+        }
         @for (b of buttons(); track b.id) {
           <button
             z-button
@@ -95,7 +103,18 @@ interface ActivityButton {
 })
 export class WorkspaceActivityBarComponent {
   readonly repoId = input.required<string>();
-  readonly currentWorkspaceId = input.required<string>();
+  /** The open workspace to highlight — set on the workspace detail route only. */
+  readonly currentWorkspaceId = input<string | null>(null);
+  /** Optional row prefix naming the repo — set where several bars stack (the project route). */
+  readonly label = input<string | null>(null);
+
+  /** Distinct accessible names when several bars stack on one page. */
+  readonly navLabel = computed(() => {
+    const prefix = this.label();
+    return prefix
+      ? `Workspaces with recent agent activity in ${prefix}`
+      : 'Workspaces with recent agent activity';
+  });
 
   private readonly workspaceService = inject(WorkspaceControllerService);
   private readonly orderStore = inject(WorkspaceActivityOrderStore);
