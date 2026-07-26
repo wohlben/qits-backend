@@ -42,7 +42,7 @@ the stack first-class (a Lit framework detector, test↔code linking). It does *
 
 ## Parts, in implementation order
 
-1. **[servable-quarkus-lit-fixture](feature-ideas/servable-quarkus-lit-fixture.md)** — the
+1. **[servable-quarkus-lit-fixture](features/2026-07-26_servable-quarkus-lit-fixture.md)** — the
    foundation and first cut of everything: a minimal but **servable** Quarkus 3 + Lit
    web-components fixture (`qits-fixture-quarkus-lit`, multiple self-contained components
    built and served through one Quinoa), wired to the **full qits integration surface**
@@ -51,7 +51,9 @@ the stack first-class (a Lit framework detector, test↔code linking). It does *
 
 Candidate later parts (not drafted): a Lit-only frontend fixture split (the `qits-fixture-lit`
 sibling of `qits-fixture-angular`, composed back via submodule), and the `@qits/lit`
-integration library once the convention's Lit packaging stabilizes.
+integration library once the convention's Lit packaging stabilizes — the GitHub repo
+`wohlben/qits-integration-lit` already exists, **reserved** for that library (deliberately not
+used as the fixture backend).
 
 ## Done when
 
@@ -65,4 +67,4 @@ quarkus-angular fixture passes today.
 
 | Part | Status |
 |---|---|
-| [servable-quarkus-lit-fixture](feature-ideas/servable-quarkus-lit-fixture.md) | idea |
+| [servable-quarkus-lit-fixture](features/2026-07-26_servable-quarkus-lit-fixture.md) | implemented 2026-07-26 (deterministic acceptance items verified; docker-dependent walk pending) |

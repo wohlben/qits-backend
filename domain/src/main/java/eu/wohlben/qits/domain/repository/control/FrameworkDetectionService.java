@@ -184,6 +184,74 @@ public class FrameworkDetectionService {
         }
       };
 
+  /**
+   * Vite config file names that mark a candidate Lit root. The marker is structural (this class
+   * stays content-free): a Vite config that is not an Angular workspace. Whether the project
+   * actually depends on {@code lit} is a content peek layered in {@link DetectionService}, the way
+   * the {@code java-quarkus} label refinement peeks the pom.
+   */
+  private static final List<String> VITE_MARKERS =
+      List.of("vite.config.ts", "vite.config.mts", "vite.config.js", "vite.config.mjs");
+
+  private static final Descriptor TS_LIT =
+      new Descriptor() {
+        @Override
+        public String id() {
+          return "ts-lit";
+        }
+
+        @Override
+        public String label() {
+          return "TypeScript / Lit";
+        }
+
+        @Override
+        public List<String> detectRoots(List<String> paths) {
+          Set<String> angular = new TreeSet<>(markerRoots(paths, "angular.json"));
+          Set<String> roots = new TreeSet<>();
+          for (String marker : VITE_MARKERS) {
+            roots.addAll(markerRoots(paths, marker));
+          }
+          roots.removeAll(angular);
+          return new ArrayList<>(roots);
+        }
+
+        @Override
+        public List<String> frameworkGlobs() {
+          return List.of(
+              "package.json",
+              "vite.config.*",
+              "vitest.config.*",
+              "tsconfig*.json",
+              "index.html",
+              "src/**",
+              "public/**");
+        }
+
+        @Override
+        public boolean isTestPath(String rel) {
+          return rel.endsWith(".test.ts");
+        }
+
+        @Override
+        public List<String> testCandidates(String rel) {
+          // .test.ts is itself a .ts — exclude it (and Angular's .spec.ts) so a test never claims
+          // a test as its counterpart.
+          if (rel.endsWith(".test.ts") || rel.endsWith(".spec.ts") || !rel.endsWith(".ts")) {
+            return List.of();
+          }
+          return List.of(rel.substring(0, rel.length() - 3) + ".test.ts");
+        }
+
+        @Override
+        public List<String> sourceCandidates(String relTest) {
+          if (!relTest.endsWith(".test.ts")) {
+            return List.of();
+          }
+          return List.of(relTest.substring(0, relTest.length() - ".test.ts".length()) + ".ts");
+        }
+      };
+
   private static final Descriptor DOCS =
       new Descriptor() {
         @Override
@@ -207,13 +275,14 @@ public class FrameworkDetectionService {
         }
       };
 
-  /** The framework kinds we ship, in registry order — adding a fourth is a one-entry change. */
-  public static final List<Descriptor> DESCRIPTORS = List.of(JAVA_QUARKUS, TS_ANGULAR, DOCS);
+  /** The framework kinds we ship, in registry order — adding another is a one-entry change. */
+  public static final List<Descriptor> DESCRIPTORS =
+      List.of(JAVA_QUARKUS, TS_ANGULAR, TS_LIT, DOCS);
 
   /**
    * The descriptor with the given {@link Descriptor#id()} ({@code java-quarkus}/{@code
-   * ts-angular}/{@code docs}), or {@code null} for an unknown id. Used to resolve a {@code
-   * frameworks[].kind} declared in {@code .qits-config.yml} to a real descriptor.
+   * ts-angular}/{@code ts-lit}/{@code docs}), or {@code null} for an unknown id. Used to resolve a
+   * {@code frameworks[].kind} declared in {@code .qits-config.yml} to a real descriptor.
    */
   public static Descriptor descriptorById(String id) {
     for (Descriptor descriptor : DESCRIPTORS) {

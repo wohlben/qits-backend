@@ -57,3 +57,4 @@ derive() {
 derive testing-repo                 testing-repo.git                 master
 derive testing-repo-quarkus-angular testing-repo-quarkus-angular.git main
 derive testing-repo-angular         qits-fixture-angular.git         main
+derive testing-repo-quarkus-lit     testing-repo-quarkus-lit.git     main

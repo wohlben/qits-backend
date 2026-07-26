@@ -65,6 +65,9 @@ public class DetectionService {
 
   private static final Pattern QUARKUS = Pattern.compile("quarkus", Pattern.CASE_INSENSITIVE);
 
+  /** A {@code "lit"} dependency key in a package.json — the ts-lit candidate confirmation. */
+  private static final Pattern LIT_DEP = Pattern.compile("\"lit\"\\s*:");
+
   /**
    * The workspace's detection metadata, computed on demand. A merely-stopped container is
    * materialized by the same {@code ensureContainer} path every file read uses; a tree with no
@@ -101,8 +104,12 @@ public class DetectionService {
 
     // Consult the repository's declared frameworks first (a .qits-config.yml override/hint), then
     // fall back to marker-based detection for everything not declared. Declared entries win on the
-    // (kind, root) they name; markers fill in the rest.
-    List<DetectedProject> projects = mergeDeclaredFrameworks(repoId, detector.detect(paths));
+    // (kind, root) they name; markers fill in the rest. The ts-lit marker (a Vite config) also
+    // matches React/Vue Vite apps, so candidates are confirmed by a content peek first — a
+    // declared ts-lit entry bypasses the peek by construction (merged afterwards).
+    List<DetectedProject> projects =
+        mergeDeclaredFrameworks(
+            repoId, filterLitCandidates(repoId, workspaceId, detector.detect(paths)));
 
     // Content peeks, memoized per root within the request: a pom's Quarkus label and a TS project's
     // test runner. Both are one small read per detected root, not per file.
@@ -139,6 +146,33 @@ public class DetectionService {
     // The structural generation token, stamped so the client can render detection only against the
     // matching /files generation (WorkspaceTreeFingerprint.of over the same normalized path list).
     return new DetectionDto(projectDtos, frameworks, links, WorkspaceTreeFingerprint.of(paths));
+  }
+
+  /**
+   * Confirms marker-detected {@code ts-lit} candidates with the content peek the pure detector
+   * can't do: a Vite root counts as Lit only when its {@code package.json} declares a {@code lit}
+   * dependency. Other kinds pass through untouched; a Vite root without the dependency is simply
+   * not a project (never mislabeled). One small read per candidate root, mirroring the {@code
+   * java-quarkus} pom peek.
+   */
+  private List<DetectedProject> filterLitCandidates(
+      String repoId, String workspaceId, List<DetectedProject> detected) {
+    List<DetectedProject> kept = new ArrayList<>();
+    for (DetectedProject project : detected) {
+      if ("ts-lit".equals(project.descriptor().id())) {
+        String root = project.root();
+        String packageJson = root.isEmpty() ? "package.json" : root + "/package.json";
+        boolean isLit =
+            readIfPresent(repoId, workspaceId, packageJson)
+                .filter(c -> LIT_DEP.matcher(c).find())
+                .isPresent();
+        if (!isLit) {
+          continue;
+        }
+      }
+      kept.add(project);
+    }
+    return kept;
   }
 
   /**
@@ -225,10 +259,10 @@ public class DetectionService {
   }
 
   /**
-   * The runner kind(s) of a test file. Java tests are {@code junit}; a {@code *.spec.ts} takes its
-   * owning Angular project's runner, config-detected once per root (never a hardcoded default —
-   * this repo's own SPA runs Vitest). A test owned by no known project falls back to {@code
-   * unspecified}.
+   * The runner kind(s) of a test file. Java tests are {@code junit}; a {@code *.spec.ts} / {@code
+   * *.test.ts} takes its owning TS project's (Angular or Lit) runner, config-detected once per root
+   * (never a hardcoded default — this repo's own SPA runs Vitest). A test owned by no known project
+   * falls back to {@code unspecified}.
    */
   private List<String> testKinds(
       String repoId,
@@ -240,7 +274,9 @@ public class DetectionService {
     if (owner != null && "java-quarkus".equals(owner.descriptor().id())) {
       return List.of("junit");
     }
-    if (owner != null && "ts-angular".equals(owner.descriptor().id())) {
+    if (owner != null
+        && ("ts-angular".equals(owner.descriptor().id())
+            || "ts-lit".equals(owner.descriptor().id()))) {
       return List.of(
           runnerByRoot.computeIfAbsent(
               owner.root(), root -> detectRunner(repoId, workspaceId, root)));
@@ -249,9 +285,10 @@ public class DetectionService {
   }
 
   /**
-   * The test runner of a TS/Angular project, detected from config: the {@code angular.json} test
-   * builder first, then the presence of a runner's config file at the project root. Emits an open
-   * string id, or {@code unspecified} when nothing matches — never a canonical guess.
+   * The test runner of a TS project (Angular or Lit), detected from config: the {@code
+   * angular.json} test builder first (absent at a Lit root, so it falls through), then the presence
+   * of a runner's config file at the project root. Emits an open string id, or {@code unspecified}
+   * when nothing matches — never a canonical guess.
    */
   private String detectRunner(String repoId, String workspaceId, String root) {
     String angularJson = root.isEmpty() ? "angular.json" : root + "/angular.json";
