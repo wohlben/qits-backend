@@ -59,3 +59,11 @@ logs instead of a mystery. No behavior change.
 
 Trigger to pick up: a real report of an agent session starting with no task, or the autonomous
 conflict-resolution flow leaving a workspace untouched with no error.
+
+**2026-07-26 — trigger fired (deterministic variant).** Mode 2 happens on every domain test run:
+`ResolveConflictServiceTest` spawns real autonomous agents whose MCP endpoint can never be reached
+(a `domain` `@QuarkusTest` runs no HTTP server), so each starts task-less by construction. That
+test-side spawn is its own bug with its own fix direction — see
+[2026-07-26_resolve-conflict-tests-spawn-real-orphaned-agents](2026-07-26_resolve-conflict-tests-spawn-real-orphaned-agents.md)
+— but it also stands as a live confirmation of this doc's mode 2: the agent gets the bootstrap
+turn, finds no `taskPrompt` tool, and produces no merge, with no error surfaced anywhere.
