@@ -10,6 +10,8 @@ import { AgentMcpScope } from '@/api/model/agentMcpScope';
 import { RepositoryDto } from '@/api/model/repositoryDto';
 import { PageLayoutComponent } from '@/layout/page-layout/page-layout.component';
 import { ProjectDetailHeaderComponent } from '@/ui/components/project/project-detail-header.component';
+import { GlobalLiveService } from '@/pattern/workspace/global-live.service';
+import { WorkspaceActivityBarComponent } from '@/pattern/workspace/workspace-activity-bar.component';
 import { ProjectEpicListComponent } from '@/pattern/project/project-epic-list.component';
 import { ProjectRepositoryListComponent } from '@/pattern/project/project-repository-list.component';
 import { ZardButtonComponent } from '@/shared/components/button';
@@ -19,11 +21,13 @@ import { ZardButtonComponent } from '@/shared/components/button';
   imports: [
     PageLayoutComponent,
     ProjectDetailHeaderComponent,
+    WorkspaceActivityBarComponent,
     ProjectEpicListComponent,
     ProjectRepositoryListComponent,
     RouterLink,
     ZardButtonComponent,
   ],
+  providers: [GlobalLiveService],
   template: `
     <app-page-layout
       [request]="projectQuery"
@@ -70,6 +74,20 @@ import { ZardButtonComponent } from '@/shared/components/button';
         </button>
       </div>
 
+      <!-- Sticky rows of workspaces with a live agent session, one bar per repository (each names
+           its repo and hides itself while its repo has no active agent) — the same jump-to-the-
+           workspace-that-needs-you element as on the workspace detail route. The wrapper carries no
+           chrome of its own, so it is invisible while every bar is empty. -->
+      <div class="sticky top-0 z-20 -mx-6 mb-2 flex flex-col">
+        @for (repo of activityRepos(); track repo.id) {
+          <app-workspace-activity-bar
+            class="block border-b border-border bg-background/95 px-6 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+            [repoId]="repo.id"
+            [label]="repo.label"
+          />
+        }
+      </div>
+
       <div class="flex flex-col gap-8">
         <app-project-epic-list [projectId]="projectId" />
         <app-project-repository-list [projectId]="projectId" />
@@ -88,6 +106,12 @@ export class ProjectDetailPage {
 
   readonly projectId = this.route.snapshot.paramMap.get('id')!;
 
+  constructor() {
+    // One app-wide SSE channel keeps the per-repository agent-activity bars fresh: an
+    // `agent-activity` hint invalidates the ['workspaces'] prefix, refetching every observed list.
+    inject(GlobalLiveService).connect();
+  }
+
   readonly projectQuery = injectQuery(() => ({
     queryKey: ['project', this.projectId],
     queryFn: () =>
@@ -104,6 +128,16 @@ export class ProjectDetailPage {
           r.entries?.map((e) => e.repository!).filter((p): p is RepositoryDto => !!p) ?? [],
       ),
   }));
+
+  /** One activity bar per repository, prefixed with a compact repo name (url tail, else id). */
+  readonly activityRepos = computed(() =>
+    (this.repositoriesQuery.data() ?? [])
+      .filter((r): r is RepositoryDto & { id: string } => !!r.id)
+      .map((r) => {
+        const segment = r.url?.replace(/\/+$/, '').split('/').pop()?.replace(/\.git$/, '');
+        return { id: r.id, label: segment || r.id };
+      }),
+  );
 
   // The project session still runs in a checkout, so pick the first repository that has a main
   // branch to host the terminal — the MCP scope spans the whole project regardless of which one.

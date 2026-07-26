@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { RepositoryLiveService } from './repository-live.service';
+import { GlobalLiveService } from './global-live.service';
 
 /** Stand-in for the browser's EventSource; lets a test drive open/message frames synchronously. */
 class FakeEventSource {
@@ -30,16 +30,16 @@ class FakeEventSource {
   }
 }
 
-// Provides the service exactly as the sync component does (component-scoped), so destroy tears it down.
-@Component({ selector: 'app-test-repo-live-host', template: '', providers: [RepositoryLiveService] })
+// Provides the service exactly as the project page does (component-scoped), so destroy tears it down.
+@Component({ selector: 'app-test-global-live-host', template: '', providers: [GlobalLiveService] })
 class TestLiveHost {
-  readonly live = inject(RepositoryLiveService);
+  readonly live = inject(GlobalLiveService);
   constructor() {
-    this.live.connect('repo-1');
+    this.live.connect();
   }
 }
 
-describe('RepositoryLiveService', () => {
+describe('GlobalLiveService', () => {
   let queryClient: QueryClient;
   let invalidate: ReturnType<typeof vi.spyOn>;
   const originalEventSource = globalThis.EventSource;
@@ -72,37 +72,20 @@ describe('RepositoryLiveService', () => {
     return calls.map((call) => JSON.stringify(call[0].queryKey));
   }
 
-  it('opens one EventSource at the repository events path', () => {
+  it('opens one EventSource at the global events path', () => {
     const { source } = connect();
     expect(FakeEventSource.instances).toHaveLength(1);
-    expect(source.url).toBe('/api/repositories/repo-1/events');
+    expect(source.url).toBe('/api/events');
   });
 
-  it('maps the process hint to the active-process invalidation', () => {
-    const { source } = connect();
-    invalidate.mockClear();
-
-    source.emitTopic('process');
-
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['repository-active-process', 'repo-1'])]);
-  });
-
-  it('maps the git-status hint to the workspaces invalidation', () => {
-    const { source } = connect();
-    invalidate.mockClear();
-
-    source.emitTopic('git-status');
-
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces', 'repo-1'])]);
-  });
-
-  it('maps the agent-activity hint to the workspaces invalidation (the activity bar)', () => {
+  it('maps the agent-activity hint to the workspaces prefix invalidation', () => {
     const { source } = connect();
     invalidate.mockClear();
 
     source.emitTopic('agent-activity');
 
-    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces', 'repo-1'])]);
+    // The prefix ['workspaces'] — every observed repo's workspace list refetches.
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces'])]);
   });
 
   it('ignores unknown topics such as the heartbeat', () => {
@@ -120,12 +103,7 @@ describe('RepositoryLiveService', () => {
 
     source.emitOpen();
 
-    expect(invalidate).toHaveBeenCalledTimes(3);
-    expect(invalidatedKeys()).toEqual([
-      JSON.stringify(['repository-active-process', 'repo-1']),
-      JSON.stringify(['workspaces', 'repo-1']),
-      JSON.stringify(['workspaces', 'repo-1']),
-    ]);
+    expect(invalidatedKeys()).toEqual([JSON.stringify(['workspaces'])]);
   });
 
   it('closes the EventSource when the providing component is destroyed', () => {
