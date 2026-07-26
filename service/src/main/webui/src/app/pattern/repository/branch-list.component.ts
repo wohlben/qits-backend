@@ -362,7 +362,7 @@ interface CreateWorkspaceForm {
     </ng-template>
 
     <!-- Starting workspace: the live, segmented log of the container start (docker run, clone,
-         daemon auto-start), streamed from its technical process. Closing the dialog does not stop
+         service auto-start), streamed from its technical process. Closing the dialog does not stop
          the work — reopening (or the workspace detail's transient tab) replays and resumes. -->
     <ng-template #processTpl>
       @if (ui().processId; as processId) {

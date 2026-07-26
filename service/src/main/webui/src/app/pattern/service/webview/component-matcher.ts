@@ -18,12 +18,12 @@ interface Match {
  * Builds a matcher over a workspace's component map. On match resolution, per DOM node walking
  * upward from the picked element:
  *
- * 1. Angular's dev-mode debug API (`ng.getComponent`, exposed on the framed window because daemon
+ * 1. Angular's dev-mode debug API (`ng.getComponent`, exposed on the framed window because service
  *    dev servers run dev builds) resolves the node's component instance exactly — including
  *    selector-less routed components rendered as `<ng-component>` — and its constructor name is
  *    looked up in the map.
  * 2. Fallback: the node's tag against the map's element selectors, or any of its attributes
- *    against the attribute selectors (covers prod-mode daemons, where class names are minified).
+ *    against the attribute selectors (covers prod-mode services, where class names are minified).
  *
  * The first matching node (the element itself included) is the owning component; matches further
  * up become the `ancestors` chain. Both paths resolve against the same backend-served map, so a

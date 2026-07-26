@@ -40,7 +40,7 @@ type Status = 'connecting' | 'open' | 'closed';
       <!-- The host must grow for the transcript's inner scroller to work and the form to pin. -->
       <app-chat-transcript class="flex min-h-0 flex-1 flex-col" [items]="items()" [waiting]="thinking()" />
 
-      <!-- Elements picked from a daemon web view and code references selected in the Files tab
+      <!-- Elements picked from a service web view and code references selected in the Files tab
            (root-scoped cache) — click to drop one into the draft: elements as a fenced HTML
            block, references as their one-line path:start-end form. -->
       @if (promptContext.count() > 0 || promptContext.references().length > 0) {

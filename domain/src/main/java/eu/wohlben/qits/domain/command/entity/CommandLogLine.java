@@ -58,7 +58,7 @@ public class CommandLogLine extends PanacheEntityBase {
   public String content;
 
   /**
-   * Classified severity, stamped at persist time for DAEMON commands' OUTPUT lines; null where the
+   * Classified severity, stamped at persist time for SERVICE commands' OUTPUT lines; null where the
    * classifier saw nothing (routine output) and for other command kinds. Enables {@code ?severity=}
    * filters without re-parsing.
    */

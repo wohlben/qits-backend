@@ -266,7 +266,7 @@ components:
       enum:
       - TERMINAL
       - CHAT
-      - DAEMON
+      - SERVICE
     CommandLogLineDto:
       type: object
       properties:
@@ -1779,7 +1779,7 @@ components:
     ServiceInstanceDto:
       type: object
       properties:
-        daemon:
+        definition:
           $ref: "#/components/schemas/ServiceDefinitionDto"
         status:
           $ref: "#/components/schemas/ServiceStatus"
@@ -4624,15 +4624,15 @@ paths:
       summary: List
       tags:
       - Workspace Service Controller
-  /api/repositories/{repoId}/workspaces/{workspaceId}/services/{daemonId}/start:
+  /api/repositories/{repoId}/workspaces/{workspaceId}/services/{serviceId}/start:
     post:
       parameters:
-      - name: daemonId
+      - name: repoId
         in: path
         required: true
         schema:
           type: string
-      - name: repoId
+      - name: serviceId
         in: path
         required: true
         schema:
@@ -4652,15 +4652,15 @@ paths:
       summary: Start
       tags:
       - Workspace Service Controller
-  /api/repositories/{repoId}/workspaces/{workspaceId}/services/{daemonId}/stop:
+  /api/repositories/{repoId}/workspaces/{workspaceId}/services/{serviceId}/stop:
     post:
       parameters:
-      - name: daemonId
+      - name: repoId
         in: path
         required: true
         schema:
           type: string
-      - name: repoId
+      - name: serviceId
         in: path
         required: true
         schema:

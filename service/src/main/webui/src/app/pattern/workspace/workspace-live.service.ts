@@ -5,7 +5,7 @@ import { appUrl } from '@/shared/utils/app-base';
 
 /**
  * Keeps the workspace detail route fresh over one Server-Sent-Events channel instead of eight
- * free-running polls. The backend pushes payload-free topic hints (`daemons`, `daemon-events`,
+ * free-running polls. The backend pushes payload-free topic hints (`services`, `service-events`,
  * `telemetry`, `commands`, `files`); each maps to one or more TanStack Query invalidations, so data
  * keeps flowing through the unchanged REST endpoints — polling becomes fetch-on-signal, and an idle
  * workspace fetches nothing. The `files` hint is pushed by the per-workspace file watcher when the
@@ -75,8 +75,8 @@ export class WorkspaceLiveService {
    */
   private topicKeys(repoId: string, workspaceId: string): Record<string, QueryKey[]> {
     return {
-      daemons: [['workspace-services', repoId, workspaceId]],
-      'daemon-events': [['workspace-service-events', repoId, workspaceId]],
+      services: [['workspace-services', repoId, workspaceId]],
+      'service-events': [['workspace-service-events', repoId, workspaceId]],
       telemetry: [
         ['telemetry-errors', repoId, workspaceId],
         ['telemetry-spans', repoId, workspaceId],

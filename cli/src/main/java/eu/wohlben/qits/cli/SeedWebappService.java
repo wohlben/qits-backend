@@ -29,7 +29,7 @@ import org.jboss.logging.Logger;
  * Seeds a demo project around the <b>servable</b> {@code testing-repo-quarkus-angular.git} fixture
  * (a minimal Quarkus 3 + Angular app, see {@code
  * docs/epics/qits-testing-fixtures/features/2026-07-05_servable-quarkus-angular-fixture.md}), so
- * features that run real work in a workspace — dev-server daemons, the web-view picker, actions,
+ * features that run real work in a workspace — dev-server services, the web-view picker, actions,
  * the coding agent — have a plausible app to point at. Sibling of {@link SeedService} (which seeds
  * the tiny {@code testing-repo} for pure git-mechanics demos); invoked from the {@code seed-webapp}
  * command in {@link Main}.
@@ -88,7 +88,7 @@ public class SeedWebappService {
   Optional<String> repoUrlOverride;
 
   /**
-   * Resets and re-creates the demo project, repository, dev-server daemon and branch tree. Returns
+   * Resets and re-creates the demo project, repository, dev-server service and branch tree. Returns
    * the created repository.
    *
    * <p>{@link ActivateRequestContext} so the non-transactional {@code list()} read works in command

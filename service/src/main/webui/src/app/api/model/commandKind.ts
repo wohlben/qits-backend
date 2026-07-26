@@ -12,7 +12,7 @@
 export const CommandKind = {
     Terminal: 'TERMINAL',
     Chat: 'CHAT',
-    Daemon: 'DAEMON'
+    Service: 'SERVICE'
 } as const;
 export type CommandKind = typeof CommandKind[keyof typeof CommandKind];
 

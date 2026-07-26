@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
  * challenge, marked XHRs get the 499 contract, bearer JWTs pass resource-server validation, and the
  * container-facing public surface stays token-free. {@code /rawroute} challenging is the regression
  * test that the global policy covers raw Vert.x router routes, not just JAX-RS (in the service app:
- * the /daemon proxy).
+ * the /service proxy).
  */
 @QuarkusTest
 @QuarkusTestResource(value = OidcWiremockTestResource.class, restrictToAnnotatedClass = true)

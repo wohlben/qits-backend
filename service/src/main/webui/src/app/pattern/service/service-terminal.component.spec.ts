@@ -13,7 +13,7 @@ describe('ServiceTerminalComponent', () => {
     const fixture = TestBed.createComponent(ServiceTerminalComponent);
     fixture.componentRef.setInput('repoId', 'repo-1');
     fixture.componentRef.setInput('workspaceId', 'wt-1');
-    fixture.componentRef.setInput('daemonId', 'd-1');
+    fixture.componentRef.setInput('serviceId', 'd-1');
     fixture.componentRef.setInput('name', 'dev server');
     fixture.detectChanges();
     return fixture;
@@ -28,6 +28,6 @@ describe('ServiceTerminalComponent', () => {
 
   it('computes the service interactive-attach socket path from its inputs', () => {
     const fixture = createComponent();
-    expect(fixture.componentInstance.socketPath()).toBe('api/terminal/daemons/repo-1/wt-1/d-1');
+    expect(fixture.componentInstance.socketPath()).toBe('api/terminal/services/repo-1/wt-1/d-1');
   });
 });

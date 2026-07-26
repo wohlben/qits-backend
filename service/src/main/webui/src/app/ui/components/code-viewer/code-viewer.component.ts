@@ -120,7 +120,7 @@ export class CodeViewerComponent {
   readonly binary = input(false);
   readonly isDark = input(false);
   readonly highlights = input<LineRange[]>([]);
-  /** When set, the viewer scrolls this 1-based line into view (e.g. a daemon event's anchor). */
+  /** When set, the viewer scrolls this 1-based line into view (e.g. a service event's anchor). */
   readonly scrollToLine = input<number | null>(null);
   /**
    * When true the editor grows to fit its content instead of filling its parent — use it for short

@@ -10,7 +10,7 @@ import java.time.Instant;
  * @param sequence the monotonic per-command ordinal (stable sort key)
  * @param channel which stream the line came from (STDIN vs merged OUTPUT)
  * @param content the raw line text (may contain ANSI escapes)
- * @param severity classified severity (DAEMON output lines only); null on routine output
+ * @param severity classified severity (SERVICE output lines only); null on routine output
  * @param timestamp when the line completed
  */
 public record CommandLogLineDto(

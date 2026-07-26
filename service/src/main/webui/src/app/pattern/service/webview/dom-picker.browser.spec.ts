@@ -5,7 +5,7 @@ import { DomPicker, LONG_PRESS_MS, PickedRef, PickOptions } from './dom-picker';
 /**
  * Functional picker coverage in a real headless Chromium (Vitest browser mode — jsdom's iframe
  * support is not faithful enough for contentDocument + real event dispatch). A same-origin
- * `srcdoc` frame stands in for the proxied daemon app.
+ * `srcdoc` frame stands in for the proxied service app.
  */
 
 function frameWith(html: string): Promise<HTMLIFrameElement> {

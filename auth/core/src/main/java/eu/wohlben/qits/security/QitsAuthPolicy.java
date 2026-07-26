@@ -14,7 +14,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  * {@link HttpSecurityPolicy} ({@code name()} stays {@code null}): Quarkus mounts the
  * authentication/authorization handlers on the main Vert.x router ahead of every user route, so
  * this covers the JAX-RS tree under {@code /api}, the raw router routes ({@code /git} host, {@code
- * /daemon} proxy), the MCP servers, the websockets-next upgrades, and Quinoa's static/SPA serving
+ * /service} proxy), the MCP servers, the websockets-next upgrades, and Quinoa's static/SPA serving
  * alike.
  *
  * <p>Always enforcing — there is no runtime off switch; an unauthenticated qits exists only as a
@@ -34,7 +34,7 @@ public class QitsAuthPolicy implements HttpSecurityPolicy {
   Optional<String> requiredRole;
 
   /**
-   * Non-{@code /} only when qits itself runs as a managed daemon (the qits-in-qits start script
+   * Non-{@code /} only when qits itself runs as a managed service (the qits-in-qits start script
    * bridges {@code -Dquarkus.http.root-path}): the request path then carries the prefix, but {@link
    * PublicPaths} matches the app-relative shape — strip before matching. The normal deployment's
    * {@code /} strips nothing.

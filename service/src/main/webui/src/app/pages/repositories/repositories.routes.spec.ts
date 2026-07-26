@@ -18,8 +18,8 @@ describe('workspaceDetailMatcher', () => {
   });
 
   it('matches a trailing tab segment — even an unknown slug (the page normalizes those)', () => {
-    const result = workspaceDetailMatcher(segments('repo-1/workspaces/wt-1/daemons'));
-    expect(result!.posParams!['tab']!.path).toBe('daemons');
+    const result = workspaceDetailMatcher(segments('repo-1/workspaces/wt-1/services'));
+    expect(result!.posParams!['tab']!.path).toBe('services');
 
     expect(
       workspaceDetailMatcher(segments('repo-1/workspaces/wt-1/bogus'))!.posParams!['tab']!.path,
@@ -32,7 +32,7 @@ describe('workspaceDetailMatcher', () => {
 
   it('declines URLs that are not workspace detail shapes', () => {
     expect(workspaceDetailMatcher(segments('repo-1/history/h-1'))).toBeNull();
-    expect(workspaceDetailMatcher(segments('repo-1/daemons'))).toBeNull();
+    expect(workspaceDetailMatcher(segments('repo-1/services'))).toBeNull();
     expect(workspaceDetailMatcher(segments('repo-1'))).toBeNull();
     expect(workspaceDetailMatcher(segments('repo-1/workspaces/wt-1/files/extra'))).toBeNull();
   });

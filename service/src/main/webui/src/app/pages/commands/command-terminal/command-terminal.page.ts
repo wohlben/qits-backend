@@ -159,7 +159,7 @@ export class CommandTerminalPage {
   });
   readonly commandId = computed(() => this.params().get('commandId')!);
 
-  /** Optional ?seq=&seqTo= from a daemon event's "open in source" link. */
+  /** Optional ?seq=&seqTo= from a service event's "open in source" link. */
   readonly highlightFrom = this.queryParamNumber('seq');
   readonly highlightTo = this.queryParamNumber('seqTo');
 

@@ -332,7 +332,7 @@ export class WorkspaceActionsComponent {
     return command.actionName ?? this.kindLabel(command);
   }
 
-  /** Non-terminal runs (chat sessions, daemons) get an origin badge — "what ran here", honestly. */
+  /** Non-terminal runs (chat sessions, services) get an origin badge — "what ran here", honestly. */
   showKindBadge(command: CommandDto): boolean {
     return command.kind !== undefined && command.kind !== CommandKind.Terminal;
   }
@@ -341,8 +341,8 @@ export class WorkspaceActionsComponent {
     switch (command.kind) {
       case CommandKind.Chat:
         return 'chat session';
-      case CommandKind.Daemon:
-        return 'daemon';
+      case CommandKind.Service:
+        return 'service';
       default:
         return 'terminal';
     }

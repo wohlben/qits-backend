@@ -103,7 +103,7 @@ public class AgentLaunchService {
 
   @Inject RepositoryRepository repositoryRepository;
 
-  @Inject ServiceEventSpool daemonEventSpool;
+  @Inject ServiceEventSpool serviceEventSpool;
 
   @Inject AgentAuthStatus agentAuthStatus;
 
@@ -259,9 +259,9 @@ public class AgentLaunchService {
       commandRegistry.chatSend(command.id(), seed);
     }
     recordDelivery(deliverBootstrap, repoId, workspaceId, command.id());
-    // Daemon events that fired while no chat was running land in the new session right after the
-    // seed prompt, so the agent starts with the workspace's recent daemon history.
-    List<String> spooledEvents = daemonEventSpool.drain(repoId, workspaceId);
+    // Service events that fired while no chat was running land in the new session right after the
+    // seed prompt, so the agent starts with the workspace's recent service history.
+    List<String> spooledEvents = serviceEventSpool.drain(repoId, workspaceId);
     if (!spooledEvents.isEmpty()) {
       commandRegistry.chatSend(command.id(), String.join("\n\n", spooledEvents));
     }

@@ -116,7 +116,7 @@ public class AgentLaunchServiceTest {
     // Mutating tools are left out so the agent still prompts before changing anything.
     assertFalse(actions.allowedTools().contains("mcp__actions__createGlobalAction"));
 
-    // The repository server rides along, narrowed to this repository — daemons and the other
+    // The repository server rides along, narrowed to this repository — services and the other
     // repository-owned configuration are managed there.
     AgentLaunchService.ScopedMcp repository = servers.get(1);
     assertEquals("repository", repository.key());

@@ -67,14 +67,15 @@ public class SeedWebappServiceTest {
   // transient-reference error that never occurs in the real CLI. This profile boots its own Quarkus
   // instance with a clean in-memory H2, so leaving committed rows behind is harmless.
   @Test
-  public void seedsStackDemoWithObservableDaemonAndFeatureFlow() {
+  public void seedsStackDemoWithObservableServiceAndFeatureFlow() {
     // Drives the command via the real services with no JAX-RS request context — a guard for the
     // command-mode wiring (@ActivateRequestContext on seed()).
     Repository first = seedWebappService.seed();
     assertNotNull(first, "first seed should create the repository");
 
     // Idempotent by reset: a second run tears the prior project down and recreates it, so there is
-    // still exactly one project and its workspaces/daemons/feature-flows are back to the known-good
+    // still exactly one project and its workspaces/services/feature-flows are back to the
+    // known-good
     // state (not duplicated, not "already exists" errors from re-creating the same workspace ids).
     Repository second = seedWebappService.seed();
     assertNotNull(second);

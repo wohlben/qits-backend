@@ -6,19 +6,19 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Test helper: records every {@link WorkspaceReadyForDaemons} the async event bus delivers, so
- * tests can assert whether (and when) the bootstrap runner released daemon auto-start.
+ * Test helper: records every {@link WorkspaceReadyForServices} the async event bus delivers, so
+ * tests can assert whether (and when) the bootstrap runner released service auto-start.
  */
 @ApplicationScoped
-public class WorkspaceReadyForDaemonsRecorder {
+public class WorkspaceReadyForServicesRecorder {
 
-  private final List<WorkspaceReadyForDaemons> events = new CopyOnWriteArrayList<>();
+  private final List<WorkspaceReadyForServices> events = new CopyOnWriteArrayList<>();
 
-  void onReady(@ObservesAsync WorkspaceReadyForDaemons evt) {
+  void onReady(@ObservesAsync WorkspaceReadyForServices evt) {
     events.add(evt);
   }
 
-  public List<WorkspaceReadyForDaemons> events() {
+  public List<WorkspaceReadyForServices> events() {
     return List.copyOf(events);
   }
 

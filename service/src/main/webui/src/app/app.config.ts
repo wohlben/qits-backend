@@ -26,7 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withFetch(), withInterceptors([authSessionInterceptor])),
     provideZard(),
     provideTanStackQuery(new QueryClient()),
-    // Base-relative API root: '' at root (today's behavior), the /daemon/{ws}/{d} prefix framed.
+    // Base-relative API root: '' at root (today's behavior), the /service/{ws}/{s} prefix framed.
     provideApi(appBasePath())
   ]
 };

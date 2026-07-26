@@ -17,7 +17,7 @@ export interface SnippetComponent {
 }
 
 /**
- * One DOM element picked from a daemon's web view — a structural pointer for the agent, not a
+ * One DOM element picked from a service's web view — a structural pointer for the agent, not a
  * reproduction (the HTML carries dev-time attributes and no computed styles).
  */
 export interface PickedSnippet {
@@ -36,7 +36,7 @@ export interface PickedSnippet {
   selector: string;
   /** The framed document's location at pick time. */
   url: string;
-  /** The app-side route at pick time — {@link url} with the daemon's proxy prefix stripped. */
+  /** The app-side route at pick time — {@link url} with the service's proxy prefix stripped. */
   appPath?: string;
   tag: string;
   textPreview: string;
@@ -236,7 +236,7 @@ function parseDraftContent(
 
 /**
  * The prompt-context store: the composition state for one workspace's next agent launch — the
- * editable prompt text, elements picked from a daemon web view, and code references selected in the
+ * editable prompt text, elements picked from a service web view, and code references selected in the
  * Files tab. Root-scoped so it outlives its collecting components and navigation, but the state it
  * holds is the **active** workspace's bucket: {@link setActiveWorkspace} resets it on a workspace
  * switch, so picks staged under workspace A never leak into workspace B (the one deliberate change

@@ -5,7 +5,7 @@ package eu.wohlben.qits.http;
  * route router under the root path, so route <em>patterns</em> stay relative — but {@code
  * rc.request().path()}/{@code normalizedPath()} return the full path, so any handler that parses
  * its path must strip the prefix first. Only non-{@code /} when qits itself runs as a managed
- * daemon (the qits-in-qits start script bridges {@code -Dquarkus.http.root-path}); the normal
+ * service (the qits-in-qits start script bridges {@code -Dquarkus.http.root-path}); the normal
  * deployment's root path is {@code /} and the prefix is empty.
  */
 public final class RootPath {

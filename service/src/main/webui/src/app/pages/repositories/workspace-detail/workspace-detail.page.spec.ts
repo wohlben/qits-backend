@@ -378,7 +378,7 @@ describe('WorkspaceDetailPage', () => {
 
     queryClient.setQueryData(
       ['workspace-services', 'repo-1', 'wt-1'],
-      [{ daemon: { id: 'd-1', name: 'dev server' }, status: ServiceStatus.Ready, restartCount: 0 }],
+      [{ definition: { id: 'd-1', name: 'dev server' }, status: ServiceStatus.Ready, restartCount: 0 }],
     );
     await flush();
     fixture.detectChanges();
@@ -390,7 +390,7 @@ describe('WorkspaceDetailPage', () => {
       ['workspace-services', 'repo-1', 'wt-1'],
       [
         {
-          daemon: { id: 'd-1', name: 'dev server' },
+          definition: { id: 'd-1', name: 'dev server' },
           status: ServiceStatus.Restarting,
           restartCount: 0,
         },
@@ -408,10 +408,10 @@ describe('WorkspaceDetailPage', () => {
       ['workspace-services', 'repo-1', 'wt-1'],
       [
         {
-          daemon: { id: 'd-1', name: 'dev server' },
+          definition: { id: 'd-1', name: 'dev server' },
           status: ServiceStatus.Ready,
           restartCount: 0,
-          proxyPath: '/daemon/wt-1/d-1/',
+          proxyPath: '/service/wt-1/d-1/',
         },
       ],
     );
@@ -437,10 +437,10 @@ describe('WorkspaceDetailPage', () => {
       ['workspace-services', 'repo-1', 'wt-1'],
       [
         {
-          daemon: { id: 'd-1', name: 'dev server' },
+          definition: { id: 'd-1', name: 'dev server' },
           status: ServiceStatus.Ready,
           restartCount: 0,
-          proxyPath: '/daemon/wt-1/d-1/',
+          proxyPath: '/service/wt-1/d-1/',
         },
       ],
     );

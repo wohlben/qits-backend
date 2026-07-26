@@ -13,7 +13,7 @@ import { ServiceStatus } from './serviceStatus';
 
 
 export interface ServiceInstanceDto { 
-    daemon?: ServiceDefinitionDto;
+    definition?: ServiceDefinitionDto;
     status?: ServiceStatus;
     restartCount?: number;
     commandId?: string;

@@ -1280,7 +1280,7 @@ export class WorkspaceFileBrowserComponent {
   readonly selectedPath = signal<string | null>(null);
 
   /**
-   * A daemon event's "open in source" target: the file plus the anchored line range, painted as a
+   * A service event's "open in source" target: the file plus the anchored line range, painted as a
    * highlight and scrolled into view. Independent of the git-aware tree — log files are usually
    * gitignored and invisible there, but the content endpoint reads any file in the workspace.
    */

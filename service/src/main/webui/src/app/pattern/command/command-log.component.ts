@@ -44,7 +44,7 @@ const GAP_THRESHOLD_MS = 2000;
 export class CommandLogComponent implements OnDestroy {
   readonly commandId = input.required<string>();
   /**
-   * Optional anchor: the log-line sequence range a daemon event referenced. The anchored lines
+   * Optional anchor: the log-line sequence range a service event referenced. The anchored lines
    * render inverse-video and the view scrolls to the first of them.
    */
   readonly highlightFrom = input<number | null>(null);
@@ -119,7 +119,7 @@ export class CommandLogComponent implements OnDestroy {
         // Cyan, with a marker, so typed input is distinct from program output.
         out.push(`\x1b[36m❯ ${content}\x1b[0m\r\n`);
       } else if (anchored) {
-        // Inverse video marks the anchored evidence a daemon event pointed at.
+        // Inverse video marks the anchored evidence a service event pointed at.
         out.push(`\x1b[7m${content}\x1b[27m\r\n`);
       } else {
         out.push(`${content}\r\n`);

@@ -36,12 +36,12 @@ class ForwardAuthVariantTest {
   }
 
   @Test
-  void daemonProxyIsProtectedDespiteBeingARawRouterRoute() {
+  void serviceProxyIsProtectedDespiteBeingARawRouterRoute() {
     given()
         .redirects()
         .follow(false)
         .when()
-        .get("/service/some-workspace/some-daemon/")
+        .get("/service/some-workspace/some-service/")
         .then()
         .statusCode(401);
   }

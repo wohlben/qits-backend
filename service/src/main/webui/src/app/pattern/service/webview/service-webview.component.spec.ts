@@ -13,18 +13,18 @@ import { ServiceWebviewComponent } from './service-webview.component';
 const snippet: NewSnippet = {
   html: '<button>Go</button>',
   selector: 'button:nth-of-type(1)',
-  url: 'http://localhost/daemon/wt-1/d-1/',
+  url: 'http://localhost/service/wt-1/d-1/',
   tag: 'button',
   textPreview: 'Go',
 };
 
 function instance(overrides: Partial<ServiceInstanceDto> = {}): ServiceInstanceDto {
   return {
-    daemon: { id: 'd-1', name: 'dev server' },
+    definition: { id: 'd-1', name: 'dev server' },
     status: ServiceStatus.Ready,
     restartCount: 0,
     commandId: 'cmd-1',
-    proxyPath: '/daemon/wt-1/d-1/',
+    proxyPath: '/service/wt-1/d-1/',
     ...overrides,
   } as ServiceInstanceDto;
 }
@@ -95,8 +95,8 @@ describe('ServiceWebviewComponent', () => {
   it('shows the empty state without a proxyPath or without a live status', () => {
     const fixture = createComponent([
       instance({ proxyPath: undefined }),
-      instance({ daemon: { id: 'd-2', name: 'stopped one' }, status: ServiceStatus.Stopped }),
-      instance({ daemon: { id: 'd-3', name: 'crashed one' }, status: ServiceStatus.Crashed }),
+      instance({ definition: { id: 'd-2', name: 'stopped one' }, status: ServiceStatus.Stopped }),
+      instance({ definition: { id: 'd-3', name: 'crashed one' }, status: ServiceStatus.Crashed }),
     ]);
 
     expect(fixture.componentInstance.webViewable().length).toBe(0);
@@ -108,18 +108,18 @@ describe('ServiceWebviewComponent', () => {
 
   it('selects the first web-viewable service and lets a picked id override it', () => {
     const fixture = createComponent([
-      instance({ daemon: { id: 'd-0', name: 'not web' }, proxyPath: undefined }),
+      instance({ definition: { id: 'd-0', name: 'not web' }, proxyPath: undefined }),
       instance(),
       instance({
-        daemon: { id: 'd-2', name: 'second' },
-        proxyPath: '/daemon/wt-1/d-2/',
+        definition: { id: 'd-2', name: 'second' },
+        proxyPath: '/service/wt-1/d-2/',
         status: ServiceStatus.Starting,
       }),
     ]);
 
-    expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-1');
+    expect(fixture.componentInstance.selected()?.definition?.id).toBe('d-1');
     fixture.componentInstance.selectedServiceId.set('d-2');
-    expect(fixture.componentInstance.selected()?.daemon?.id).toBe('d-2');
+    expect(fixture.componentInstance.selected()?.definition?.id).toBe('d-2');
   });
 
   it('drops pick mode after a plain pick — the pick lands, the picking UX turns off', () => {
@@ -175,7 +175,7 @@ describe('ServiceWebviewComponent', () => {
   it('stores the app-side path alongside the pick-time URL', () => {
     const fixture = createComponent([instance()]);
     fixture.componentInstance.onPicked(
-      { ...snippet, url: 'http://localhost/daemon/wt-1/d-1/greeting?x=1' },
+      { ...snippet, url: 'http://localhost/service/wt-1/d-1/greeting?x=1' },
       { keepPicking: false },
     );
 
@@ -195,7 +195,7 @@ describe('ServiceWebviewComponent', () => {
   it('globe toggles the URL bar open (seeded with the current path) and back without applying', () => {
     const fixture = createComponent([
       instance({
-        daemon: { id: 'd-1', name: 'dev server', webView: { port: 4200, entryPath: 'greeting' } },
+        definition: { id: 'd-1', name: 'dev server', webView: { port: 4200, entryPath: 'greeting' } },
       }),
     ]);
     const component = fixture.componentInstance;
@@ -245,7 +245,7 @@ describe('ServiceWebviewComponent', () => {
     const component = fixture.componentInstance;
     component.toggleUrlBar();
 
-    component.urlValue.set('/daemon/wt-1/other-daemon/route');
+    component.urlValue.set('/service/wt-1/other-service/route');
     fixture.detectChanges();
 
     expect(component.urlError()).not.toBeNull();
@@ -274,20 +274,20 @@ describe('ServiceWebviewComponent', () => {
   it('opens the frame at proxyPath + entryPath, and at the bare proxyPath without one', () => {
     const fixture = createComponent([
       instance({
-        daemon: { id: 'd-1', name: 'dev server', webView: { port: 4200, entryPath: 'greeting' } },
+        definition: { id: 'd-1', name: 'dev server', webView: { port: 4200, entryPath: 'greeting' } },
       }),
       instance({
-        daemon: { id: 'd-2', name: 'no entry', webView: { port: 8080 } },
-        proxyPath: '/daemon/wt-1/d-2/',
+        definition: { id: 'd-2', name: 'no entry', webView: { port: 8080 } },
+        proxyPath: '/service/wt-1/d-2/',
       }),
     ]);
     const frameUrl = () =>
       String(fixture.componentInstance.frameSrc()).replace(/^SafeValue.*?: (.*)\.?$/, '$1');
 
-    expect(String(fixture.componentInstance.frameSrc())).toContain('/daemon/wt-1/d-1/greeting');
+    expect(String(fixture.componentInstance.frameSrc())).toContain('/service/wt-1/d-1/greeting');
 
     fixture.componentInstance.selectedServiceId.set('d-2');
-    expect(frameUrl()).toContain('/daemon/wt-1/d-2/');
+    expect(frameUrl()).toContain('/service/wt-1/d-2/');
     expect(frameUrl()).not.toContain('greeting');
   });
 });

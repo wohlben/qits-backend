@@ -144,12 +144,12 @@ public class CommandServiceTest {
   }
 
   @Test
-  public void daemonLaunchWithOtelInjectsExporterEnvAndUserOverridesWin() throws Exception {
+  public void serviceLaunchWithOtelInjectsExporterEnvAndUserOverridesWin() throws Exception {
     String repoId = repoWithWorkspace();
 
     // The daemon's own environment overrides one injected var — the definition overlay must win.
     CommandDto command =
-        commandService.launchDaemon(
+        commandService.launchService(
             repoId,
             "work",
             "otel daemon",
@@ -178,11 +178,11 @@ public class CommandServiceTest {
   }
 
   @Test
-  public void daemonLaunchWithoutOtelInjectsNothing() throws Exception {
+  public void serviceLaunchWithoutOtelInjectsNothing() throws Exception {
     String repoId = repoWithWorkspace();
 
     CommandDto command =
-        commandService.launchDaemon(
+        commandService.launchService(
             repoId,
             "work",
             "plain daemon",
@@ -203,13 +203,13 @@ public class CommandServiceTest {
   }
 
   @Test
-  public void daemonLaunchInjectsCaptureEndpointRegardlessOfOtelAndUserOverrideWins()
+  public void serviceLaunchInjectsCaptureEndpointRegardlessOfOtelAndUserOverrideWins()
       throws Exception {
     String repoId = repoWithWorkspace();
 
-    // otel toggle OFF: the capture endpoint is injected unconditionally for daemons (like TERM).
+    // otel toggle OFF: the capture endpoint is injected unconditionally for services (like TERM).
     CommandDto command =
-        commandService.launchDaemon(
+        commandService.launchService(
             repoId,
             "work",
             "capture daemon",
@@ -229,7 +229,7 @@ public class CommandServiceTest {
 
     // Definition overlay wins, like OTEL_* / QITS_PUBLIC_BASE.
     CommandDto overridden =
-        commandService.launchDaemon(
+        commandService.launchService(
             repoId,
             "work",
             "capture daemon override",
@@ -249,25 +249,25 @@ public class CommandServiceTest {
   }
 
   @Test
-  public void daemonLaunchWithPublicBaseInjectsIt() throws Exception {
+  public void serviceLaunchWithPublicBaseInjectsIt() throws Exception {
     String repoId = repoWithWorkspace();
 
     CommandDto command =
-        commandService.launchDaemon(
+        commandService.launchService(
             repoId,
             "work",
             "web daemon",
             "env",
             Map.of(),
             false,
-            "/daemon/work/some-daemon-id/",
+            "/service/work/some-service-id/",
             (commandId, exitCode, terminatedManually) -> {},
             null);
 
     List<CommandLogLineDto> lines = awaitStableLog(command.id());
     assertTrue(
         lines.stream()
-            .anyMatch(l -> l.content().contains("QITS_PUBLIC_BASE=/daemon/work/some-daemon-id/")),
+            .anyMatch(l -> l.content().contains("QITS_PUBLIC_BASE=/service/work/some-service-id/")),
         "the proxied base path must be injected: " + lines);
   }
 

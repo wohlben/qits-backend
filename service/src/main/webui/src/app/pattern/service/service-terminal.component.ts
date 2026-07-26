@@ -17,7 +17,7 @@ import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 /**
  * The service interactive terminal: a per-service "Terminal" button that opens a fullscreen dialog
  * framing an xterm.js attached to the service's tmux session through the
- * `/api/terminal/daemons/{repoId}/{workspaceId}/{daemonId}` socket (the interactive half of
+ * `/api/terminal/services/{repoId}/{workspaceId}/{serviceId}` socket (the interactive half of
  * Increment 2 of tmux-backed services — real input/resize, e.g. Quarkus dev's `[r]`/`[e]` keys).
  * Rendered only for a live service; closing the dialog detaches the tmux client and leaves the
  * service running. Mirrors the service web-view's overlay recipe.
@@ -68,7 +68,7 @@ import { ZardDialogRef, ZardDialogService } from '@/shared/components/dialog';
 export class ServiceTerminalComponent {
   readonly repoId = input.required<string>();
   readonly workspaceId = input.required<string>();
-  readonly daemonId = input.required<string>();
+  readonly serviceId = input.required<string>();
   readonly name = input.required<string>();
 
   private readonly dialog = inject(ZardDialogService);
@@ -77,7 +77,7 @@ export class ServiceTerminalComponent {
 
   /** The interactive-attach WS path (relative to origin; the backend gates on service liveness). */
   readonly socketPath = computed(
-    () => `api/terminal/daemons/${this.repoId()}/${this.workspaceId()}/${this.daemonId()}`,
+    () => `api/terminal/services/${this.repoId()}/${this.workspaceId()}/${this.serviceId()}`,
   );
 
   open() {

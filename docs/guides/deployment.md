@@ -192,7 +192,7 @@ traffic reaches qits directly on qits-net, bypassing any proxy: `/git/*`, `/mcp/
 `/api/capture`, the per-command `agent-session` report hook, `/q/*` health probes, and
 `/api/auth/*`. These are the paths workspace containers and the cross-origin fixture SPA call —
 clients that cannot carry a user token. Everything else, including the SPA itself and the
-`/daemon/*` web-view proxy, requires an identity.
+`/service/*` web-view proxy, requires an identity.
 
 ### Either way
 

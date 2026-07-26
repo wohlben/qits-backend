@@ -23,15 +23,15 @@ describe('app-base', () => {
     expect(appUrl('api/auth/me')).toBe('/api/auth/me');
   });
 
-  it('prefixes the daemon web-view base', () => {
-    setBaseHref('/daemon/ws-1/d-1/');
-    expect(appBasePath()).toBe('/daemon/ws-1/d-1');
-    expect(appUrl('api/auth/me')).toBe('/daemon/ws-1/d-1/api/auth/me');
+  it('prefixes the service web-view base', () => {
+    setBaseHref('/service/ws-1/d-1/');
+    expect(appBasePath()).toBe('/service/ws-1/d-1');
+    expect(appUrl('api/auth/me')).toBe('/service/ws-1/d-1/api/auth/me');
   });
 
   it('builds ws URLs on the current host inside the base', () => {
-    setBaseHref('/daemon/ws-1/d-1/');
+    setBaseHref('/service/ws-1/d-1/');
     const url = wsUrl('api/chat/commands/c-1');
-    expect(url).toBe(`ws://${window.location.host}/daemon/ws-1/d-1/api/chat/commands/c-1`);
+    expect(url).toBe(`ws://${window.location.host}/service/ws-1/d-1/api/chat/commands/c-1`);
   });
 });

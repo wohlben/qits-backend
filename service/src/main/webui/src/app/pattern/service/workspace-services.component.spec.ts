@@ -16,7 +16,7 @@ function flush(): Promise<void> {
 
 function instance(overrides: Partial<ServiceInstanceDto>): ServiceInstanceDto {
   return {
-    daemon: { id: 'daemon-1', name: 'dev server', restartPolicy: 'ON_FAILURE' },
+    definition: { id: 'service-1', name: 'dev server', restartPolicy: 'ON_FAILURE' },
     status: ServiceStatus.Stopped,
     restartCount: 0,
     ...overrides,
@@ -28,10 +28,10 @@ describe('WorkspaceServicesComponent', () => {
     apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesGet: vi
       .fn()
       .mockReturnValue(of({ entries: [] })),
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost: vi
       .fn()
       .mockReturnValue(of({})),
-    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost: vi
+    apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost: vi
       .fn()
       .mockReturnValue(of({})),
   };
@@ -69,7 +69,7 @@ describe('WorkspaceServicesComponent', () => {
       [
         instance({}),
         instance({
-          daemon: { id: 'daemon-2', name: 'watcher' },
+          definition: { id: 'service-2', name: 'watcher' },
           status: ServiceStatus.Ready,
           restartCount: 2,
           commandId: 'cmd-9',
@@ -102,7 +102,7 @@ describe('WorkspaceServicesComponent', () => {
             { name: 'Angular', kind: 'HTTP', state: 'UNHEALTHY' },
           ],
         } as Partial<ServiceInstanceDto>),
-        instance({ daemon: { id: 'daemon-2', name: 'checkless' } }),
+        instance({ definition: { id: 'service-2', name: 'checkless' } }),
       ],
     );
     const fixture = createComponent();
@@ -117,7 +117,7 @@ describe('WorkspaceServicesComponent', () => {
     expect(healthRows[0].querySelector('.bg-red-500')).not.toBeNull();
   });
 
-  it('starting a service posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
+  it('starting a service posts with the generated (repoId, serviceId, workspaceId) arg order', async () => {
     queryClient.setQueryData(['workspace-services', 'repo-1', 'wt-1'], [instance({})]);
     const fixture = createComponent();
 
@@ -127,14 +127,14 @@ describe('WorkspaceServicesComponent', () => {
     startButton!.click();
     await flush();
 
-    // The generated client orders path params alphabetically (daemonId, repoId, workspaceId), not in
+    // The generated client orders path params alphabetically (repoId, serviceId, workspaceId), not in
     // path order — asserting the exact order guards against the scrambled-URL 404 regression.
     expect(
-      serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStartPost,
-    ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
+      serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStartPost,
+    ).toHaveBeenCalledWith('repo-1', 'service-1', 'wt-1');
   });
 
-  it('stopping a service posts with the generated (daemonId, repoId, workspaceId) arg order', async () => {
+  it('stopping a service posts with the generated (repoId, serviceId, workspaceId) arg order', async () => {
     queryClient.setQueryData(
       ['workspace-services', 'repo-1', 'wt-1'],
       [instance({ status: ServiceStatus.Ready })],
@@ -148,8 +148,8 @@ describe('WorkspaceServicesComponent', () => {
     await flush();
 
     expect(
-      serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesDaemonIdStopPost,
-    ).toHaveBeenCalledWith('daemon-1', 'repo-1', 'wt-1');
+      serviceApi.apiRepositoriesRepoIdWorkspacesWorkspaceIdServicesServiceIdStopPost,
+    ).toHaveBeenCalledWith('repo-1', 'service-1', 'wt-1');
   });
 
 });

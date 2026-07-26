@@ -97,7 +97,7 @@ public class SeedLitServiceTest {
             .orElseThrow(() -> new AssertionError("the seed registered no repository"));
     assertEquals("main", repo.mainBranch, "fixture's default branch is 'main'");
 
-    // The dev-server daemon and build/lint/test actions come from the fixture's committed
+    // The dev-server service and build/lint/test actions come from the fixture's committed
     // .qits-config.yml (read in-container per workspace) — nothing daemon-shaped to assert
     // host-side.
     assertGreetingWorkspace(repo.id);
